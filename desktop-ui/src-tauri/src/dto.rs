@@ -292,10 +292,14 @@ pub struct SessionStatsDto {
     pub seconds_today: u32,
 }
 
-#[derive(Debug, Clone, Serialize, TS)]
-#[ts(export, export_to = "../../src/lib/backend/generated/")]
+/// Settings fields the frontend reads and writes with the same shape.
+///
+/// Flattened into [`WorkspaceSettingsDto`] and [`SaveWorkspaceSettingsInput`],
+/// so a shared setting is declared once and both directions stay in step. The
+/// `serde(default)`s apply when a save omits the field.
+#[derive(Debug, Clone, Serialize, Deserialize, TS)]
 #[serde(rename_all = "camelCase")]
-pub struct WorkspaceSettingsDto {
+pub struct SettingsCoreDto {
     pub activation_mode: ActivationModeDto,
     pub dictation_mode: DictationModeDto,
     /// Keep the dictated text on the clipboard after delivery (orthogonal to the
@@ -313,45 +317,67 @@ pub struct WorkspaceSettingsDto {
     pub hotkey_toggle: String,
     pub hotkey_cancel: String,
     pub pill_visibility: PillVisibilityDto,
+    #[serde(default)]
     pub pill_anchor: PillAnchorDto,
+    #[serde(default)]
     pub pill_locked: bool,
+    #[serde(default = "default_pill_edge_margin_dto")]
     pub pill_edge_margin: u32,
     /// Monitor connector name the pill is pinned to; null = automatic.
+    #[serde(default)]
     pub pill_monitor: Option<String>,
+    #[serde(default = "default_true_dto")]
     pub pill_all_workspaces: bool,
+    #[serde(default)]
     pub pill_size: PillSizeDto,
+    #[serde(default)]
     pub pill_orientation: PillOrientationDto,
+    #[serde(default)]
     pub pill_corner: PillCornerDto,
     pub language: String,
     pub dictation_language: String,
     /// Minutes without a dictation before the ASR model is freed; null = never.
+    #[serde(default)]
     pub model_idle_unload_minutes: Option<u32>,
     /// Preferred microphone input device by name; null = system default.
+    #[serde(default)]
     pub input_device: Option<String>,
     pub vad_pcen: bool,
     pub start_minimized: bool,
     /// Check the release endpoint for a newer version at startup.
+    #[serde(default)]
     pub check_updates_on_launch: bool,
     /// How long to keep dictation history, in days. `None` disables history.
     pub session_history_days: Option<u32>,
     /// Paste-shortcut selection strategy for the output stage.
     pub terminal_mode: TerminalModeDto,
     /// Whether remote services may be used at all.
+    #[serde(default)]
     pub privacy_mode: PrivacyModeDto,
     /// Whether the remote styling LLM backend is enabled.
     pub llm_enabled: bool,
-    // OpenAI ASR fields (populated when asr_backend_type == OpenAiCompatible)
+    /// OpenAI-compatible ASR endpoint and model (meaningful when
+    /// `asr_backend_type` is `OpenAiCompatible`).
     pub openai_asr_base_url: Option<String>,
     pub openai_asr_model: Option<String>,
-    pub openai_asr_api_key_set: bool,
-    // Remote styling LLM fields, populated only when the LLM backend is a
-    // remote OpenAI-compatible provider (`None`/`false` when styling is off).
-    // Let the UI gate example generation on a fully-configured remote provider.
+    /// Saved remote styling provider. It persists when styling is off; on save,
+    /// a blank value keeps the saved one.
     pub openai_llm_base_url: Option<String>,
     pub openai_llm_model: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, TS)]
+#[ts(export, export_to = "../../src/lib/backend/generated/")]
+#[serde(rename_all = "camelCase")]
+pub struct WorkspaceSettingsDto {
+    #[serde(flatten)]
+    pub core: SettingsCoreDto,
+    /// Whether an ASR API key is saved. The key itself never leaves the backend.
+    pub openai_asr_api_key_set: bool,
+    /// Whether a styling API key is saved.
     pub openai_llm_api_key_set: bool,
-    /// Whether the *active* styling backend is the remote provider (the fields
-    /// above are the saved provider and persist even when it isn't active).
+    /// Whether the *active* styling backend is the remote provider (the provider
+    /// fields persist even when it isn't active).
     pub openai_llm_active: bool,
     /// Selected local whisper model (meaningful when asr_backend_type == WhisperCpp).
     pub whisper_model: WhisperModelDto,
@@ -556,73 +582,14 @@ impl UpdateStateDto {
 #[ts(export, export_to = "../../src/lib/backend/generated/")]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct SaveWorkspaceSettingsInput {
-    pub activation_mode: ActivationModeDto,
-    pub dictation_mode: DictationModeDto,
-    /// Keep the dictated text on the clipboard after delivery (orthogonal to the
-    /// send method).
-    pub copy_to_clipboard: bool,
-    /// Play short sound cues on dictation start/stop/error.
-    pub sound_cues_enabled: bool,
-    /// Sound cue playback volume in [0.0, 1.0].
-    pub sound_cue_volume: f32,
-    pub use_gpu: bool,
-    pub device_policy: DevicePolicyDto,
-    pub asr_backend_type: AsrBackendTypeDto,
-    pub confidence_threshold: Option<f32>,
-    pub style_preset: Option<String>,
-    pub hotkey_toggle: String,
-    pub hotkey_cancel: String,
-    pub pill_visibility: PillVisibilityDto,
-    #[serde(default)]
-    pub pill_anchor: PillAnchorDto,
-    #[serde(default)]
-    pub pill_locked: bool,
-    #[serde(default = "default_pill_edge_margin_dto")]
-    pub pill_edge_margin: u32,
-    /// Monitor connector name to pin the pill to; null = automatic.
-    #[serde(default)]
-    pub pill_monitor: Option<String>,
-    #[serde(default = "default_true_dto")]
-    pub pill_all_workspaces: bool,
-    #[serde(default)]
-    pub pill_size: PillSizeDto,
-    #[serde(default)]
-    pub pill_orientation: PillOrientationDto,
-    #[serde(default)]
-    pub pill_corner: PillCornerDto,
-    pub language: String,
-    pub dictation_language: String,
-    /// Minutes without a dictation before the ASR model is freed; null = never.
-    #[serde(default)]
-    pub model_idle_unload_minutes: Option<u32>,
-    /// Preferred microphone input device by name; null = system default.
-    #[serde(default)]
-    pub input_device: Option<String>,
-    pub vad_pcen: bool,
-    pub start_minimized: bool,
-    /// Check the release endpoint for a newer version at startup.
-    #[serde(default)]
-    pub check_updates_on_launch: bool,
-    /// How long to keep dictation history, in days. `None` disables history.
-    pub session_history_days: Option<u32>,
-    /// Paste-shortcut selection strategy for the output stage.
-    pub terminal_mode: TerminalModeDto,
-    /// Whether remote services may be used at all.
-    #[serde(default)]
-    pub privacy_mode: PrivacyModeDto,
-    /// Whether the correction LLM backend should be enabled.
-    pub llm_enabled: bool,
-    /// Which styling engine to use when enabled (local vs remote).
+    #[serde(flatten)]
+    pub core: SettingsCoreDto,
+    /// Which styling engine to use when enabled.
     pub llm_backend_type: LlmBackendTypeDto,
-    // OpenAI ASR fields (sent when asr_backend_type == OpenAiCompatible)
-    pub openai_asr_base_url: Option<String>,
+    /// A `None` key keeps the saved one.
     pub openai_asr_api_key: Option<String>,
-    pub openai_asr_model: Option<String>,
-    // OpenAI styling-LLM fields (sent when llm_backend_type == OpenAiCompatible).
-    // A `None` api key means "keep the saved key".
-    pub openai_llm_base_url: Option<String>,
+    /// A `None` key keeps the saved one.
     pub openai_llm_api_key: Option<String>,
-    pub openai_llm_model: Option<String>,
     /// Selected local whisper model (sent when asr_backend_type == WhisperCpp).
     #[serde(default)]
     pub whisper_model: Option<WhisperModelDto>,
@@ -724,7 +691,44 @@ pub enum SessionStreamEvent {
 
 #[cfg(test)]
 mod tests {
-    use super::{AsrBackendTypeDto, SessionStreamEvent};
+    use super::{AsrBackendTypeDto, SaveWorkspaceSettingsInput, SessionStreamEvent};
+
+    /// Every field the save input requires, and nothing else.
+    fn minimal_save_input() -> serde_json::Value {
+        serde_json::json!({
+            "activationMode": "Toggle",
+            "dictationMode": "TypeInPlace",
+            "copyToClipboard": false,
+            "soundCuesEnabled": true,
+            "soundCueVolume": 0.5,
+            "useGpu": true,
+            "devicePolicy": "Auto",
+            "asrBackendType": "WhisperCpp",
+            "hotkeyToggle": "Ctrl+Space",
+            "hotkeyCancel": "Escape",
+            "pillVisibility": "Always",
+            "language": "en",
+            "dictationLanguage": "auto",
+            "vadPcen": true,
+            "startMinimized": false,
+            "terminalMode": "Auto",
+            "llmEnabled": false,
+            "llmBackendType": "OpenAiCompatible",
+        })
+    }
+
+    /// A renamed or misspelled frontend field must fail the save loudly rather
+    /// than be dropped. A read-only field sent back is the likeliest mistake.
+    #[test]
+    fn save_settings_input_rejects_unknown_fields() {
+        serde_json::from_value::<SaveWorkspaceSettingsInput>(minimal_save_input())
+            .expect("minimal input deserializes");
+
+        let mut input = minimal_save_input();
+        input["openaiAsrApiKeySet"] = true.into();
+        let err = serde_json::from_value::<SaveWorkspaceSettingsInput>(input).unwrap_err();
+        assert!(err.to_string().contains("unknown field"), "{err}");
+    }
 
     #[test]
     fn session_stream_events_match_frontend_shape() {

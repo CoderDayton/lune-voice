@@ -963,9 +963,63 @@ fn is_oversplit_period_word(tok: &str) -> bool {
     !NON_TERMINAL_ABBREVIATIONS.contains(&stem.to_ascii_lowercase().as_str())
 }
 
+/// Deterministic shaping of a corrected transcript, applied in a fixed order:
+/// English-only de-fusing and filler stripping, wrapping-quote removal,
+/// punctuation and casing normalization, then English-only mid-sentence
+/// de-casing.
+///
+/// `strip_wrapping_quotes` must run before `normalize_with`: normalize appends
+/// terminal punctuation outside a closing quote (`"…".`), and the strip, which
+/// needs the quote to be the final character, can no longer find the pair.
+///
+/// `lang` is a display name from `lune_core::lang::display_name`. The
+/// English-only passes rely on English capitalization and frequency tables, and
+/// on "um" being a filler, which it is not in every language.
+pub fn shape(text: &str, lang: &str, fmt: &FormatToggles) -> String {
+    let english = lang == "English";
+    let text = if english {
+        strip_fillers(&defuse_inconsistent(text))
+    } else {
+        text.to_owned()
+    };
+    let text = strip_wrapping_quotes(&text);
+    let text = normalize_with(&text, fmt).text;
+    if english {
+        decase_common_words(&text)
+    } else {
+        text
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn shape_strips_wrapping_quotes_before_punctuating() {
+        let fmt = FormatToggles::default();
+        assert_eq!(
+            shape("\"the results were mixed\"", "English", &fmt),
+            "The results were mixed."
+        );
+    }
+
+    #[test]
+    fn shape_strips_english_fillers() {
+        let fmt = FormatToggles::default();
+        assert_eq!(
+            shape("um the results were mixed", "English", &fmt),
+            "The results were mixed."
+        );
+    }
+
+    #[test]
+    fn shape_keeps_english_only_passes_off_other_languages() {
+        // "um" is a real word outside English, so it must survive.
+        let fmt = FormatToggles::default();
+        let shaped = shape("um dia bonito", "Portuguese", &fmt);
+        assert!(shaped.starts_with("Um dia"), "{shaped}");
+    }
 
     #[test]
     fn strip_wrapping_quotes_removes_whole_text_pair() {

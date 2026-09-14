@@ -42,4 +42,4 @@ mod focus;
 pub use focus::{FocusToken, WindowTarget, capture_focus_target};
 
 pub use delivery::{DeliveryHealth, DeliveryService};
-pub use session::{SessionManager, SessionManagerConfig};
+pub use session::{SessionAudio, SessionKind, SessionManager, SessionManagerConfig};

@@ -32,6 +32,10 @@ const tauriBackendClient: BackendClient = {
     return invoke<boolean>('grant_uinput_access');
   },
 
+  holdToTalkAvailable() {
+    return invoke<boolean>('hold_to_talk_available');
+  },
+
   listAudioInputDevices() {
     return invoke<string[]>('list_audio_input_devices');
   },

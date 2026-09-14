@@ -144,6 +144,11 @@ export interface BackendClient {
    * whether typing works afterwards.
    */
   grantUinputAccess(): Promise<boolean>;
+  /**
+   * Whether the Hold recording mode works right now. `false` means the
+   * fallback shortcut is in charge, and it can only toggle.
+   */
+  holdToTalkAvailable(): Promise<boolean>;
   /** Input devices the machine reports, for the setup readiness check. */
   listAudioInputDevices(): Promise<string[]>;
   /**

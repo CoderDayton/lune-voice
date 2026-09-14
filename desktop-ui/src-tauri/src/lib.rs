@@ -432,6 +432,7 @@ pub fn run() {
             commands::gpu_backend_status,
             commands::uinput_access_ready,
             commands::grant_uinput_access,
+            commands::hold_to_talk_available,
             commands::uinput_rule_installed,
             commands::remove_uinput_rule,
             commands::active_model_download,

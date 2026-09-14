@@ -13,11 +13,14 @@ use lune_core::config::{
 };
 use lune_core::llm::LlmService;
 use lune_core::session::SessionEvent;
-use lune_dict::DictionaryManager;
+use lune_dict::UserDictionary;
 use lune_dict::commands::VoiceCommandRouter;
 use lune_llm::{NullPostProcessor, OpenAiLlmBackend, OpenAiLlmConfig};
 use lune_persist::{AppPaths, Database, SettingsStore};
-use lune_voice::{DeliveryHealth, DeliveryService, SessionManager, SessionManagerConfig};
+use lune_voice::{
+    DeliveryHealth, DeliveryService, SessionAudio, SessionKind, SessionManager,
+    SessionManagerConfig,
+};
 use lune_voice::{WindowTarget, capture_focus_target};
 use tauri::{AppHandle, Emitter, Manager, ipc::Channel};
 use tokio::sync::{Mutex, RwLock, mpsc};
@@ -864,11 +867,8 @@ impl AppRuntime {
             }
         };
         let (event_tx, event_rx) = mpsc::channel(256);
-        let start_result = match (prewarmed, fallback_stream) {
-            (Some(handle), _) => manager.start_with_handle(event_tx, handle).await,
-            (None, Some(stream)) => manager.start_with_audio(event_tx, stream).await,
-            (None, None) => manager.start(event_tx).await,
-        };
+        let audio = Self::session_audio(prewarmed, fallback_stream);
+        let start_result = manager.start(event_tx, audio, SessionKind::Dictate).await;
         let session_id = match start_result {
             Ok(session_id) => session_id,
             Err(error) => {
@@ -894,6 +894,20 @@ impl AppRuntime {
         self.spawn_event_forwarder(event_rx, false);
 
         Ok(session_id)
+    }
+
+    /// Where a starting session reads audio: the pre-warmed ring when one is
+    /// live, else the stream opened for this start, else the session opens
+    /// its own.
+    fn session_audio(
+        prewarmed: Option<lune_audio::AudioStreamHandle>,
+        fallback: Option<AudioStream>,
+    ) -> SessionAudio {
+        match (prewarmed, fallback) {
+            (Some(handle), _) => SessionAudio::Shared(handle),
+            (None, Some(stream)) => SessionAudio::Owned(stream),
+            (None, None) => SessionAudio::Open,
+        }
     }
 
     /// Start a capture-only session for the snippet trigger recorder. Speech
@@ -931,11 +945,10 @@ impl AppRuntime {
             }
         };
         let (event_tx, event_rx) = mpsc::channel(256);
-        let start_result = match (prewarmed, fallback_stream) {
-            (Some(handle), _) => manager.start_capture_with_handle(event_tx, handle).await,
-            (None, Some(stream)) => manager.start_capture_with_audio(event_tx, stream).await,
-            (None, None) => manager.start_capture(event_tx).await,
-        };
+        let audio = Self::session_audio(prewarmed, fallback_stream);
+        let start_result = manager
+            .start(event_tx, audio, SessionKind::CaptureRaw)
+            .await;
         let session_id = match start_result {
             Ok(session_id) => session_id,
             Err(error) => {
@@ -1682,15 +1695,14 @@ async fn build_pipeline(
     let style_pipeline = Arc::new(lune_llm::StylePipeline::new(Arc::clone(&llm_service)));
     let post_processor: Arc<dyn lune_core::llm::TextPostProcessor> = style_pipeline;
     let router = Arc::new(VoiceCommandRouter::new());
-    let dict = Arc::new(Mutex::new(
-        DictionaryManager::new(
-            Database::open(&paths.database_file()).map_err(|e| format!("open dict db: {e}"))?,
-        )
-        .map_err(|e| format!("init dictionary manager: {e}"))?,
+    let mut session_db =
+        Database::open(&paths.database_file()).map_err(|e| format!("open session db: {e}"))?;
+    let dict = Arc::new(UserDictionary::new(
+        session_db
+            .list_dictionary_entries()
+            .map_err(|e| format!("load dictionary: {e}"))?,
     ));
-    let db = Arc::new(Mutex::new(
-        Database::open(&paths.database_file()).map_err(|e| format!("open session db: {e}"))?,
-    ));
+    let db = Arc::new(Mutex::new(session_db));
     // Resolve backend defaults + user TOML overrides once, then repair any
     // invariant violation rather than running on it. An out-of-range override
     // otherwise degrades every session silently — an instant wall-clock

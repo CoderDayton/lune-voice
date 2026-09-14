@@ -122,9 +122,7 @@ fn main() {
 
     let (transcript, elapsed) = local.block_on(&rt, async {
         let db = lune_persist::Database::open_in_memory().unwrap();
-        let dict =
-            lune_dict::DictionaryManager::new(lune_persist::Database::open_in_memory().unwrap())
-                .unwrap();
+        let dict = lune_dict::UserDictionary::default();
 
         let pipeline = asr.pipeline_config();
         let config = SessionManagerConfig {
@@ -139,7 +137,7 @@ fn main() {
             asr,
             Arc::new(lune_dict::commands::VoiceCommandRouter::new()),
             llm,
-            Arc::new(Mutex::new(dict)),
+            Arc::new(dict),
             Arc::new(Mutex::new(db)),
             Arc::new(lune_dict::corrector::LexicalGate::new()),
             config,
@@ -149,7 +147,13 @@ fn main() {
         let (event_tx, mut event_rx) = mpsc::channel::<SessionEvent>(256);
         let start = Instant::now();
 
-        mgr.start(event_tx).await.expect("start session");
+        mgr.start(
+            event_tx,
+            lune_voice::SessionAudio::Open,
+            lune_voice::SessionKind::Dictate,
+        )
+        .await
+        .expect("start session");
 
         let mut transcript = String::new();
         let mut stopping = false;

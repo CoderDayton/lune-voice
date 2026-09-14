@@ -6,6 +6,7 @@ import {
   DescriptiveDropdown,
   type DescriptiveOption,
 } from '../../../components/ui/descriptive-dropdown';
+import { backendClient } from '../../../lib/backend/client';
 import { saveWorkspaceSetting } from '../../../store/workspace-store';
 import { KeyCaptureInput } from '../components/key-capture-input';
 import { type SettingsProps, SettingsRow, SettingsSection } from '../components/section';
@@ -31,6 +32,22 @@ export function DictationSection({ settings }: SettingsProps) {
         setDevices([]);
       });
   }, []);
+
+  // `null` until known, so the Hold warning never flashes on a working setup.
+  // Re-read on every settings snapshot, not only a switch to Hold: any save
+  // (a hotkey change, say) can start the native listener while Hold stays selected.
+  const [holdAvailable, setHoldAvailable] = useState<boolean | null>(null);
+  useEffect(() => {
+    if (settings.activationMode !== 'Hold') return;
+    backendClient
+      .holdToTalkAvailable()
+      .then(setHoldAvailable)
+      .catch((e) => {
+        console.error('hold_to_talk_available:', e);
+        setHoldAvailable(null);
+      });
+  }, [settings]);
+  const holdDegraded = settings.activationMode === 'Hold' && holdAvailable === false;
 
   const saved = settings.inputDevice;
   const available = devices ?? [];
@@ -94,6 +111,17 @@ export function DictationSection({ settings }: SettingsProps) {
           <span>
             <Trans>
               Toggle and cancel are bound to the same key combo. One will override the other.
+            </Trans>
+          </span>
+        </div>
+      )}
+
+      {holdDegraded && (
+        <div role="alert" className="alert alert-warning alert-soft sm:flex-row">
+          <span>
+            <Trans>
+              Hold is unavailable right now, so the shortcut toggles recording instead. Grant
+              keyboard access to use Hold.
             </Trans>
           </span>
         </div>

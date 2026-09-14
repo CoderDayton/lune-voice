@@ -113,9 +113,12 @@ Styling is a remote call, so it inherits your endpoint's latency.
 
 ## Remote ASR / styling endpoint failing
 
-- ASR retries transient failures (5xx, 429) three times with jittered
-  exponential backoff, honouring `Retry-After` up to 30 s. A 4xx fails
-  immediately — that is a configuration or credential problem, not a blip.
+- ASR and styling share one retry policy (`lune_core::retry`): transport
+  errors, 5xx and 429 get three attempts with jittered exponential backoff,
+  honouring `Retry-After` up to 30 s. A 4xx fails immediately — that is a
+  configuration or credential problem, not a blip.
+- Response bodies are capped (ASR 8 MiB, styling 1 MiB); an endpoint that sends
+  more is refused rather than buffered.
 - `ASR API error 401` → the key is wrong or missing. Re-enter it in Settings.
 - The base URL must be HTTPS unless it is loopback; plaintext to a remote host
   is refused at construction.

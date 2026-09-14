@@ -338,6 +338,16 @@ impl HotkeyController {
         self.plugin.rebind(config)
     }
 
+    /// Whether push-to-talk works right now.
+    ///
+    /// Only a native listener reports key releases. Without one the plugin
+    /// fallback is in charge, and it treats `ActivationMode::Hold` as a toggle.
+    pub fn hold_available(&self) -> bool {
+        let mut state = self.state.lock().unwrap_or_else(|e| e.into_inner());
+        Self::retire_dead_native(&mut state);
+        state.native.is_some()
+    }
+
     /// Try to start the native listener now, if one is not already running.
     ///
     /// For the case where the *environment* changed rather than the config:
@@ -605,6 +615,24 @@ mod tests {
 
         assert!(controller.retry_native(&config("f9"), ActivationMode::Hold));
         assert_eq!(starts.load(Ordering::SeqCst), 1);
+    }
+
+    /// Hold needs a release event, which only a native listener reports. The
+    /// settings page reads this to warn that the plugin fallback toggles.
+    #[test]
+    fn hold_is_available_only_while_a_native_listener_is_live() {
+        let (without, _plugin, _starts) = controller(None, None);
+        assert!(!without.hold_available());
+
+        let backend = Arc::new(FakeBackend::default());
+        let (with, _plugin, _starts) = controller(Some(backend.clone()), None);
+        assert!(with.hold_available());
+
+        backend.dead.store(true, Ordering::SeqCst);
+        assert!(
+            !with.hold_available(),
+            "a stopped listener cannot report a release"
+        );
     }
 
     /// The repair path: a key name that did not resolve at startup left the

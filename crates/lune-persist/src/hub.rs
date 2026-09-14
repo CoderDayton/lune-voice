@@ -412,13 +412,7 @@ pub fn download_model(
 /// can match either against `required_files` interchangeably.
 fn list_repo_files(repo_id: &str) -> PersistResult<Vec<String>> {
     let url = format!("https://huggingface.co/api/models/{repo_id}");
-    let mut req = http_agent().get(&url);
-    if let Ok(token) = std::env::var("HF_TOKEN") {
-        req = req.header("Authorization", &format!("Bearer {token}"));
-    }
-    let info: RepoInfo = req
-        .call()
-        .and_then(|mut r| r.body_mut().read_json())
+    let info: RepoInfo = get_json(&url)
         .map_err(|e| PersistError::ModelDownload(format!("{repo_id}: repo info: {e}")))?;
     Ok(info.siblings.into_iter().map(|s| s.rfilename).collect())
 }
@@ -614,29 +608,49 @@ fn record_verified(
     manifest.insert(basename.to_owned(), FileMetadata { size, sha256 });
 }
 
-/// Connect / response / body timeouts for every hub request.
+/// Timeouts for every hub request.
 ///
-/// ureq's default `Agent` has **no** timeouts at all, so a server that accepts
-/// the connection and then goes silent hangs the download thread forever with
-/// no way for the UI to cancel — the same failure `gpu_plugin.rs` guards
-/// against on its reqwest client. The body timeout is a *total* duration, not
-/// an idle one (ureq 3 exposes no idle bound), so it is generous: model files
-/// are hundreds of MB and a slow link must not be cut off mid-download.
+/// A server that accepts the connection and then goes silent must not hang the
+/// download thread, which the UI cannot cancel mid-read. `HTTP_IO_TIMEOUT` is
+/// reqwest's blocking-client timeout: it bounds waiting for the response
+/// headers and *each* body read separately, so it is an idle bound, and a slow
+/// link still finishes a multi-gigabyte model file.
 const HTTP_CONNECT_TIMEOUT: Duration = Duration::from_secs(30);
-const HTTP_RESPONSE_TIMEOUT: Duration = Duration::from_secs(30);
-const HTTP_BODY_TIMEOUT: Duration = Duration::from_secs(60 * 60);
+const HTTP_IO_TIMEOUT: Duration = Duration::from_secs(30);
 
-/// Shared agent carrying those timeouts. Built once; cloning is cheap.
-fn http_agent() -> &'static ureq::Agent {
-    static AGENT: OnceLock<ureq::Agent> = OnceLock::new();
-    AGENT.get_or_init(|| {
-        ureq::Agent::config_builder()
-            .timeout_connect(Some(HTTP_CONNECT_TIMEOUT))
-            .timeout_recv_response(Some(HTTP_RESPONSE_TIMEOUT))
-            .timeout_recv_body(Some(HTTP_BODY_TIMEOUT))
-            .build()
-            .into()
-    })
+/// Shared client carrying those timeouts. Built once.
+///
+/// Hub calls run off the async workers (the Tauri command wraps them in
+/// `spawn_blocking`), which the blocking client requires.
+fn http_client() -> Result<&'static reqwest::blocking::Client, String> {
+    static CLIENT: OnceLock<Result<reqwest::blocking::Client, String>> = OnceLock::new();
+    CLIENT
+        .get_or_init(|| {
+            reqwest::blocking::Client::builder()
+                .connect_timeout(HTTP_CONNECT_TIMEOUT)
+                .timeout(HTTP_IO_TIMEOUT)
+                .build()
+                .map_err(|e| format!("build HTTP client: {e}"))
+        })
+        .as_ref()
+        .map_err(Clone::clone)
+}
+
+/// Send a GET to the hub with `HF_TOKEN` when set, and fail on a non-success
+/// status: a 404 page must never be saved as a model file.
+fn hub_get(url: &str) -> Result<reqwest::blocking::Response, String> {
+    let mut req = http_client()?.get(url);
+    if let Ok(token) = std::env::var("HF_TOKEN") {
+        req = req.bearer_auth(token);
+    }
+    req.send()
+        .and_then(reqwest::blocking::Response::error_for_status)
+        .map_err(|e| e.to_string())
+}
+
+/// GET a JSON document from the hub.
+fn get_json<T: serde::de::DeserializeOwned>(url: &str) -> Result<T, String> {
+    hub_get(url)?.json().map_err(|e| e.to_string())
 }
 
 /// Fetch per-file size + LFS sha256 from the HF tree API.
@@ -647,11 +661,7 @@ fn http_agent() -> &'static ureq::Agent {
 /// We log the failure once per repo at WARN so it's visible in support logs.
 fn fetch_repo_file_metadata(repo_id: &str) -> HashMap<String, FileMetadata> {
     let url = format!("https://huggingface.co/api/models/{repo_id}/tree/main?recursive=true");
-    let mut req = http_agent().get(&url);
-    if let Ok(token) = std::env::var("HF_TOKEN") {
-        req = req.header("Authorization", &format!("Bearer {token}"));
-    }
-    let entries: Vec<TreeEntry> = match req.call().and_then(|mut r| r.body_mut().read_json()) {
+    let entries: Vec<TreeEntry> = match get_json(&url) {
         Ok(v) => v,
         Err(e) => {
             warn!(repo_id, error = %e, "could not fetch repo tree metadata; falling back to size-less integrity check");
@@ -690,7 +700,7 @@ struct TreeEntryLfs {
 }
 
 /// Direct HTTPS download from HuggingFace CDN — the only path that fetches
-/// model bytes, so every transfer carries `http_agent()`'s timeouts.
+/// model bytes, so every transfer carries `http_client()`'s timeouts.
 ///
 /// Uses the resolve endpoint which redirects to the actual blob URL.
 /// Streams to a temp file, then renames atomically to avoid partial files.
@@ -706,18 +716,12 @@ fn download_file_direct(
     cancel: &AtomicBool,
 ) -> PersistResult<FileMetadata> {
     let url = format!("https://huggingface.co/{repo_id}/resolve/main/{filename}");
-    let mut req = http_agent().get(&url);
-    if let Ok(token) = std::env::var("HF_TOKEN") {
-        req = req.header("Authorization", &format!("Bearer {token}"));
-    }
-    let resp = req
-        .call()
+    let mut resp = hub_get(&url)
         .map_err(|e| PersistError::ModelDownload(format!("{repo_id}/{filename}: {e}")))?;
 
-    // Content-Length only equals the bytes we write when the body isn't
-    // transparently decompressed — ureq's default `gzip` feature decodes
-    // Content-Encoding: gzip on the fly (possible on small text files; CDN
-    // model blobs are served identity). Skip the check in that case.
+    // Content-Length equals the bytes written only for an identity-encoded
+    // body, so the length check is skipped for any other encoding. CDN model
+    // blobs are served identity.
     let content_encoded = resp
         .headers()
         .get("content-encoding")
@@ -742,12 +746,7 @@ fn download_file_direct(
         // cancel that only takes effect at the end of the transfer is not a
         // cancel. 256 KiB is large enough that the check costs nothing and
         // small enough to stop within a few milliseconds of the click.
-        let result = copy_cancellable(
-            &mut resp.into_body().as_reader(),
-            &mut writer,
-            cancel,
-            filename,
-        );
+        let result = copy_cancellable(&mut resp, &mut writer, cancel, filename);
         let (written, sha256) = writer.finish();
         result.map(|()| (written, sha256))
     };
@@ -867,7 +866,7 @@ fn ensure_directory_model_with_progress(
         on_file(filename, idx, total);
 
         // Every transfer goes through `download_file_direct`, so it carries
-        // `http_agent()`'s timeouts. That bound is the point: on an untimed
+        // `http_client()`'s timeouts. That bound is the point: on an untimed
         // client, a server that accepted the connection and then went silent
         // hung this thread forever with no way to cancel, on the
         // multi-hundred-MB model transfers.

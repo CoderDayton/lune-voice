@@ -14,7 +14,7 @@ use lune_core::config::{PipelineConfig, StylePreset, UserSettings, builtin_regis
 use lune_core::error::Error;
 use lune_core::llm::TextPostProcessor;
 use lune_core::session::{DictationSession, SessionEvent, SessionStatus};
-use lune_dict::DictionaryManager;
+use lune_dict::UserDictionary;
 use lune_dict::commands::VoiceCommandRouter;
 use lune_dict::corrector::LexicalGate;
 use lune_persist::{Database, PersistResult};
@@ -64,7 +64,7 @@ pub(crate) enum SessionControl {
 
 /// What the session does with the transcript once capture ends.
 #[derive(Clone, Copy, PartialEq, Eq)]
-enum SessionKind {
+pub enum SessionKind {
     /// Full dictation: commands, snippets, correction, styling, delivery,
     /// history.
     Dictate,
@@ -76,7 +76,7 @@ enum SessionKind {
 }
 
 /// How the session should obtain audio.
-pub(crate) enum SessionAudio {
+pub enum SessionAudio {
     /// Open a fresh `AudioStream` inside the session task (default path).
     Open,
     /// Consume from a stream owned by the caller (tests/file replay).
@@ -94,7 +94,7 @@ pub struct SessionManager<A: AsrBackend> {
     asr: Arc<A>,
     router: Arc<VoiceCommandRouter>,
     post_processor: Arc<dyn TextPostProcessor>,
-    dict: Arc<Mutex<DictionaryManager>>,
+    dict: Arc<UserDictionary>,
     persist: Arc<Mutex<Database>>,
     heuristic: Arc<LexicalGate>,
     config: SessionManagerConfig,
@@ -109,7 +109,7 @@ impl<A: AsrBackend + 'static> SessionManager<A> {
         asr: Arc<A>,
         router: Arc<VoiceCommandRouter>,
         post_processor: Arc<dyn TextPostProcessor>,
-        dict: Arc<Mutex<DictionaryManager>>,
+        dict: Arc<UserDictionary>,
         persist: Arc<Mutex<Database>>,
         heuristic: Arc<LexicalGate>,
         config: SessionManagerConfig,
@@ -129,71 +129,11 @@ impl<A: AsrBackend + 'static> SessionManager<A> {
         }
     }
 
-    /// Start a new session. Returns `Err` if one is already active.
-    pub async fn start(&self, event_tx: mpsc::Sender<SessionEvent>) -> Result<Uuid> {
-        self.start_inner(event_tx, SessionAudio::Open, SessionKind::Dictate)
-            .await
-    }
-
-    /// Start a session with a pre-built audio stream (e.g. from a file).
-    pub async fn start_with_audio(
-        &self,
-        event_tx: mpsc::Sender<SessionEvent>,
-        audio: AudioStream,
-    ) -> Result<Uuid> {
-        self.start_inner(event_tx, SessionAudio::Owned(audio), SessionKind::Dictate)
-            .await
-    }
-
-    /// Start a session reading from a pre-warmed shared audio stream.
-    /// The handle's ring is drained on entry so stale audio captured
-    /// during the idle period is discarded.
-    pub async fn start_with_handle(
-        &self,
-        event_tx: mpsc::Sender<SessionEvent>,
-        handle: AudioStreamHandle,
-    ) -> Result<Uuid> {
-        self.start_inner(event_tx, SessionAudio::Shared(handle), SessionKind::Dictate)
-            .await
-    }
-
-    /// Start a capture-only session (see [`SessionKind::CaptureRaw`]): records
-    /// and transcribes like dictation but delivers nothing, persists nothing,
-    /// and emits the raw transcript as `FinalizedText`.
-    pub async fn start_capture(&self, event_tx: mpsc::Sender<SessionEvent>) -> Result<Uuid> {
-        self.start_inner(event_tx, SessionAudio::Open, SessionKind::CaptureRaw)
-            .await
-    }
-
-    /// Capture-only session on a pre-warmed shared audio stream.
-    pub async fn start_capture_with_handle(
-        &self,
-        event_tx: mpsc::Sender<SessionEvent>,
-        handle: AudioStreamHandle,
-    ) -> Result<Uuid> {
-        self.start_inner(
-            event_tx,
-            SessionAudio::Shared(handle),
-            SessionKind::CaptureRaw,
-        )
-        .await
-    }
-
-    /// Capture-only session with a pre-built audio stream (tests, benches).
-    pub async fn start_capture_with_audio(
-        &self,
-        event_tx: mpsc::Sender<SessionEvent>,
-        audio: AudioStream,
-    ) -> Result<Uuid> {
-        self.start_inner(
-            event_tx,
-            SessionAudio::Owned(audio),
-            SessionKind::CaptureRaw,
-        )
-        .await
-    }
-
-    async fn start_inner(
+    /// Start a session. Returns `Err` if one is already active.
+    ///
+    /// `audio_override` picks where samples come from; `kind` picks what happens to the
+    /// transcript once capture ends (see [`SessionKind`]).
+    pub async fn start(
         &self,
         event_tx: mpsc::Sender<SessionEvent>,
         audio_override: SessionAudio,
@@ -242,7 +182,7 @@ impl<A: AsrBackend + 'static> SessionManager<A> {
         // Hold the active lock across persist + spawn and only assign
         // `*lock = Some(...)` at the very end. Cancellation safety
         // relies on the `MutexGuard` auto-dropping on early return:
-        // if `start_inner` is wrapped in `tokio::time::timeout` and
+        // if `start` is wrapped in `tokio::time::timeout` and
         // cancelled at any await below, the slot stays `None` and a
         // subsequent start succeeds. Style resolution is intentionally
         // outside the lock so a config error returns without
@@ -501,7 +441,7 @@ struct SessionDeps {
     session_id: Uuid,
     router: Arc<VoiceCommandRouter>,
     post_processor: Arc<dyn TextPostProcessor>,
-    dict: Arc<Mutex<DictionaryManager>>,
+    dict: Arc<UserDictionary>,
     persist: Arc<Mutex<Database>>,
     heuristic: Arc<LexicalGate>,
     config: SessionManagerConfig,
@@ -667,10 +607,9 @@ struct Shaped {
     dropped_risks: usize,
 }
 
-/// Pure and synchronous: heuristic correction, then English-only de-fusing,
-/// punctuation/casing normalization, and the gate that decides whether the LLM
-/// pass runs. The dictionary scan (an async lock) stays with the caller, which
-/// passes the pre-scanned `dict_replacements` in.
+/// Pure and synchronous: heuristic correction, then [`lune_dict::formatting::shape`],
+/// and the gate that decides whether the LLM pass runs. The dictionary scan stays with the
+/// caller, which passes the pre-scanned `dict_replacements` in.
 fn correct_and_format(
     text: &str,
     segments: &[AsrSegment],
@@ -703,32 +642,8 @@ fn correct_and_format(
         heuristic_flag_risk,
         fmt.brand_casing,
     );
-    // De-fuse words the ASR ran together inconsistently before punctuation /
-    // casing, so a split sentence-start capitalizes correctly. English only —
-    // the p_cap/freq guards are English.
-    let corrected = if detected_lang == "English" {
-        // De-fuse run-together words, then drop hesitation fillers ("um"/"uh")
-        // before punctuation/casing — English-only, so the multilingual ASR and
-        // languages where "um" is a real word are untouched.
-        let defused = lune_dict::formatting::defuse_inconsistent(&heuristic_result.corrected_text);
-        lune_dict::formatting::strip_fillers(&defused)
-    } else {
-        heuristic_result.corrected_text.clone()
-    };
-    // Whisper sometimes wraps a whole read-aloud utterance in quotes; the user
-    // dictated the content, not the quote marks. Strip a single wrapping pair
-    // BEFORE punctuation normalization — otherwise normalize appends terminal
-    // punctuation OUTSIDE the closing quote (`"…".`), and the strip (which
-    // requires the quote to be the final char) can no longer detect the pair.
-    let corrected = lune_dict::formatting::strip_wrapping_quotes(&corrected);
-    let punctuation = lune_dict::formatting::normalize_with(&corrected, fmt);
-    // Downcase mid-sentence common-word capitals on the always-on path so casing
-    // is normalized once whether or not the gated LLM pass runs. English only.
-    let text_after_heuristic = if detected_lang == "English" {
-        lune_dict::formatting::decase_common_words(&punctuation.text)
-    } else {
-        punctuation.text
-    };
+    let text_after_heuristic =
+        lune_dict::formatting::shape(&heuristic_result.corrected_text, detected_lang, fmt);
 
     // Words the corrector could neither resolve nor confidently preserve —
     // surfaced in the gate UI and the reason the correction pass runs. They are
@@ -854,8 +769,7 @@ async fn process_and_deliver(
     let pipeline_t0 = tokio::time::Instant::now();
     // ── Step 1: Dictionary scan + Heuristic correction ─────────────────
     let (dictionary_entries, dict_replacements) = {
-        let guard = dict.lock().await;
-        let mut entries = guard
+        let mut entries = dict
             .top_relevant(&text_after_commands, 20)
             .into_iter()
             .cloned()
@@ -871,7 +785,7 @@ async fn process_and_deliver(
                 entry.replacement = lower;
             }
         }
-        let replacements = guard.scan(&text_after_commands);
+        let replacements = dict.scan(&text_after_commands);
         (entries, replacements)
     };
     let fmt = style_preset
@@ -1160,7 +1074,7 @@ async fn read_clipboard_text() -> Option<String> {
 /// `tokio::sync::Mutex`, and the guard cannot cross into a spawned task.
 ///
 /// `block_in_place` fits instead. It needs no `Send` bound, spawns nothing, and
-/// — being synchronous — adds no cancellation point, so `start_inner`'s
+/// — being synchronous — adds no cancellation point, so `start`'s
 /// cancellation safety is exactly what it was. Writes are small (a session row
 /// is ~1.4 KB), but a WAL autocheckpoint can land on any of them and turn one
 /// into a multi-megabyte copy plus two fsyncs, which is not something to do on
@@ -1632,9 +1546,7 @@ mod tests {
     ) -> (SessionManager<A>, Arc<Mutex<Database>>) {
         lune_dict::lexicon::warm();
         let db = lune_persist::Database::open_in_memory().unwrap();
-        let dict =
-            lune_dict::DictionaryManager::new(lune_persist::Database::open_in_memory().unwrap())
-                .unwrap();
+        let dict = UserDictionary::default();
         let settings = Arc::new(RwLock::new(user_settings));
         let db = Arc::new(Mutex::new(db));
 
@@ -1642,7 +1554,7 @@ mod tests {
             Arc::new(asr),
             Arc::new(VoiceCommandRouter::new()),
             post_processor,
-            Arc::new(Mutex::new(dict)),
+            Arc::new(dict),
             Arc::clone(&db),
             Arc::new(LexicalGate::new()),
             SessionManagerConfig::default(),
@@ -1690,7 +1602,14 @@ mod tests {
             .run_until(async {
                 let (mgr, _) = make_manager(scripted_asr(vec![]), Arc::new(EchoPostProcessor));
                 let (tx, rx) = mpsc::channel(16);
-                let id = mgr.start_with_audio(tx, speech_stream()).await.unwrap();
+                let id = mgr
+                    .start(
+                        tx,
+                        SessionAudio::Owned(speech_stream()),
+                        SessionKind::Dictate,
+                    )
+                    .await
+                    .unwrap();
                 assert!(!id.is_nil());
                 let _ = collect_events(rx).await;
             })
@@ -1712,7 +1631,13 @@ mod tests {
                     Arc::new(EchoPostProcessor),
                 );
                 let (tx, rx) = mpsc::channel(16);
-                mgr.start_with_audio(tx, speech_stream()).await.unwrap();
+                mgr.start(
+                    tx,
+                    SessionAudio::Owned(speech_stream()),
+                    SessionKind::Dictate,
+                )
+                .await
+                .unwrap();
                 mgr.stop().await;
                 let events = collect_events(rx).await;
                 let processing_idx = events
@@ -1746,7 +1671,14 @@ mod tests {
             .run_until(async {
                 let (mgr, db) = make_manager(PanickingAsr, Arc::new(EchoPostProcessor));
                 let (tx, rx) = mpsc::channel(16);
-                let id = mgr.start_with_audio(tx, speech_stream()).await.unwrap();
+                let id = mgr
+                    .start(
+                        tx,
+                        SessionAudio::Owned(speech_stream()),
+                        SessionKind::Dictate,
+                    )
+                    .await
+                    .unwrap();
                 let events = collect_events(rx).await;
 
                 assert!(
@@ -1793,8 +1725,20 @@ mod tests {
                 let (mgr, _) = make_manager(scripted_asr(vec![]), Arc::new(EchoPostProcessor));
                 let (tx1, _rx1) = mpsc::channel(16);
                 let (tx2, _rx2) = mpsc::channel(16);
-                mgr.start_with_audio(tx1, speech_stream()).await.unwrap();
-                let err = mgr.start_with_audio(tx2, speech_stream()).await;
+                mgr.start(
+                    tx1,
+                    SessionAudio::Owned(speech_stream()),
+                    SessionKind::Dictate,
+                )
+                .await
+                .unwrap();
+                let err = mgr
+                    .start(
+                        tx2,
+                        SessionAudio::Owned(speech_stream()),
+                        SessionKind::Dictate,
+                    )
+                    .await;
                 assert!(err.is_err());
                 mgr.stop().await;
             })
@@ -1807,7 +1751,13 @@ mod tests {
             .run_until(async {
                 let (mgr, _) = make_manager(scripted_asr(vec![]), Arc::new(EchoPostProcessor));
                 let (tx, rx) = mpsc::channel(16);
-                mgr.start_with_audio(tx, speech_stream()).await.unwrap();
+                mgr.start(
+                    tx,
+                    SessionAudio::Owned(speech_stream()),
+                    SessionKind::Dictate,
+                )
+                .await
+                .unwrap();
                 mgr.stop().await;
                 let _ = collect_events(rx).await;
                 assert!(mgr.active_session_id().await.is_none());
@@ -1831,7 +1781,14 @@ mod tests {
             .run_until(async {
                 let (mgr, db) = make_manager(scripted_asr(vec![]), Arc::new(EchoPostProcessor));
                 let (tx, rx) = mpsc::channel(64);
-                let session_id = mgr.start_with_audio(tx, silent_stream(10)).await.unwrap();
+                let session_id = mgr
+                    .start(
+                        tx,
+                        SessionAudio::Owned(silent_stream(10)),
+                        SessionKind::Dictate,
+                    )
+                    .await
+                    .unwrap();
 
                 // Yield long enough for the capture loop to start
                 // pumping ticks, then issue Stop while it's mid-loop.
@@ -1887,7 +1844,14 @@ mod tests {
             .run_until(async {
                 let (mgr, db) = make_manager(scripted_asr(vec![]), Arc::new(EchoPostProcessor));
                 let (tx, _rx) = mpsc::channel(16);
-                let session_id = mgr.start_with_audio(tx, speech_stream()).await.unwrap();
+                let session_id = mgr
+                    .start(
+                        tx,
+                        SessionAudio::Owned(speech_stream()),
+                        SessionKind::Dictate,
+                    )
+                    .await
+                    .unwrap();
 
                 mgr.stop_and_wait().await;
 
@@ -1908,7 +1872,14 @@ mod tests {
                 let responses = vec![Ok(vec![make_segment("hello new line world", false)])];
                 let (mgr, db) = make_manager(scripted_asr(responses), Arc::new(EchoPostProcessor));
                 let (tx, rx) = mpsc::channel(32);
-                let session_id = mgr.start_with_audio(tx, speech_stream()).await.unwrap();
+                let session_id = mgr
+                    .start(
+                        tx,
+                        SessionAudio::Owned(speech_stream()),
+                        SessionKind::Dictate,
+                    )
+                    .await
+                    .unwrap();
 
                 let events = collect_events(rx).await;
                 let finalized: Vec<&str> = events
@@ -1937,7 +1908,14 @@ mod tests {
                     .insert_snippet("greet", "greeting", "Hello from Lune!\nSecond line.")
                     .unwrap();
                 let (tx, rx) = mpsc::channel(32);
-                let session_id = mgr.start_with_audio(tx, speech_stream()).await.unwrap();
+                let session_id = mgr
+                    .start(
+                        tx,
+                        SessionAudio::Owned(speech_stream()),
+                        SessionKind::Dictate,
+                    )
+                    .await
+                    .unwrap();
 
                 let events = collect_events(rx).await;
                 let finalized: Vec<&str> = events
@@ -1974,7 +1952,14 @@ mod tests {
                     .insert_snippet("mh", "meeting header", "## Meeting — {date}")
                     .unwrap();
                 let (tx, rx) = mpsc::channel(32);
-                let _ = mgr.start_with_audio(tx, speech_stream()).await.unwrap();
+                let _ = mgr
+                    .start(
+                        tx,
+                        SessionAudio::Owned(speech_stream()),
+                        SessionKind::Dictate,
+                    )
+                    .await
+                    .unwrap();
 
                 let events = collect_events(rx).await;
                 let text = events
@@ -2005,7 +1990,11 @@ mod tests {
                     .unwrap();
                 let (tx, rx) = mpsc::channel(32);
                 let session_id = mgr
-                    .start_capture_with_audio(tx, speech_stream())
+                    .start(
+                        tx,
+                        SessionAudio::Owned(speech_stream()),
+                        SessionKind::CaptureRaw,
+                    )
                     .await
                     .unwrap();
 
@@ -2037,7 +2026,14 @@ mod tests {
                 )])];
                 let (mgr, _db) = make_manager(scripted_asr(responses), Arc::new(EchoPostProcessor));
                 let (tx, rx) = mpsc::channel(32);
-                let _ = mgr.start_with_audio(tx, speech_stream()).await.unwrap();
+                let _ = mgr
+                    .start(
+                        tx,
+                        SessionAudio::Owned(speech_stream()),
+                        SessionKind::Dictate,
+                    )
+                    .await
+                    .unwrap();
 
                 let events = collect_events(rx).await;
                 let finalized: Vec<&str> = events
@@ -2090,7 +2086,14 @@ mod tests {
                 let responses = vec![Ok(vec![make_segment("switch to formal", false)])];
                 let (mgr, _) = make_manager(scripted_asr(responses), Arc::new(EchoPostProcessor));
                 let (tx, rx) = mpsc::channel(32);
-                let session_id = mgr.start_with_audio(tx, speech_stream()).await.unwrap();
+                let session_id = mgr
+                    .start(
+                        tx,
+                        SessionAudio::Owned(speech_stream()),
+                        SessionKind::Dictate,
+                    )
+                    .await
+                    .unwrap();
 
                 let events = collect_events(rx).await;
                 let detected = events.iter().find_map(|e| match e {
@@ -2117,7 +2120,14 @@ mod tests {
                 let responses = vec![Err(CoreError::asr("boom")), Err(CoreError::asr("boom"))];
                 let (mgr, db) = make_manager(scripted_asr(responses), Arc::new(EchoPostProcessor));
                 let (tx, rx) = mpsc::channel(32);
-                let session_id = mgr.start_with_audio(tx, speech_stream()).await.unwrap();
+                let session_id = mgr
+                    .start(
+                        tx,
+                        SessionAudio::Owned(speech_stream()),
+                        SessionKind::Dictate,
+                    )
+                    .await
+                    .unwrap();
 
                 let events = collect_events(rx).await;
                 assert!(events.iter().any(
@@ -2144,7 +2154,14 @@ mod tests {
                 let responses = vec![Err(CoreError::asr("boom")), Err(CoreError::asr("boom"))];
                 let (mgr, db) = make_manager(scripted_asr(responses), Arc::new(EchoPostProcessor));
                 let (tx, rx) = mpsc::channel(32);
-                let session_id = mgr.start_with_audio(tx, silent_stream(1)).await.unwrap();
+                let session_id = mgr
+                    .start(
+                        tx,
+                        SessionAudio::Owned(silent_stream(1)),
+                        SessionKind::Dictate,
+                    )
+                    .await
+                    .unwrap();
 
                 let events = collect_events(rx).await;
                 assert!(events.iter().any(
@@ -2185,7 +2202,14 @@ mod tests {
                 };
                 let (mgr, db) = make_manager_with_settings(scripted_asr(responses), post, settings);
                 let (tx, rx) = mpsc::channel(32);
-                let session_id = mgr.start_with_audio(tx, speech_stream()).await.unwrap();
+                let session_id = mgr
+                    .start(
+                        tx,
+                        SessionAudio::Owned(speech_stream()),
+                        SessionKind::Dictate,
+                    )
+                    .await
+                    .unwrap();
 
                 tokio::time::timeout(Duration::from_secs(5), entered.notified())
                     .await
@@ -2241,7 +2265,7 @@ mod tests {
         );
     }
 
-    /// Regression: `start_inner` must remain cancellation-safe. If the
+    /// Regression: `start` must remain cancellation-safe. If the
     /// future is dropped while it is parked on the persist write (e.g.
     /// wrapped in `tokio::time::timeout`), the active slot must not
     /// stay populated — otherwise no future session can ever start and
@@ -2252,18 +2276,19 @@ mod tests {
             .run_until(async {
                 let (mgr, db) = make_manager(scripted_asr(vec![]), Arc::new(EchoPostProcessor));
 
-                // Hold the persist lock so the persist write inside start_inner
+                // Hold the persist lock so the persist write inside start
                 // parks. The exact phase doesn't matter — we just need a
                 // suspension point that the timeout can land in.
                 let persist_guard = db.lock().await;
 
                 let (tx, _rx) = mpsc::channel(16);
-                let start_fut = mgr.start_with_audio(tx, speech_stream());
-                let timed = tokio::time::timeout(Duration::from_millis(50), start_fut).await;
-                assert!(
-                    timed.is_err(),
-                    "expected start_inner to be cancelled by timeout"
+                let start_fut = mgr.start(
+                    tx,
+                    SessionAudio::Owned(speech_stream()),
+                    SessionKind::Dictate,
                 );
+                let timed = tokio::time::timeout(Duration::from_millis(50), start_fut).await;
+                assert!(timed.is_err(), "expected start to be cancelled by timeout");
 
                 drop(persist_guard);
 
@@ -2274,7 +2299,11 @@ mod tests {
 
                 let (tx2, rx2) = mpsc::channel(16);
                 let id = mgr
-                    .start_with_audio(tx2, speech_stream())
+                    .start(
+                        tx2,
+                        SessionAudio::Owned(speech_stream()),
+                        SessionKind::Dictate,
+                    )
                     .await
                     .expect("subsequent start should succeed after cancellation");
                 assert!(!id.is_nil());

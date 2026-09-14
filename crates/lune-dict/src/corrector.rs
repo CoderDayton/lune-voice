@@ -621,7 +621,7 @@ struct AlignedRisks {
     dropped: usize,
 }
 
-/// Re-locates each multi-word `DictMatch` (from `DictionaryManager::scan`'s
+/// Re-locates each multi-word `DictMatch` (from `UserDictionary::scan`'s
 /// exact multi-word matching) to its start position in `words`, so the
 /// corrector's loop can treat it exactly like a vocab phrase match. Needed
 /// because `scan()` validates and returns the matched phrase as plain text —

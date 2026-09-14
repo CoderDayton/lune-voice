@@ -15,8 +15,9 @@ use crate::dto::{
     DevicePolicyDto, DictationModeDto, DictionaryItemDto, HistoryItemDto, HistoryPageDto,
     LlmBackendTypeDto, PillAnchorDto, PillCornerDto, PillOrientationDto, PillSizeDto,
     PillVisibilityDto, PrivacyModeDto, SaveSnippetInput, SaveWorkspaceSettingsInput,
-    SessionStatsDto, SnippetItemDto, StylePresetDto, TerminalModeDto, UpdateCustomStyleInput,
-    UpdateDictionaryEntryInput, WhisperModelDto, WorkspaceSettingsDto, WorkspaceSnapshot,
+    SessionStatsDto, SettingsCoreDto, SnippetItemDto, StylePresetDto, TerminalModeDto,
+    UpdateCustomStyleInput, UpdateDictionaryEntryInput, WhisperModelDto, WorkspaceSettingsDto,
+    WorkspaceSnapshot,
 };
 
 /// Page size ceiling for `list_history_page`, which is what the History tab
@@ -785,46 +786,48 @@ fn settings_to_dto(settings: &UserSettings) -> WorkspaceSettingsDto {
     );
 
     WorkspaceSettingsDto {
-        activation_mode: activation_mode_to_dto(settings.activation_mode),
-        dictation_mode: dictation_mode_to_dto(settings.dictation_mode),
-        copy_to_clipboard: settings.copy_to_clipboard,
-        sound_cues_enabled: settings.sound_cues_enabled,
-        sound_cue_volume: settings.sound_cue_volume,
-        use_gpu: !matches!(settings.device, DevicePolicy::Cpu),
-        device_policy: device_policy_to_dto(settings.device),
-        asr_backend_type: settings.asr_backend.kind().into(),
-        confidence_threshold: settings
-            .pipeline
-            .word_confidence_threshold
-            .or(backend_defaults.word_confidence_threshold),
-        style_preset: settings.default_style.clone(),
-        hotkey_toggle: format_key_combo(&settings.hotkey.toggle_dictation),
-        hotkey_cancel: format_key_combo(&settings.hotkey.cancel_dictation),
-        pill_visibility: pill_visibility_to_dto(settings.pill_visibility),
-        pill_anchor: pill_anchor_to_dto(settings.pill_anchor),
-        pill_locked: settings.pill_locked,
-        pill_edge_margin: settings.pill_edge_margin,
-        pill_monitor: settings.pill_monitor.clone(),
-        pill_all_workspaces: settings.pill_all_workspaces,
-        pill_size: pill_size_to_dto(settings.pill_size),
-        pill_orientation: pill_orientation_to_dto(settings.pill_orientation),
-        pill_corner: pill_corner_to_dto(settings.pill_corner),
-        language: settings.language.clone(),
-        dictation_language: settings.dictation_language.clone(),
-        model_idle_unload_minutes: settings.model_idle_unload_minutes,
-        input_device: settings.input_device.clone(),
-        vad_pcen: settings.vad_pcen,
-        start_minimized: settings.start_minimized,
-        check_updates_on_launch: settings.check_updates_on_launch,
-        session_history_days: settings.session_history_days,
-        terminal_mode: terminal_mode_to_dto(settings.terminal_mode),
-        privacy_mode: privacy_mode_to_dto(settings.privacy_mode),
-        llm_enabled: !matches!(settings.llm_backend, LlmBackendConfig::Disabled),
-        openai_asr_base_url,
-        openai_asr_model,
+        core: SettingsCoreDto {
+            activation_mode: activation_mode_to_dto(settings.activation_mode),
+            dictation_mode: dictation_mode_to_dto(settings.dictation_mode),
+            copy_to_clipboard: settings.copy_to_clipboard,
+            sound_cues_enabled: settings.sound_cues_enabled,
+            sound_cue_volume: settings.sound_cue_volume,
+            use_gpu: !matches!(settings.device, DevicePolicy::Cpu),
+            device_policy: device_policy_to_dto(settings.device),
+            asr_backend_type: settings.asr_backend.kind().into(),
+            confidence_threshold: settings
+                .pipeline
+                .word_confidence_threshold
+                .or(backend_defaults.word_confidence_threshold),
+            style_preset: settings.default_style.clone(),
+            hotkey_toggle: format_key_combo(&settings.hotkey.toggle_dictation),
+            hotkey_cancel: format_key_combo(&settings.hotkey.cancel_dictation),
+            pill_visibility: pill_visibility_to_dto(settings.pill_visibility),
+            pill_anchor: pill_anchor_to_dto(settings.pill_anchor),
+            pill_locked: settings.pill_locked,
+            pill_edge_margin: settings.pill_edge_margin,
+            pill_monitor: settings.pill_monitor.clone(),
+            pill_all_workspaces: settings.pill_all_workspaces,
+            pill_size: pill_size_to_dto(settings.pill_size),
+            pill_orientation: pill_orientation_to_dto(settings.pill_orientation),
+            pill_corner: pill_corner_to_dto(settings.pill_corner),
+            language: settings.language.clone(),
+            dictation_language: settings.dictation_language.clone(),
+            model_idle_unload_minutes: settings.model_idle_unload_minutes,
+            input_device: settings.input_device.clone(),
+            vad_pcen: settings.vad_pcen,
+            start_minimized: settings.start_minimized,
+            check_updates_on_launch: settings.check_updates_on_launch,
+            session_history_days: settings.session_history_days,
+            terminal_mode: terminal_mode_to_dto(settings.terminal_mode),
+            privacy_mode: privacy_mode_to_dto(settings.privacy_mode),
+            llm_enabled: !matches!(settings.llm_backend, LlmBackendConfig::Disabled),
+            openai_asr_base_url,
+            openai_asr_model,
+            openai_llm_base_url,
+            openai_llm_model,
+        },
         openai_asr_api_key_set,
-        openai_llm_base_url,
-        openai_llm_model,
         openai_llm_api_key_set,
         openai_llm_active,
         whisper_model: match &settings.asr_backend {
@@ -839,6 +842,13 @@ fn apply_settings_dto(
     input: SaveWorkspaceSettingsInput,
     database: &mut Database,
 ) -> Result<(), String> {
+    let SaveWorkspaceSettingsInput {
+        core: input,
+        llm_backend_type,
+        openai_asr_api_key,
+        openai_llm_api_key,
+        whisper_model,
+    } = input;
     settings.activation_mode = activation_mode_from_dto(input.activation_mode);
     settings.pill_visibility = pill_visibility_from_dto(input.pill_visibility);
     // A placement change (anchor / edge margin / pinned monitor) clears any
@@ -864,8 +874,13 @@ fn apply_settings_dto(
     settings.sound_cues_enabled = input.sound_cues_enabled;
     settings.sound_cue_volume = input.sound_cue_volume.clamp(0.0, 1.0);
     settings.device = resolve_device_policy(input.use_gpu, input.device_policy);
-    settings.asr_backend =
-        asr_backend_from_type(input.asr_backend_type, &settings.asr_backend, &input)?;
+    settings.asr_backend = asr_backend_from_type(
+        input.asr_backend_type,
+        &settings.asr_backend,
+        &input,
+        openai_asr_api_key.as_deref(),
+        whisper_model,
+    )?;
 
     // Validate numeric thresholds — reject NaN/Inf/out-of-range.
     if let Some(ct) = input.confidence_threshold
@@ -950,16 +965,12 @@ fn apply_settings_dto(
     if let Some(m) = input.openai_llm_model.as_deref().filter(|s| !s.is_empty()) {
         settings.llm_openai.model = m.to_owned();
     }
-    if let Some(k) = input
-        .openai_llm_api_key
-        .as_deref()
-        .filter(|s| !s.is_empty())
-    {
+    if let Some(k) = openai_llm_api_key.as_deref().filter(|s| !s.is_empty()) {
         settings.llm_openai.api_key = RedactedString::new(k);
     }
     // Off ⇒ Disabled; otherwise build the remote engine from the saved provider.
     settings.llm_backend = if input.llm_enabled {
-        llm_backend_from_type(input.llm_backend_type, &settings.llm_openai)?
+        llm_backend_from_type(llm_backend_type, &settings.llm_openai)?
     } else {
         LlmBackendConfig::Disabled
     };
@@ -1144,7 +1155,9 @@ fn privacy_mode_from_dto(dto: PrivacyModeDto) -> PrivacyMode {
 fn asr_backend_from_type(
     kind: AsrBackendTypeDto,
     current: &AsrBackendConfig,
-    input: &SaveWorkspaceSettingsInput,
+    input: &SettingsCoreDto,
+    api_key: Option<&str>,
+    whisper_model: Option<WhisperModelDto>,
 ) -> Result<AsrBackendConfig, String> {
     Ok(match kind {
         AsrBackendTypeDto::WhisperCpp => {
@@ -1153,8 +1166,7 @@ fn asr_backend_from_type(
             // the WhisperCpp variant, so a switch away and back within one session
             // is preserved via `current`, but it is not persisted across a
             // different backend.
-            let model = input
-                .whisper_model
+            let model = whisper_model
                 .map(Into::into)
                 .or(match current {
                     AsrBackendConfig::WhisperCpp { model } => Some(*model),
@@ -1183,7 +1195,7 @@ fn asr_backend_from_type(
                 ),
             };
             let base_url_str = input.openai_asr_base_url.as_deref().unwrap_or(&cur_url);
-            let api_key_str = input.openai_asr_api_key.as_deref().unwrap_or(&cur_key);
+            let api_key_str = api_key.unwrap_or(&cur_key);
             let model_str = input.openai_asr_model.as_deref().unwrap_or(&cur_model);
             let base_url: url::Url = base_url_str
                 .parse()
@@ -1367,50 +1379,30 @@ mod tests {
         assert!(db.list_sessions(10).unwrap().is_empty());
     }
 
+    /// The frontend reads every settings field at the top level of the object.
+    #[test]
+    fn settings_dto_serializes_flat() {
+        let dto = serde_json::to_value(settings_to_dto(&UserSettings::default())).unwrap();
+        for key in [
+            "activationMode",
+            "privacyMode",
+            "openaiLlmActive",
+            "whisperModel",
+        ] {
+            assert!(dto.get(key).is_some(), "missing top-level {key}: {dto}");
+        }
+        assert!(dto.get("core").is_none(), "{dto}");
+    }
+
     /// Build a `SaveWorkspaceSettingsInput` from defaults for test convenience.
     fn default_save_input() -> SaveWorkspaceSettingsInput {
         let dto = settings_to_dto(&UserSettings::default());
         SaveWorkspaceSettingsInput {
-            activation_mode: dto.activation_mode,
-            dictation_mode: dto.dictation_mode,
-            copy_to_clipboard: dto.copy_to_clipboard,
-            sound_cues_enabled: dto.sound_cues_enabled,
-            sound_cue_volume: dto.sound_cue_volume,
-            use_gpu: dto.use_gpu,
-            device_policy: dto.device_policy,
-            asr_backend_type: dto.asr_backend_type,
-            confidence_threshold: dto.confidence_threshold,
-            style_preset: dto.style_preset,
-            hotkey_toggle: dto.hotkey_toggle,
-            hotkey_cancel: dto.hotkey_cancel,
-            pill_visibility: dto.pill_visibility,
-            pill_anchor: dto.pill_anchor,
-            pill_locked: dto.pill_locked,
-            pill_edge_margin: dto.pill_edge_margin,
-            pill_monitor: dto.pill_monitor,
-            pill_all_workspaces: dto.pill_all_workspaces,
-            pill_size: dto.pill_size,
-            pill_orientation: dto.pill_orientation,
-            pill_corner: dto.pill_corner,
-            language: dto.language,
-            dictation_language: dto.dictation_language,
-            model_idle_unload_minutes: dto.model_idle_unload_minutes,
-            input_device: dto.input_device,
-            vad_pcen: dto.vad_pcen,
-            start_minimized: dto.start_minimized,
-            check_updates_on_launch: dto.check_updates_on_launch,
-            session_history_days: dto.session_history_days,
-            terminal_mode: dto.terminal_mode,
-            privacy_mode: dto.privacy_mode,
-            llm_enabled: dto.llm_enabled,
+            core: dto.core,
             llm_backend_type: LlmBackendTypeDto::OpenAiCompatible,
-            whisper_model: Some(dto.whisper_model),
-            openai_asr_base_url: dto.openai_asr_base_url,
             openai_asr_api_key: None,
-            openai_asr_model: dto.openai_asr_model,
-            openai_llm_base_url: dto.openai_llm_base_url,
             openai_llm_api_key: None,
-            openai_llm_model: dto.openai_llm_model,
+            whisper_model: Some(dto.whisper_model),
         }
     }
 
@@ -1420,11 +1412,11 @@ mod tests {
         let mut db = Database::open_in_memory().expect("db");
 
         let mut input = default_save_input();
-        input.style_preset = Some("not-a-style".into());
+        input.core.style_preset = Some("not-a-style".into());
         assert!(apply_settings_dto(&mut settings, input, &mut db).is_err());
 
         let mut input = default_save_input();
-        input.language = "bad tag".into();
+        input.core.language = "bad tag".into();
         assert!(apply_settings_dto(&mut settings, input, &mut db).is_err());
     }
 
@@ -1434,13 +1426,13 @@ mod tests {
         let mut db = Database::open_in_memory().expect("db");
 
         let mut input = default_save_input();
-        input.confidence_threshold = Some(0.55);
+        input.core.confidence_threshold = Some(0.55);
         apply_settings_dto(&mut settings, input, &mut db).unwrap();
         assert_eq!(settings.pipeline.word_confidence_threshold, Some(0.55));
 
         // Out-of-range is rejected.
         let mut input = default_save_input();
-        input.confidence_threshold = Some(1.5);
+        input.core.confidence_threshold = Some(1.5);
         assert!(apply_settings_dto(&mut settings, input, &mut db).is_err());
     }
 
@@ -1450,17 +1442,17 @@ mod tests {
         let mut db = Database::open_in_memory().expect("db");
 
         let mut input = default_save_input();
-        input.dictation_language = "auto".into();
+        input.core.dictation_language = "auto".into();
         apply_settings_dto(&mut settings, input, &mut db).unwrap();
         assert_eq!(settings.dictation_language, "auto");
 
         let mut input = default_save_input();
-        input.dictation_language = "en".into();
+        input.core.dictation_language = "en".into();
         apply_settings_dto(&mut settings, input, &mut db).unwrap();
         assert_eq!(settings.dictation_language, "en");
 
         let mut input = default_save_input();
-        input.dictation_language = "zh".into();
+        input.core.dictation_language = "zh".into();
         apply_settings_dto(&mut settings, input, &mut db).unwrap();
         assert_eq!(settings.dictation_language, "zh");
     }
@@ -1471,7 +1463,7 @@ mod tests {
         let mut db = Database::open_in_memory().expect("db");
 
         let mut input = default_save_input();
-        input.dictation_language = "not valid".into();
+        input.core.dictation_language = "not valid".into();
         assert!(apply_settings_dto(&mut settings, input, &mut db).is_err());
     }
 
@@ -1483,7 +1475,7 @@ mod tests {
         };
 
         let dto = settings_to_dto(&settings);
-        assert_eq!(dto.dictation_language, "de");
+        assert_eq!(dto.core.dictation_language, "de");
     }
 
     #[test]
@@ -1494,8 +1486,8 @@ mod tests {
         };
         let mut db = Database::open_in_memory().expect("db");
         let mut input = default_save_input();
-        input.use_gpu = true;
-        input.device_policy = DevicePolicyDto::Cuda;
+        input.core.use_gpu = true;
+        input.core.device_policy = DevicePolicyDto::Cuda;
 
         apply_settings_dto(&mut settings, input, &mut db).unwrap();
         assert!(matches!(settings.device, DevicePolicy::Cuda));

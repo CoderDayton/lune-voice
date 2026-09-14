@@ -544,6 +544,11 @@ export const mockBackendClient: BackendClient = {
     return true;
   },
 
+  // No hotkey listener runs in a browser tab, so there is nothing to warn about.
+  async holdToTalkAvailable() {
+    return true;
+  },
+
   async listAudioInputDevices() {
     return ['Mock microphone'];
   },

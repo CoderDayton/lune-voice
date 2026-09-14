@@ -61,7 +61,7 @@ msgstr "{count} محدد"
 msgid "{page} / {totalPages}"
 msgstr "{page} / {totalPages}"
 
-#: src/features/settings/sections/dictation-section.tsx:45
+#: src/features/settings/sections/dictation-section.tsx:61
 msgid "{saved} (unavailable)"
 msgstr "{saved} (غير متوفر)"
 
@@ -133,8 +133,8 @@ msgstr "نشط"
 msgid "Active style"
 msgstr "أسلوب نشط"
 
-#: src/features/settings/sections/dictation-section.tsx:124
-#: src/features/settings/sections/dictation-section.tsx:132
+#: src/features/settings/sections/dictation-section.tsx:151
+#: src/features/settings/sections/dictation-section.tsx:159
 msgid "Adaptive gain control"
 msgstr "التحكم في الكسب التكيفي"
 
@@ -335,7 +335,7 @@ msgstr "مدمج"
 msgid "Cancel"
 msgstr "إلغاء"
 
-#: src/features/settings/sections/dictation-section.tsx:67
+#: src/features/settings/sections/dictation-section.tsx:83
 msgid "Cancel current recording"
 msgstr "إلغاء التسجيل الحالي"
 
@@ -352,7 +352,7 @@ msgstr "الأحرف الكبيرة"
 msgid "Capture by voice"
 msgstr "التقاط بالصوت"
 
-#: src/features/settings/sections/dictation-section.tsx:105
+#: src/features/settings/sections/dictation-section.tsx:132
 msgid "Capture device and how recording detects when you speak."
 msgstr "جهاز الالتقاط وكيفية اكتشاف التسجيل لبدء حديثك."
 
@@ -676,7 +676,7 @@ msgstr "لم يُلتقط أي شيء — حاول مرة أخرى، واقتر�
 msgid "Discard dictation"
 msgstr "تجاهل الإملاء"
 
-#: src/features/settings/sections/dictation-section.tsx:68
+#: src/features/settings/sections/dictation-section.tsx:84
 msgid "Discard the current draft and return to idle. Click the binding to change it."
 msgstr "تجاهل المسودة الحالية والعودة إلى وضع الخمول. انقر فوق الرابط لتغييره."
 
@@ -971,6 +971,10 @@ msgstr "يُحفظ السجل إلى الأبد"
 msgid "History retention"
 msgstr "الاحتفاظ بالسجل"
 
+#: src/features/settings/sections/dictation-section.tsx:121
+msgid "Hold is unavailable right now, so the shortcut toggles recording instead. Grant keyboard access to use Hold."
+msgstr "وضع الاستمرار بالضغط غير متاح حاليًا، لذلك يبدّل الاختصار التسجيل بدلًا من ذلك. امنح صلاحية الوصول إلى لوحة المفاتيح لاستخدام الاستمرار بالضغط."
+
 #: src/features/overview/overview-page.tsx:297
 msgid "Hold the hotkey and speak, and your words land wherever your cursor is."
 msgstr "اضغط مع الاستمرار على مفتاح الاختصار وتحدّث، وستظهر كلماتك في موضع المؤشر."
@@ -1197,9 +1201,9 @@ msgstr "متوسط"
 msgid "meeting header"
 msgstr "ترويسة اجتماع"
 
-#: src/features/settings/sections/dictation-section.tsx:104
-#: src/features/settings/sections/dictation-section.tsx:109
-#: src/features/settings/sections/dictation-section.tsx:115
+#: src/features/settings/sections/dictation-section.tsx:131
+#: src/features/settings/sections/dictation-section.tsx:136
+#: src/features/settings/sections/dictation-section.tsx:142
 #: src/features/welcome/components/ready-checks.tsx:88
 msgid "Microphone"
 msgstr "الميكروفون"
@@ -1326,7 +1330,7 @@ msgstr "لا يوجد نص"
 msgid "None"
 msgstr "بلا"
 
-#: src/features/settings/sections/dictation-section.tsx:125
+#: src/features/settings/sections/dictation-section.tsx:152
 msgid "Normalizes microphone level before voice detection. Helps quiet mics and noisy rooms. Recommended."
 msgstr "يضبط مستوى الميكروفون قبل اكتشاف الصوت. يساعد مع الميكروفونات الهادئة والغرف الصاخبة. موصى به."
 
@@ -1568,8 +1572,8 @@ msgstr "مستعد"
 msgid "Recent sessions"
 msgstr "الجلسات الأخيرة"
 
-#: src/features/settings/sections/dictation-section.tsx:77
-#: src/features/settings/sections/dictation-section.tsx:83
+#: src/features/settings/sections/dictation-section.tsx:93
+#: src/features/settings/sections/dictation-section.tsx:99
 msgid "Recording mode"
 msgstr "وضع التسجيل"
 
@@ -1768,7 +1772,7 @@ msgstr "جارٍ إعداد وحدة معالجة الرسوميات"
 msgid "Settings sections"
 msgstr "أقسام الإعدادات"
 
-#: src/features/settings/sections/dictation-section.tsx:52
+#: src/features/settings/sections/dictation-section.tsx:68
 #: src/features/styles/components/style-hero.tsx:18
 msgid "Shortcuts"
 msgstr "الاختصارات"
@@ -1874,11 +1878,11 @@ msgstr "بدء الإملاء"
 msgid "Start minimized"
 msgstr "ابدأ بالتصغير"
 
-#: src/features/settings/sections/dictation-section.tsx:57
+#: src/features/settings/sections/dictation-section.tsx:73
 msgid "Start or stop recording"
 msgstr "بدء التسجيل أو إيقافه"
 
-#: src/features/settings/sections/dictation-section.tsx:53
+#: src/features/settings/sections/dictation-section.tsx:69
 msgid "Start, stop, and cancel dictation without leaving your work."
 msgstr "ابدأ الإملاء وأوقفه وألغِه دون مغادرة عملك."
 
@@ -1933,7 +1937,7 @@ msgstr "تبديل النمط"
 msgid "System"
 msgstr "نظام"
 
-#: src/features/settings/sections/dictation-section.tsx:38
+#: src/features/settings/sections/dictation-section.tsx:54
 msgid "System default"
 msgstr "الافتراضي للنظام"
 
@@ -1957,7 +1961,7 @@ msgstr "مؤشر الحالة العائم الذي يظهر أثناء الإم
 msgid "The local runtime isn't responding. The figures below are the last known values."
 msgstr "بيئة التشغيل المحلية لا تستجيب. الأرقام أدناه هي آخر القيم المعروفة."
 
-#: src/features/settings/sections/dictation-section.tsx:58
+#: src/features/settings/sections/dictation-section.tsx:74
 msgid "The main shortcut used for voice typing. Click the binding to change it."
 msgstr "الاختصار الرئيسي المستخدم للكتابة الصوتية. انقر فوق الرابط لتغييره."
 
@@ -2023,11 +2027,11 @@ msgstr "لبدء الإملاء"
 msgid "Today"
 msgstr "اليوم"
 
-#: src/features/settings/sections/dictation-section.tsx:95
+#: src/features/settings/sections/dictation-section.tsx:111
 msgid "Toggle and cancel are bound to the same key combo. One will override the other."
 msgstr "التبديل والإلغاء مرتبطان بمجموعة المفاتيح نفسها. سيتجاوز أحدهما الآخر."
 
-#: src/features/settings/sections/dictation-section.tsx:78
+#: src/features/settings/sections/dictation-section.tsx:94
 msgid "Toggle is easiest for longer dictation. Hold is better for quick bursts."
 msgstr "التبديل أسهل للإملاء الطويل. الضغط المستمر أفضل للدفعات السريعة."
 
@@ -2228,7 +2232,7 @@ msgstr "متى يظهر المؤشر أثناء الإملاء."
 msgid "Where the pill sits on screen. Dragging it overrides the preset until you reset."
 msgstr "موضع المؤشر على الشاشة. سحبه يتجاوز الموضع المحدّد مسبقًا إلى أن تعيد التعيين."
 
-#: src/features/settings/sections/dictation-section.tsx:110
+#: src/features/settings/sections/dictation-section.tsx:137
 msgid "Which input device dictation captures from. Changes apply right away."
 msgstr "جهاز الإدخال الذي يلتقط منه الإملاء. تُطبَّق التغييرات على الفور."
 

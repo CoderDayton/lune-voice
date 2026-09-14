@@ -61,7 +61,7 @@ msgstr "{count} चयनित"
 msgid "{page} / {totalPages}"
 msgstr "{page} / {totalPages}"
 
-#: src/features/settings/sections/dictation-section.tsx:45
+#: src/features/settings/sections/dictation-section.tsx:61
 msgid "{saved} (unavailable)"
 msgstr "{saved} (अनुपलब्ध)"
 
@@ -133,8 +133,8 @@ msgstr "सक्रिय"
 msgid "Active style"
 msgstr "सक्रिय शैली"
 
-#: src/features/settings/sections/dictation-section.tsx:124
-#: src/features/settings/sections/dictation-section.tsx:132
+#: src/features/settings/sections/dictation-section.tsx:151
+#: src/features/settings/sections/dictation-section.tsx:159
 msgid "Adaptive gain control"
 msgstr "अनुकूल गेन नियंत्रण"
 
@@ -335,7 +335,7 @@ msgstr "अंतर्निहित"
 msgid "Cancel"
 msgstr "रद्द करें"
 
-#: src/features/settings/sections/dictation-section.tsx:67
+#: src/features/settings/sections/dictation-section.tsx:83
 msgid "Cancel current recording"
 msgstr "वर्त���ान रिकॉर्डिंग रद्द करें"
 
@@ -352,7 +352,7 @@ msgstr "बड़े अक्षर"
 msgid "Capture by voice"
 msgstr "आवाज़ से रिकॉर्ड करें"
 
-#: src/features/settings/sections/dictation-section.tsx:105
+#: src/features/settings/sections/dictation-section.tsx:132
 msgid "Capture device and how recording detects when you speak."
 msgstr "कैप्चर डिवाइस और रिकॉर्डिंग यह कैसे पहचानती है कि आप कब बोल रहे हैं।"
 
@@ -676,7 +676,7 @@ msgstr "कुछ सुनाई नहीं दिया — माइक क
 msgid "Discard dictation"
 msgstr "डिक्टेशन खारिज करें"
 
-#: src/features/settings/sections/dictation-section.tsx:68
+#: src/features/settings/sections/dictation-section.tsx:84
 msgid "Discard the current draft and return to idle. Click the binding to change it."
 msgstr "वर्तमान ड्राफ्ट को त्यागें और निष्क्रिय स्थिति में लौटें। इसे बदलने के लिए बाइंडिंग पर क्लिक करें।"
 
@@ -971,6 +971,10 @@ msgstr "इतिहास हमेशा के लिए रखा जात�
 msgid "History retention"
 msgstr "इतिहास प्रतिधारण"
 
+#: src/features/settings/sections/dictation-section.tsx:121
+msgid "Hold is unavailable right now, so the shortcut toggles recording instead. Grant keyboard access to use Hold."
+msgstr "दबाए रखना अभी उपलब्ध नहीं है, इसलिए शॉर्टकट रिकॉर्डिंग को चालू और बंद करता है। दबाए रखने के लिए कीबोर्ड एक्सेस दें।"
+
 #: src/features/overview/overview-page.tsx:297
 msgid "Hold the hotkey and speak, and your words land wherever your cursor is."
 msgstr "हॉटकी दबाए रखें और बोलें — आपके शब्द वहीं आएंगे जहाँ कर्सर है।"
@@ -1197,9 +1201,9 @@ msgstr "मध्यम"
 msgid "meeting header"
 msgstr "बैठक शीर्षक"
 
-#: src/features/settings/sections/dictation-section.tsx:104
-#: src/features/settings/sections/dictation-section.tsx:109
-#: src/features/settings/sections/dictation-section.tsx:115
+#: src/features/settings/sections/dictation-section.tsx:131
+#: src/features/settings/sections/dictation-section.tsx:136
+#: src/features/settings/sections/dictation-section.tsx:142
 #: src/features/welcome/components/ready-checks.tsx:88
 msgid "Microphone"
 msgstr "माइक्रोफ़ोन"
@@ -1326,7 +1330,7 @@ msgstr "कोई टेक्स्ट नहीं"
 msgid "None"
 msgstr "कोई नहीं"
 
-#: src/features/settings/sections/dictation-section.tsx:125
+#: src/features/settings/sections/dictation-section.tsx:152
 msgid "Normalizes microphone level before voice detection. Helps quiet mics and noisy rooms. Recommended."
 msgstr "आवाज का पता लगाने से पहले माइक्रोफोन स्तर को सामान्य करता है। माइक और शोर वाले कमरों को शांत करने में मदद करता है। अनुशंसित।"
 
@@ -1568,8 +1572,8 @@ msgstr "तैयार"
 msgid "Recent sessions"
 msgstr "हाल के सत्र"
 
-#: src/features/settings/sections/dictation-section.tsx:77
-#: src/features/settings/sections/dictation-section.tsx:83
+#: src/features/settings/sections/dictation-section.tsx:93
+#: src/features/settings/sections/dictation-section.tsx:99
 msgid "Recording mode"
 msgstr "रिकॉर्डिंग मोड"
 
@@ -1768,7 +1772,7 @@ msgstr "आपका GPU सेट किया जा रहा है"
 msgid "Settings sections"
 msgstr "सेटिंग्स अनुभाग"
 
-#: src/features/settings/sections/dictation-section.tsx:52
+#: src/features/settings/sections/dictation-section.tsx:68
 #: src/features/styles/components/style-hero.tsx:18
 msgid "Shortcuts"
 msgstr "शॉर्टकट"
@@ -1874,11 +1878,11 @@ msgstr "डिक्टेशन शुरू करें"
 msgid "Start minimized"
 msgstr "मिनिमाइज़ होकर शुरू करें"
 
-#: src/features/settings/sections/dictation-section.tsx:57
+#: src/features/settings/sections/dictation-section.tsx:73
 msgid "Start or stop recording"
 msgstr "रिकॉर्डिंग प्रारंभ या बंद करें"
 
-#: src/features/settings/sections/dictation-section.tsx:53
+#: src/features/settings/sections/dictation-section.tsx:69
 msgid "Start, stop, and cancel dictation without leaving your work."
 msgstr "अपना काम छोड़े बिना डिक्टेशन शुरू करें, रोकें और रद्द करें।"
 
@@ -1933,7 +1937,7 @@ msgstr "शैली बदलें"
 msgid "System"
 msgstr "प्रणाली"
 
-#: src/features/settings/sections/dictation-section.tsx:38
+#: src/features/settings/sections/dictation-section.tsx:54
 msgid "System default"
 msgstr "सिस्टम डिफ़ॉल्ट"
 
@@ -1957,7 +1961,7 @@ msgstr "श्रुत���ेख के दौरान दिखने �
 msgid "The local runtime isn't responding. The figures below are the last known values."
 msgstr "स्थानीय रनटाइम प्रतिक्रिया नहीं दे रहा है। नीचे दिए गए आंकड़े अंतिम ज्ञात मान हैं।"
 
-#: src/features/settings/sections/dictation-section.tsx:58
+#: src/features/settings/sections/dictation-section.tsx:74
 msgid "The main shortcut used for voice typing. Click the binding to change it."
 msgstr "ध्वनि टाइपिंग के लिए उपयोग किया जाने वाला मुख्य शॉर्टकट। इसे बदलने के लिए बाइंडिंग पर क्लिक करें।"
 
@@ -2023,11 +2027,11 @@ msgstr "डिक्टेशन शुरू करने के लिए"
 msgid "Today"
 msgstr "आज"
 
-#: src/features/settings/sections/dictation-section.tsx:95
+#: src/features/settings/sections/dictation-section.tsx:111
 msgid "Toggle and cancel are bound to the same key combo. One will override the other."
 msgstr "टॉगल और रद्द करना एक ही कुंजी कॉम्बो से बंधे हैं। एक दूसरे पर हावी हो जाएगा."
 
-#: src/features/settings/sections/dictation-section.tsx:78
+#: src/features/settings/sections/dictation-section.tsx:94
 msgid "Toggle is easiest for longer dictation. Hold is better for quick bursts."
 msgstr "लंबे समय तक श्रुतलेखन के लिए टॉगल करना सबसे आसान है। त्वरित विस्फोट के लिए होल्ड करना बेहतर है।"
 
@@ -2228,7 +2232,7 @@ msgstr "श्रुतलेख के दौरान संकेतक क�
 msgid "Where the pill sits on screen. Dragging it overrides the preset until you reset."
 msgstr "संकेतक स्क्रीन पर कहाँ रहता है। उसे खींचने पर पूर्वनिर्धारित स्थिति तब तक हट जाती है जब तक आप रीसेट न करें।"
 
-#: src/features/settings/sections/dictation-section.tsx:110
+#: src/features/settings/sections/dictation-section.tsx:137
 msgid "Which input device dictation captures from. Changes apply right away."
 msgstr "श्रुतलेख किस इनपुट डिवाइस से कैप्चर करता है। बदलाव तुरंत लागू होते हैं।"
 

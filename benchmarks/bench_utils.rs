@@ -829,10 +829,7 @@ impl BenchmarkHarness {
         use tokio::sync::{Mutex, RwLock};
 
         let db = lune_persist::Database::open_in_memory().expect("in-memory DB");
-        let dict = lune_dict::DictionaryManager::new(
-            lune_persist::Database::open_in_memory().expect("in-memory DB for dict"),
-        )
-        .expect("DictionaryManager");
+        let dict = lune_dict::UserDictionary::default();
 
         let config = lune_voice::SessionManagerConfig {
             asr_backend_kind: self.asr.kind(),
@@ -844,7 +841,7 @@ impl BenchmarkHarness {
             Arc::clone(&self.asr),
             Arc::new(lune_dict::commands::VoiceCommandRouter::new()),
             Arc::clone(&self.llm),
-            Arc::new(Mutex::new(dict)),
+            Arc::new(dict),
             Arc::new(Mutex::new(db)),
             Arc::new(lune_dict::corrector::LexicalGate::new()),
             config,

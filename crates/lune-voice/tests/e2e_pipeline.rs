@@ -9,10 +9,10 @@ use lune_core::Result;
 use lune_core::asr::{AsrBackend, AsrSegment, AsrSessionConfig};
 use lune_core::llm::{PostProcessInput, PostProcessOutput, TextPostProcessor};
 use lune_core::session::SessionEvent;
-use lune_dict::DictionaryManager;
+use lune_dict::UserDictionary;
 use lune_dict::commands::VoiceCommandRouter;
 use lune_persist::Database;
-use lune_voice::{SessionManager, SessionManagerConfig};
+use lune_voice::{SessionAudio, SessionKind, SessionManager, SessionManagerConfig};
 use tokio::sync::{Mutex, RwLock, mpsc};
 
 // ── Test stubs ───────────────────────────────────────────────────────────────
@@ -50,15 +50,14 @@ impl TextPostProcessor for EchoPostProcessor {
 
 fn make_manager() -> SessionManager<NoopAsr> {
     let db = Database::open_in_memory().unwrap();
-    let dict_db = Database::open_in_memory().unwrap();
-    let dict = DictionaryManager::new(dict_db).unwrap();
+    let dict = UserDictionary::default();
     let settings = Arc::new(RwLock::new(lune_core::config::UserSettings::default()));
 
     SessionManager::new(
         Arc::new(NoopAsr),
         Arc::new(VoiceCommandRouter::new()),
         Arc::new(EchoPostProcessor),
-        Arc::new(Mutex::new(dict)),
+        Arc::new(dict),
         Arc::new(Mutex::new(db)),
         Arc::new(lune_dict::corrector::LexicalGate::new()),
         SessionManagerConfig::default(),
@@ -77,7 +76,10 @@ async fn e2e_start_stop_emits_events() {
             let (tx, mut rx) = mpsc::channel(32);
 
             // Start session.
-            let session_id = mgr.start(tx).await.unwrap();
+            let session_id = mgr
+                .start(tx, SessionAudio::Open, SessionKind::Dictate)
+                .await
+                .unwrap();
             assert!(!session_id.is_nil());
 
             // Should receive Started event.
@@ -118,8 +120,12 @@ async fn e2e_double_start_rejected() {
             let (tx1, _rx1) = mpsc::channel(16);
             let (tx2, _rx2) = mpsc::channel(16);
 
-            mgr.start(tx1).await.unwrap();
-            let result = mgr.start(tx2).await;
+            mgr.start(tx1, SessionAudio::Open, SessionKind::Dictate)
+                .await
+                .unwrap();
+            let result = mgr
+                .start(tx2, SessionAudio::Open, SessionKind::Dictate)
+                .await;
             assert!(result.is_err(), "second start should fail");
 
             mgr.stop().await;
@@ -135,7 +141,9 @@ async fn e2e_cancel_is_graceful() {
             let mgr = make_manager();
             let (tx, _rx) = mpsc::channel(16);
 
-            mgr.start(tx).await.unwrap();
+            mgr.start(tx, SessionAudio::Open, SessionKind::Dictate)
+                .await
+                .unwrap();
             mgr.cancel().await;
 
             tokio::time::sleep(Duration::from_millis(100)).await;

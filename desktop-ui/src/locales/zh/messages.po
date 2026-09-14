@@ -61,7 +61,7 @@ msgstr "已选择 {count} 项"
 msgid "{page} / {totalPages}"
 msgstr "{page} / {totalPages}"
 
-#: src/features/settings/sections/dictation-section.tsx:45
+#: src/features/settings/sections/dictation-section.tsx:61
 msgid "{saved} (unavailable)"
 msgstr "{saved}（不可用）"
 
@@ -133,8 +133,8 @@ msgstr "积极的"
 msgid "Active style"
 msgstr "活跃风格"
 
-#: src/features/settings/sections/dictation-section.tsx:124
-#: src/features/settings/sections/dictation-section.tsx:132
+#: src/features/settings/sections/dictation-section.tsx:151
+#: src/features/settings/sections/dictation-section.tsx:159
 msgid "Adaptive gain control"
 msgstr "自适应增益控制"
 
@@ -335,7 +335,7 @@ msgstr "内置"
 msgid "Cancel"
 msgstr "取消"
 
-#: src/features/settings/sections/dictation-section.tsx:67
+#: src/features/settings/sections/dictation-section.tsx:83
 msgid "Cancel current recording"
 msgstr "取消当前录音"
 
@@ -352,7 +352,7 @@ msgstr "首都"
 msgid "Capture by voice"
 msgstr "用语音录制"
 
-#: src/features/settings/sections/dictation-section.tsx:105
+#: src/features/settings/sections/dictation-section.tsx:132
 msgid "Capture device and how recording detects when you speak."
 msgstr "采���设备以及录音如何检测您何时说话。"
 
@@ -676,7 +676,7 @@ msgstr "没有听到任何内容 — 请靠近麦克风一点再试。"
 msgid "Discard dictation"
 msgstr "放弃听写"
 
-#: src/features/settings/sections/dictation-section.tsx:68
+#: src/features/settings/sections/dictation-section.tsx:84
 msgid "Discard the current draft and return to idle. Click the binding to change it."
 msgstr "放弃当前草稿并返回空闲状态。单击绑定以更改它。"
 
@@ -971,6 +971,10 @@ msgstr "历史记录永久保留"
 msgid "History retention"
 msgstr "历史记录保留"
 
+#: src/features/settings/sections/dictation-section.tsx:121
+msgid "Hold is unavailable right now, so the shortcut toggles recording instead. Grant keyboard access to use Hold."
+msgstr "按住模式当前不可用，因此快捷键改为切换录音。授予键盘访问权限即可使用按住模式。"
+
 #: src/features/overview/overview-page.tsx:297
 msgid "Hold the hotkey and speak, and your words land wherever your cursor is."
 msgstr "按住快捷键说话，文字会输入到光标所在的位置。"
@@ -1197,9 +1201,9 @@ msgstr "中"
 msgid "meeting header"
 msgstr "会议抬头"
 
-#: src/features/settings/sections/dictation-section.tsx:104
-#: src/features/settings/sections/dictation-section.tsx:109
-#: src/features/settings/sections/dictation-section.tsx:115
+#: src/features/settings/sections/dictation-section.tsx:131
+#: src/features/settings/sections/dictation-section.tsx:136
+#: src/features/settings/sections/dictation-section.tsx:142
 #: src/features/welcome/components/ready-checks.tsx:88
 msgid "Microphone"
 msgstr "麦克风"
@@ -1326,7 +1330,7 @@ msgstr "没有成绩单"
 msgid "None"
 msgstr "无"
 
-#: src/features/settings/sections/dictation-section.tsx:125
+#: src/features/settings/sections/dictation-section.tsx:152
 msgid "Normalizes microphone level before voice detection. Helps quiet mics and noisy rooms. Recommended."
 msgstr "在语音检测之前标准化麦克风电平。有助于安静的麦克风和嘈杂的房间。受到推崇的。"
 
@@ -1568,8 +1572,8 @@ msgstr "准备好"
 msgid "Recent sessions"
 msgstr "最近会话"
 
-#: src/features/settings/sections/dictation-section.tsx:77
-#: src/features/settings/sections/dictation-section.tsx:83
+#: src/features/settings/sections/dictation-section.tsx:93
+#: src/features/settings/sections/dictation-section.tsx:99
 msgid "Recording mode"
 msgstr "录音模式"
 
@@ -1768,7 +1772,7 @@ msgstr "正在设置你的 GPU"
 msgid "Settings sections"
 msgstr "设置部分"
 
-#: src/features/settings/sections/dictation-section.tsx:52
+#: src/features/settings/sections/dictation-section.tsx:68
 #: src/features/styles/components/style-hero.tsx:18
 msgid "Shortcuts"
 msgstr "快捷方式"
@@ -1874,11 +1878,11 @@ msgstr "开始听写"
 msgid "Start minimized"
 msgstr "最小化启动"
 
-#: src/features/settings/sections/dictation-section.tsx:57
+#: src/features/settings/sections/dictation-section.tsx:73
 msgid "Start or stop recording"
 msgstr "开始或停止录音"
 
-#: src/features/settings/sections/dictation-section.tsx:53
+#: src/features/settings/sections/dictation-section.tsx:69
 msgid "Start, stop, and cancel dictation without leaving your work."
 msgstr "无需离开当前工作即可开始、停止和取消听写。"
 
@@ -1933,7 +1937,7 @@ msgstr "开关款式"
 msgid "System"
 msgstr "系统"
 
-#: src/features/settings/sections/dictation-section.tsx:38
+#: src/features/settings/sections/dictation-section.tsx:54
 msgid "System default"
 msgstr "系统默认"
 
@@ -1957,7 +1961,7 @@ msgstr "听写时显示的浮动状态指示器。"
 msgid "The local runtime isn't responding. The figures below are the last known values."
 msgstr "本地运行时无响应。下方数据为最后已知的数值。"
 
-#: src/features/settings/sections/dictation-section.tsx:58
+#: src/features/settings/sections/dictation-section.tsx:74
 msgid "The main shortcut used for voice typing. Click the binding to change it."
 msgstr "用于语音输入的主要快捷方式。单击绑定以更改它。"
 
@@ -2023,11 +2027,11 @@ msgstr "开始听写"
 msgid "Today"
 msgstr "今天"
 
-#: src/features/settings/sections/dictation-section.tsx:95
+#: src/features/settings/sections/dictation-section.tsx:111
 msgid "Toggle and cancel are bound to the same key combo. One will override the other."
 msgstr "切换和取消绑定到相同的组合键。其中一个将凌驾于另一个之上。"
 
-#: src/features/settings/sections/dictation-section.tsx:78
+#: src/features/settings/sections/dictation-section.tsx:94
 msgid "Toggle is easiest for longer dictation. Hold is better for quick bursts."
 msgstr "对于较长的听写来说，切换是最简单的。保持更适合快速爆发。"
 
@@ -2228,7 +2232,7 @@ msgstr "听写时指示器何时出现。"
 msgid "Where the pill sits on screen. Dragging it overrides the preset until you reset."
 msgstr "指示器在屏幕上的位置。拖动它会覆盖预设位置，直到你重置为止。"
 
-#: src/features/settings/sections/dictation-section.tsx:110
+#: src/features/settings/sections/dictation-section.tsx:137
 msgid "Which input device dictation captures from. Changes apply right away."
 msgstr "听写从哪个输入设备采���。更改会立即生效。"
 

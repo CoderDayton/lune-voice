@@ -339,7 +339,7 @@ Blocking work is dispatched as follows:
   GPU-plugin unpack use `spawn_blocking`. The session lifecycle cannot: its
   `Database` lives behind a shared `tokio::sync::Mutex` whose guard cannot cross
   into a spawned task, so it uses `block_in_place` instead — same handoff, no
-  `Send` bound, and no extra cancellation point in `start_inner`.
+  `Send` bound, and no extra cancellation point in `start`.
 
 The audio capture callback runs on cpal's own high-priority thread and pushes
 into a lock-free ring buffer; the session loop polls it, so the real-time path

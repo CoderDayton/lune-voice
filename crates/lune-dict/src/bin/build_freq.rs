@@ -1,6 +1,8 @@
 //! Compiles per-language frequency lists from `corpora/{lang}.csv` into the
 //! `data/{lang}_freq.bin` artifacts bundled via `include_bytes!`.
 //!
+//! Run with `cargo run -p lune-dict --features data-tools --bin build_freq`.
+//!
 //! Source corpora are the OpenSubtitles-derived word lists from
 //! hermitdave/FrequencyWords (MIT License, Copyright (c) 2016 Hermit Dave).
 //! Input accepts either CSV (`word,freq`) or the raw whitespace-separated

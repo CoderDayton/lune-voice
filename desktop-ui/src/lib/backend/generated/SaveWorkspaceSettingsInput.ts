@@ -13,7 +13,23 @@ import type { PrivacyModeDto } from "./PrivacyModeDto";
 import type { TerminalModeDto } from "./TerminalModeDto";
 import type { WhisperModelDto } from "./WhisperModelDto";
 
-export type SaveWorkspaceSettingsInput = { activationMode: ActivationModeDto, dictationMode: DictationModeDto, 
+export type SaveWorkspaceSettingsInput = { 
+/**
+ * Which styling engine to use when enabled.
+ */
+llmBackendType: LlmBackendTypeDto, 
+/**
+ * A `None` key keeps the saved one.
+ */
+openaiAsrApiKey: string | null, 
+/**
+ * A `None` key keeps the saved one.
+ */
+openaiLlmApiKey: string | null, 
+/**
+ * Selected local whisper model (sent when asr_backend_type == WhisperCpp).
+ */
+whisperModel: WhisperModelDto | null, activationMode: ActivationModeDto, dictationMode: DictationModeDto, 
 /**
  * Keep the dictated text on the clipboard after delivery (orthogonal to the
  * send method).
@@ -28,7 +44,7 @@ soundCuesEnabled: boolean,
  */
 soundCueVolume: number, useGpu: boolean, devicePolicy: DevicePolicyDto, asrBackendType: AsrBackendTypeDto, confidenceThreshold: number | null, stylePreset: string | null, hotkeyToggle: string, hotkeyCancel: string, pillVisibility: PillVisibilityDto, pillAnchor: PillAnchorDto, pillLocked: boolean, pillEdgeMargin: number, 
 /**
- * Monitor connector name to pin the pill to; null = automatic.
+ * Monitor connector name the pill is pinned to; null = automatic.
  */
 pillMonitor: string | null, pillAllWorkspaces: boolean, pillSize: PillSizeDto, pillOrientation: PillOrientationDto, pillCorner: PillCornerDto, language: string, dictationLanguage: string, 
 /**
@@ -56,14 +72,16 @@ terminalMode: TerminalModeDto,
  */
 privacyMode: PrivacyModeDto, 
 /**
- * Whether the correction LLM backend should be enabled.
+ * Whether the remote styling LLM backend is enabled.
  */
 llmEnabled: boolean, 
 /**
- * Which styling engine to use when enabled (local vs remote).
+ * OpenAI-compatible ASR endpoint and model (meaningful when
+ * `asr_backend_type` is `OpenAiCompatible`).
  */
-llmBackendType: LlmBackendTypeDto, openaiAsrBaseUrl: string | null, openaiAsrApiKey: string | null, openaiAsrModel: string | null, openaiLlmBaseUrl: string | null, openaiLlmApiKey: string | null, openaiLlmModel: string | null, 
+openaiAsrBaseUrl: string | null, openaiAsrModel: string | null, 
 /**
- * Selected local whisper model (sent when asr_backend_type == WhisperCpp).
+ * Saved remote styling provider. It persists when styling is off; on save,
+ * a blank value keeps the saved one.
  */
-whisperModel: WhisperModelDto | null, };
+openaiLlmBaseUrl: string | null, openaiLlmModel: string | null, };

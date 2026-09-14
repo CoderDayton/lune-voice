@@ -18,6 +18,10 @@ async-openai.workspace = true
 reqwest = { workspace = true }
 url.workspace = true
 serde_json.workspace = true
-
-[dev-dependencies]
+# `RemoteService` (backend/openai.rs): the tower `Service` async-openai's
+# `middleware` feature executes requests through, the retry sleep, and the
+# `http::Response` a capped body is rebuilt into. All three are already in the
+# tree via async-openai and reqwest.
+tower = { version = "0.5", default-features = false }
 tokio.workspace = true
+http = "1"

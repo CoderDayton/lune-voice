@@ -61,7 +61,7 @@ msgstr "{count} sélectionnées"
 msgid "{page} / {totalPages}"
 msgstr "{page} / {totalPages}"
 
-#: src/features/settings/sections/dictation-section.tsx:45
+#: src/features/settings/sections/dictation-section.tsx:61
 msgid "{saved} (unavailable)"
 msgstr "{saved} (indisponible)"
 
@@ -133,8 +133,8 @@ msgstr "Actif"
 msgid "Active style"
 msgstr "Style actif"
 
-#: src/features/settings/sections/dictation-section.tsx:124
-#: src/features/settings/sections/dictation-section.tsx:132
+#: src/features/settings/sections/dictation-section.tsx:151
+#: src/features/settings/sections/dictation-section.tsx:159
 msgid "Adaptive gain control"
 msgstr "Contrôle de gain adaptatif"
 
@@ -335,7 +335,7 @@ msgstr "Intégré"
 msgid "Cancel"
 msgstr "Annuler"
 
-#: src/features/settings/sections/dictation-section.tsx:67
+#: src/features/settings/sections/dictation-section.tsx:83
 msgid "Cancel current recording"
 msgstr "Annuler l'enregistrement en cours"
 
@@ -352,7 +352,7 @@ msgstr "Capitales"
 msgid "Capture by voice"
 msgstr "Capturer à la voix"
 
-#: src/features/settings/sections/dictation-section.tsx:105
+#: src/features/settings/sections/dictation-section.tsx:132
 msgid "Capture device and how recording detects when you speak."
 msgstr "Périphérique de capture et façon dont l'enregistrement détecte votre voix."
 
@@ -676,7 +676,7 @@ msgstr "Rien n'a été capté — réessayez, un peu plus près du micro."
 msgid "Discard dictation"
 msgstr "Supprimer la dictée"
 
-#: src/features/settings/sections/dictation-section.tsx:68
+#: src/features/settings/sections/dictation-section.tsx:84
 msgid "Discard the current draft and return to idle. Click the binding to change it."
 msgstr "Supprimez le brouillon actuel et revenez au mode veille. Cliquez sur la liaison pour la modifier."
 
@@ -971,6 +971,10 @@ msgstr "Historique conservé indéfiniment"
 msgid "History retention"
 msgstr "Conservation de l'historique"
 
+#: src/features/settings/sections/dictation-section.tsx:121
+msgid "Hold is unavailable right now, so the shortcut toggles recording instead. Grant keyboard access to use Hold."
+msgstr "Le maintien n'est pas disponible pour le moment : le raccourci démarre et arrête donc l'enregistrement. Autorisez l'accès au clavier pour utiliser le maintien."
+
 #: src/features/overview/overview-page.tsx:297
 msgid "Hold the hotkey and speak, and your words land wherever your cursor is."
 msgstr "Maintenez le raccourci et parlez : vos mots arrivent là où se trouve votre curseur."
@@ -1197,9 +1201,9 @@ msgstr "Moyen"
 msgid "meeting header"
 msgstr "en-tête de réunion"
 
-#: src/features/settings/sections/dictation-section.tsx:104
-#: src/features/settings/sections/dictation-section.tsx:109
-#: src/features/settings/sections/dictation-section.tsx:115
+#: src/features/settings/sections/dictation-section.tsx:131
+#: src/features/settings/sections/dictation-section.tsx:136
+#: src/features/settings/sections/dictation-section.tsx:142
 #: src/features/welcome/components/ready-checks.tsx:88
 msgid "Microphone"
 msgstr "Microphone"
@@ -1326,7 +1330,7 @@ msgstr "Pas de transcription"
 msgid "None"
 msgstr "Aucun"
 
-#: src/features/settings/sections/dictation-section.tsx:125
+#: src/features/settings/sections/dictation-section.tsx:152
 msgid "Normalizes microphone level before voice detection. Helps quiet mics and noisy rooms. Recommended."
 msgstr "Normalise le niveau du microphone avant la détection vocale. Aide les micros silencieux et les pièces bruyantes. Recommandé."
 
@@ -1568,8 +1572,8 @@ msgstr "Prêt"
 msgid "Recent sessions"
 msgstr "Sessions récentes"
 
-#: src/features/settings/sections/dictation-section.tsx:77
-#: src/features/settings/sections/dictation-section.tsx:83
+#: src/features/settings/sections/dictation-section.tsx:93
+#: src/features/settings/sections/dictation-section.tsx:99
 msgid "Recording mode"
 msgstr "Mode d'enregistrement"
 
@@ -1768,7 +1772,7 @@ msgstr "Configuration de votre GPU"
 msgid "Settings sections"
 msgstr "Sections de paramètres"
 
-#: src/features/settings/sections/dictation-section.tsx:52
+#: src/features/settings/sections/dictation-section.tsx:68
 #: src/features/styles/components/style-hero.tsx:18
 msgid "Shortcuts"
 msgstr "Raccourcis"
@@ -1874,11 +1878,11 @@ msgstr "Démarrer la dictée"
 msgid "Start minimized"
 msgstr "Démarrer réduit"
 
-#: src/features/settings/sections/dictation-section.tsx:57
+#: src/features/settings/sections/dictation-section.tsx:73
 msgid "Start or stop recording"
 msgstr "Démarrer ou arrêter l'enregistrement"
 
-#: src/features/settings/sections/dictation-section.tsx:53
+#: src/features/settings/sections/dictation-section.tsx:69
 msgid "Start, stop, and cancel dictation without leaving your work."
 msgstr "Démarrez, arrêtez et annulez la dictée sans quitter votre travail."
 
@@ -1933,7 +1937,7 @@ msgstr "Changer de style"
 msgid "System"
 msgstr "Système"
 
-#: src/features/settings/sections/dictation-section.tsx:38
+#: src/features/settings/sections/dictation-section.tsx:54
 msgid "System default"
 msgstr "Valeur par défaut du système"
 
@@ -1957,7 +1961,7 @@ msgstr "L'indicateur d'état flottant affiché pendant la dictée."
 msgid "The local runtime isn't responding. The figures below are the last known values."
 msgstr "Le moteur local ne répond pas. Les chiffres ci-dessous sont les dernières valeurs connues."
 
-#: src/features/settings/sections/dictation-section.tsx:58
+#: src/features/settings/sections/dictation-section.tsx:74
 msgid "The main shortcut used for voice typing. Click the binding to change it."
 msgstr "Le raccourci principal utilisé pour la saisie vocale. Cliquez sur la liaison pour la modifier."
 
@@ -2023,11 +2027,11 @@ msgstr "commencer à dicter"
 msgid "Today"
 msgstr "Aujourd'hui"
 
-#: src/features/settings/sections/dictation-section.tsx:95
+#: src/features/settings/sections/dictation-section.tsx:111
 msgid "Toggle and cancel are bound to the same key combo. One will override the other."
 msgstr "Basculer et annuler sont liés à la même combinaison de touches. L’un remplacera l’autre."
 
-#: src/features/settings/sections/dictation-section.tsx:78
+#: src/features/settings/sections/dictation-section.tsx:94
 msgid "Toggle is easiest for longer dictation. Hold is better for quick bursts."
 msgstr "Basculer est le plus simple pour une dictée plus longue. La tenue est meilleure pour les rafales rapides."
 
@@ -2228,7 +2232,7 @@ msgstr "Quand l'indicateur apparaît pendant la dictée."
 msgid "Where the pill sits on screen. Dragging it overrides the preset until you reset."
 msgstr "Où l'indicateur se place à l'écran. Le faire glisser remplace le préréglage jusqu'à la réinitialisation."
 
-#: src/features/settings/sections/dictation-section.tsx:110
+#: src/features/settings/sections/dictation-section.tsx:137
 msgid "Which input device dictation captures from. Changes apply right away."
 msgstr "De quel périphérique d'entrée la dictée capture. Les modifications s'appliquent immédiatement."
 

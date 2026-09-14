@@ -10,12 +10,24 @@ workspace = true
 [dependencies]
 bincode = { version = "2", features = ["serde"] }
 lune-core.workspace = true
-lune-persist.workspace = true
 serde.workspace = true
 tracing.workspace = true
 # Core dependency: the corrector and lexicon call wordnik_list::word_exists on
 # the always-compiled path (not training-only), so it stays unconditional.
 wordnik_list = "0.2"
+
+[features]
+# Offline data-regeneration tools in src/bin. The app ships their compiled
+# output from data/, so they are not built unless asked for.
+data-tools = []
+
+[[bin]]
+name = "build_freq"
+required-features = ["data-tools"]
+
+[[bin]]
+name = "build_caprate"
+required-features = ["data-tools"]
 
 [build-dependencies]
 bincode = { version = "2", features = ["serde"] }

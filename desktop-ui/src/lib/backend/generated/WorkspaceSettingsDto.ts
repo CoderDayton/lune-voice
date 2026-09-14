@@ -12,7 +12,24 @@ import type { PrivacyModeDto } from "./PrivacyModeDto";
 import type { TerminalModeDto } from "./TerminalModeDto";
 import type { WhisperModelDto } from "./WhisperModelDto";
 
-export type WorkspaceSettingsDto = { activationMode: ActivationModeDto, dictationMode: DictationModeDto, 
+export type WorkspaceSettingsDto = { 
+/**
+ * Whether an ASR API key is saved. The key itself never leaves the backend.
+ */
+openaiAsrApiKeySet: boolean, 
+/**
+ * Whether a styling API key is saved.
+ */
+openaiLlmApiKeySet: boolean, 
+/**
+ * Whether the *active* styling backend is the remote provider (the provider
+ * fields persist even when it isn't active).
+ */
+openaiLlmActive: boolean, 
+/**
+ * Selected local whisper model (meaningful when asr_backend_type == WhisperCpp).
+ */
+whisperModel: WhisperModelDto, activationMode: ActivationModeDto, dictationMode: DictationModeDto, 
 /**
  * Keep the dictated text on the clipboard after delivery (orthogonal to the
  * send method).
@@ -57,13 +74,14 @@ privacyMode: PrivacyModeDto,
 /**
  * Whether the remote styling LLM backend is enabled.
  */
-llmEnabled: boolean, openaiAsrBaseUrl: string | null, openaiAsrModel: string | null, openaiAsrApiKeySet: boolean, openaiLlmBaseUrl: string | null, openaiLlmModel: string | null, openaiLlmApiKeySet: boolean, 
+llmEnabled: boolean, 
 /**
- * Whether the *active* styling backend is the remote provider (the fields
- * above are the saved provider and persist even when it isn't active).
+ * OpenAI-compatible ASR endpoint and model (meaningful when
+ * `asr_backend_type` is `OpenAiCompatible`).
  */
-openaiLlmActive: boolean, 
+openaiAsrBaseUrl: string | null, openaiAsrModel: string | null, 
 /**
- * Selected local whisper model (meaningful when asr_backend_type == WhisperCpp).
+ * Saved remote styling provider. It persists when styling is off; on save,
+ * a blank value keeps the saved one.
  */
-whisperModel: WhisperModelDto, };
+openaiLlmBaseUrl: string | null, openaiLlmModel: string | null, };

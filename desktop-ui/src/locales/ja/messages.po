@@ -61,7 +61,7 @@ msgstr "{count} 件選択中"
 msgid "{page} / {totalPages}"
 msgstr "{page} / {totalPages}"
 
-#: src/features/settings/sections/dictation-section.tsx:45
+#: src/features/settings/sections/dictation-section.tsx:61
 msgid "{saved} (unavailable)"
 msgstr "{saved}（利用不可）"
 
@@ -133,8 +133,8 @@ msgstr "アクティブ"
 msgid "Active style"
 msgstr "アクティブスタイル"
 
-#: src/features/settings/sections/dictation-section.tsx:124
-#: src/features/settings/sections/dictation-section.tsx:132
+#: src/features/settings/sections/dictation-section.tsx:151
+#: src/features/settings/sections/dictation-section.tsx:159
 msgid "Adaptive gain control"
 msgstr "適応ゲイン制御"
 
@@ -335,7 +335,7 @@ msgstr "組み込み"
 msgid "Cancel"
 msgstr "キャンセル"
 
-#: src/features/settings/sections/dictation-section.tsx:67
+#: src/features/settings/sections/dictation-section.tsx:83
 msgid "Cancel current recording"
 msgstr "現在の録音をキャンセル"
 
@@ -352,7 +352,7 @@ msgstr "大文字"
 msgid "Capture by voice"
 msgstr "音声で登録"
 
-#: src/features/settings/sections/dictation-section.tsx:105
+#: src/features/settings/sections/dictation-section.tsx:132
 msgid "Capture device and how recording detects when you speak."
 msgstr "キャプチャデバイスと、録音があなたの発話を検出する方法。"
 
@@ -676,7 +676,7 @@ msgstr "何も聞き取れませんでした — マイクに少し近づいて�
 msgid "Discard dictation"
 msgstr "音声入力を破棄"
 
-#: src/features/settings/sections/dictation-section.tsx:68
+#: src/features/settings/sections/dictation-section.tsx:84
 msgid "Discard the current draft and return to idle. Click the binding to change it."
 msgstr "現在のドラフトを破棄し、アイドル状態に戻ります。バインディングをクリッ���して変更します。"
 
@@ -971,6 +971,10 @@ msgstr "履歴を永久に保持"
 msgid "History retention"
 msgstr "履歴の保持"
 
+#: src/features/settings/sections/dictation-section.tsx:121
+msgid "Hold is unavailable right now, so the shortcut toggles recording instead. Grant keyboard access to use Hold."
+msgstr "現在は押し続けるモードを使用できないため、ショートカットで録音を切り替えます。押し続けるモードを使うには、キーボードへのアクセスを許可してください。"
+
 #: src/features/overview/overview-page.tsx:297
 msgid "Hold the hotkey and speak, and your words land wherever your cursor is."
 msgstr "ホットキーを押しながら話すと、カーソルのある場所に文字が入力されます。"
@@ -1197,9 +1201,9 @@ msgstr "中"
 msgid "meeting header"
 msgstr "会議ヘッダー"
 
-#: src/features/settings/sections/dictation-section.tsx:104
-#: src/features/settings/sections/dictation-section.tsx:109
-#: src/features/settings/sections/dictation-section.tsx:115
+#: src/features/settings/sections/dictation-section.tsx:131
+#: src/features/settings/sections/dictation-section.tsx:136
+#: src/features/settings/sections/dictation-section.tsx:142
 #: src/features/welcome/components/ready-checks.tsx:88
 msgid "Microphone"
 msgstr "マイク"
@@ -1326,7 +1330,7 @@ msgstr "文字起こしなし"
 msgid "None"
 msgstr "なし"
 
-#: src/features/settings/sections/dictation-section.tsx:125
+#: src/features/settings/sections/dictation-section.tsx:152
 msgid "Normalizes microphone level before voice detection. Helps quiet mics and noisy rooms. Recommended."
 msgstr "音声検出前にマイクレベルを正規化します。小さい音のマイクや騒がしい部屋に役立ちます。推奨。"
 
@@ -1568,8 +1572,8 @@ msgstr "準備完了"
 msgid "Recent sessions"
 msgstr "最近のセッション"
 
-#: src/features/settings/sections/dictation-section.tsx:77
-#: src/features/settings/sections/dictation-section.tsx:83
+#: src/features/settings/sections/dictation-section.tsx:93
+#: src/features/settings/sections/dictation-section.tsx:99
 msgid "Recording mode"
 msgstr "録音モード"
 
@@ -1768,7 +1772,7 @@ msgstr "GPU をセットアップしています"
 msgid "Settings sections"
 msgstr "設定セクション"
 
-#: src/features/settings/sections/dictation-section.tsx:52
+#: src/features/settings/sections/dictation-section.tsx:68
 #: src/features/styles/components/style-hero.tsx:18
 msgid "Shortcuts"
 msgstr "ショートカット"
@@ -1874,11 +1878,11 @@ msgstr "音声入力を開始"
 msgid "Start minimized"
 msgstr "最小化して開始"
 
-#: src/features/settings/sections/dictation-section.tsx:57
+#: src/features/settings/sections/dictation-section.tsx:73
 msgid "Start or stop recording"
 msgstr "録音の開始または停止"
 
-#: src/features/settings/sections/dictation-section.tsx:53
+#: src/features/settings/sections/dictation-section.tsx:69
 msgid "Start, stop, and cancel dictation without leaving your work."
 msgstr "作業を中断せずに、音声入力の開始・停止・キャンセルを行えます。"
 
@@ -1933,7 +1937,7 @@ msgstr "スタイルを切り替え"
 msgid "System"
 msgstr "システム"
 
-#: src/features/settings/sections/dictation-section.tsx:38
+#: src/features/settings/sections/dictation-section.tsx:54
 msgid "System default"
 msgstr "システムの既定値"
 
@@ -1957,7 +1961,7 @@ msgstr "ディクテーション中に表示されるフローティングのス
 msgid "The local runtime isn't responding. The figures below are the last known values."
 msgstr "ローカルランタイムが応答していません。以下の数値は最後に確認された値です。"
 
-#: src/features/settings/sections/dictation-section.tsx:58
+#: src/features/settings/sections/dictation-section.tsx:74
 msgid "The main shortcut used for voice typing. Click the binding to change it."
 msgstr "音声入力に使用される主なショートカット。バインディングをクリックして変更します。"
 
@@ -2023,11 +2027,11 @@ msgstr "音声入力を始める"
 msgid "Today"
 msgstr "今日"
 
-#: src/features/settings/sections/dictation-section.tsx:95
+#: src/features/settings/sections/dictation-section.tsx:111
 msgid "Toggle and cancel are bound to the same key combo. One will override the other."
 msgstr "切り替えとキャンセルに同じキー操作が割り当てられています。どちらか一方が上書きされます。"
 
-#: src/features/settings/sections/dictation-section.tsx:78
+#: src/features/settings/sections/dictation-section.tsx:94
 msgid "Toggle is easiest for longer dictation. Hold is better for quick bursts."
 msgstr "長い音声入力には切り替えが便利です。短く話す場合は長押しが向いています。"
 
@@ -2228,7 +2232,7 @@ msgstr "ディクテーション中にインジケーターを表示するタイ
 msgid "Where the pill sits on screen. Dragging it overrides the preset until you reset."
 msgstr "インジケーターを画面のどこに置くか。ドラッ���すると、リセットするまで既定位置より優先されます。"
 
-#: src/features/settings/sections/dictation-section.tsx:110
+#: src/features/settings/sections/dictation-section.tsx:137
 msgid "Which input device dictation captures from. Changes apply right away."
 msgstr "ディクテーションがどの入力デバイスから取り込むか。変更はすぐに適用されます。"
 

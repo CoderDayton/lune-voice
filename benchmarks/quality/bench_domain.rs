@@ -418,8 +418,7 @@ async fn run_pipeline(
         lune_audio::AudioStream::from_samples(&fixture.pcm, lune_audio::AudioConfig::default())
             .unwrap();
     let db = lune_persist::Database::open_in_memory().unwrap();
-    let dict = lune_dict::DictionaryManager::new(lune_persist::Database::open_in_memory().unwrap())
-        .unwrap();
+    let dict = lune_dict::UserDictionary::default();
 
     let config = SessionManagerConfig {
         asr_backend_kind: harness.asr.kind(),
@@ -433,7 +432,7 @@ async fn run_pipeline(
         Arc::clone(&harness.asr),
         Arc::new(lune_dict::commands::VoiceCommandRouter::new()),
         Arc::clone(&harness.llm),
-        Arc::new(Mutex::new(dict)),
+        Arc::new(dict),
         Arc::new(Mutex::new(db)),
         Arc::new(lune_dict::corrector::LexicalGate::new()),
         config,
@@ -444,7 +443,11 @@ async fn run_pipeline(
     tokio::task::LocalSet::new()
         .run_until(async {
             let _id = mgr
-                .start_with_audio(event_tx, audio_stream)
+                .start(
+                    event_tx,
+                    lune_voice::SessionAudio::Owned(audio_stream),
+                    lune_voice::SessionKind::Dictate,
+                )
                 .await
                 .expect("start session");
             let mut final_text = String::new();

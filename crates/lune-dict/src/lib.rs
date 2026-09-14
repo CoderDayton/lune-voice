@@ -8,74 +8,28 @@ pub mod snippets;
 pub mod vocab;
 
 use lune_core::dict::DictionaryEntry;
-use lune_persist::{Database, PersistResult};
 
-/// Manages the user dictionary: in-memory cache + DB persistence.
+/// The user dictionary as the correction pipeline reads it.
 ///
-/// Applies corrections to ASR text (multi-word exact match, single-word fuzzy
-/// with Levenshtein distance ≤ 1) and selects relevant entries for LLM prompts.
-pub struct DictionaryManager {
-    db: Database,
-    cache: Vec<DictionaryEntry>,
+/// Finds matches in ASR text (multi-word exact match, single-word fuzzy with
+/// Levenshtein distance ≤ 1) and selects relevant entries for LLM prompts.
+/// Holds no database handle: the caller loads the entries and builds a new
+/// value when they change.
+#[derive(Debug, Clone, Default)]
+pub struct UserDictionary {
+    /// Highest priority first; `top_relevant` truncates in this order.
+    entries: Vec<DictionaryEntry>,
 }
 
-impl DictionaryManager {
-    /// Create a manager and load the initial cache from the database.
-    pub fn new(mut db: Database) -> PersistResult<Self> {
-        let cache = db.list_dictionary_entries()?;
-        Ok(Self { db, cache })
+impl UserDictionary {
+    pub fn new(mut entries: Vec<DictionaryEntry>) -> Self {
+        entries.sort_by_key(|e| std::cmp::Reverse(e.priority));
+        Self { entries }
     }
-
-    /// Reload the in-memory cache from the database.
-    pub fn reload(&mut self) -> PersistResult<()> {
-        self.cache = self.db.list_dictionary_entries()?;
-        Ok(())
-    }
-
-    /// Current cached entries (sorted by priority DESC, as returned by DB).
-    pub fn entries(&self) -> &[DictionaryEntry] {
-        &self.cache
-    }
-
-    // ── CRUD ─────────────────────────────────────────────────────────────
-
-    pub fn insert(&mut self, phrase: &str, replacement: &str, priority: u8) -> PersistResult<i32> {
-        let id = self
-            .db
-            .insert_dictionary_entry(phrase, replacement, priority)?;
-        self.cache.push(DictionaryEntry {
-            phrase: phrase.into(),
-            replacement: replacement.into(),
-            priority,
-        });
-        // Re-sort by priority DESC to maintain invariant.
-        self.cache
-            .sort_unstable_by_key(|e| std::cmp::Reverse(e.priority));
-        Ok(id)
-    }
-
-    pub fn delete(&mut self, db_id: i32) -> PersistResult<bool> {
-        // We don't store DB IDs in the cache, so reload after deletion.
-        let deleted = self.db.delete_dictionary_entry(db_id)?;
-        if deleted {
-            self.reload()?;
-        }
-        Ok(deleted)
-    }
-
-    // ── Text correction ──────────────────────────────────────────────────
-
-    // `apply()` was removed: it reimplemented dictionary correction
-    // independently of `scan()`, which is what the runtime pipeline actually
-    // calls, and the two had already drifted (it stripped only trailing
-    // punctuation and never split on internal glue punctuation). Nothing
-    // outside its own tests used it, and those tests gave false confidence
-    // that "dictionary correction" was covered end to end. Correction lives in
-    // `corrector.rs`, driven by `scan()` — one source of truth.
 
     pub fn scan(&self, text: &str) -> Vec<DictMatch> {
         let (multi, single): (Vec<&DictionaryEntry>, Vec<&DictionaryEntry>) = self
-            .cache
+            .entries
             .iter()
             .partition(|e| e.phrase.contains(char::is_whitespace));
 
@@ -159,7 +113,7 @@ impl DictionaryManager {
             .collect();
 
         let mut relevant: Vec<&DictionaryEntry> = self
-            .cache
+            .entries
             .iter()
             .filter(|e| {
                 // No-alloc ASCII CI substring match.
@@ -174,7 +128,7 @@ impl DictionaryManager {
             })
             .collect();
 
-        // Already sorted priority DESC by cache invariant; just truncate.
+        // Already sorted priority DESC by the `entries` invariant; just truncate.
         relevant.truncate(limit);
         relevant
     }
@@ -182,7 +136,7 @@ impl DictionaryManager {
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
-/// One dictionary match found by [`DictionaryManager::scan`]. `fuzzy` is true
+/// One dictionary match found by [`UserDictionary::scan`]. `fuzzy` is true
 /// for single-word edit-distance-1 matches (not exact and not multi-word
 /// phrase matches), which the corrector gates on low word confidence so a
 /// garbled ASR onset isn't rewritten into a coincidentally-near dictionary term.
@@ -319,11 +273,27 @@ fn lev_le1_by<T: Copy>(a: &[T], b: &[T], eq: impl Fn(T, T) -> bool) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use lune_persist::Database;
 
-    fn manager() -> DictionaryManager {
-        let db = Database::open_in_memory().unwrap();
-        DictionaryManager::new(db).unwrap()
+    fn entry(phrase: &str, replacement: &str, priority: u8) -> DictionaryEntry {
+        DictionaryEntry {
+            phrase: phrase.into(),
+            replacement: replacement.into(),
+            priority,
+        }
+    }
+
+    /// `top_relevant` truncates in cache order, so the dictionary must own the
+    /// priority ordering rather than trust whoever loaded the entries.
+    #[test]
+    fn a_user_dictionary_orders_entries_by_priority() {
+        let dict = UserDictionary::new(vec![
+            entry("rust", "Rust", 1),
+            entry("github", "GitHub", 9),
+            entry("tokio", "Tokio", 5),
+        ]);
+        let top = dict.top_relevant("rust github tokio", 2);
+        let phrases: Vec<&str> = top.iter().map(|e| e.phrase.as_str()).collect();
+        assert_eq!(phrases, ["github", "tokio"]);
     }
 
     /// A phrase that is whitespace but not empty passes the multi-word
@@ -332,8 +302,7 @@ mod tests {
     /// on *any* dictation, including an empty transcript.
     #[test]
     fn a_whitespace_only_phrase_does_not_loop_forever() {
-        let mut m = manager();
-        m.insert("\t", "boom", 100).unwrap();
+        let m = UserDictionary::new(vec![entry("\t", "boom", 100)]);
         assert!(m.scan("hello there").is_empty());
         assert!(m.scan("").is_empty());
     }
@@ -387,8 +356,7 @@ mod tests {
 
     #[test]
     fn scan_finds_fuzzy_match_glued_by_internal_punctuation() {
-        let mut mgr = manager();
-        mgr.insert("dayton", "Dayton", 10).unwrap();
+        let mgr = UserDictionary::new(vec![entry("dayton", "Dayton", 10)]);
 
         // Whisper sometimes glues a trailing-thought ellipsis directly onto
         // the next word with no whitespace: "is...Tayton." is ONE
@@ -408,8 +376,7 @@ mod tests {
 
     #[test]
     fn top_relevant_finds_match_glued_by_internal_punctuation() {
-        let mut mgr = manager();
-        mgr.insert("dayton", "Dayton", 10).unwrap();
+        let mgr = UserDictionary::new(vec![entry("dayton", "Dayton", 10)]);
 
         let relevant = mgr.top_relevant("hello my name is...Tayton.", 10);
         assert!(relevant.iter().any(|e| e.phrase == "dayton"));
@@ -419,9 +386,10 @@ mod tests {
 
     #[test]
     fn top_relevant_finds_match() {
-        let mut mgr = manager();
-        mgr.insert("github", "GitHub", 5).unwrap();
-        mgr.insert("rust", "Rust", 10).unwrap();
+        let mgr = UserDictionary::new(vec![
+            entry("github", "GitHub", 5),
+            entry("rust", "Rust", 10),
+        ]);
 
         let relevant = mgr.top_relevant("I use github", 10);
         assert!(relevant.iter().any(|e| e.phrase == "github"));
@@ -429,11 +397,11 @@ mod tests {
 
     #[test]
     fn top_relevant_respects_limit() {
-        let mut mgr = manager();
-        for i in 0..15u8 {
-            mgr.insert(&format!("word{i}"), &format!("Word{i}"), i)
-                .unwrap();
-        }
+        let mgr = UserDictionary::new(
+            (0..15u8)
+                .map(|i| entry(&format!("word{i}"), &format!("Word{i}"), i))
+                .collect(),
+        );
         let text: String = (0..15)
             .map(|i| format!("word{i}"))
             .collect::<Vec<_>>()

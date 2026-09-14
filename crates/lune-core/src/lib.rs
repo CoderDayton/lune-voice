@@ -7,6 +7,7 @@ pub mod error;
 pub mod lang;
 pub mod llm;
 pub mod models;
+pub mod retry;
 pub mod session;
 
 pub use error::{Error, Result};

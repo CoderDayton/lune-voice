@@ -61,7 +61,7 @@ msgstr "{count}개 선택됨"
 msgid "{page} / {totalPages}"
 msgstr "{page} / {totalPages}"
 
-#: src/features/settings/sections/dictation-section.tsx:45
+#: src/features/settings/sections/dictation-section.tsx:61
 msgid "{saved} (unavailable)"
 msgstr "{saved} (사용 불가)"
 
@@ -133,8 +133,8 @@ msgstr "활성"
 msgid "Active style"
 msgstr "활성 스타일"
 
-#: src/features/settings/sections/dictation-section.tsx:124
-#: src/features/settings/sections/dictation-section.tsx:132
+#: src/features/settings/sections/dictation-section.tsx:151
+#: src/features/settings/sections/dictation-section.tsx:159
 msgid "Adaptive gain control"
 msgstr "적응형 이득 제어"
 
@@ -335,7 +335,7 @@ msgstr "내장"
 msgid "Cancel"
 msgstr "취소"
 
-#: src/features/settings/sections/dictation-section.tsx:67
+#: src/features/settings/sections/dictation-section.tsx:83
 msgid "Cancel current recording"
 msgstr "현재 녹음 취소"
 
@@ -352,7 +352,7 @@ msgstr "대문자"
 msgid "Capture by voice"
 msgstr "음성으로 등록"
 
-#: src/features/settings/sections/dictation-section.tsx:105
+#: src/features/settings/sections/dictation-section.tsx:132
 msgid "Capture device and how recording detects when you speak."
 msgstr "캡처 장치와 녹음이 말하는 시점을 감지하는 방식입니다."
 
@@ -676,7 +676,7 @@ msgstr "아무것도 들리지 않았습니다 — 마이크에 조금 더 가�
 msgid "Discard dictation"
 msgstr "받아쓰기 취소"
 
-#: src/features/settings/sections/dictation-section.tsx:68
+#: src/features/settings/sections/dictation-section.tsx:84
 msgid "Discard the current draft and return to idle. Click the binding to change it."
 msgstr "현재 초안을 삭제하고 유휴 상태로 돌아갑니다. 바인딩을 클릭하여 변경하세요."
 
@@ -971,6 +971,10 @@ msgstr "기록을 영구 보관"
 msgid "History retention"
 msgstr "기록 보존"
 
+#: src/features/settings/sections/dictation-section.tsx:121
+msgid "Hold is unavailable right now, so the shortcut toggles recording instead. Grant keyboard access to use Hold."
+msgstr "지금은 누르고 있기를 사용할 수 없어 단축키가 녹음을 켜고 끕니다. 누르고 있기를 사용하려면 키보드 접근 권한을 허용하세요."
+
 #: src/features/overview/overview-page.tsx:297
 msgid "Hold the hotkey and speak, and your words land wherever your cursor is."
 msgstr "단축키를 누른 채 말하면 커서가 있는 곳에 텍스트가 입력됩니다."
@@ -1197,9 +1201,9 @@ msgstr "중간"
 msgid "meeting header"
 msgstr "회의 머리글"
 
-#: src/features/settings/sections/dictation-section.tsx:104
-#: src/features/settings/sections/dictation-section.tsx:109
-#: src/features/settings/sections/dictation-section.tsx:115
+#: src/features/settings/sections/dictation-section.tsx:131
+#: src/features/settings/sections/dictation-section.tsx:136
+#: src/features/settings/sections/dictation-section.tsx:142
 #: src/features/welcome/components/ready-checks.tsx:88
 msgid "Microphone"
 msgstr "마이크"
@@ -1326,7 +1330,7 @@ msgstr "텍스트 없음"
 msgid "None"
 msgstr "없음"
 
-#: src/features/settings/sections/dictation-section.tsx:125
+#: src/features/settings/sections/dictation-section.tsx:152
 msgid "Normalizes microphone level before voice detection. Helps quiet mics and noisy rooms. Recommended."
 msgstr "음성 감지 전에 마이크 레벨을 표준화합니다. 조용한 마이크와 시끄러운 방을 도와줍니다. 추천합니다."
 
@@ -1568,8 +1572,8 @@ msgstr "준비됨"
 msgid "Recent sessions"
 msgstr "최근 세션"
 
-#: src/features/settings/sections/dictation-section.tsx:77
-#: src/features/settings/sections/dictation-section.tsx:83
+#: src/features/settings/sections/dictation-section.tsx:93
+#: src/features/settings/sections/dictation-section.tsx:99
 msgid "Recording mode"
 msgstr "녹음 모드"
 
@@ -1768,7 +1772,7 @@ msgstr "GPU를 설정하는 중"
 msgid "Settings sections"
 msgstr "설정 섹션"
 
-#: src/features/settings/sections/dictation-section.tsx:52
+#: src/features/settings/sections/dictation-section.tsx:68
 #: src/features/styles/components/style-hero.tsx:18
 msgid "Shortcuts"
 msgstr "단축키"
@@ -1874,11 +1878,11 @@ msgstr "받아쓰기 시작"
 msgid "Start minimized"
 msgstr "최소화된 상태로 시작"
 
-#: src/features/settings/sections/dictation-section.tsx:57
+#: src/features/settings/sections/dictation-section.tsx:73
 msgid "Start or stop recording"
 msgstr "녹음 시작 또는 중지"
 
-#: src/features/settings/sections/dictation-section.tsx:53
+#: src/features/settings/sections/dictation-section.tsx:69
 msgid "Start, stop, and cancel dictation without leaving your work."
 msgstr "작업을 벗어나지 않고 받아쓰기를 시작, 중지, 취소하세요."
 
@@ -1933,7 +1937,7 @@ msgstr "스타일 전환"
 msgid "System"
 msgstr "시스템"
 
-#: src/features/settings/sections/dictation-section.tsx:38
+#: src/features/settings/sections/dictation-section.tsx:54
 msgid "System default"
 msgstr "시스템 기본값"
 
@@ -1957,7 +1961,7 @@ msgstr "받아쓰는 동안 표시되는 떠 있는 상태 표시기입니다."
 msgid "The local runtime isn't responding. The figures below are the last known values."
 msgstr "로컬 런타임이 응답하지 않습니다. 아래 수치는 마지막으로 확인된 값입니다."
 
-#: src/features/settings/sections/dictation-section.tsx:58
+#: src/features/settings/sections/dictation-section.tsx:74
 msgid "The main shortcut used for voice typing. Click the binding to change it."
 msgstr "음성 입력에 사용되는 주요 단축키입니다. 바인딩을 클릭하여 변경하세요."
 
@@ -2023,11 +2027,11 @@ msgstr "받아쓰기를 시작하려면"
 msgid "Today"
 msgstr "오늘"
 
-#: src/features/settings/sections/dictation-section.tsx:95
+#: src/features/settings/sections/dictation-section.tsx:111
 msgid "Toggle and cancel are bound to the same key combo. One will override the other."
 msgstr "전환 및 취소는 동일한 키 콤보에 바인딩됩니다. 하나는 다른 것보다 우선합니다."
 
-#: src/features/settings/sections/dictation-section.tsx:78
+#: src/features/settings/sections/dictation-section.tsx:94
 msgid "Toggle is easiest for longer dictation. Hold is better for quick bursts."
 msgstr "긴 받아쓰기에는 전환 방식이 가장 쉽습니다. 짧게 말할 때는 길게 누르기가 더 좋습니다."
 
@@ -2228,7 +2232,7 @@ msgstr "받아쓰는 동안 표시기가 나타나는 시점입니다."
 msgid "Where the pill sits on screen. Dragging it overrides the preset until you reset."
 msgstr "표시기가 화면에서 놓이는 위치입니다. 끌어다 놓으면 초기화할 때까지 기본 위치보다 우선합니다."
 
-#: src/features/settings/sections/dictation-section.tsx:110
+#: src/features/settings/sections/dictation-section.tsx:137
 msgid "Which input device dictation captures from. Changes apply right away."
 msgstr "받아쓰기가 캡처하는 입력 장치. 변경 사항은 즉시 적용됩니다."
 

@@ -43,7 +43,11 @@ fn main() {
             let t0 = Instant::now();
 
             let _id = mgr
-                .start_with_audio(event_tx, audio_stream)
+                .start(
+                    event_tx,
+                    lune_voice::SessionAudio::Owned(audio_stream),
+                    lune_voice::SessionKind::Dictate,
+                )
                 .await
                 .expect("start session");
 

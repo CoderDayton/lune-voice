@@ -128,6 +128,10 @@ describe("mock backend client", () => {
     expect(status.devices).toEqual([]);
   });
 
+  test("holdToTalkAvailable keeps the Hold warning out of a browser tab", async () => {
+    expect(await mockBackendClient.holdToTalkAvailable()).toBe(true);
+  });
+
   test("history entries have valid ISO timestamps and transcripts", async () => {
     const snapshot = await mockBackendClient.loadWorkspaceSnapshot();
 

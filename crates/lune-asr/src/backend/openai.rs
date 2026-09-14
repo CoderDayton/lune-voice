@@ -7,6 +7,7 @@ use url::Url;
 use lune_core::asr::{AsrBackend, AsrSegment, AsrSessionConfig};
 use lune_core::config::RedactedString;
 use lune_core::error::{Error, Result};
+use lune_core::retry;
 
 /// Configuration for the OpenAI-compatible ASR backend.
 #[derive(Debug, Clone)]
@@ -58,8 +59,8 @@ pub struct OpenAiAsrSession {
 /// `POST /v1/audio/transcriptions` when `poll_final` is called. Encodes
 /// audio as 16-bit PCM WAV.
 ///
-/// On transient HTTP errors, retries up to 3 times with 2 s initial
-/// exponential backoff. An opportunistic flush that still fails re-buffers
+/// On transient failures, retries per [`lune_core::retry`], the policy the
+/// styling LLM client shares. An opportunistic flush that still fails re-buffers
 /// the audio with a WARN log; a forced flush (`poll_final`, the batch
 /// pipeline's one transcription shot) propagates the error so the session
 /// reports a failure instead of a silent "no speech detected".
@@ -93,6 +94,7 @@ impl OpenAiCompatibleAsrBackend {
         // HTTPS/locality check above inspects `base_url` only, so a 302 to a
         // plaintext or third-party host would carry the recorded audio past it.
         let client = reqwest::Client::builder()
+            .connect_timeout(retry::CONNECT_TIMEOUT)
             .timeout(config.timeout)
             .redirect(reqwest::redirect::Policy::none())
             .build()
@@ -219,14 +221,16 @@ impl OpenAiCompatibleAsrBackend {
         let wav_len = wav.len() as u64;
 
         let mut last_err = String::new();
-        let mut delay = INITIAL_BACKOFF;
+        let mut delay = retry::INITIAL_BACKOFF;
         // Set from `Retry-After` when the server tells us how long to wait;
         // overrides our own schedule for that one attempt.
         let mut server_delay: Option<Duration> = None;
 
-        for attempt in 0..MAX_ATTEMPTS {
+        for attempt in 0..retry::MAX_ATTEMPTS {
             if attempt > 0 {
-                let wait = server_delay.take().unwrap_or_else(|| jittered(delay));
+                let wait = server_delay
+                    .take()
+                    .unwrap_or_else(|| retry::jittered(delay));
                 tokio::time::sleep(wait).await;
                 delay *= 2;
             }
@@ -260,7 +264,7 @@ impl OpenAiCompatibleAsrBackend {
                     last_err = e.to_string();
                     tracing::warn!(attempt, error = %e, "ASR request failed");
                 }
-                Ok(r) if r.status().is_server_error() || r.status() == 429 => {
+                Ok(r) if retry::is_transient_status(r.status().as_u16()) => {
                     last_err = format!("HTTP {}", r.status());
                     server_delay = retry_after(r.headers());
                     tracing::warn!(
@@ -285,7 +289,8 @@ impl OpenAiCompatibleAsrBackend {
         }
 
         Err(Error::asr(format!(
-            "ASR failed after {MAX_ATTEMPTS} attempts: {last_err}"
+            "ASR failed after {} attempts: {last_err}",
+            retry::MAX_ATTEMPTS
         )))
     }
 }
@@ -343,51 +348,9 @@ async fn read_capped(response: reqwest::Response, cap: usize) -> String {
     String::from_utf8_lossy(&out).into_owned()
 }
 
-/// Attempts made before a transient failure becomes a hard error.
-const MAX_ATTEMPTS: u8 = 3;
-
-/// First backoff window; doubled on each subsequent attempt.
-const INITIAL_BACKOFF: Duration = Duration::from_secs(2);
-
-/// Ceiling applied to a server-supplied `Retry-After`. The header is remote
-/// input: an endpoint that asks us to sleep for an hour would hang the
-/// utterance far past any point the user still wants it.
-const MAX_RETRY_AFTER: Duration = Duration::from_secs(30);
-
-/// Equal-jitter backoff: keep half the window fixed so the delay still grows,
-/// and randomise the other half.
-///
-/// A desktop client has no herd to stampede, so this is not about protecting the
-/// server. It matters when the endpoint is a *local* llama-server or Ollama that
-/// just restarted: without jitter every retry in the process lands on the same
-/// tick, so the requests keep colliding on the same cold-start window instead of
-/// spreading across it.
-fn jittered(base: Duration) -> Duration {
-    const NANOS_PER_SEC: u128 = 1_000_000_000;
-
-    let half = base / 2;
-    // Nanosecond phase as the entropy source. Jitter needs spread, not
-    // unpredictability, so a CSPRNG (and the dependency it costs) would be
-    // wasted here.
-    let nanos = std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .map_or(0, |d| d.subsec_nanos());
-    // Scale the sub-second phase across the whole half-window rather than using
-    // it as raw nanoseconds: the phase only spans 1 s, so adding it directly
-    // would confine a 2 s half-window's jitter to its first second and leave the
-    // rest of the window unused — the spread shrinking exactly as backoff grows.
-    let spread = u128::from(nanos) * half.as_nanos() / NANOS_PER_SEC;
-    half + Duration::from_nanos(u64::try_from(spread).unwrap_or(u64::MAX))
-}
-
-/// Parse a `Retry-After` delay, clamped to [`MAX_RETRY_AFTER`].
-///
-/// Only the delta-seconds form is honoured; the HTTP-date form is rare on the
-/// APIs this talks to and our own backoff is a fine fallback for it.
+/// `Retry-After` from a response, via [`retry::parse_retry_after`].
 fn retry_after(headers: &reqwest::header::HeaderMap) -> Option<Duration> {
-    let raw = headers.get(reqwest::header::RETRY_AFTER)?.to_str().ok()?;
-    let secs: u64 = raw.trim().parse().ok()?;
-    Some(Duration::from_secs(secs).min(MAX_RETRY_AFTER))
+    retry::parse_retry_after(headers.get(reqwest::header::RETRY_AFTER)?.to_str().ok()?)
 }
 
 fn build_transcription_url(base_url: &Url) -> Result<Url> {
@@ -515,62 +478,6 @@ impl VerboseJsonResponse {
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    #[test]
-    fn jitter_stays_within_the_backoff_window() {
-        let base = Duration::from_secs(4);
-        // Never below half the window (the delay must still grow across
-        // attempts) and never above it (backoff must stay bounded).
-        for _ in 0..256 {
-            let d = jittered(base);
-            assert!(d >= base / 2, "{d:?} collapsed the backoff");
-            assert!(d <= base, "{d:?} overshot the window");
-        }
-    }
-
-    #[test]
-    fn jitter_actually_varies() {
-        let base = Duration::from_secs(4);
-        // A constant "jitter" would defeat the point; sample until we see two
-        // different values rather than asserting on one draw.
-        let first = jittered(base);
-        let varied = (0..1000).any(|_| jittered(base) != first);
-        assert!(varied, "jitter produced a constant delay");
-    }
-
-    #[test]
-    fn jitter_handles_a_degenerate_window() {
-        // `half` is zero here; the modulus must not divide by zero.
-        assert_eq!(jittered(Duration::ZERO), Duration::ZERO);
-    }
-
-    #[test]
-    fn retry_after_is_honoured_and_clamped() {
-        use reqwest::header::{HeaderMap, HeaderValue, RETRY_AFTER};
-
-        let mut headers = HeaderMap::new();
-        headers.insert(RETRY_AFTER, HeaderValue::from_static("5"));
-        assert_eq!(retry_after(&headers), Some(Duration::from_secs(5)));
-
-        // A hostile or misconfigured endpoint must not park the utterance.
-        headers.insert(RETRY_AFTER, HeaderValue::from_static("86400"));
-        assert_eq!(retry_after(&headers), Some(MAX_RETRY_AFTER));
-    }
-
-    #[test]
-    fn unparseable_retry_after_falls_back_to_our_own_backoff() {
-        use reqwest::header::{HeaderMap, HeaderValue, RETRY_AFTER};
-
-        let mut headers = HeaderMap::new();
-        assert_eq!(retry_after(&headers), None);
-
-        // The HTTP-date form is deliberately not parsed.
-        headers.insert(
-            RETRY_AFTER,
-            HeaderValue::from_static("Wed, 21 Oct 2015 07:28:00 GMT"),
-        );
-        assert_eq!(retry_after(&headers), None);
-    }
 
     #[test]
     fn encode_wav_header() {

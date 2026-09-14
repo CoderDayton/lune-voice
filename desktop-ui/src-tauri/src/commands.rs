@@ -174,9 +174,9 @@ pub async fn load_pill_snapshot(
     snapshot.service_status = runtime.service_status().await;
     Ok(PillSnapshotDto {
         service_status: snapshot.service_status,
-        activation_mode: snapshot.settings.activation_mode,
-        pill_visibility: snapshot.settings.pill_visibility,
-        pill_locked: snapshot.settings.pill_locked,
+        activation_mode: snapshot.settings.core.activation_mode,
+        pill_visibility: snapshot.settings.core.pill_visibility,
+        pill_locked: snapshot.settings.core.pill_locked,
     })
 }
 
@@ -227,20 +227,20 @@ pub async fn save_workspace_settings(
     // taken from the returned snapshot rather than `inner.settings`, which
     // stays stale until the next pipeline rebuild.
     runtime
-        .sync_capture_device(Some(snapshot.settings.input_device.clone()))
+        .sync_capture_device(Some(snapshot.settings.core.input_device.clone()))
         .await;
     // Same staleness reason as the mic reconcile above: the idle-unload
     // watchdog reads `inner.settings`, so hand it the freshly-saved value
     // instead of leaving the change to take effect a dictation late.
     runtime
-        .sync_idle_unload(snapshot.settings.model_idle_unload_minutes)
+        .sync_idle_unload(snapshot.settings.core.model_idle_unload_minutes)
         .await;
     // Apply sound-cue settings live — they're played from the backend and must
     // not lag a dictation behind a toggle/volume change.
     runtime
         .sync_sound_cues(
-            snapshot.settings.sound_cues_enabled,
-            snapshot.settings.sound_cue_volume,
+            snapshot.settings.core.sound_cues_enabled,
+            snapshot.settings.core.sound_cue_volume,
         )
         .await;
     // Push pill overlay settings (geometry/placement/lock/pinning) into the
@@ -249,7 +249,8 @@ pub async fn save_workspace_settings(
     // rebuilds an existing window; `show_after` re-maps it per the same
     // visibility rule reconcile uses.
     {
-        let vis = crate::persistence::pill_visibility_from_dto(snapshot.settings.pill_visibility);
+        let vis =
+            crate::persistence::pill_visibility_from_dto(snapshot.settings.core.pill_visibility);
         let status = runtime.service_status().await;
         let show_after = crate::pill::should_show_pill(vis, &status);
         if let Some(paths) = lune_persist::AppPaths::resolve() {
@@ -271,7 +272,7 @@ pub async fn save_workspace_settings(
     // a freshly created pill reads current settings from its snapshot on load.
     crate::pill::set_pill_enabled(
         runtime.app_handle(),
-        snapshot.settings.pill_visibility != crate::dto::PillVisibilityDto::Never,
+        snapshot.settings.core.pill_visibility != crate::dto::PillVisibilityDto::Never,
     );
     // Map/unmap the pill to the new visibility right now, against the live
     // status — otherwise a switch to "Always" (or away from it) wouldn't take
@@ -279,7 +280,7 @@ pub async fn save_workspace_settings(
     // set_pill_enabled so the window exists (Never -> enabled) before we show it.
     runtime
         .reconcile_pill_visibility(crate::persistence::pill_visibility_from_dto(
-            snapshot.settings.pill_visibility,
+            snapshot.settings.core.pill_visibility,
         ))
         .await;
     // Notify the pill of the one setting it renders from. Everything else
@@ -287,7 +288,7 @@ pub async fn save_workspace_settings(
     if let Err(e) = runtime.app_handle().emit_to(
         "pill",
         "lune://pill-settings",
-        serde_json::json!({ "pillLocked": snapshot.settings.pill_locked }),
+        serde_json::json!({ "pillLocked": snapshot.settings.core.pill_locked }),
     ) {
         tracing::debug!(error = %e, "pill settings emit skipped (pill window may not exist)");
     }
@@ -849,6 +850,21 @@ pub fn uinput_access_ready(window: WebviewWindow) -> Result<bool, String> {
     {
         Ok(true)
     }
+}
+
+/// Whether the Hold activation mode works right now.
+///
+/// `false` means the global-shortcut plugin is handling the hotkey, and it
+/// can only toggle.
+#[tauri::command]
+pub fn hold_to_talk_available(window: WebviewWindow) -> Result<bool, String> {
+    use tauri::Manager;
+
+    require_window_access(&window, &["main"])?;
+    Ok(window
+        .app_handle()
+        .try_state::<std::sync::Arc<crate::hotkey::HotkeyController>>()
+        .is_some_and(|controller| controller.hold_available()))
 }
 
 /// Install the udev rule that lets this user synthesise keystrokes.
