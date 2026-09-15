@@ -8,7 +8,9 @@ styling LLM is remote-only (OpenAI-compatible HTTP) — no native build step.
 The `whisper-rs` `*-sys` crate **vendors and compiles the native C/C++ library
 from source at `cargo build` time** (CMake + a C++ toolchain + `libclang` for
 bindgen). It is vendored under `vendor/whisper-rs-sys/` via `[patch.crates-io]`,
-with a single modified file (`build.rs`) that adds `GGML_BACKEND_DL` support.
+with two modified files, both marked `LUNE FORK`: `build.rs` adds
+`GGML_BACKEND_DL` support, and `src/lib.rs` adds a lint allow for the bindgen
+output.
 
 ## Distribution model
 
@@ -168,8 +170,12 @@ binary runs on the newer ones too. The `.rpm`'s `Requires` come from
 The `.tar.gz` is the `.deb` payload repacked, not a second compile: the deb's
 `usr/` tree is kept intact (tauri resolves resources as
 `<prefix>/bin/lune-voice` -> `<prefix>/lib/Lune Voice`) with a top-level
-`lune-voice` launcher and a `README.txt` covering the udev rule. Bundle file
-names are normalized from `Lune Voice_...` to `lune-voice_...`.
+`lune-voice` launcher and a `README.txt` covering the udev rule. The binary's
+tauri bundle stamp is reset from `.deb` to "no bundle" (same length, and the
+script refuses unless exactly one stamp is found), so the portable copy offers
+a manual download instead of running `dpkg -i` through pkexec. Bundle file
+names are normalized from `Lune Voice_...` to `lune-voice_...`, by
+`package-all.sh` and by the release workflow alike.
 
 | `--env TYPE=` | Produces |
 |---|---|

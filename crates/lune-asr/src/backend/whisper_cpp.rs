@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 //! Local whisper.cpp ASR backend.
 //!
 //! The real implementation (feature `whisper-cpp`) wraps [`whisper_rs`], which

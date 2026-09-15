@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 //! IBus input-method delivery backend — **Linux only**.
 //!
 //! Windows and macOS deliver text through the `arboard` + `enigo` path in

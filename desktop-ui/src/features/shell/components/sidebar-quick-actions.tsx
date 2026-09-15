@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 import { useLingui } from '@lingui/react/macro';
 import { formatForDisplay } from '@tanstack/react-hotkeys';
 import { useRouter } from '@tanstack/react-router';

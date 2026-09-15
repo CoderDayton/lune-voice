@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 use serde::{Deserialize, Serialize};
 use ts_rs::TS;
 
@@ -521,6 +523,9 @@ pub enum UpdatePhaseDto {
     UpToDate,
     /// A newer version exists and is waiting for the user to accept it.
     Available,
+    /// A newer version exists, but this copy is not a package the updater can
+    /// replace (the portable archive). The user downloads it themselves.
+    ManualDownload,
     /// The accepted update is downloading.
     Downloading,
     /// Download finished; the package is being applied. The app restarts next.

@@ -1,0 +1,20 @@
+name: Feature request
+description: Suggest something Lune Voice should do.
+labels: [enhancement]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: What you are trying to do
+      description: The task or problem, not only the feature you have in mind.
+    validations:
+      required: true
+  - type: textarea
+    id: idea
+    attributes:
+      label: What would help
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: What you use today
+      description: Workarounds or other tools, if any.

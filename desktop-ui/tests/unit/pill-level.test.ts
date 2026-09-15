@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 import { describe, expect, test } from "bun:test";
 import { DOT_COUNT, dotStyle } from "../../src/features/dictation/dot-style";
 import {

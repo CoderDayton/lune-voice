@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 //! `src/cosmic_protocol.rs` expands the vendored COSMIC protocol XML through
 //! `wayland-scanner`'s proc macros. Cargo cannot see files a proc macro reads,
 //! so without these directives an edit to the XML would leave the generated

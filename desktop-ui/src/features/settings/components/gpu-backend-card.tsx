@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 import { useLingui } from '@lingui/react/macro';
 import { Check, Cpu, Download, Loader2, RefreshCw, Zap } from 'lucide-react';
 import { ByteProgress } from '../../../components/ui/byte-progress';

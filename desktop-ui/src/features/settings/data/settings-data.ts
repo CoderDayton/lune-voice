@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 import type { I18n, MessageDescriptor } from '@lingui/core';
 import { msg } from '@lingui/core/macro';
 import { ClipboardPaste, Cpu, Hand, Keyboard, PowerOff, Server, ToggleLeft } from 'lucide-react';

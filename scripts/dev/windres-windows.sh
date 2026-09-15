@@ -1,4 +1,5 @@
 #!/bin/sh
+# SPDX-License-Identifier: GPL-3.0-or-later
 # Windows resource compiler for the `x86_64-pc-windows-gnu` check.
 #
 # `embed-resource` (via `tauri-winres`, via `tauri_build::build()`) compiles the

@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 //! Prompt output cleanup utilities.
 
 /// Collapses unnecessary spaces within numeric values like thousands separators.

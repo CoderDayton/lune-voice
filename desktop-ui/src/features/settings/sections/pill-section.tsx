@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 import { useLingui } from '@lingui/react/macro';
 import { useStore } from '@tanstack/react-store';
 import { Move, Pill, Shapes } from 'lucide-react';

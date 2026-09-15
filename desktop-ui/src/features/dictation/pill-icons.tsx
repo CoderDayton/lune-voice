@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 /** Pill overlay icons — stroke-based, 24×24 viewBox, inherits currentColor. */
 
 interface IconProps {

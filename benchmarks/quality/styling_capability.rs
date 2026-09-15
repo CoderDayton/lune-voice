@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 //! Styling-LLM capability benchmark.
 //!
 //! Answers one question: **is the configured remote styling LLM good enough

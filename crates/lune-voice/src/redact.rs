@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 //! Keeping dictated text out of the logs.
 //!
 //! Every transcript this app touches is, by definition, private speech: the

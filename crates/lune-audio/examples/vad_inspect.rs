@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 //! VAD timeline inspection for WAV files, with PCEN-AGC telemetry.
 //!
 //! Usage:

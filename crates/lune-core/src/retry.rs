@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 //! Retry policy shared by the remote OpenAI-compatible clients (ASR and the
 //! styling LLM), so both back off the same way against the same class of
 //! user-configured, untrusted endpoint.

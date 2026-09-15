@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 import { createRootRoute } from '@tanstack/react-router';
 import { AppShell } from '../features/shell/components/app-shell';
 

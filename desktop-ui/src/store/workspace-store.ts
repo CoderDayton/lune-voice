@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 import { i18n } from '@lingui/core';
 import { msg } from '@lingui/core/macro';
 import { Store } from '@tanstack/store';

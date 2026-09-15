@@ -1,8 +1,20 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 import { useLingui } from '@lingui/react/macro';
-import { CircleAlert, CircleCheck, Download, Info, Loader2, RefreshCw } from 'lucide-react';
+import { openUrl } from '@tauri-apps/plugin-opener';
+import {
+  CircleAlert,
+  CircleCheck,
+  Download,
+  ExternalLink,
+  Info,
+  Loader2,
+  RefreshCw,
+} from 'lucide-react';
 import { useEffect, useId, useRef } from 'react';
 import { ByteProgress } from '../../components/ui/byte-progress';
 import type { UpdatePhaseDto, UpdateStateDto } from '../../lib/backend/types';
+import { RELEASES_URL } from '../../lib/links';
 import { useUpdateFlow } from './use-update-flow';
 
 /**
@@ -96,6 +108,7 @@ function UpdateBody({ state, titleId, onInstall, onDismiss, onRetryCheck }: Upda
     checking: t`Checking for updates`,
     'up-to-date': t`You're up to date`,
     available: t`Update available`,
+    'manual-download': t`Update available`,
     downloading: t`Downloading update`,
     installing: t`Installing update`,
     'check-failed': t`Update check failed`,
@@ -131,6 +144,20 @@ function UpdateBody({ state, titleId, onInstall, onDismiss, onRetryCheck }: Upda
           </p>
           <p className="mt-1 text-sm text-content-muted">
             {t`Installing replaces the app and restarts it. Your settings, history and models are untouched.`}
+          </p>
+          {notes && <ReleaseNotes notes={notes} />}
+        </>
+      )}
+
+      {phase === 'manual-download' && (
+        <>
+          <p className="mt-2 text-sm text-content-muted">
+            {t`Lune Voice ${version} is available. You have ${currentVersion}.`}
+          </p>
+          <p className="mt-1 text-sm break-words text-content-muted">
+            {/* The portable archive has no package the updater can replace, so
+                the URL stays visible in case the browser cannot be opened. */}
+            {t`This copy can't update itself. Download the new version from ${RELEASES_URL} and replace this one. Your settings, history and models are kept.`}
           </p>
           {notes && <ReleaseNotes notes={notes} />}
         </>
@@ -236,6 +263,26 @@ function UpdateActions({ phase, onInstall, onDismiss, onRetryCheck }: UpdateActi
         <button type="button" className="btn btn-primary gap-2" onClick={onInstall}>
           <Download size={16} strokeWidth={1.8} />
           {t`Install and restart`}
+        </button>
+      </>
+    );
+  }
+
+  if (phase === 'manual-download') {
+    return (
+      <>
+        <button type="button" className="btn btn-soft" onClick={onDismiss}>
+          {t`Later`}
+        </button>
+        <button
+          type="button"
+          className="btn btn-primary gap-2"
+          onClick={() =>
+            void openUrl(RELEASES_URL).catch((e) => console.error('open releases page:', e))
+          }
+        >
+          <ExternalLink size={16} strokeWidth={1.8} />
+          {t`Open releases page`}
         </button>
       </>
     );

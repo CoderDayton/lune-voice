@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 diesel::table! {
     dictionary (id) {
         id -> Integer,

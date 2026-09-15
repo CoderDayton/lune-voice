@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 export const DOT_COUNT = 7;
 
 // Per-bar scale offsets — center bars react most, edges least (symmetric). An

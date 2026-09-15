@@ -1,4 +1,5 @@
 #!/bin/sh
+# SPDX-License-Identifier: GPL-3.0-or-later
 # C/C++ cross-compiler for the `x86_64-pc-windows-gnu` check, backed by `zig cc`.
 #
 # `cc-rs` passes the Rust triple as `--target=x86_64-pc-windows-gnu`. Zig's

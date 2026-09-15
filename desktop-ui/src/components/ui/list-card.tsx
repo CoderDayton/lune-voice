@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 import { useLingui } from '@lingui/react/macro';
 import { Search, X } from 'lucide-react';
 import { type ReactNode, type Ref, type RefObject, useEffect } from 'react';

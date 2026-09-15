@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 use std::collections::HashMap;
 use std::io::Read;
 use std::path::{Path, PathBuf};

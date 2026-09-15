@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 import { i18n } from '@lingui/core';
 import { I18nProvider } from '@lingui/react';
 import ReactDOM from 'react-dom/client';

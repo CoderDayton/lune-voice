@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 //! Live transcription WER benchmark.
 //!
 //! Prompts you to read each reference line aloud, records it from the mic, runs

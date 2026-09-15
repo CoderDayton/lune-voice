@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 //! Live microphone transcription with delivery.
 //!
 //! Records from the default mic, runs the full ASR + LLM pipeline, and
@@ -168,10 +170,6 @@ fn main() {
                 }
                 event = event_rx.recv() => {
                     match event {
-                        Some(SessionEvent::PartialText) => {
-                            // Show partial text in gray, overwrite line
-                            eprint!("\r\x1b[2K  \x1b[90m(processing...)\x1b[0m");
-                        }
                         Some(SessionEvent::FinalizedText { text: t, .. }) => {
                             eprint!("\r\x1b[2K  {t}\n");
                             if let Some(svc) = &delivery {

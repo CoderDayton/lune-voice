@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 /**
  * Id of the DaisyUI drawer checkbox that drives the sidebar's expanded state.
  *

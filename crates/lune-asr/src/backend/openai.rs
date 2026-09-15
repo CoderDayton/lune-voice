@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 use std::sync::Mutex;
 use std::time::Duration;
 

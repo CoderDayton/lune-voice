@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 import { useLingui } from '@lingui/react/macro';
 import { Check, Lock, Pencil, Trash2 } from 'lucide-react';
 import type { StylePreset } from '../../../store/workspace-types';

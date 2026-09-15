@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 //! Updater tests against a local HTTP endpoint.
 //!
 //! These cover the part that carries the trust: a manifest is honoured only if

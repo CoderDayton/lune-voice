@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 //! dlopen-able ggml compute backends.
 //!
 //! The shipped binary is built with `GGML_BACKEND_DL=ON`, so ggml's compute

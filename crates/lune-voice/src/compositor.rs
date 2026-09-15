@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 //! Whether the app must fall back to XWayland for the dictation pill.
 //!
 //! The pill overlay needs two things a *native* Wayland window cannot do on its

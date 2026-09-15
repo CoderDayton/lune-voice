@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# SPDX-License-Identifier: GPL-3.0-or-later
 # Install (or remove) a user-level desktop entry for a locally built binary.
 #
 # Why this exists: the shell shows the icon of the *application* it matched a

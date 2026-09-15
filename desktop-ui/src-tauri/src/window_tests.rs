@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 //! Sizing rules for the main window's adaptive default.
 //!
 //! `adaptive_window_size` itself needs a live `AppHandle`, so the clamping it

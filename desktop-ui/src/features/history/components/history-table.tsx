@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 import { plural } from '@lingui/core/macro';
 import { useLingui } from '@lingui/react/macro';
 import { useStore } from '@tanstack/react-store';

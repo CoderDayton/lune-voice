@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 //! The Win32 half of the Windows hotkey backend: a `WH_KEYBOARD_LL` hook and
 //! the thread that pumps messages for it.
 //!

@@ -136,9 +136,14 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p release-artifacts
-          cp target/release/bundle/deb/*.deb           release-artifacts/
-          cp target/release/bundle/rpm/*.rpm           release-artifacts/
-          cp target/release/bundle/appimage/*.AppImage release-artifacts/
+          # Same names as `cgs package`: tauri names bundles after
+          # `productName` ("Lune Voice"), and the space breaks download URLs.
+          for f in target/release/bundle/deb/*.deb \
+                   target/release/bundle/rpm/*.rpm \
+                   target/release/bundle/appimage/*.AppImage; do
+            dest="$(basename "$f")"
+            cp "$f" "release-artifacts/${dest//Lune Voice/lune-voice}"
+          done
           (cd release-artifacts && sha256sum ./* > SHA256SUMS)
           ls -la release-artifacts
 
@@ -225,7 +230,10 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p release-artifacts
-          cp target/release/bundle/nsis/*-setup.exe release-artifacts/
+          for f in target/release/bundle/nsis/*-setup.exe; do
+            dest="$(basename "$f")"
+            cp "$f" "release-artifacts/${dest//Lune Voice/lune-voice}"
+          done
           (cd release-artifacts && sha256sum ./* > SHA256SUMS-windows)
           ls -la release-artifacts
 

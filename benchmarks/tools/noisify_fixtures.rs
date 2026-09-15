@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 //! Generate noisy variants of the clean fixtures for LLM-correction
 //! stress-testing.
 //!

@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 import type { RegisterableHotkey } from '@tanstack/react-hotkeys';
 import type { LucideIcon } from 'lucide-react';
 import { BookText, Clock, House, Paintbrush, ScrollText, Settings } from 'lucide-react';

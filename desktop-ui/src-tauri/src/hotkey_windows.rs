@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 //! Windows global hotkey detection via a low-level keyboard hook.
 //!
 //! `tauri-plugin-global-shortcut` cannot serve this app on Windows: it reports

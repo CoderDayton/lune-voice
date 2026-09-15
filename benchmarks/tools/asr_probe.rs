@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 //! Single-WAV / dump ASR probe — feed recordings through the real ASR (and,
 //! for WAVs, the full VAD+ASR+LLM pipeline) and print the hypothesis.
 //! Throwaway diagnostic for the quiet short-utterance investigation.

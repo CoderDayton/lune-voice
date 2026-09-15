@@ -1,5 +1,8 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 import { useLingui } from '@lingui/react/macro';
-import { SlidersHorizontal } from 'lucide-react';
+import { openUrl } from '@tauri-apps/plugin-opener';
+import { ExternalLink, SlidersHorizontal } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import {
   DescriptiveDropdown,
@@ -7,6 +10,7 @@ import {
 } from '../../../components/ui/descriptive-dropdown';
 import { activateLocale, type LocaleKey, locales } from '../../../i18n';
 import { backendClient } from '../../../lib/backend/client';
+import { REPO_URL } from '../../../lib/links';
 import { saveWorkspaceSetting, type WorkspaceSettings } from '../../../store/workspace-store';
 import { SettingsRow, SettingsSection } from '../components/section';
 import {
@@ -134,6 +138,25 @@ export function GeneralSection({ settings }: { settings: WorkspaceSettings }) {
             onClick={() => void checkForUpdates()}
           >
             {checking ? t`Checking…` : t`Check for updates`}
+          </button>
+        }
+      />
+
+      {/* GPLv3 §0 "Appropriate Legal Notices": an interactive program shows its
+          licence, the absence of warranty, and where the source is. */}
+      <SettingsRow
+        label={t`License`}
+        description={t`Lune Voice is free software under the GNU General Public License, version 3 or later, and comes with no warranty. You may copy, change and share it under those terms; the source code is at ${REPO_URL}.`}
+        control={
+          <button
+            type="button"
+            className="btn gap-2"
+            onClick={() =>
+              void openUrl(REPO_URL).catch((e) => console.error('open source repository:', e))
+            }
+          >
+            <ExternalLink size={16} strokeWidth={1.8} />
+            {t`View source`}
           </button>
         }
       />

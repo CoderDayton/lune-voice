@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 //! Focused-window capture on Windows.
 //!
 //! Where the Unix side has to negotiate with whichever compositor is running,

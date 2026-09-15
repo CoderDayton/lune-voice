@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 //! Runtime-dispatched ASR backend registry.
 //!
 //! [`AsrRegistry`] wraps all available ASR backends behind a single enum that

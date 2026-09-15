@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 use std::hint::black_box;
 use std::time::{Duration, Instant};
 

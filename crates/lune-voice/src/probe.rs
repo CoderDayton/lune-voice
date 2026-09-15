@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 //! Bounded probing of a display server.
 //!
 //! Wayland and X11 clients block on socket I/O with no deadline of their own.

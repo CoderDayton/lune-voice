@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 //! AGC frontend benchmark: PCEN off vs on.
 //!
 //! Compares Earshot VAD behavior with and without the PCEN-style adaptive

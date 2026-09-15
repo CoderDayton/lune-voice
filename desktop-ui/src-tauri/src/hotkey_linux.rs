@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 //! Linux-only global hotkey detection via evdev with device grab.
 //!
 //! Grabs physical keyboards exclusively and re-injects non-hotkey events

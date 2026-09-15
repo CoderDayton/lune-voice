@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 //! Prompt-strategy A/B for the configured remote styling LLM.
 //!
 //! Tests the folk claim that tiny models do better with **explicit numbered

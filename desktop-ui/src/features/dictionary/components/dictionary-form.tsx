@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 import { Trans, useLingui } from '@lingui/react/macro';
 import { ArrowRight, Plus } from 'lucide-react';
 import { type FormEvent, useId, useRef, useState } from 'react';

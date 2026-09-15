@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 //! Real-model integration test for whisper.cpp's built-in (silero ggml) VAD.
 //!
 //! Ignored by default (needs ggml models on disk + the C++ build). Run with:

@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 //! Model load / unload timing probe.
 //!
 //! Answers the one question an idle-unload feature cannot be designed without:

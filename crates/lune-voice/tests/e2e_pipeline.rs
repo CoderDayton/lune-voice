@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 //! End-to-end pipeline test using NoopAsr + EchoPostProcessor.
 //!
 //! Verifies: start → events arrive → stop → DB record persisted.

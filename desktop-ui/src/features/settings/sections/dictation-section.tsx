@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 import { Trans, useLingui } from '@lingui/react/macro';
 import { invoke } from '@tauri-apps/api/core';
 import { Keyboard, Mic } from 'lucide-react';

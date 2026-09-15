@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 /** Binary step between KB, MB and GB — the units disk and download sizes use. */
 const UNIT = 1024;
 const MB = UNIT * UNIT;

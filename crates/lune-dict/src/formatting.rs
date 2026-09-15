@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 //! Deterministic punctuation normalization + LLM-gate detection.
 //!
 //! ASR output (Qwen3-ASR in particular) often arrives lowercase and without

@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 //! Per-stage pipeline latency benchmark.
 //!
 //! Decomposes the dictation pipeline into measured stages

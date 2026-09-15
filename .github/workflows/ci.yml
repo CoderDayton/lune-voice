@@ -29,6 +29,8 @@ jobs:
         with:
           components: rustfmt
       - run: cargo fmt --all -- --check
+      - name: SPDX licence lines
+        run: bash scripts/dev/check-spdx.sh
 
   # ── Clippy ────────────────────────────────────────────────────────────────
   clippy:

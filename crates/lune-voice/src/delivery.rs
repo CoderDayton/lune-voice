@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 // The IBus arm and the Windows/macOS driver both borrow-or-flatten.
 #[cfg(any(target_os = "linux", not(unix)))]
 use std::borrow::Cow;

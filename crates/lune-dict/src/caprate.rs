@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 //! Per-word capitalization rate: `P(capitalized | the word is not at a
 //! sentence start)`, built from cased corpora by `scripts/build/cap_rate.py` +
 //! the `build_caprate` bin.

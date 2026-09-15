@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 import { useLingui } from '@lingui/react/macro';
 import type { WorkspaceSettings } from '../../../store/workspace-store';
 import { useDebouncedSetting } from '../hooks/use-debounced-setting';

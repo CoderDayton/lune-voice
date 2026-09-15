@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 import { invoke } from '@tauri-apps/api/core';
 import { useCallback, useEffect, useState } from 'react';
 import type { GpuBackendStatusDto } from '../../../lib/backend/generated/GpuBackendStatusDto';

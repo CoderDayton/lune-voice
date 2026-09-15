@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 import type { MessageDescriptor } from '@lingui/core';
 import { useLingui } from '@lingui/react/macro';
 import { Copy, RefreshCw } from 'lucide-react';

@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 //! Cairo renderer for the native Linux pill overlay.
 //!
 //! The Linux pill is drawn directly with cairo instead of a webview: WebKitGTK's

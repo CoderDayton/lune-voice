@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 //! Control-character sanitizing for text on its way to the keyboard.
 //!
 //! Delivered text is not trusted. It has passed through the ASR decoder, the

@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 //! PCEN-style adaptive AGC for the VAD frontend.
 //!
 //! Operates on f32 mono audio in `[-1, 1]`. Tracks signal and noise envelopes

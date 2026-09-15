@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 //! dict_carrier_ab — A/B: do dictionary terms survive the correction pass
 //! WITHOUT the user-prompt dictionary-carrier examples?
 //!

@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# SPDX-License-Identifier: GPL-3.0-or-later
 # Build the `latest.json` the updater plugin fetches, from artifacts already in
 # release-artifacts/.
 #
@@ -96,6 +97,9 @@ RPM=("$ARTIFACTS_DIR"/*.rpm)
 # `*-setup.exe` is the NSIS bundle; the pattern excludes any other .exe that
 # happens to be lying in the directory.
 NSIS=("$ARTIFACTS_DIR"/*-setup.exe)
+# The portable archive starts with a version number, which keeps the GPU plugin
+# archive (`lune-voice-gpu-...tar.gz`, ~500 MB) out of the app release.
+PORTABLE=("$ARTIFACTS_DIR"/lune-voice-[0-9]*-linux-*.tar.gz)
 shopt -u nullglob
 
 if [ ${#APPIMAGE[@]} -eq 0 ] && [ ${#RAW_APPIMAGE[@]} -gt 0 ]; then
@@ -143,4 +147,7 @@ echo "valid JSON"
 grep -oE '"(linux|windows)-x86_64(-[a-z]*)?"' "$MANIFEST" | tr -d '"' | sed 's/^/  platform: /'
 echo
 echo "Upload latest.json together with the artifacts, e.g.:"
-echo "  gh release upload $TAG $ARTIFACTS_DIR/latest.json $ARTIFACTS_DIR/*.{deb,rpm,AppImage,tar.gz,exe}"
+upload=("$MANIFEST" "${RAW_APPIMAGE[@]}" "${APPIMAGE[@]}" "${DEB[@]}" "${RPM[@]}" "${NSIS[@]}" "${PORTABLE[@]}")
+printf '  gh release upload %q' "$TAG"
+printf ' %q' "${upload[@]}"
+echo

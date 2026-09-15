@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 // DTO shapes are generated from `desktop-ui/src-tauri/src/dto.rs` via ts-rs.
 // Run `cargo test -p lune-ui` after editing any Rust DTO to regenerate.
 //

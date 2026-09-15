@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 use lune_core::config::PrivacyMode;
 use tauri::{AppHandle, Emitter, Runtime, State, WebviewWindow, ipc::Channel};
 use tauri_plugin_dialog::DialogExt;

@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 //! ASR backend implementations — runtime-dispatched inference engines.
 
 pub mod openai;

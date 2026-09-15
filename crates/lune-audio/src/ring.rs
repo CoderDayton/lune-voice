@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 //! Lock-free SPSC ring buffer for audio chunks.
 //!
 //! `push` never blocks and never fails: when the buffer is full it evicts the

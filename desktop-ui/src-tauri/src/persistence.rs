@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 use lune_asr::AsrRegistry;
 use lune_core::config::{
     ActivationMode, AsrBackendConfig, DevicePolicy, DictationMode, FormatToggles, HistoryRetention,

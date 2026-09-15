@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 //! Audio capture stage.
 //!
 //! Streams microphone audio into the ASR backend, which buffers the whole

@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 //! Per-backend pipeline configuration.
 //!
 //! Each ASR backend provides tuned defaults for the confidence threshold,

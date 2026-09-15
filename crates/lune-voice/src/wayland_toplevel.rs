@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 //! Wayland `wlr-foreign-toplevel-management-v1` client.
 //!
 //! Returns the `app_id` of the focused (activated) toplevel on any compositor

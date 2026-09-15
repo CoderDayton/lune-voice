@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 //! Shared state for the two foreign-toplevel clients.
 //!
 //! wlr-foreign-toplevel-management and COSMIC's toplevel-info answer the same

@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 //! The Linux dictation pill: a bare GTK window painted with cairo.
 //!
 //! Not a Tauri window. Tauri only creates windows with a `WebviewWindowBuilder`,

@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 //! Update checking and installing, reported through the app's own UI.
 //!
 //! Every outcome a user can see is an [`UpdateStateDto`] the main window
@@ -15,6 +17,7 @@
 use std::sync::Mutex;
 use std::sync::atomic::{AtomicBool, Ordering};
 
+use tauri::utils::config::BundleType;
 use tauri::{AppHandle, Emitter, EventTarget, Manager, State, WebviewWindow};
 use tauri_plugin_updater::{Update, UpdaterExt};
 
@@ -208,8 +211,9 @@ pub fn notify_update_available<R: tauri::Runtime>(
 /// All three Linux bundles are supported — the plugin swaps an AppImage in
 /// place and installs a .deb/.rpm through `pkexec` (a graphical password
 /// prompt) — as is the Windows NSIS installer, which the plugin runs directly.
-/// A binary run straight out of `target/` has no package to replace, so the
-/// install step fails and says so rather than pretending to work.
+/// A release binary with no package stamp — the portable archive, or one run
+/// straight out of `target/` — is offered a manual download instead (see
+/// [`installs_in_place`]).
 ///
 /// The manifest key is left to the plugin: it asks for
 /// `linux-x86_64-{deb,rpm,appimage}` matching how this install was packaged and
@@ -346,16 +350,38 @@ pub async fn run_update_check(app: &AppHandle, mode: CheckMode) {
     announce_update(app, mode, update, &current);
 }
 
+/// Whether the updater can replace this copy in place.
+///
+/// The bundler stamps a binary with the package it went into. On Linux, an
+/// unstamped release binary — the portable archive, whose stamp
+/// `package-all.sh` clears, or one run straight out of `target/` — has no
+/// package to replace, and the plugin would hand its download to the AppImage
+/// installer. Debug builds keep the in-place path for `cgs updater-test`.
+fn installs_in_place(bundle: Option<BundleType>, debug_build: bool) -> bool {
+    debug_build || bundle.is_some() || !cfg!(target_os = "linux")
+}
+
 /// Store a found update and tell the user about it in the way `mode` calls for.
 fn announce_update(app: &AppHandle, mode: CheckMode, update: Update, current: &str) {
     let version = update.version.clone();
     let notes = update.body.clone();
-    *lock(&app.state::<UpdateFlow>().pending) = Some(update);
+
+    // A copy that cannot be replaced keeps no `Update`: with nothing pending,
+    // `install_pending_update` refuses rather than running an installer.
+    let phase = if installs_in_place(
+        tauri::utils::platform::bundle_type(),
+        cfg!(debug_assertions),
+    ) {
+        *lock(&app.state::<UpdateFlow>().pending) = Some(update);
+        UpdatePhaseDto::Available
+    } else {
+        UpdatePhaseDto::ManualDownload
+    };
 
     let offer = UpdateStateDto {
         available_version: Some(version.clone()),
         notes,
-        ..UpdateStateDto::phase(UpdatePhaseDto::Available, current)
+        ..UpdateStateDto::phase(phase, current)
     };
 
     // A check nobody asked for announces by notification and stores the offer
@@ -611,6 +637,23 @@ mod tests {
         assert_eq!(state.notes.as_deref(), Some("fixes"));
         assert_eq!(state.downloaded_bytes, 512);
         assert_eq!(state.total_bytes, 2048);
+    }
+
+    /// A Linux copy with no package stamp — the portable archive, or a release
+    /// binary run out of `target/` — has no package the updater can replace:
+    /// the plugin would hand the download to its AppImage installer. It is
+    /// offered a manual download instead. Debug builds keep the in-place path
+    /// so `cgs updater-test` can exercise it.
+    #[test]
+    fn only_a_packaged_copy_installs_updates_in_place() {
+        assert!(installs_in_place(Some(BundleType::Deb), false));
+        assert!(installs_in_place(Some(BundleType::AppImage), false));
+        assert!(installs_in_place(None, true));
+        assert_eq!(
+            installs_in_place(None, false),
+            !cfg!(target_os = "linux"),
+            "an unpackaged Linux release build must not install in place"
+        );
     }
 
     #[test]

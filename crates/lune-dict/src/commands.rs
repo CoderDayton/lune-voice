@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 use lune_core::command::VoiceCommand;
 
 /// Result of routing a text through the command recognizer.

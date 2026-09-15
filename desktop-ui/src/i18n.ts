@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 import { i18n } from '@lingui/core';
 
 // Locales shown in the language selector. Every entry must have a translated

@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 //! Feedback relay — posts user feedback to a self-hosted proxy that holds the
 //! real chat webhook.
 //!

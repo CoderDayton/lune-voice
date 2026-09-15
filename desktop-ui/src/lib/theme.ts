@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 /** Theme management — supports custom Lune themes + all 35 DaisyUI built-in themes. */
 
 import { useSyncExternalStore } from 'react';

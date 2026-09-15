@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 //! Device-memory probe for the ASR backend lifecycle.
 //!
 //! Answers two questions that only a running GPU can answer, and that a leak

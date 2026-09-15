@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 //! The dictation pill overlay: geometry, placement and lifecycle.
 //!
 //! Two implementations sit behind this module. On Linux the pill is a bare GTK

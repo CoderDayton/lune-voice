@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 //! Shared helpers for pipeline benchmarks.
 //!
 //! Included via `#[path = "../bench_utils.rs"] mod bench_utils;` from each

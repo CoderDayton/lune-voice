@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 //! Client bindings for the COSMIC toplevel-info protocol, generated here from
 //! vendored protocol XML.
 //!

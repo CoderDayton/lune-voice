@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 //! Voice-snippet stage benchmark — the cost and safety of the snippet
 //! expansion stage added to every dictation (`session.rs::process_and_deliver`).
 //!

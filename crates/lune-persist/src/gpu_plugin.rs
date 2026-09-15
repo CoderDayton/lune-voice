@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 //! Downloading and installing the optional CUDA compute backend.
 //!
 //! The app ships without any NVIDIA code: the executable has no `DT_NEEDED` on

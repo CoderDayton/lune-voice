@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 mod commands;
 mod dto;
 mod feedback;
@@ -498,6 +500,8 @@ fn spawn_hotkeys(app: &tauri::App) -> Result<(), Box<dyn std::error::Error>> {
     );
 
     let native = hotkey::start(&settings.hotkey, settings.activation_mode, sink.clone());
+    // The pair the plugin actually holds, so a failed rebind can restore it.
+    let mut plugin_bound = None;
     match &native {
         Some(backend) => {
             tracing::info!(backend = backend.name(), "native hotkey listener started")
@@ -509,8 +513,11 @@ fn spawn_hotkeys(app: &tauri::App) -> Result<(), Box<dyn std::error::Error>> {
             // fix it, and the controller retries the native start on the next
             // settings save.
             tracing::info!("no native hotkey backend; using the global-shortcut plugin");
-            if let Err(e) = register_hotkeys_with(app.handle(), &settings.hotkey) {
-                tracing::warn!(error = %e, "global shortcut registration failed; hotkeys are off");
+            match register_hotkeys_with(app.handle(), &settings.hotkey) {
+                Ok(()) => plugin_bound = Some(settings.hotkey.clone()),
+                Err(e) => {
+                    tracing::warn!(error = %e, "global shortcut registration failed; hotkeys are off")
+                }
             }
         }
     }
@@ -523,6 +530,7 @@ fn spawn_hotkeys(app: &tauri::App) -> Result<(), Box<dyn std::error::Error>> {
         sink,
         Box::new(PluginShortcuts {
             app: app.handle().clone(),
+            bound: std::sync::Mutex::new(plugin_bound),
         }),
     )));
 
@@ -569,14 +577,34 @@ async fn dispatch_hotkey(rt: &runtime::AppRuntime, action: hotkey::HotkeyAction)
 /// The global-shortcut plugin as the hotkey controller sees it.
 struct PluginShortcuts {
     app: tauri::AppHandle,
+    /// The last pair that registered successfully. `register_hotkeys_with`
+    /// unbinds before registering, so a combo another application already
+    /// owns would otherwise leave no hotkeys at all.
+    bound: std::sync::Mutex<Option<lune_core::config::HotkeyConfig>>,
 }
 
 impl hotkey::PluginHotkeys for PluginShortcuts {
     fn rebind(&self, config: &lune_core::config::HotkeyConfig) -> Result<(), String> {
-        register_hotkeys_with(&self.app, config).map_err(|e| e.to_string())
+        let mut bound = self.bound.lock().unwrap_or_else(|e| e.into_inner());
+        match register_hotkeys_with(&self.app, config) {
+            Ok(()) => {
+                *bound = Some(config.clone());
+                Ok(())
+            }
+            Err(e) => {
+                if let Some(previous) = bound.as_ref()
+                    && let Err(restore) = register_hotkeys_with(&self.app, previous)
+                {
+                    tracing::warn!(error = %restore, "could not restore the previous hotkeys");
+                    *bound = None;
+                }
+                Err(e.to_string())
+            }
+        }
     }
 
     fn clear(&self) {
+        *self.bound.lock().unwrap_or_else(|e| e.into_inner()) = None;
         if let Err(e) = self.app.global_shortcut().unregister_all() {
             tracing::warn!(error = %e, "could not release the global-shortcut hotkeys");
         }

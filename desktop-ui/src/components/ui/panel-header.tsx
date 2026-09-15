@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 import type { ComponentType, ReactNode } from 'react';
 
 interface PanelHeaderProps {

@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 import { listen } from '@tauri-apps/api/event';
 import { useEffect, useEffectEvent, useRef, useState } from 'react';
 import { backendClient } from '../../lib/backend/client';

@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 import type { DictionaryEntry } from '../features/dictionary/data/dictionary-data';
 import type {
   ActivationModeValue,

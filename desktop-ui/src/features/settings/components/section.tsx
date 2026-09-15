@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 import type { ComponentType, ReactNode } from 'react';
 import { PanelHeader } from '../../../components/ui/panel-header';
 import type { WorkspaceSettings } from '../../../store/workspace-store';

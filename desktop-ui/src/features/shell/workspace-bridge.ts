@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 import { attachSessionStream, listenToWorkspaceInvalidation } from '../../lib/backend/stream';
 import type { SessionStreamEvent } from '../../lib/backend/types';
 import { loadWorkspaceSnapshot } from '../../store/workspace-store';

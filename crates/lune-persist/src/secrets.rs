@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 //! OS keyring–backed storage for API keys.
 //!
 //! API keys used to be written verbatim into `settings.toml`. This module keeps

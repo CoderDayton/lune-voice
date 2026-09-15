@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 //! What window the dictation is going into, and how to name it.
 //!
 //! Delivery has to answer two questions about the focused window: *is it a

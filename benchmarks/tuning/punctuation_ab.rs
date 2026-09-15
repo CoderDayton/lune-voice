@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 //! punctuation_ab — does the deterministic punctuation layer (`punctuation.rs`)
 //! help or hurt? Runs the REAL ASR + LLM once per fixture and compares four
 //! post-ASR variants against the cased, punctuated reference:

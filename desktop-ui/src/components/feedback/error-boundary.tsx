@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 import { Trans } from '@lingui/react/macro';
 import { Component, type ErrorInfo, type ReactNode } from 'react';
 

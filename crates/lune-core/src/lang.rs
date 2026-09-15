@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 //! Language-tag normalization shared across the pipeline.
 //!
 //! The runtime mixes BCP-47 codes (`en`, `en-US`) with full English language

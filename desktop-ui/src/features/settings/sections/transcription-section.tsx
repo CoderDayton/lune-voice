@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 import { useLingui } from '@lingui/react/macro';
 import { AudioLines, SpellCheck } from 'lucide-react';
 import { DescriptiveDropdown } from '../../../components/ui/descriptive-dropdown';

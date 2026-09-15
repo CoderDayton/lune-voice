@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 use serde::{Deserialize, Serialize};
 
 /// A user-specific dictionary entry for ASR correction.

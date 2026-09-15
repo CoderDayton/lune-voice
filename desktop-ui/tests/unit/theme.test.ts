@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 import { describe, expect, test } from "bun:test";
 import { ALL_THEMES, isDarkTheme, themeLabel, THEME_GROUPS } from "../../src/lib/theme";
 

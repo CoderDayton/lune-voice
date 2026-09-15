@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 //! Voice snippet matching and placeholder rendering.
 //!
 //! A snippet is a user-defined template ([`lune_core::dict::Snippet`])

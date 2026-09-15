@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 import { describe, expect, test } from "bun:test";
 import type { Clock } from "../../src/features/dictation/mode-gate";
 import { ModeGate } from "../../src/features/dictation/mode-gate";

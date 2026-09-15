@@ -1,0 +1,55 @@
+name: Bug report
+description: Something does not work as it should.
+labels: [bug]
+body:
+  - type: input
+    id: version
+    attributes:
+      label: Lune Voice version
+      description: Settings → General shows it.
+      placeholder: 0.1.0
+    validations:
+      required: true
+  - type: dropdown
+    id: install
+    attributes:
+      label: How it was installed
+      options:
+        - .deb
+        - .rpm
+        - .AppImage
+        - Portable .tar.gz
+        - Windows installer
+        - Built from source
+    validations:
+      required: true
+  - type: input
+    id: os
+    attributes:
+      label: Operating system
+      description: Distro and desktop (for example "Fedora 42, GNOME on Wayland"), or the Windows version.
+    validations:
+      required: true
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened
+      description: What you did, what you expected, and what happened instead.
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. ...
+        2. ...
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs
+      description: >
+        Run the app with `RUST_LOG=info` and paste the output. Transcript text is
+        redacted from logs by default; check before pasting if you turned
+        `LUNE_LOG_TRANSCRIPTS` on.
+      render: text

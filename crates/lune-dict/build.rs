@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 //! Compiles the supplemental vocabulary at build time.
 //!
 //! Each `data/vocab/*.txt` file is one category of words (one word per line;

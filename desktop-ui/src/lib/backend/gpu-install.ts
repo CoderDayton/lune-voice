@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 import { Channel, invoke } from '@tauri-apps/api/core';
 import type { GpuBackendStatusDto } from './generated/GpuBackendStatusDto';
 import type { GpuInstallProgressDto } from './generated/GpuInstallProgressDto';

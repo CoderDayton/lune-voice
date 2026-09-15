@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 //! Real pipeline benchmark — exercises the real SessionManager path with VAD
 //! and ASR, through the production style gate (LLM is skipped by default —
 //! no style selected, same as production's `UserSettings::default()`).

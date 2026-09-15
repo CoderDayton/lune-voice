@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { startWorkspaceBridge } from "../../src/features/shell/workspace-bridge";
 import type { SessionStreamEvent } from "../../src/lib/backend/types";

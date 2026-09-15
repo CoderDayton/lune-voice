@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 //! # lune-audio
 //!
 //! Microphone capture for the dictation pipeline: cpal input → mono downmix →

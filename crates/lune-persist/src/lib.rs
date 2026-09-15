@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 mod db;
 mod error;
 pub mod gpu_plugin;

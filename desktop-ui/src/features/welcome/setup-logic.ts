@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 import type { GpuBackendStateDto } from '../../lib/backend/generated/GpuBackendStateDto';
 import {
   type AsrBackendValue,

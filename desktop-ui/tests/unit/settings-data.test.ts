@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 import { setupI18n } from "@lingui/core";
 import { describe, expect, test } from "bun:test";
 import {

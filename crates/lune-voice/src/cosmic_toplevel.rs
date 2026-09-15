@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 //! COSMIC `zcosmic_toplevel_info_v1` client.
 //!
 //! cosmic-comp does not implement `zwlr_foreign_toplevel_manager_v1`. It

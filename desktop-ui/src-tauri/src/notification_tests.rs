@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 //! Tests for how a found update is announced.
 //!
 //! Delivery itself is not assertable — every desktop backend hands the

@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { backendClient } from "../../src/lib/backend/client";
 import {

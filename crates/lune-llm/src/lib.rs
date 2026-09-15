@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 pub mod backend;
 pub mod few_shot;
 pub mod pipeline;

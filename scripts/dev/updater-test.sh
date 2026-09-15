@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# SPDX-License-Identifier: GPL-3.0-or-later
 # End-to-end test of the updater's install path, entirely on this machine.
 #
 #   cgs updater-test          # build both AppImages, serve, print instructions

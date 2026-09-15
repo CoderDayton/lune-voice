@@ -1,3 +1,5 @@
+/* SPDX-License-Identifier: GPL-3.0-or-later */
+
 /* Vite compiles this file on its own when an `@utility` body changes, and on
    that path it has no Tailwind context — `@apply gap-x-4` then fails with
    "unknown utility class". The import into app.css is what makes the

@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 import type { LucideIcon } from 'lucide-react';
 import { Briefcase, Code2, Feather, MessageCircle, PenTool, Scroll, Sparkles } from 'lucide-react';
 import type { StylePreset } from '../../store/workspace-types';

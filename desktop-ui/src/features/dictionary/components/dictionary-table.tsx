@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 import { Trans, useLingui } from '@lingui/react/macro';
 import { useStore } from '@tanstack/react-store';
 import { ArrowRight, Check, CheckCheck, Pencil, Sparkles, Trash2, X } from 'lucide-react';

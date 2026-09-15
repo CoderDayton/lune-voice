@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 /**
  * The feedback contract shared with `src-tauri/src/feedback.rs`.
  *

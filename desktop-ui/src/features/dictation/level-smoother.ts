@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 /** Fast-attack / slow-release exponential smoothing factors. */
 const ATTACK_ALPHA = 0.35;
 const RELEASE_ALPHA = 0.15;

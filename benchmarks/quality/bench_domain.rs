@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 //! Domain benchmark — runs the full pipeline against categorized fixtures
 //! and reports per-category WER, command exact-match, proper-noun accuracy,
 //! and long-form truncation.

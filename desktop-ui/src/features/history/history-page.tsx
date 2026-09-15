@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 import { useStore } from '@tanstack/react-store';
 import { workspaceStore } from '../../store/workspace-store';
 import { HistoryTable } from './components/history-table';

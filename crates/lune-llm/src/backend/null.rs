@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 //! No-op text post-processor.
 //!
 //! Returns the raw input text unchanged. Used as the default

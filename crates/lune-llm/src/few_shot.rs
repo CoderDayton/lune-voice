@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 use lune_core::llm::LlmService;
 use lune_core::{Error, Result};
 

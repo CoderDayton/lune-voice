@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 pub type PersistResult<T> = std::result::Result<T, PersistError>;
 
 #[derive(Debug, thiserror::Error)]

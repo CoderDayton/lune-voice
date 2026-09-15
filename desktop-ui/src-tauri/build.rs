@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 fn main() {
     // ggml's compute backends are built as dlopen-able plugins
     // (`GGML_BACKEND_DL`), which also makes libwhisper/libggml shared objects

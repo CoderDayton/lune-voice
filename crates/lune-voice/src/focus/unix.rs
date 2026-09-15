@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 //! Asking a Unix desktop which window has focus, and putting focus back.
 //!
 //! There is no one answer: each compositor exposes the focused window through

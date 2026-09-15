@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 //! Example: Live audio capture with sample count and buffer fill reporting.
 
 use lune_audio::{AudioConfig, AudioStream};

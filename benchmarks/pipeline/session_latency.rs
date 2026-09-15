@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 //! End-to-end session latency benchmark — timestamps every SessionEvent to
 //! show per-phase timing, especially the gap between FinalizedText and Stopped.
 //!
@@ -61,13 +63,11 @@ fn main() {
                         let elapsed_ms = t0.elapsed().as_secs_f64() * 1000.0;
                         let tag = match ev {
                             SessionEvent::Started => "Started",
-                            SessionEvent::PartialText => "PartialText",
                             SessionEvent::Processing => "Processing",
                             SessionEvent::FinalizedText { text: t, .. } => {
                                 final_text.push_str(t);
                                 "FinalizedText"
                             }
-                            SessionEvent::CorrectedText(_) => "CorrectedText",
                             SessionEvent::AudioLevel(_) => continue,
                             SessionEvent::CommandDetected { .. } => "CommandDetected",
                             SessionEvent::Error(_) => "Error",

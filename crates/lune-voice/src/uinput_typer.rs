@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 //! Clipboard-paste delivery via uinput virtual keyboard.
 //!
 //! Primary path: set clipboard via `wl-copy`/`xclip` → detect if focused window

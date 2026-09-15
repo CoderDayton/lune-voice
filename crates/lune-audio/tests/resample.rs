@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 //! Guards the capture resampler across rubato upgrades: the path only runs
 //! inside the cpal callback, so nothing else exercises it.
 

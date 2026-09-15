@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 import { useLingui } from '@lingui/react/macro';
 import { useCallback, useRef } from 'react';
 import { backendClient } from '../../lib/backend/client';

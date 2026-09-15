@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 pub mod caprate;
 pub mod commands;
 pub mod corrector;

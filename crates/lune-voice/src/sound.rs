@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 //! Best-effort UI sound cues, played from the always-running backend.
 //!
 //! The desktop windows are not a reliable place to play audio: the main

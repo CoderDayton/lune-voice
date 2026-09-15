@@ -1,4 +1,5 @@
 #!/usr/bin/env bun
+// SPDX-License-Identifier: GPL-3.0-or-later
 /**
  * Fills in empty msgstr entries in Lingui PO catalog files using
  * embedded translation maps. Entries that already have a translation

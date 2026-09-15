@@ -1,8 +1,11 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 import { useLingui } from '@lingui/react/macro';
 import { openUrl } from '@tauri-apps/plugin-opener';
 import { ExternalLink, Send } from 'lucide-react';
 import { useCallback, useEffect, useId, useRef, useState } from 'react';
 import { backendClient } from '../../lib/backend/client';
+import { REPO_URL } from '../../lib/links';
 import {
   CATEGORIES,
   type Category,
@@ -12,7 +15,6 @@ import {
   MIN_MESSAGE_CHARS,
 } from './limits';
 
-const REPO_URL = 'https://github.com/CoderDayton/lune-voice';
 const ISSUES_URL = `${REPO_URL}/issues`;
 const DISCUSSIONS_URL = `${REPO_URL}/discussions`;
 

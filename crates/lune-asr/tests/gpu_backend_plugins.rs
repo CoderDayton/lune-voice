@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 //! End-to-end check that ggml's dlopen-able backends actually register.
 //!
 //! Only meaningful for a `GGML_BACKEND_DL=ON` build whose plugins have been

@@ -10,6 +10,10 @@ pre-commit:
       run: cargo fmt --all --check
       fail_text: "formatting needed — run `cargo fmt --all` then restage"
 
+    spdx:
+      run: bash scripts/dev/check-spdx.sh
+      fail_text: "a source file lacks its SPDX line — add `SPDX-License-Identifier: GPL-3.0-or-later` in a comment at the top"
+
     check:
       run: CARGO_BUILD_JOBS=${CARGO_BUILD_JOBS:-4} cargo check --workspace --all-targets
       fail_text: "cargo check failed — fix compilation errors"

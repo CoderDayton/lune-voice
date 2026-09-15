@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 use diesel::prelude::*;
 
 use super::schema::{correction_pairs, custom_styles, dictionary, sessions, snippets};

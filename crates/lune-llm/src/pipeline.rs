@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 //! LLM-based text styling pipeline.
 //!
 //! Wraps any `LlmService` backend and implements the `TextPostProcessor`

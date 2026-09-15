@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 import type { I18n } from '@lingui/core';
 import type { DictionaryEntry } from '../features/dictionary/data/dictionary-data';
 import {

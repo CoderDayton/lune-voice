@@ -64,9 +64,28 @@ sudo apt install ./lune-voice_*_amd64.deb
 **Windows** — run the `-setup.exe` installer. The in-app updater keeps it
 current from there.
 
+### Uninstall
+
+Removing the app leaves your data behind, including the downloaded models (up
+to ~1.6 GB). Delete these folders to remove it too:
+
+- **Linux**: `~/.local/share/lune-voice/` (models, history) and `~/.config/lune-voice/` (settings)
+- **Windows**: `%APPDATA%\lune-voice\`
+
+The `.deb` and `.rpm` remove their udev rule themselves. The AppImage and the
+portable archive install it to `/etc/udev/rules.d/99-lune-voice-uinput.rules`;
+remove it from Settings → Text delivery before deleting the app, or with
+`sudo rm` afterwards.
+
 ## Building from source
 
-You need Rust, [Bun](https://bun.sh), CMake, LLVM, the Tauri WebView dependencies, and the `cgs` task runner that drives the build scripts. A CUDA toolkit is only needed if you want to build the GPU plugin yourself.
+You need Rust, [Bun](https://bun.sh) 1.3.10 (pinned in `desktop-ui/package.json`), CMake, a C++ toolchain, LLVM with libclang, the Tauri WebView dependencies, and the `cgs` task runner that drives the build scripts. A CUDA toolkit is only needed if you want to build the GPU plugin yourself.
+
+Some tasks need more:
+
+- **Cold builds** need `LIBCLANG_PATH` set for bindgen, e.g. `export LIBCLANG_PATH=/lib/x86_64-linux-gnu` on Debian and Ubuntu.
+- **`cgs package`** builds inside an `ubuntu:22.04` container, so it needs Docker (or another engine named in `CONTAINER_ENGINE`).
+- **`cgs check-windows`** needs [zig](https://ziglang.org) and `binutils-mingw-w64-x86-64`.
 
 ```bash
 cargo install cargo-script   # provides the `cgs` command

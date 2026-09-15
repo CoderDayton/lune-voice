@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 import { useLingui } from '@lingui/react/macro';
 import { useNavigate, useSearch } from '@tanstack/react-router';
 import { useStore } from '@tanstack/react-store';

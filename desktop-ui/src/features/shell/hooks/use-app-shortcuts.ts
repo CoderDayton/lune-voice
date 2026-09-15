@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 import { useHotkey } from '@tanstack/react-hotkeys';
 import { useRouter } from '@tanstack/react-router';
 import { backendClient } from '../../../lib/backend/client';

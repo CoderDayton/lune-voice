@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 //! The one definition of every input limit the backend enforces.
 //!
 //! These used to be written twice — a Rust constant on the command side and a

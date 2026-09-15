@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 import { useLingui } from '@lingui/react/macro';
 import { Check, Lock, type LucideIcon } from 'lucide-react';
 import type { DownloadProgress } from '../use-model-setup';

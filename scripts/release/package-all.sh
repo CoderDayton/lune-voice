@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# SPDX-License-Identifier: GPL-3.0-or-later
 set -euo pipefail
 
 # Build the shippable Linux artifacts in one container: .deb, .AppImage, .rpm
@@ -200,6 +201,19 @@ build_tarball() {
         return
     fi
 
+    # The bundler stamps the binary with the package it went into. Left as the
+    # .deb stamp, the updater installs the next version with `dpkg -i` through
+    # pkexec, asking root of someone who chose a no-root archive. Restore the
+    # "no bundle" stamp (same length) so the app offers a manual download.
+    local bin="$stage/$name/usr/bin/lune-voice" stamps
+    stamps="$(grep -a -o '__TAURI_BUNDLE_TYPE_VAR_DEB' "$bin" | wc -l)"
+    if [[ "$stamps" -ne 1 ]]; then
+        red "WARN: expected one .deb bundle stamp in the binary, found $stamps — skipping tar.gz"
+        rm -rf "$stage"
+        return
+    fi
+    perl -0777 -pi -e 's/__TAURI_BUNDLE_TYPE_VAR_DEB/__TAURI_BUNDLE_TYPE_VAR_UNK/' "$bin"
+
     # Top-level launcher: resolves its own directory, so the archive runs from
     # wherever it was extracted.
     cat > "$stage/$name/lune-voice" <<'LAUNCHER'
@@ -226,6 +240,9 @@ for this archive, install the rule once and log back in:
 
 Speech models are downloaded by the app on first run into
 ~/.local/share/lune-voice/models/ and are not part of this archive.
+
+This archive does not update itself. When a new version is out, the app says
+so; download the new archive and extract it over this one.
 
 Licences: usr/lib/Lune Voice/THIRD_PARTY_NOTICES.md
 README

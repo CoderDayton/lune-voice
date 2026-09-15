@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 import { useLingui } from '@lingui/react/macro';
 import { Check, Palette } from 'lucide-react';
 import { memo, useCallback, useEffect, useId, useRef, useState } from 'react';

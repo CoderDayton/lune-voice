@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 //! Platform-neutral global-hotkey core.
 //!
 //! Everything here is true of a hotkey listener on any OS: what a press

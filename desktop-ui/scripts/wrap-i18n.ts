@@ -1,4 +1,5 @@
 #!/usr/bin/env bun
+// SPDX-License-Identifier: GPL-3.0-or-later
 // Auto-wrap user-facing string props in Lingui macros.
 // Usage: bun scripts/wrap-i18n.ts [--dry-run] [glob...]
 

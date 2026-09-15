@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 //! Confusion mining — decode fixtures, word-align against references, extract
 //! substitution pairs where model picked wrong BPE path.
 //!

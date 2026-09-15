@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 /**
  * The settings tab ids, shared by the page and the `/settings` route.
  *

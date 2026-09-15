@@ -1,3 +1,5 @@
+/* SPDX-License-Identifier: GPL-3.0-or-later */
+
 /* ── Snippet trigger voice capture ─────────────────────────────────────
    The trigger input and its capture control act as one instrument: the
    wrapper carries the live/success treatments as overlay pseudo-elements so

@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 //! Compiles per-language frequency lists from `corpora/{lang}.csv` into the
 //! `data/{lang}_freq.bin` artifacts bundled via `include_bytes!`.
 //!
