@@ -9,6 +9,12 @@ on:
     # Weekly advisory scan — every Monday 07:00 UTC.
     - cron: '0 7 * * 1'
 
+# A newer push or PR update cancels the run it supersedes. The event name keeps
+# the weekly scheduled scan from being cancelled by a push to main.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event_name }}-${{ github.ref }}
+  cancel-in-progress: true
+
 env:
   CARGO_TERM_COLOR: always
   RUST_BACKTRACE: 1
