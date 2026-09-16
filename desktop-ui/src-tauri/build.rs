@@ -17,5 +17,22 @@ fn main() {
         println!("cargo:rustc-link-arg=-Wl,-rpath,$ORIGIN");
         println!("cargo:rustc-link-arg=-Wl,-rpath,$ORIGIN/lib");
     }
-    tauri_build::build();
+
+    // `tauri_build` puts its app manifest in a resource linked into binaries
+    // only, so test executables start without Common Controls v6 and exit
+    // with STATUS_ENTRYPOINT_NOT_FOUND. On MSVC the linker embeds the manifest
+    // into every binary instead, tests included. The GNU link has no such
+    // flag and keeps tauri_build's resource manifest.
+    let windows = if std::env::var("CARGO_CFG_TARGET_ENV").as_deref() == Ok("msvc") {
+        let manifest =
+            std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("windows-app-manifest.xml");
+        println!("cargo:rerun-if-changed={}", manifest.display());
+        println!("cargo:rustc-link-arg=/MANIFEST:EMBED");
+        println!("cargo:rustc-link-arg=/MANIFESTINPUT:{}", manifest.display());
+        tauri_build::WindowsAttributes::new_without_app_manifest()
+    } else {
+        tauri_build::WindowsAttributes::new()
+    };
+    tauri_build::try_build(tauri_build::Attributes::new().windows_attributes(windows))
+        .expect("failed to run tauri_build");
 }
