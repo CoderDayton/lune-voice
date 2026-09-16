@@ -10,6 +10,14 @@
 
 use lune_asr::gpu_backend::{bundled_plugin_dir, load_plugins};
 
+/// Prefix ggml gives its own plugin files (`backend_filename_prefix` in
+/// `ggml-backend-reg.cpp`): Windows drops the `lib` that every other target
+/// keeps.
+#[cfg(target_os = "windows")]
+const GGML_PLUGIN_PREFIX: &str = "ggml-";
+#[cfg(not(target_os = "windows"))]
+const GGML_PLUGIN_PREFIX: &str = "libggml-";
+
 #[test]
 fn bundled_plugins_register_a_compute_device() {
     let Some(dir) = bundled_plugin_dir() else {
@@ -18,7 +26,13 @@ fn bundled_plugins_register_a_compute_device() {
     };
     let staged = dir.is_dir()
         && std::fs::read_dir(&dir).is_ok_and(|mut e| {
-            e.any(|f| f.is_ok_and(|f| f.file_name().to_string_lossy().starts_with("libggml-")))
+            e.any(|f| {
+                f.is_ok_and(|f| {
+                    f.file_name()
+                        .to_string_lossy()
+                        .starts_with(GGML_PLUGIN_PREFIX)
+                })
+            })
         });
     if !staged {
         eprintln!(

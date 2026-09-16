@@ -627,6 +627,14 @@ fn hex(bytes: &[u8]) -> String {
 mod tests {
     use super::*;
 
+    /// Name of a CUDA runtime member this platform's allowlist actually
+    /// permits, so archive fixtures build a shape valid on both OSes instead
+    /// of assuming Linux `.so` names.
+    #[cfg(target_os = "windows")]
+    const CUDA_RUNTIME_MEMBER: &str = "cudart64_13.dll";
+    #[cfg(not(target_os = "windows"))]
+    const CUDA_RUNTIME_MEMBER: &str = "libcudart.so.13";
+
     #[test]
     fn permitted_members_are_the_cuda_libraries_only() {
         #[cfg(not(target_os = "windows"))]
@@ -764,11 +772,13 @@ mod tests {
         // that cannot load — and the UI offers no way back from that state.
         let tmp = tempfile::tempdir().expect("tempdir");
         let archive = tmp.path().join("gpu.tar.gz");
+        let plugin_name = format!("./{CUDA_PLUGIN_FILE}");
+        let runtime_name = format!("./{CUDA_RUNTIME_MEMBER}");
         write_archive(
             &archive,
             &[
-                ("./libggml-cuda.so", b"plugin"),
-                ("./libcudart.so.13", b"runtime"),
+                (plugin_name.as_str(), b"plugin" as &[u8]),
+                (runtime_name.as_str(), b"runtime"),
                 ("./evil.so", b"nope"),
             ],
         );
@@ -792,18 +802,20 @@ mod tests {
     fn a_clean_archive_publishes_every_member() {
         let tmp = tempfile::tempdir().expect("tempdir");
         let archive = tmp.path().join("gpu.tar.gz");
+        let runtime_name = format!("./{CUDA_RUNTIME_MEMBER}");
+        let plugin_name = format!("./{CUDA_PLUGIN_FILE}");
         write_archive(
             &archive,
             &[
-                ("./libcudart.so.13", b"runtime"),
-                ("./libggml-cuda.so", b"plugin"),
+                (runtime_name.as_str(), b"runtime" as &[u8]),
+                (plugin_name.as_str(), b"plugin"),
             ],
         );
 
         let written = unpack(&archive, tmp.path()).expect("unpack");
         assert_eq!(written.len(), 2);
         assert!(plugin_installed_at(tmp.path()));
-        assert!(tmp.path().join("libcudart.so.13").is_file());
+        assert!(tmp.path().join(CUDA_RUNTIME_MEMBER).is_file());
     }
 
     /// `plugin_installed` resolves `<data dir>/backends`; these tests unpack
