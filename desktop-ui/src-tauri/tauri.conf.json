@@ -56,7 +56,8 @@
     "license": "GPL-3.0-or-later",
     "licenseFile": "../../LICENSE",
     "resources": {
-      "../../THIRD_PARTY_NOTICES.md": "THIRD_PARTY_NOTICES.md"
+      "../../THIRD_PARTY_NOTICES.md": "THIRD_PARTY_NOTICES.md",
+      "../../THIRD_PARTY_LICENSES.md": "THIRD_PARTY_LICENSES.md"
     },
     "linux": {
       "deb": {

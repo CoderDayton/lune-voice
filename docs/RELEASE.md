@@ -289,6 +289,7 @@ and opens the draft release. Sign and finish it locally:
 
 ```bash
 git tag v0.2.0 && git push origin v0.2.0      # CI builds + drafts the release
+rm -rf release-artifacts                      # no older release left behind
 gh release download v0.2.0 -D release-artifacts
 cgs updater-manifest --env TAG=v0.2.0         # signs, writes release-artifacts/latest.json
 gh release upload v0.2.0 release-artifacts/latest.json
@@ -387,6 +388,28 @@ objects wherever `GGML_BACKEND_DL` is enabled. The GPU plugin archive also
 carries NVIDIA's redistributable CUDA runtime libraries. Keep
 `THIRD_PARTY_NOTICES.md` in sync with the bundled upstream when its version
 changes.
+
+Every bundle ships two files:
+
+- `THIRD_PARTY_NOTICES.md`, written by hand: native libraries, the CUDA runtime,
+  models, fonts, the compiled-in data files and the vendored `whisper-rs-sys`
+  fork.
+- `THIRD_PARTY_LICENSES.md`, generated: the licence text of every Rust crate in
+  the release build (cargo-about, `about.toml`) and every JavaScript package in
+  the interface bundle (`desktop-ui/scripts/third-party-licenses.ts`).
+
+Regenerate the second after any dependency change, and before `cgs package`:
+
+```bash
+cargo install cargo-about --locked --features cli --version 0.9.2   # once; same as release.yml
+cgs licenses                                        # rewrite THIRD_PARTY_LICENSES.md
+cgs licenses --env CHECK=1                          # verify only
+```
+
+`release.yml` runs the check before building, so a tag with a stale file fails
+instead of shipping wrong notices. cargo-about runs with `--fail`: a crate whose
+licence it cannot determine stops the run, and needs a `clarify` entry in
+`about.toml`.
 
 Lune Voice itself is GPL-3.0-or-later; `cargo deny check licenses` gates the
 dependency tree against the allow-list in `deny.toml`.

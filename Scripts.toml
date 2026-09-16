@@ -566,6 +566,13 @@ bash scripts/release/updater-manifest.sh "${TAG:?set --env TAG=v0.2.0}"
 '''
 info = "Sign the release artifacts and write release-artifacts/latest.json for the updater (--env TAG=v0.2.0)"
 
+[scripts.licenses]
+interpreter = "bash"
+command = '''
+bash scripts/release/third-party-licenses.sh ${CHECK:+--check}
+'''
+info = "Regenerate THIRD_PARTY_LICENSES.md from the Rust and JS dependency trees (--env CHECK=1 to only verify it)"
+
 [scripts.desktop-entry]
 interpreter = "bash"
 command = '''

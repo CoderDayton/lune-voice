@@ -1,0 +1,17 @@
+{{!-- SPDX-License-Identifier: GPL-3.0-or-later --}}
+## Rust crates compiled into the application
+
+{{#each licenses}}
+### {{{name}}}
+
+Used by:
+
+{{#each used_by}}
+- {{{crate.name}}} {{{crate.version}}}
+{{/each}}
+
+````text
+{{{text}}}
+````
+
+{{/each}}

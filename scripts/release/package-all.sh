@@ -244,7 +244,8 @@ Speech models are downloaded by the app on first run into
 This archive does not update itself. When a new version is out, the app says
 so; download the new archive and extract it over this one.
 
-Licences: usr/lib/Lune Voice/THIRD_PARTY_NOTICES.md
+Licences: usr/lib/Lune Voice/THIRD_PARTY_NOTICES.md and
+usr/lib/Lune Voice/THIRD_PARTY_LICENSES.md
 README
 
     tar -czf "$ARTIFACTS_DIR/$name.tar.gz" -C "$stage" "$name"

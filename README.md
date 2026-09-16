@@ -122,6 +122,6 @@ There is no separate GPU build to pick. The app detects an NVIDIA driver and off
 
 ## License
 
-GNU General Public License, version 3 or later. See [LICENSE](LICENSE) for the full text, and [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) for the upstream projects bundled into the binary.
+GNU General Public License, version 3 or later. See [LICENSE](LICENSE) for the full text, [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) for the native libraries, fonts and data bundled into the binary, and [THIRD_PARTY_LICENSES.md](THIRD_PARTY_LICENSES.md) for the licences of every Rust crate and JavaScript package it includes.
 
 If you distribute Lune Voice, modified or not, you have to make the source available to whoever you give it to, under these same terms.

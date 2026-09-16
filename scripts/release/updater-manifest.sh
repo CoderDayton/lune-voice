@@ -89,17 +89,48 @@ pack_appimage() {
     printf '%s\n' "$archive"
 }
 
+# Keep only the files named for $VERSION, into the array named by $1.
+#
+# release-artifacts/ can still hold another release, and glob order is
+# version-ascending, so the first match of `*.deb` is the OLDEST one. A manifest
+# built from it says $VERSION while its URLs install an older build; the
+# signature still verifies, and clients are re-offered the same update forever.
+# A format present only for other versions stops the script instead of being
+# dropped, which would leave that format's users without the update. Set
+# LENIENT=1 for a kind whose absence is fine.
+for_version() {
+    local -n picked="$1"
+    local kind="$2" f
+    shift 2
+    picked=()
+    for f in "$@"; do
+        case "${f##*/}" in
+            *[_-]"$VERSION"[_-]*) picked+=("$f") ;;
+        esac
+    done
+    if [ -z "${LENIENT:-}" ] && [ $# -gt 0 ] && [ ${#picked[@]} -eq 0 ]; then
+        echo "no $kind for $VERSION in $ARTIFACTS_DIR, only: ${*##*/}" >&2
+        exit 1
+    fi
+    if [ ${#picked[@]} -gt 1 ]; then
+        echo "more than one $kind for $VERSION: ${picked[*]##*/}" >&2
+        exit 1
+    fi
+}
+
 shopt -s nullglob
-RAW_APPIMAGE=("$ARTIFACTS_DIR"/*.AppImage)
-APPIMAGE=("$ARTIFACTS_DIR"/*.AppImage.tar.gz)
-DEB=("$ARTIFACTS_DIR"/*.deb)
-RPM=("$ARTIFACTS_DIR"/*.rpm)
+for_version RAW_APPIMAGE ".AppImage" "$ARTIFACTS_DIR"/*.AppImage
+# Packed from the raw AppImage below when missing.
+LENIENT=1 for_version APPIMAGE ".AppImage.tar.gz" "$ARTIFACTS_DIR"/*.AppImage.tar.gz
+for_version DEB ".deb" "$ARTIFACTS_DIR"/*.deb
+for_version RPM ".rpm" "$ARTIFACTS_DIR"/*.rpm
 # `*-setup.exe` is the NSIS bundle; the pattern excludes any other .exe that
 # happens to be lying in the directory.
-NSIS=("$ARTIFACTS_DIR"/*-setup.exe)
+for_version NSIS "Windows installer" "$ARTIFACTS_DIR"/*-setup.exe
 # The portable archive starts with a version number, which keeps the GPU plugin
-# archive (`lune-voice-gpu-...tar.gz`, ~500 MB) out of the app release.
-PORTABLE=("$ARTIFACTS_DIR"/lune-voice-[0-9]*-linux-*.tar.gz)
+# archive (`lune-voice-gpu-...tar.gz`, ~500 MB) out of the app release. It only
+# feeds the upload hint, so its absence is fine.
+LENIENT=1 for_version PORTABLE "portable archive" "$ARTIFACTS_DIR"/lune-voice-[0-9]*-linux-*.tar.gz
 shopt -u nullglob
 
 if [ ${#APPIMAGE[@]} -eq 0 ] && [ ${#RAW_APPIMAGE[@]} -gt 0 ]; then

@@ -10,6 +10,7 @@ name: Release
 # is the trust root and lives only at ~/.tauri/lune-voice-updater.key, never in
 # CI (docs/RELEASE.md, "In-app updater"). Finish the release by hand:
 #
+#   rm -rf release-artifacts                   # no older release left behind
 #   gh release download <tag> -D release-artifacts
 #   cgs updater-manifest --env TAG=<tag>       # signs, writes latest.json
 #   gh release upload <tag> release-artifacts/latest.json
@@ -118,6 +119,14 @@ jobs:
       - name: Install frontend dependencies
         working-directory: desktop-ui
         run: bun install --frozen-lockfile
+
+      # The bundle ships THIRD_PARTY_LICENSES.md; it must list what this build
+      # compiles in. Pinned so the check cannot drift with a cargo-about release.
+      - name: Install cargo-about
+        run: cargo install cargo-about --locked --features cli --version 0.9.2
+
+      - name: Third-party licences are current
+        run: bash scripts/release/third-party-licenses.sh --check
 
       # Mirrors the PORTABLE branch of `[scripts.build]` in Scripts.toml.
       # GGML_NATIVE=OFF plus the explicit ISA flags stop ggml defaulting to

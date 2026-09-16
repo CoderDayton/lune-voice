@@ -1,0 +1,39 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
+#
+# cargo-about config for scripts/release/third-party-licenses.sh, which writes
+# THIRD_PARTY_LICENSES.md. `accepted` mirrors the allow-list in deny.toml.
+
+accepted = [
+    "GPL-3.0-or-later",
+    "MIT",
+    "Apache-2.0",
+    "Apache-2.0 WITH LLVM-exception",
+    "BSD-2-Clause",
+    "BSD-3-Clause",
+    "BSL-1.0",
+    "CDLA-Permissive-2.0",
+    "ISC",
+    "MPL-2.0",
+    "Unicode-3.0",
+    "Unlicense",
+    "Zlib",
+]
+
+# The platforms release binaries are built for.
+targets = ["x86_64-unknown-linux-gnu", "x86_64-pc-windows-msvc"]
+
+# Build scripts and test helpers do not ship in the binary.
+ignore-build-dependencies = true
+ignore-dev-dependencies = true
+
+# No `license` field, and its LICENSE holds two MIT texts (the code, and
+# Wordnik's word list) that cargo-about cannot read as one licence. The same
+# crate needs a clarify entry in deny.toml. Both texts are also reproduced in
+# THIRD_PARTY_NOTICES.md. The checksum is the SHA-256 of the file as published.
+[wordnik_list.clarify]
+license = "MIT"
+
+[[wordnik_list.clarify.files]]
+path = "LICENSE"
+license = "MIT"
+checksum = "fc77a874ca38f40ac09636d8e95c5568ada32ceab9a505e8dff14f1f6b971479"
