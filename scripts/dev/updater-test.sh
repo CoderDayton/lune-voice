@@ -75,7 +75,9 @@ if [ "${KEEP:-}" != "1" ]; then
     cp "$BUNDLE_DIR"/*.AppImage "$WORK_DIR/new.AppImage"
     tar czf "$WORK_DIR/new.AppImage.tar.gz" -C "$WORK_DIR" new.AppImage
     rm -f "$WORK_DIR/new.AppImage" "$WORK_DIR/new.AppImage.tar.gz.sig"
-    bunx tauri signer sign -f "$KEY_PATH" "$WORK_DIR/new.AppImage.tar.gz" >/dev/null
+    # From desktop-ui, where the Tauri CLI is installed: at the repo root `bunx`
+    # resolves the unrelated npm package `tauri`, which has no executable.
+    (cd "$REPO_ROOT/desktop-ui" && bun tauri signer sign -f "$KEY_PATH" "$WORK_DIR/new.AppImage.tar.gz") >/dev/null
 fi
 
 if [ ! -s "$WORK_DIR/new.AppImage.tar.gz.sig" ]; then
