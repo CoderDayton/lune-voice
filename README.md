@@ -86,6 +86,7 @@ Some tasks need more:
 - **Cold builds** need `LIBCLANG_PATH` set for bindgen, e.g. `export LIBCLANG_PATH=/lib/x86_64-linux-gnu` on Debian and Ubuntu.
 - **`cgs package`** builds inside an `ubuntu:22.04` container, so it needs Docker (or another engine named in `CONTAINER_ENGINE`).
 - **`cgs check-windows`** needs [zig](https://ziglang.org) and `binutils-mingw-w64-x86-64`.
+- **`cgs licenses`** needs `cargo-about` 0.9.2 (`cargo install cargo-about --locked --features cli --version 0.9.2`) and an installed `desktop-ui/node_modules`. The version is pinned because the release build compares the generated file byte for byte.
 
 ```bash
 cargo install cargo-script   # provides the `cgs` command
@@ -101,7 +102,7 @@ cgs package  # build the .deb / .rpm / .AppImage / .tar.gz installers
 | | |
 |---|---|
 | **OS** | Linux (X11 or Wayland) or Windows 10/11 |
-| **Typing** | **Linux**: IBus when it is your input method, otherwise `/dev/uinput` — the first run asks for a polkit password to install a udev rule. `wl-copy` or `xclip` for the paste path. **Windows**: the clipboard plus a synthetic paste, with per-key typing as the fallback. |
+| **Typing** | **Linux**: IBus when it is your input method, otherwise `/dev/uinput` — the first run asks for a polkit password to install a udev rule. `wl-copy` or `xclip` for the paste path. **Windows**: the clipboard plus a synthetic paste, with per-key typing as the fallback. Either way the text goes to the window you were in when you started speaking. |
 | **Hotkey** | Toggle or push-to-talk on both platforms — Linux grabs the keyboard through evdev, Windows uses a low-level keyboard hook. |
 | **GPU** | Optional, Linux only for now. If you have an NVIDIA card, the app offers a one-time download that moves transcription onto it. CPU-only works everywhere, just slower. |
 | **Disk** | ~540 MB for the default model, ~1.6 GB for all three |
@@ -122,6 +123,6 @@ There is no separate GPU build to pick. The app detects an NVIDIA driver and off
 
 ## License
 
-GNU General Public License, version 3 or later. See [LICENSE](LICENSE) for the full text, [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) for the native libraries, fonts and data bundled into the binary, and [THIRD_PARTY_LICENSES.md](THIRD_PARTY_LICENSES.md) for the licences of every Rust crate and JavaScript package it includes.
+GNU General Public License, version 3 or later. See [LICENSE](LICENSE) for the full text, [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) for the native libraries, models, fonts and data it ships or downloads — including the modified `whisper-rs-sys` fork — and [THIRD_PARTY_LICENSES.md](THIRD_PARTY_LICENSES.md) for the licences of every Rust crate and JavaScript package it includes.
 
 If you distribute Lune Voice, modified or not, you have to make the source available to whoever you give it to, under these same terms.

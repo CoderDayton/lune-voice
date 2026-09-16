@@ -22,17 +22,18 @@ First release, for Linux and Windows.
 - Voice commands: new line, new paragraph, list item, scratch that, stop dictation — each recognized only as a whole utterance, so the same words inside a sentence are dictated normally
 - Text delivery through IBus when it is the active input method, otherwise a `uinput` virtual keyboard, with a clipboard paste path for non-ASCII. With **Copy to clipboard** off, the previous clipboard — text or images — is restored byte-for-byte. Multi-line text is never typed key by key, so newlines cannot press Enter in the focused app
 - Remote OpenAI-compatible transcription as an alternative to local whisper
-- The idle whisper model is unloaded to give back its memory while the microphone stays warm, so the next dictation still starts immediately
+- The idle whisper model can be unloaded to give back its memory while the microphone stays warm, so the next dictation still starts immediately. Off by default; set `model_idle_unload_minutes` to turn it on
 
 ### Platforms
 
 - **Linux** (X11 or Wayland): evdev hotkey grab, IBus or `uinput` delivery, and focused-window detection on COSMIC, `wlr-foreign-toplevel` and the major compositors. Ships as `.deb`, `.rpm`, `.AppImage` and a portable `.tar.gz`. The `/dev/uinput` udev rule ships with the `.deb` and `.rpm`
-- **Windows** 10/11: low-level keyboard hook, clipboard paste with per-key typing as the fallback, and an NSIS installer
+- **Windows** 10/11: low-level keyboard hook, clipboard paste with per-key typing as the fallback, and an NSIS installer. Delivery targets the window that was focused when you started speaking, and puts focus back there first if one of the app's own windows took it
 - In-app updates for the `.deb`, `.rpm`, `.AppImage` and Windows installer. The portable `.tar.gz` announces a new version and links to the download instead of asking for root
 
 ### Interface
 
-- Dictation pill overlay with live audio levels and session state: choose its monitor, anchor, size, orientation, corner style and edge margin, drag it anywhere, lock it in place, and keep it across workspaces. Runs under XWayland on compositors without `wlr-layer-shell`
+- Dictation pill overlay with live audio levels and session state: choose its monitor, anchor, size, orientation, corner style and edge margin, drag it anywhere, and lock it in place. It never takes keyboard focus, so clicking it cannot divert your text. Keeping it across workspaces works on Linux and macOS; Windows virtual desktops cannot be addressed per-window. Runs under XWayland on compositors without `wlr-layer-shell`
+- The pill places itself correctly across monitors running at different scale factors, so a laptop panel next to a scaled external display puts it where you dropped it
 - Onboarding that can be cancelled and resumed. A model download survives the window closing, and a reopened window re-attaches to it
 - Searchable session history with per-session transcript, timing, and the style applied. Retention is configurable, including forever, and sessions can be deleted in bulk
 - Dictionary management with inline editing and priority ranking
@@ -61,3 +62,4 @@ First release, for Linux and Windows.
 - Dictated text carries the clipboard-history exclusion hint, so it stays out of clipboard managers
 - Content Security Policy on the Tauri webview
 - GPL-3.0-or-later, with `cargo deny` gating licenses and advisories across the dependency tree
+- Every bundle ships `THIRD_PARTY_NOTICES.md` for the native libraries, models, fonts and data, and a generated `THIRD_PARTY_LICENSES.md` carrying the full licence text of every Rust crate and JavaScript package. The release build fails if the generated file is out of date

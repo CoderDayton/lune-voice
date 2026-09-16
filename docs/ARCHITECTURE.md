@@ -30,10 +30,12 @@ Dictation is **hotkey-bounded**: the session collects audio for as long as the h
 
 The runtime pipeline uses interchangeable backends:
 
-| Component | Backends | Model format | Runtime |
-|-----------|----------|--------------|---------|
-| ASR | WhisperCpp (local), OpenAI-compatible (remote) | GGML `.bin` / remote API | whisper-rs (whisper.cpp) / HTTP |
-| LLM | OpenAI-compatible (remote), disabled | remote API | HTTP |
+
+| Component | Backends                                       | Model format             | Runtime                         |
+| --------- | ---------------------------------------------- | ------------------------ | ------------------------------- |
+| ASR       | WhisperCpp (local), OpenAI-compatible (remote) | GGML `.bin` / remote API | whisper-rs (whisper.cpp) / HTTP |
+| LLM       | OpenAI-compatible (remote), disabled           | remote API               | HTTP                            |
+
 
 The native ASR backend compiles its C/C++ library from source at build time via a `*-sys` crate. GPU (CUDA) support on Linux is a **runtime** capability: ggml's compute backends are built as `dlopen`-able plugins (`GGML_BACKEND_DL`), so the CUDA backend is downloaded on request rather than linked in — see [docs/GPU_PLUGIN.md](GPU_PLUGIN.md). The styling LLM is remote-only — point it at Ollama, llama-server, LM Studio, or a hosted API. See [docs/RELEASE.md](RELEASE.md) for the full build matrix.
 
@@ -93,11 +95,13 @@ The `WhisperCppBackend` wraps `whisper-rs`, which vendors and compiles `whisper.
 
 Three GGML model sizes are available, all from `ggerganov/whisper.cpp`:
 
-| Variant | File | Size | Directory |
-|---------|------|------|-----------|
-| `Small` | `ggml-small-q5_1.bin` | ~190 MB | `whisper-small-q5_1` |
-| `Medium` *(default)* | `ggml-medium-q5_0.bin` | ~539 MB | `whisper-medium-q5_0` |
-| `LargeV3Turbo` | `ggml-large-v3-turbo-q8_0.bin` | ~874 MB | `whisper-large-v3-turbo-q8_0` |
+
+| Variant              | File                           | Size    | Directory                     |
+| -------------------- | ------------------------------ | ------- | ----------------------------- |
+| `Small`              | `ggml-small-q5_1.bin`          | ~190 MB | `whisper-small-q5_1`          |
+| `Medium` *(default)* | `ggml-medium-q5_0.bin`         | ~539 MB | `whisper-medium-q5_0`         |
+| `LargeV3Turbo`       | `ggml-large-v3-turbo-q8_0.bin` | ~874 MB | `whisper-large-v3-turbo-q8_0` |
+
 
 #### 2a-i. Compute backend selection
 
@@ -144,12 +148,14 @@ The session calls `StylePipeline::transform()` for LLM post-processing.
 
 `PostProcessInput` carries:
 
-| Field | Meaning |
-|-------|---------| 
-| `raw_text` | ASR transcript after dictionary substitution |
-| `dictionary` | Entries for the pre-LLM seed substitution; never sent to the model |
-| `style_preset` | Output style contract |
-| `language` | BCP-47 code from ASR detection, `"en"` when unset |
+
+| Field          | Meaning                                                            |
+| -------------- | ------------------------------------------------------------------ |
+| `raw_text`     | ASR transcript after dictionary substitution                       |
+| `dictionary`   | Entries for the pre-LLM seed substitution; never sent to the model |
+| `style_preset` | Output style contract                                              |
+| `language`     | BCP-47 code from ASR detection, `"en"` when unset                  |
+
 
 `StylePipeline` runs two steps:
 
@@ -164,9 +170,11 @@ The LLM backend (`OpenAiLlmBackend`) wraps an `async-openai` `Client` and makes 
 
 ### 5. Text Delivery
 
-**Crate:** `lune-voice` | **Files:** `crates/lune-voice/src/delivery.rs`, `uinput_typer.rs`, `ibus.rs`, `focus.rs` + `focus/unix.rs`, `probe.rs`
+**Crate:** `lune-voice` | **Files:** `crates/lune-voice/src/delivery.rs`, `uinput_typer.rs`, `ibus.rs`, `focus.rs` + `focus/unix.rs` + `focus/windows.rs`, `probe.rs`
 
-`delivery.rs` defines one `PlatformDriver` trait with a half per platform. `focus.rs` owns focused-window detection and terminal classification — the compositor probes live in `focus/unix.rs`, the Win32 `GetForegroundWindow` path in `focus/windows.rs` — and every external probe (compositor sockets, `wl-paste`, `swaymsg`, `xdotool`) runs through `probe.rs`, which time-bounds it and drains both child pipes for the whole wait so a chatty child is not killed mid-answer.
+`delivery.rs` defines one `PlatformDriver` trait with a half per platform. `focus.rs` owns focused-window detection, terminal classification and focus restore, with a half per platform: the compositor probes in `focus/unix.rs`, the Win32 calls in `focus/windows.rs`. Every external probe (compositor sockets, `wl-paste`, `swaymsg`, `xdotool`) runs through `probe.rs`, which time-bounds it and drains both child pipes for the whole wait so a chatty child is not killed mid-answer.
+
+**The target window is captured once, when the dictation starts** (`capture_focus_target`, run off the start path because the Unix probes can cost ~500 ms) and consumed seconds later at delivery. Two things can move focus in between: the user, deliberately, and one of our own windows — the pill above all. So capture drops the restore token when the foreground window belongs to this process, and delivery restores the captured window before typing, but only while one of our own windows holds focus. Someone who switched apps on purpose keeps the app they switched to. The restore therefore covers focus that moves *after* capture only — a dictation that starts while one of our windows is already in front has no token to restore to, which is why the pill refuses activation in the first place.
 
 The session emits the delivery payload directly on the event channel as
 `FinalizedText { session_id, text }` — styled text for delivery.
@@ -176,14 +184,18 @@ Delivery runs on a dedicated thread and picks a backend once at startup. On Linu
 - **IBus** — used when IBus is the active input method (e.g. GNOME/Wayland; detected via `GTK_IM_MODULE` / `QT_IM_MODULE` / `XMODIFIERS`). Commits Unicode straight into the focused input context — no terminal detection, paste chord, or clipboard.
 - **uinput** — the universal fallback. Drives a virtual keyboard through `/dev/uinput`.
 
-On Windows (and macOS) there is one: **arboard + enigo** — `arboard` for the clipboard, `enigo` for the paste chord and for per-key Unicode typing. `arboard` reads and writes the clipboard in-process, so there is no child process to bound; it reads text only, so a non-text clipboard is snapshotted as "nothing to restore" rather than as bytes.
+On Windows (and macOS) there is one: **arboard + enigo** — `arboard` for the clipboard, `enigo` for the paste chord and for per-key Unicode typing. `arboard` reads and writes the clipboard in-process, so there is no child process to bound; it reads text only, so a non-text clipboard is snapshotted as "nothing to restore" rather than as bytes. On Windows this driver first restores the captured window (`focus::restore_focus` — `SetForegroundWindow`, guarded by `IsWindow` because Windows reuses handles) and waits 30 ms for the activation to land, because the paste chord goes wherever focus is.
 
 `dictation_mode` selects the delivery method; `copy_to_clipboard` is an orthogonal toggle for whether a copy is *kept*:
 
-| Mode | uinput path | IBus path |
-|------|-------------|-----------|
-| `TypeInPlace` | Types each key (US-QWERTY). Non-ASCII text routes through the clipboard paste path so it is never dropped. | `commit_text` |
-| `Clipboard` | Sets the clipboard (`wl-copy`/`xclip`), detects terminals, sends Ctrl+V / Ctrl+Shift+V. Adaptive post-paste delay (EMA of clipboard RTT); per-key fallback for paste-hostile apps. | `commit_text` |
+
+| Mode          | uinput (Linux)                                                                                                                                                                     | IBus (Linux)  | arboard + enigo (Windows / macOS)                                                |
+| ------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------- | -------------------------------------------------------------------------------- |
+| `TypeInPlace` | Types each key (US-QWERTY). Non-ASCII text routes through the clipboard paste path so it is never dropped.                                                                         | `commit_text` | `enigo.text()` — there is no uinput here                                         |
+| `Clipboard`   | Sets the clipboard (`wl-copy`/`xclip`), detects terminals, sends Ctrl+V / Ctrl+Shift+V. Adaptive post-paste delay (EMA of clipboard RTT); per-key fallback for paste-hostile apps. | `commit_text` | In-process clipboard, then Ctrl+V — Cmd+V on macOS — **always**, terminal or not |
+
+
+Terminal classification means something different on each side. On Linux it picks the chord. On Windows every console takes Ctrl+V, so it only decides whether the text must be flattened first.
 
 **Undeliverable text.** Delivery reports back whether the text reached the focused app. Multi-line text is never typed key-by-key — a newline would press Enter into whatever has focus — so if the clipboard is also unavailable the text is dropped rather than sent, and the session raises a warning instead of reporting success.
 
@@ -231,32 +243,34 @@ The desktop app does not scrape logs or poll for session state. It uses typed Ta
 
 ### Commands
 
-| Command | Window access | Result |
-|---------|---------------|--------|
-| `load_workspace_snapshot` | `main` | Settings, history, dictionary, style presets, service status |
-| `save_workspace_settings` | `main` | Updated workspace snapshot |
-| `create_dictionary_entry` / `delete_dictionary_entry` | `main` | Updated workspace snapshot |
-| `subscribe_session_stream` / `detach_session_stream` | `main` | Live session event subscription |
-| `start_dictation` / `stop_dictation` / `cancel_dictation` / `toggle_dictation` | `main`, `pill` | Session control |
-| `load_pill_snapshot` | `pill` | Minimal state for the overlay |
-| `nudge_pill` / `save_pill_position` | `pill` | Drag the overlay and persist where it lands (webview pill only) |
-| `reset_pill_position` | `main` | Clear the saved position back to the anchor default |
-| `list_monitors` | `main` | Connected displays for the pill's monitor picker |
-| `gpu_backend_status` | `main` | Runtime GPU state: `unsupported`, `driver-missing`, `not-installed`, `ready`, `failed` |
-| `install_gpu_backend` | `main` | Downloads and verifies the CUDA plugin, streaming progress over a channel |
-| `list_history_page` / `delete_session` / `delete_sessions` | `main` | History paging, single and bulk deletion |
-| `update_dictionary_entry` | `main` | Edit a dictionary entry in place |
-| `save_snippet` / `delete_snippet` | `main` | Snippet management |
-| `create_custom_style` / `update_custom_style` / `delete_custom_style` / `generate_style_examples` | `main` | Custom style presets |
-| `list_audio_input_devices` | `main` | Input device picker |
-| `start_trigger_capture` | `main` | Capture-only session for the snippet voice-trigger recorder (transcript streamed back, nothing typed, no history row) |
-| `check_model_status` / `download_model_cmd` / `delete_model_cmd` | `main` | Model management |
-| `required_models_ready` | `main` | Whether the configured ASR backend has what it needs on disk — the same check the pipeline builds against, so setup and runtime cannot drift |
-| `active_model_download` / `cancel_model_download` | `main` | The download slot is global, so a transfer survives the window closing and a reopened window re-attaches to it instead of restarting setup. A second `download_model_cmd` for the same model joins the running transfer and reports its outcome |
-| `uinput_access_ready` / `grant_uinput_access` / `uinput_rule_installed` / `remove_uinput_rule` | `main` | The `/dev/uinput` udev rule, asked for during setup rather than mid-dictation. `grant_uinput_access` returns `false` when the rule is installed but needs a reboot to take effect; `Err` means the install itself failed. Removal is offered only for a rule this app wrote (a .deb/.rpm ships its own) |
-| `export_transcript` | `main` | Write a session transcript to a file |
-| `app_version` / `start_update_check` / `update_state` / `install_pending_update` / `dismiss_update` | `main` | Version string and the in-app update flow. State is held in the backend, so an offer survives the window closing |
-| `quit_app` | `main` | Runtime lifecycle |
+
+| Command                                                                                             | Window access  | Result                                                                                                                                                                                                                                                                                                  |
+| --------------------------------------------------------------------------------------------------- | -------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `load_workspace_snapshot`                                                                           | `main`         | Settings, history, dictionary, style presets, service status                                                                                                                                                                                                                                            |
+| `save_workspace_settings`                                                                           | `main`         | Updated workspace snapshot                                                                                                                                                                                                                                                                              |
+| `create_dictionary_entry` / `delete_dictionary_entry`                                               | `main`         | Updated workspace snapshot                                                                                                                                                                                                                                                                              |
+| `subscribe_session_stream` / `detach_session_stream`                                                | `main`         | Live session event subscription                                                                                                                                                                                                                                                                         |
+| `start_dictation` / `stop_dictation` / `cancel_dictation` / `toggle_dictation`                      | `main`, `pill` | Session control                                                                                                                                                                                                                                                                                         |
+| `load_pill_snapshot`                                                                                | `pill`         | Minimal state for the overlay                                                                                                                                                                                                                                                                           |
+| `nudge_pill` / `save_pill_position`                                                                 | `pill`         | Drag the overlay and persist where it lands (webview pill only). Deltas arrive as webview CSS px and are scaled into the monitor's space, carrying the sub-pixel remainder between frames                                                                                                               |
+| `reset_pill_position`                                                                               | `main`         | Clear the saved position back to the anchor default                                                                                                                                                                                                                                                     |
+| `list_monitors`                                                                                     | `main`         | Named displays for the pill's monitor picker, sized in the pill's placement space — device px on Windows/macOS, GDK logical px on Linux                                                                                                                                                                 |
+| `gpu_backend_status`                                                                                | `main`         | Runtime GPU state: `unsupported`, `driver-missing`, `not-installed`, `ready`, `failed`                                                                                                                                                                                                                  |
+| `install_gpu_backend`                                                                               | `main`         | Downloads and verifies the CUDA plugin, streaming progress over a channel                                                                                                                                                                                                                               |
+| `list_history_page` / `delete_session` / `delete_sessions`                                          | `main`         | History paging, single and bulk deletion                                                                                                                                                                                                                                                                |
+| `update_dictionary_entry`                                                                           | `main`         | Edit a dictionary entry in place                                                                                                                                                                                                                                                                        |
+| `save_snippet` / `delete_snippet`                                                                   | `main`         | Snippet management                                                                                                                                                                                                                                                                                      |
+| `create_custom_style` / `update_custom_style` / `delete_custom_style` / `generate_style_examples`   | `main`         | Custom style presets                                                                                                                                                                                                                                                                                    |
+| `list_audio_input_devices`                                                                          | `main`         | Input device picker                                                                                                                                                                                                                                                                                     |
+| `start_trigger_capture`                                                                             | `main`         | Capture-only session for the snippet voice-trigger recorder (transcript streamed back, nothing typed, no history row)                                                                                                                                                                                   |
+| `check_model_status` / `download_model_cmd` / `delete_model_cmd`                                    | `main`         | Model management                                                                                                                                                                                                                                                                                        |
+| `required_models_ready`                                                                             | `main`         | Whether the configured ASR backend has what it needs on disk — the same check the pipeline builds against, so setup and runtime cannot drift                                                                                                                                                            |
+| `active_model_download` / `cancel_model_download`                                                   | `main`         | The download slot is global, so a transfer survives the window closing and a reopened window re-attaches to it instead of restarting setup. A second `download_model_cmd` for the same model joins the running transfer and reports its outcome                                                         |
+| `uinput_access_ready` / `grant_uinput_access` / `uinput_rule_installed` / `remove_uinput_rule`      | `main`         | The `/dev/uinput` udev rule, asked for during setup rather than mid-dictation. `grant_uinput_access` returns `false` when the rule is installed but needs a reboot to take effect; `Err` means the install itself failed. Removal is offered only for a rule this app wrote (a .deb/.rpm ships its own) |
+| `export_transcript`                                                                                 | `main`         | Write a session transcript to a file                                                                                                                                                                                                                                                                    |
+| `app_version` / `start_update_check` / `update_state` / `install_pending_update` / `dismiss_update` | `main`         | Version string and the in-app update flow. State is held in the backend, so an offer survives the window closing                                                                                                                                                                                        |
+| `quit_app`                                                                                          | `main`         | Runtime lifecycle                                                                                                                                                                                                                                                                                       |
+
 
 ### Session Stream
 
@@ -275,19 +289,28 @@ The frontend store treats this stream as the source of truth for live runtime st
 Two implementations, chosen at compile time, behind one interface in `pill.rs` — which owns the config, the saved position and the placement maths for both.
 
 - **Linux — native.** A bare `gtk::Window` with a 32-bit ARGB visual, drawn with cairo (`pill_native.rs` + `pill_paint.rs`). WebKitGTK's accelerated compositor loses the alpha channel on the Nvidia + GNOME stack, so a webview pill can only ever be a flat opaque rectangle; cairo draws through XRender and never enters that path. Not a Tauri window: every Tauri window carries a webview, and the pill needs none. tao *is* GTK3 on Linux and drives the one GTK main loop, so the window just joins it.
-- **Windows/macOS — webview.** A Tauri window rendering `pill.html` (`src/features/dictation/`), styled by the `.pill-*` rules in `components.css`.
+- **Windows/macOS — webview.** A Tauri window rendering `pill.html` (`src/features/dictation/`), styled by the `.pill-*` rules in `components.css`. It carries `WS_EX_NOACTIVATE` on Windows, because the window holding focus when a dictation ends is the window the transcript is typed into — an overlay that activates on click eats the user's text. The builder's `focused(false)` covers creation only. The Linux pill makes the same promise with `set_accept_focus(false)`.
+- **`pill_all_workspaces` is Linux and macOS only.** Windows virtual desktops are not addressable per-window, so tao leaves the call unimplemented and the setting is ignored there. `WorkspaceSnapshot.capabilities` (`PlatformCapabilitiesDto`) reports this to the frontend, which drops the Settings row rather than showing a toggle that does nothing.
 
 Both draw the same thing: a bar with a circular control at each end while listening — stop-and-transcribe on the left (top when vertical), discard on the right — and the level meter between them, each chip centred in the space between the bar's end and the meter. Outside a live session both caps are absent, and the bar itself starts a session. The two implementations are kept visually in step by hand; what is checked is the shared numbers. `pill_paint.rs` mirrors the theme's oklch tokens and the meter's geometry, and unit tests read `tokens.css`/`daisyui.css` and `dot-style.ts` back, failing if either side moves.
 
 State reaches the native pill by direct call (`pill::publish_status` / `publish_audio_level`), and the webview pill by targeted event, so it can react without owning the main session channel:
 
-| Event | Payload |
-|-------|---------| 
-| `lune://pill-state` | `"ready"`, `"listening"`, `"processing"`, or `"error"` |
-| `lune://audio-level` | Float in `[0, 1]` |
-| `lune://pill-settings` | `pillLocked` |
+
+| Event                  | Payload                                                |
+| ---------------------- | ------------------------------------------------------ |
+| `lune://pill-state`    | `"ready"`, `"listening"`, `"processing"`, or `"error"` |
+| `lune://audio-level`   | Float in `[0, 1]`                                      |
+| `lune://pill-settings` | `pillLocked`                                           |
+
 
 Rust shows or hides the pill directly on status changes (`should_show_pill`) — the frontend never decides visibility, so the mapped window and its contents cannot desync.
+
+**Placement is in the desktop's own coordinate space, and there are two of them.** `MonitorRect` holds GDK logical coordinates on Linux, where the whole layout is logical and `scale` is 1.0, and device pixels straight from the platform on Windows and macOS. A desktop spanning monitors at different DPI has exactly one coherent space and it is the physical one: dividing each monitor by its own scale makes neighbouring screens claim overlapping coordinates, so a drag lands on the wrong screen.
+
+The pill's own geometry stays logical, because that is what the webview lays itself out in. `pill_extent` converts the footprint and the edge margin into the target monitor's space, so a 168×50 pill stays 168×50 to the eye on a 150% panel. `monitor_for_pill` resolves in two passes — the corner picks a candidate, that candidate's scale gives the footprint, the centre picks the answer — because the pill's size in device pixels depends on the monitor being searched for. The saved position is in the same space, so `pill_position` in `settings.toml` means different numbers on different platforms.
+
+**A geometry change rebuilds the window.** The webview pill is never resized live (compositor ghosting during resize), so any change to size, orientation, corner or anchor destroys it and builds a new one. `destroy` unregisters on the event loop, so the label frees asynchronously and building under one still taken is a silent no-op; the rebuild waits up to 5 s for it. If the label never frees, the overlay stays hidden until the next pill settings change or a restart, and says so at `error` level.
 
 ### Sound Cues
 
@@ -328,18 +351,18 @@ safely.
 Blocking work is dispatched as follows:
 
 - **whisper decode** (`poll_final`) uses `block_in_place`, not `spawn_blocking`:
-  the whisper session is `!Send` (it wraps raw C pointers) and cannot move to
-  the blocking pool. `block_in_place` hands the current worker thread off to
-  the blocking pool so other tasks keep running during the multi-second decode.
-  On a multi-thread runtime (the app) this is a true handoff; on a current-thread
-  runtime (unit tests) it runs inline and warns once.
+the whisper session is `!Send` (it wraps raw C pointers) and cannot move to
+the blocking pool. `block_in_place` hands the current worker thread off to
+the blocking pool so other tasks keep running during the multi-second decode.
+On a multi-thread runtime (the app) this is a true handoff; on a current-thread
+runtime (unit tests) it runs inline and warns once.
 - **LLM styling** is a plain async HTTP request (via `async-openai`), so it runs
-  directly on the async runtime.
+directly on the async runtime.
 - **Persistence** never stalls the runtime. The Tauri command layer and the
-  GPU-plugin unpack use `spawn_blocking`. The session lifecycle cannot: its
-  `Database` lives behind a shared `tokio::sync::Mutex` whose guard cannot cross
-  into a spawned task, so it uses `block_in_place` instead — same handoff, no
-  `Send` bound, and no extra cancellation point in `start`.
+GPU-plugin unpack use `spawn_blocking`. The session lifecycle cannot: its
+`Database` lives behind a shared `tokio::sync::Mutex` whose guard cannot cross
+into a spawned task, so it uses `block_in_place` instead — same handoff, no
+`Send` bound, and no extra cancellation point in `start`.
 
 The audio capture callback runs on cpal's own high-priority thread and pushes
 into a lock-free ring buffer; the session loop polls it, so the real-time path
@@ -380,3 +403,4 @@ lune-persist
   |
   `-- SQLite history, settings, model downloads
 ```
+

@@ -31,12 +31,12 @@ After-speech wait = poll_final (Silero endpoint trim + whisper.cpp decode) + opt
 | whisper.cpp decode (`poll_final`) | **Primary fixed cost** | Batch decode of the full utterance; scales with audio length and model size |
 | Standalone Silero VAD | Separate endpoint-trim stage | Whisper's VAD trims leading/trailing silence before decode and keeps internal pauses (a punctuation cue); NOT the in-decode `enable_vad` |
 | LLM styling | Variable; skipped when no style preset is selected | One completion call to the configured remote OpenAI-compatible endpoint; plain async HTTP, so it does not stall the runtime |
-| Delivery | Flat for a paste; ~8 ms per character when typed | Text over 80 characters, non-ASCII text and multi-line text are pasted (flat, ~100–360 ms). Shorter ASCII text is typed per key, which is faster at that length and leaves the clipboard untouched |
+| Delivery | Flat for a paste; ~8 ms per character when typed | Text over 80 characters, non-ASCII text and multi-line text are pasted (flat, ~100–360 ms). Shorter ASCII text is typed per key, which is faster at that length and leaves the clipboard untouched. On Windows, add 30 ms whenever focus has to be restored to the captured window first |
 
 ### What Does NOT Add to After-Speech Wait
 
 - **Audio accumulation** runs concurrently with the user speaking.
-- **Model load** happens once at startup; shared context is reused across sessions.
+- **Model load** happens once at startup and the context is shared across sessions — unless `model_idle_unload_minutes` is set, which frees the model after idle and pays the reload on the next hotkey press: ~160 ms with a warm page cache, ~750 ms cold, on `Medium`. Off by default.
 - **Dictionary seed** is a pure in-process string pass; negligible.
 
 ### Bottleneck Analysis
@@ -64,9 +64,13 @@ After-speech wait = poll_final (Silero endpoint trim + whisper.cpp decode) + opt
 | `pipeline` / `stages` / `latency` | Real pipeline, per-stage timings, session latency |
 | `domain` / `punctuation` / `dict` / `snippets` | Output-quality A/Bs |
 | `styling` / `rulecmp` | Remote styling capability and rule comparison (endpoint via `LUNE_BENCH_LLM_*`, see `benchmarks/bench_utils.rs`) |
-| `live` | Live microphone transcription |
+| `vram` | GPU memory use per model (`--env DEVICE=`, `CYCLES=`) |
+| `modelload` | Cold and warm model load + unload timings (`--env REPEATS=`, `WHISPER_MODEL=`) — the source of the idle-unload figures above |
+| `live` / `livewer` | Live microphone transcription, and its word error rate |
+| `confusion` / `noisify` | Recognition confusion pairs, and synthetic noise robustness |
 
-Model-backed targets compile whisper.cpp and need a model on disk. Numbers are not checked into the repository — decode time swings by an order of magnitude across CPU, GPU, model size and utterance length, so run the targets on the hardware you care about, or use the profiling guide below.
+`LUNE_BENCH_BASELINE` and `LUNE_BENCH_TOLERANCE` gate a run against a recorded
+baseline. Model-backed targets compile whisper.cpp and need a model on disk. Numbers are not checked into the repository — decode time swings by an order of magnitude across CPU, GPU, model size and utterance length, so run the targets on the hardware you care about, or use the profiling guide below.
 
 ---
 

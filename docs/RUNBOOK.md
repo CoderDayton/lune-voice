@@ -4,21 +4,27 @@ Common failure modes and how to get out of them. Lune Voice is a single-user
 desktop app, so "recovery" almost always means restoring local state, not
 failing over.
 
+Entries are tagged **(Linux)** or **(Windows)** where they only apply to one.
+Untagged entries apply to both.
+
 Everything below assumes the default paths:
 
-| What | Where |
-|---|---|
-| Settings | `~/.config/lune-voice/settings.toml` |
-| Database | `~/.local/share/lune-voice/lune.db` |
-| Models | `~/.local/share/lune-voice/models/` |
-| GPU plugin | `~/.local/share/lune-voice/backends/` |
-| IME recovery record | `~/.local/share/lune-voice/displaced-input-engine` |
+| What | Linux | Windows |
+|---|---|---|
+| Settings | `~/.config/lune-voice/settings.toml` | `%APPDATA%\lune-voice\settings.toml` |
+| Database | `~/.local/share/lune-voice/lune.db` | `%APPDATA%\lune-voice\lune.db` |
+| Models | `~/.local/share/lune-voice/models/` | `%APPDATA%\lune-voice\models\` |
+| GPU plugin | `~/.local/share/lune-voice/backends/` | not published for Windows |
+| IME recovery record | `~/.local/share/lune-voice/displaced-input-engine` | n/a |
 
 First diagnostic step for anything: run with logs on.
 
 ```sh
 RUST_LOG=info lune-voice          # or: RUST_LOG=info cgs dev
 ```
+
+In PowerShell that is `$env:RUST_LOG="info"` on its own line first, then the
+executable.
 
 Transcript text is **redacted by default**. To include it while debugging a
 recognition problem — and only then — set `LUNE_LOG_TRANSCRIPTS=1`. Never attach
@@ -83,7 +89,7 @@ Work down this list:
 
 ---
 
-## Transcript is recognized but never appears
+## Transcript is recognized but never appears (Linux)
 
 **Symptom:** the session completes and history shows the text, but nothing was
 inserted; the UI reports the dictation was not delivered.
@@ -97,6 +103,24 @@ is in history, so nothing is lost — copy it from there in the meantime.
 
 ---
 
+## The pill disappears after changing a pill setting (Windows, macOS)
+
+**Symptom:** the overlay vanishes right after you change its size, orientation,
+corner or anchor, and does not come back on its own.
+
+**Cause:** the webview pill is rebuilt rather than resized on a geometry change,
+and the old window's label had not been released 5 seconds after it was
+destroyed, so the new one could not claim it.
+
+**Diagnosis:** `pill window label still registered 5s after destroy` at `error`
+level.
+
+**Recovery:** change any pill setting again, or restart the app. Nothing is lost
+— dictation itself is unaffected, and the hotkey still works while the overlay
+is missing.
+
+---
+
 ## Transcript lands in the pill instead of the app (Windows)
 
 **Symptom:** dictation started by clicking the pill delivers nothing to the
@@ -104,9 +128,11 @@ target app. History has the text.
 
 **Cause:** the overlay took focus, so the paste chord went to it. The pill is
 built with `WS_EX_NOACTIVATE` (`pill.rs::deny_activation`) to refuse
-activation, and delivery restores the captured window before pasting
-(`focus/windows.rs::restore_focus`). Both failing at once means WebView2 called
-`SetFocus` itself and the restore was refused.
+activation — that is the only guard for this case. The delivery-side restore
+(`focus/windows.rs::restore_focus`) covers focus that moves *after* the
+dictation started; a pill that already held focus at capture time is recorded
+with no restore token, so there is nothing to restore to. Seeing this means
+WebView2 called `SetFocus` on itself before the session started.
 
 **Diagnosis:** `RUST_LOG=info` and look for `could not restore focus to the
 window the dictation started in`, or `foreground window belongs to this

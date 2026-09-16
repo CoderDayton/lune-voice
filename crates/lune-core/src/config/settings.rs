@@ -176,8 +176,8 @@ pub struct UserSettings {
     /// When to show the floating dictation pill overlay.
     #[serde(default, deserialize_with = "lenient")]
     pub pill_visibility: PillVisibility,
-    /// Persisted pill overlay position (logical px from the monitor's
-    /// top-left). `None` = default anchor placement; set when the user
+    /// Persisted pill overlay position — see [`PillPosition`] for the
+    /// coordinate space. `None` = default anchor placement; set when the user
     /// drags the pill.
     #[serde(default)]
     pub pill_position: Option<PillPosition>,

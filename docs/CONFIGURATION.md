@@ -78,9 +78,11 @@ pill_corner = "Rounded"
 pill_edge_margin = 72
 pill_all_workspaces = true
 pill_locked = false
-# pill_monitor is optional — omit to follow the active monitor, or set a
-# connector name (e.g. "DP-1") to pin the pill to one display.
-# pill_position is set automatically when you drag the pill; omit for the anchor default.
+# pill_all_workspaces is ignored on Windows — see the Pill Overlay section.
+# pill_monitor is optional — omit to follow the active monitor, or set a display
+# name (e.g. "DP-1") to pin the pill to one.
+# pill_position is set automatically when you drag the pill; omit for the anchor
+# default. Its units are per-platform — see the Pill Overlay section.
 terminal_mode = "Auto"
 sound_cues_enabled = true
 sound_cue_volume = 1.0
@@ -257,10 +259,14 @@ copy_to_clipboard = false
 
 | Mode | Behavior |
 |------|----------|
-| `TypeInPlace` | Types the text into the focused field, character by character, through a `uinput` virtual keyboard. Non-ASCII text (accents, CJK, emoji) is delivered via a clipboard paste instead, so nothing is dropped. **(default)** |
-| `Clipboard` | Delivers by setting the clipboard and sending a paste chord — `Ctrl+V`, or `Ctrl+Shift+V` when a terminal is focused. Uses an adaptive post-paste delay (EMA of clipboard round-trip) and falls back to per-key typing if `wl-copy` / `xclip` are missing. Text that cannot be typed safely per key — anything multi-line — is dropped with a warning rather than delivered, since a newline would press Enter into the focused app. |
+| `TypeInPlace` | Types the text into the focused field, character by character — a `uinput` virtual keyboard on Linux, `enigo` on Windows and macOS. Non-ASCII text (accents, CJK, emoji) is delivered via a clipboard paste instead, so nothing is dropped. **(default)** |
+| `Clipboard` | Delivers by setting the clipboard and sending a paste chord. Text that cannot be typed safely per key — anything multi-line — is dropped with a warning rather than delivered, since a newline would press Enter into the focused app. |
 
-> When IBus is the active input method (common on GNOME/Wayland), both modes commit text directly through IBus and never touch the clipboard. See [Architecture → Text Delivery](ARCHITECTURE.md#5-text-delivery).
+**The chord is per-platform.** On Linux it is `Ctrl+V`, or `Ctrl+Shift+V` when a terminal is focused, with an adaptive post-paste delay (EMA of clipboard round-trip) and a per-key fallback if `wl-copy` / `xclip` are missing. On Windows it is always `Ctrl+V` — every console accepts it — and terminal detection instead decides whether newlines and tabs must be collapsed first. macOS uses `Cmd+V`. The clipboard is in-process on Windows and macOS, so there is no helper that can be missing.
+
+**The target window is the one focused when you started speaking**, not when the text arrives. On Windows, if one of the app's own windows took focus in between — clicking the pill, say — focus is put back before the paste. See [Architecture → Text Delivery](ARCHITECTURE.md#5-text-delivery).
+
+> When IBus is the active input method (common on GNOME/Wayland), both modes commit text directly through IBus and never touch the clipboard.
 
 ### Copy to Clipboard
 
@@ -301,10 +307,10 @@ pill_anchor = "BottomCenter"     # default position when not dragged
 pill_size = "Standard"           # Compact | Standard | Large
 pill_orientation = "Horizontal"  # Horizontal | Vertical
 pill_corner = "Rounded"          # Pill | Rounded | Square
-pill_edge_margin = 72            # gap (px) from the screen edge for the anchor
-pill_all_workspaces = true       # follow you across virtual desktops
+pill_edge_margin = 72            # gap from the screen edge for the anchor, in logical px
+pill_all_workspaces = true       # follow you across workspaces (Linux/macOS only)
 pill_locked = false              # true disables dragging
-# pill_monitor = "DP-1"          # pin to a connector; omit to follow the active monitor
+# pill_monitor = "DP-1"          # pin to a display by name; omit to follow the active one
 # pill_position = { x = 40, y = 900 }  # set automatically when you drag the pill
 ```
 
@@ -315,11 +321,23 @@ pill_locked = false              # true disables dragging
 | `pill_size` | `Compact`, `Standard`, `Large` | Overall footprint |
 | `pill_orientation` | `Horizontal`, `Vertical` | `Vertical` swaps width and height |
 | `pill_corner` | `Pill`, `Rounded`, `Square` | Corner rounding of the bar |
-| `pill_edge_margin` | `0`–`512` | Distance from the anchored screen edge |
-| `pill_all_workspaces` | `true` / `false` | Show on every workspace |
+| `pill_edge_margin` | `0`–`512` | Distance from the anchored screen edge, in **logical** px — on a 150% display, 72 becomes 108 device px |
+| `pill_all_workspaces` | `true` / `false` | Show on every workspace. **Linux and macOS only**; Windows virtual desktops cannot be addressed per-window, so the value is ignored there and Settings hides the control |
 | `pill_locked` | `true` / `false` | Lock the pill against dragging |
-| `pill_monitor` | connector name or unset | Pin to a specific display |
+| `pill_monitor` | display name or unset | Pin to a specific display. The name is whatever the platform reports — a DRM connector like `DP-1` on Linux, a device name on Windows. Unnamed displays are not listed |
 | `pill_position` | `{ x, y }` or unset | Written when you drag the pill; clears when you pick a new anchor |
+
+**`pill_position` is not monitor-relative, and its units are per-platform:** logical
+pixels on Linux, device pixels on Windows and macOS, matching what each platform
+reports for monitor geometry. On the Linux layer-shell path it is a per-output
+margin instead. Hand-editing it on a scaled display is therefore guesswork — drag
+the pill and let it write the value.
+
+Changing the size, orientation, corner or anchor rebuilds the overlay window on
+Windows and macOS rather than resizing it. That is normally invisible, but if the
+rebuild fails the pill stays hidden until you change a pill setting again or
+restart, and the log says so. See
+[Architecture → The Pill Overlay](ARCHITECTURE.md#the-pill-overlay).
 
 On GNOME/Mutter and other compositors without `wlr-layer-shell`, the app runs the
 overlay under XWayland so it can position itself and stay on top.

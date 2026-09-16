@@ -296,8 +296,11 @@ gh release upload v0.2.0 release-artifacts/latest.json
 gh release edit v0.2.0 --draft=false
 ```
 
-To build the bundles locally instead of on CI, `cgs package` replaces the first
-two steps.
+To build the bundles locally instead of on CI, `cgs package` replaces the tag
+and download steps — but not the `rm -rf`. `cgs package` writes into the same
+directory, and a previous release's artifacts left there are exactly what the
+manifest's ambiguity check rejects. `cgs package` also builds Linux artifacts
+only, so the resulting `latest.json` carries no `windows-x86_64` key.
 
 `latest.json` must be uploaded to the release whose tag the endpoint resolves
 to, or clients keep seeing the previous version. Bump `version` in
@@ -315,8 +318,19 @@ The AppImage reaches clients as a `.tar.gz` (the plugin extracts it and looks
 for the `.AppImage` inside); `cgs updater-manifest` builds and signs that
 archive, and signs the deb and rpm, which the bundler would not sign even with
 `createUpdaterArtifacts` on.
-`cgs updater-manifest` also refuses to run when the tag disagrees with the
-`version` in `tauri.conf.json`.
+`cgs updater-manifest` refuses to run when the tag disagrees with the `version`
+in `tauri.conf.json`, and it selects artifacts **by that version**, not by glob
+order — glob order is version-ascending, so the oldest build used to win and the
+manifest would advertise 0.2.0 while pointing at 0.1.0 files. Two errors come
+out of that check:
+
+- `no <kind> for <version> in <dir>, only: …` — the directory holds that format
+  for some other version. Almost always a missing `rm -rf release-artifacts`.
+- `more than one <kind> for <version>` — two builds of the same format and
+  version, for example a `-rc.1` alongside the final. Remove the one you are not
+  shipping.
+
+Only the packed `.AppImage.tar.gz` and the portable archive may be absent.
 
 ### Testing the updater
 
@@ -406,10 +420,17 @@ cgs licenses                                        # rewrite THIRD_PARTY_LICENS
 cgs licenses --env CHECK=1                          # verify only
 ```
 
-`release.yml` runs the check before building, so a tag with a stale file fails
-instead of shipping wrong notices. cargo-about runs with `--fail`: a crate whose
+The `build-linux` job in `release.yml` runs `--check` before building, so a tag
+with a stale file fails instead of shipping wrong notices; `build-windows`
+inherits that through `needs:`. cargo-about runs with `--fail`: a crate whose
 licence it cannot determine stops the run, and needs a `clarify` entry in
 `about.toml`.
+
+**Nothing checks this outside a tag build.** `ci.yml` has no licence step and
+`cgs package` does not call the script, so a dependency change can land on
+`main`, and a local bundle can be built, with a stale `THIRD_PARTY_LICENSES.md`.
+Run `cgs licenses --env CHECK=1` yourself after touching `Cargo.toml` or
+`package.json`.
 
 Lune Voice itself is GPL-3.0-or-later; `cargo deny check licenses` gates the
 dependency tree against the allow-list in `deny.toml`.
