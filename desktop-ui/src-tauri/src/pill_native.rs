@@ -415,6 +415,9 @@ pub fn monitors() -> Vec<MonitorRect> {
                 w: g.width(),
                 h: g.height(),
                 primary: m.is_primary(),
+                // GDK geometry is already logical for the whole layout, so the
+                // placement space and the pill's own units are the same here.
+                scale: 1.0,
             }
         })
         .collect()

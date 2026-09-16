@@ -181,6 +181,8 @@ mod windows;
 
 #[cfg(unix)]
 pub(crate) use unix::{focused_window_class, restore_focus};
+#[cfg(target_os = "windows")]
+pub(crate) use windows::restore_focus;
 
 /// Snapshot the focused window.
 ///

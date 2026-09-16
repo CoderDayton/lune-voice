@@ -97,6 +97,26 @@ is in history, so nothing is lost — copy it from there in the meantime.
 
 ---
 
+## Transcript lands in the pill instead of the app (Windows)
+
+**Symptom:** dictation started by clicking the pill delivers nothing to the
+target app. History has the text.
+
+**Cause:** the overlay took focus, so the paste chord went to it. The pill is
+built with `WS_EX_NOACTIVATE` (`pill.rs::deny_activation`) to refuse
+activation, and delivery restores the captured window before pasting
+(`focus/windows.rs::restore_focus`). Both failing at once means WebView2 called
+`SetFocus` itself and the restore was refused.
+
+**Diagnosis:** `RUST_LOG=info` and look for `could not restore focus to the
+window the dictation started in`, or `foreground window belongs to this
+process` at capture time.
+
+**Recovery:** start dictation with the hotkey rather than the pill; the hotkey
+path never moves focus. The transcript is in history either way.
+
+---
+
 ## Styling makes dictation slow or hangs
 
 Styling is a remote call, so it inherits your endpoint's latency.

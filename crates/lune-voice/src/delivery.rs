@@ -520,6 +520,11 @@ const CLIPBOARD_SETTLE: std::time::Duration = std::time::Duration::from_millis(3
 #[cfg(not(unix))]
 const PASTE_READ_WINDOW: std::time::Duration = std::time::Duration::from_millis(100);
 
+/// How long a restored window is given to actually come to the foreground
+/// before the paste chord follows it. Activation is asynchronous.
+#[cfg(target_os = "windows")]
+const FOCUS_SWITCH_SETTLE: std::time::Duration = std::time::Duration::from_millis(30);
+
 #[cfg(not(unix))]
 struct PlatformDriver {
     clipboard: arboard::Clipboard,
@@ -534,6 +539,10 @@ impl PlatformDriver {
             arboard::Clipboard::new().map_err(|e| format!("clipboard init failed: {e}"))?;
         let enigo = enigo::Enigo::new(&enigo::Settings::default())
             .map_err(|e| format!("enigo init failed: {e}"))?;
+        // No-op here — Windows answers the focus query in three cheap Win32
+        // calls with nothing to cache — but every driver calls it, so a
+        // platform that does need priming gets it without touching this file.
+        crate::focus::warm_probes();
         Ok(Self {
             clipboard,
             enigo,
@@ -625,6 +634,16 @@ impl PlatformDriver {
         keep_clipboard: bool,
     ) -> TypeOutcome {
         debug!(class = ?target.class, is_terminal = target.is_terminal, "delivering to window");
+        // The paste chord goes to whatever holds focus, so if one of our own
+        // windows took it since the capture — a click on the pill overlay —
+        // the transcript would land in the pill. Put focus back first. A no-op
+        // when focus is already where the user left it.
+        #[cfg(target_os = "windows")]
+        if let Some(token) = target.focus_token.as_ref()
+            && crate::focus::restore_focus(token)
+        {
+            std::thread::sleep(FOCUS_SWITCH_SETTLE);
+        }
         let text: &str = &self.flattened(text, Some(target));
         self.type_text_flattened(text, keep_clipboard)
     }

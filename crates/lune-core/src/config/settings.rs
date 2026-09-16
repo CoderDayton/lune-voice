@@ -9,9 +9,10 @@ use super::pipeline::PipelineOverrides;
 use super::redacted::RedactedString;
 use super::style_llm::StyleId;
 
-/// Persisted pill overlay position, in logical pixels from the monitor's
-/// top-left corner. Stored when the user drags the pill so it reopens where
-/// they left it.
+/// Persisted pill overlay position, in the desktop's own coordinate space —
+/// logical pixels on Linux, device pixels on Windows and macOS, matching what
+/// the platform reports for monitor geometry. Stored when the user drags the
+/// pill so it reopens where they left it.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub struct PillPosition {
     pub x: i32,
@@ -194,8 +195,9 @@ pub struct UserSettings {
     /// `None` = automatic (current/primary monitor).
     #[serde(default)]
     pub pill_monitor: Option<String>,
-    /// Show the pill on every workspace/virtual desktop instead of only the
-    /// one it was opened on.
+    /// Show the pill on every workspace instead of only the one it was opened
+    /// on. Linux and macOS; Windows virtual desktops cannot be addressed
+    /// per-window, so the flag is ignored there.
     #[serde(default = "default_true")]
     pub pill_all_workspaces: bool,
     /// Footprint of the pill bar.
