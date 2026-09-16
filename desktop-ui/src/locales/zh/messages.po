@@ -53,11 +53,23 @@ msgstr "{0} 规则"
 msgid "{0} snippets"
 msgstr "{0} 个片段"
 
-#: src/features/history/components/history-table.tsx:286
+#: src/features/history/components/history-table.tsx:281
 msgid "{count} selected"
 msgstr "已选择 {count} 项"
 
-#: src/features/history/components/history-table.tsx:249
+#: src/features/history/components/session-detail-modal.tsx:59
+msgid "{days, plural, one {# day ago} other {# days ago}}"
+msgstr "{days, plural, other {# 天前}}"
+
+#: src/features/history/components/session-detail-modal.tsx:57
+msgid "{hours, plural, one {# hour ago} other {# hours ago}}"
+msgstr "{hours, plural, other {# 小时前}}"
+
+#: src/features/history/components/session-detail-modal.tsx:55
+msgid "{mins, plural, one {# minute ago} other {# minutes ago}}"
+msgstr "{mins, plural, other {# 分钟前}}"
+
+#: src/features/history/components/history-table.tsx:244
 msgid "{page} / {totalPages}"
 msgstr "{page} / {totalPages}"
 
@@ -65,11 +77,11 @@ msgstr "{page} / {totalPages}"
 msgid "{saved} (unavailable)"
 msgstr "{saved}（不可用）"
 
-#: src/features/overview/overview-page.tsx:116
+#: src/features/overview/overview-page.tsx:117
 msgid "{todayMinutes} min today"
 msgstr "今天 {todayMinutes} 分钟"
 
-#: src/features/history/components/history-table.tsx:132
+#: src/features/history/components/history-table.tsx:127
 msgid "{totalCount} sessions"
 msgstr "{totalCount} 会话"
 
@@ -77,7 +89,7 @@ msgstr "{totalCount} 会话"
 msgid "{totalSessions} total"
 msgstr "共 {totalSessions} 条"
 
-#: src/features/history/components/history-table.tsx:132
+#: src/features/history/components/history-table.tsx:127
 msgid "{visibleCount} / {totalCount}"
 msgstr "{visibleCount} / {totalCount}"
 
@@ -182,7 +194,7 @@ msgstr "AI 模型存储在您的设备上。"
 msgid "All required models are already installed. Continue when you're ready."
 msgstr "所有必需的模型均已安装。准备好后继续。"
 
-#: src/features/overview/overview-page.tsx:102
+#: src/features/overview/overview-page.tsx:103
 msgid "all-time · today"
 msgstr "全部 · 今天"
 
@@ -246,7 +258,7 @@ msgstr "正在请求…"
 msgid "At least {MIN_MESSAGE_CHARS} characters."
 msgstr "至少 {MIN_MESSAGE_CHARS} 个字符。"
 
-#: src/features/overview/overview-page.tsx:150
+#: src/features/overview/overview-page.tsx:151
 msgid "Audio"
 msgstr "声音的"
 
@@ -426,7 +438,7 @@ msgstr "选择您的语音引擎。一切都离线运行——没有云，没有
 msgid "Clear {label}"
 msgstr "清除{label}"
 
-#: src/features/history/components/history-table.tsx:289
+#: src/features/history/components/history-table.tsx:284
 msgid "Clear selection"
 msgstr "清除选择"
 
@@ -435,7 +447,7 @@ msgid "close"
 msgstr "关闭"
 
 #: src/components/feedback/help-feedback-dialog.tsx:281
-#: src/features/history/components/session-detail-modal.tsx:212
+#: src/features/history/components/session-detail-modal.tsx:206
 #: src/features/settings/sections/models-section.tsx:324
 #: src/features/styles/components/style-editor-modal.tsx:202
 #: src/features/updates/update-dialog.tsx:298
@@ -459,7 +471,7 @@ msgstr "组合键必须包含一个非修饰键。"
 msgid "Compact"
 msgstr "紧凑"
 
-#: src/features/history/components/session-detail-modal.tsx:172
+#: src/features/history/components/session-detail-modal.tsx:166
 msgid "Completed"
 msgstr "完全的"
 
@@ -482,11 +494,11 @@ msgstr "继续"
 msgid "Control how your speech is turned into text."
 msgstr "控制如何将语音转换为文本。"
 
-#: src/features/history/components/history-table.tsx:498
+#: src/features/history/components/history-table.tsx:491
 msgid "Copied"
 msgstr "已复制"
 
-#: src/features/history/components/history-table.tsx:498
+#: src/features/history/components/history-table.tsx:491
 msgid "Copy"
 msgstr "复制"
 
@@ -495,7 +507,7 @@ msgstr "复制"
 msgid "Copy to clipboard"
 msgstr "复制到剪贴板"
 
-#: src/features/history/components/session-detail-modal.tsx:135
+#: src/features/history/components/session-detail-modal.tsx:129
 msgid "Copy transcript"
 msgstr "复制转写结果"
 
@@ -575,8 +587,8 @@ msgid "Dark"
 msgstr "深色"
 
 #: src/components/feedback/confirm-dialog.tsx:72
-#: src/features/history/components/history-table.tsx:507
-#: src/features/history/components/session-detail-modal.tsx:205
+#: src/features/history/components/history-table.tsx:500
+#: src/features/history/components/session-detail-modal.tsx:199
 #: src/features/settings/sections/models-section.tsx:260
 msgid "Delete"
 msgstr "删除"
@@ -595,7 +607,7 @@ msgstr "删除 {0}"
 msgid "Delete {0}?"
 msgstr "删除{0}？"
 
-#: src/features/history/components/history-table.tsx:292
+#: src/features/history/components/history-table.tsx:287
 msgid "Delete {count, plural, one {# session} other {# sessions}}?"
 msgstr "删除 {count, plural, other {# 个会话}}？"
 
@@ -603,12 +615,12 @@ msgstr "删除 {count, plural, other {# 个会话}}？"
 msgid "Delete model"
 msgstr "删除模型"
 
-#: src/features/history/components/history-table.tsx:294
+#: src/features/history/components/history-table.tsx:289
 msgid "Delete selected"
 msgstr "删除所选"
 
-#: src/features/history/components/history-table.tsx:505
-#: src/features/history/components/session-detail-modal.tsx:203
+#: src/features/history/components/history-table.tsx:498
+#: src/features/history/components/session-detail-modal.tsx:197
 msgid "Delete session?"
 msgstr "删除会话？"
 
@@ -693,7 +705,7 @@ msgstr "消除错误"
 msgid "Don't save history"
 msgstr "不保存历史"
 
-#: src/features/history/components/history-table.tsx:501
+#: src/features/history/components/history-table.tsx:494
 #: src/features/settings/components/gpu-backend-card.tsx:114
 #: src/features/settings/sections/models-section.tsx:274
 msgid "Download"
@@ -727,7 +739,7 @@ msgstr "下载中断"
 msgid "Download progress"
 msgstr "下载���度"
 
-#: src/features/history/components/session-detail-modal.tsx:127
+#: src/features/history/components/session-detail-modal.tsx:121
 msgid "Download transcript"
 msgstr "下载转写结果"
 
@@ -754,7 +766,7 @@ msgstr "正在下载..."
 msgid "Duplicate"
 msgstr "复制"
 
-#: src/features/history/components/session-detail-modal.tsx:164
+#: src/features/history/components/session-detail-modal.tsx:158
 msgid "Duration"
 msgstr "时长"
 
@@ -794,8 +806,8 @@ msgstr "编辑样式"
 msgid "Editing “{spokenTrigger}”"
 msgstr "正在编辑“{spokenTrigger}”"
 
-#: src/features/history/components/history-table.tsx:458
-#: src/features/overview/overview-page.tsx:183
+#: src/features/history/components/history-table.tsx:451
+#: src/features/overview/overview-page.tsx:184
 msgid "Empty session"
 msgstr "空会话"
 
@@ -803,8 +815,8 @@ msgstr "空会话"
 msgid "Enable styling"
 msgstr "启用润色"
 
-#: src/features/history/components/history-table.tsx:184
-#: src/features/history/components/session-detail-modal.tsx:165
+#: src/features/history/components/history-table.tsx:179
+#: src/features/history/components/session-detail-modal.tsx:159
 #: src/features/settings/sections/styling-engine-section.tsx:44
 msgid "Engine"
 msgstr "引擎"
@@ -948,17 +960,17 @@ msgstr "GPU 支持已安装，但无法正常工作。"
 msgid "Help & feedback"
 msgstr "帮助与反馈"
 
-#: src/features/history/components/history-table.tsx:221
+#: src/features/history/components/history-table.tsx:216
 #: src/features/overview/overview-page.tsx:363
 msgid "History isn't saved"
 msgstr "不保存历史记录"
 
-#: src/features/history/components/history-table.tsx:224
+#: src/features/history/components/history-table.tsx:219
 #: src/features/overview/overview-page.tsx:366
 msgid "History kept {historyDays} days"
 msgstr "历史记录保留 {historyDays} 天"
 
-#: src/features/history/components/history-table.tsx:223
+#: src/features/history/components/history-table.tsx:218
 #: src/features/overview/overview-page.tsx:365
 msgid "History kept forever"
 msgstr "历史记录永久保留"
@@ -1008,7 +1020,7 @@ msgstr "指示器条的外观。更改会立即生效。"
 msgid "How to dictate"
 msgstr "如何听写"
 
-#: src/features/overview/overview-page.tsx:157
+#: src/features/overview/overview-page.tsx:158
 msgid "Idle · mic ready"
 msgstr "空闲 · 麦克风就绪"
 
@@ -1055,6 +1067,10 @@ msgstr "指示"
 #: src/components/feedback/help-feedback-dialog.tsx:252
 msgid "Join the discussions"
 msgstr "参与讨论"
+
+#: src/features/history/components/session-detail-modal.tsx:54
+msgid "Just now"
+msgstr "刚刚"
 
 #: src/features/settings/data/settings-data.ts:283
 msgid "Keep forever"
@@ -1107,7 +1123,7 @@ msgstr "稍后"
 msgid "Launch into the system tray instead of opening the main window. Useful when Lune Voice autostarts on login."
 msgstr "启动到系统托盘而不是打开主窗口。当 Lune Voice 在登录时自动启动时很有用。"
 
-#: src/features/history/components/history-table.tsx:182
+#: src/features/history/components/history-table.tsx:177
 #: src/features/overview/overview-page.tsx:223
 msgid "Length"
 msgstr "长度"
@@ -1137,7 +1153,7 @@ msgstr "正在聆听 — 说出该短语，然后再次点击停止。"
 msgid "Listening — say the phrase…"
 msgstr "正在聆听 — 请说出该短语…"
 
-#: src/features/overview/overview-page.tsx:157
+#: src/features/overview/overview-page.tsx:158
 #: src/features/shell/components/sidebar-widgets.tsx:53
 msgid "Listening…"
 msgstr "正在听……"
@@ -1207,11 +1223,11 @@ msgstr "会议抬头"
 msgid "Microphone"
 msgstr "麦克风"
 
-#: src/features/overview/overview-page.tsx:154
+#: src/features/overview/overview-page.tsx:155
 msgid "Microphone input level"
 msgstr "麦克风输入电平"
 
-#: src/features/overview/overview-page.tsx:113
+#: src/features/overview/overview-page.tsx:114
 msgid "min"
 msgstr "分钟"
 
@@ -1258,11 +1274,11 @@ msgstr "从不显示"
 msgid "New snippet"
 msgstr "新建片段"
 
-#: src/features/history/components/history-table.tsx:258
+#: src/features/history/components/history-table.tsx:253
 msgid "Next"
 msgstr "下一个"
 
-#: src/features/history/components/history-table.tsx:256
+#: src/features/history/components/history-table.tsx:251
 msgid "Next page"
 msgstr "下一页"
 
@@ -1282,16 +1298,16 @@ msgstr "未找到 NVIDIA 驱动。安装你的 GPU 驱动后，下载会出现�
 msgid "No rules match “{query}”."
 msgstr "没有规则匹配“{query}”。"
 
-#: src/features/history/components/history-table.tsx:212
+#: src/features/history/components/history-table.tsx:207
 msgid "No sessions"
 msgstr "暂无会话"
 
-#: src/features/history/components/history-table.tsx:154
+#: src/features/history/components/history-table.tsx:149
 msgid "No sessions found."
 msgstr "未找到会话。"
 
 #. placeholder {0}: search.trim()
-#: src/features/history/components/history-table.tsx:151
+#: src/features/history/components/history-table.tsx:146
 msgid "No sessions match \"{0}\"."
 msgstr "没有会话匹配“{0}”。"
 
@@ -1299,7 +1315,7 @@ msgstr "没有会话匹配“{0}”。"
 msgid "No sessions yet"
 msgstr "还没有会议"
 
-#: src/features/history/components/history-table.tsx:153
+#: src/features/history/components/history-table.tsx:148
 msgid "No sessions yet. Start dictating to see your transcripts here."
 msgstr "还没有会话。开始听写后，转写结果会显示在这里。"
 
@@ -1315,13 +1331,13 @@ msgstr "还没有片段"
 msgid "No styling — transcripts are delivered exactly as transcribed."
 msgstr "不做风格处理——转写结果原样输出。"
 
-#: src/features/history/components/history-table.tsx:479
-#: src/features/history/components/session-detail-modal.tsx:156
+#: src/features/history/components/history-table.tsx:472
+#: src/features/history/components/session-detail-modal.tsx:150
 msgid "No transcript"
 msgstr "没有转写结果"
 
-#: src/features/history/components/history-table.tsx:491
-#: src/features/history/components/session-detail-modal.tsx:166
+#: src/features/history/components/history-table.tsx:484
+#: src/features/history/components/session-detail-modal.tsx:160
 msgid "None"
 msgstr "无"
 
@@ -1350,7 +1366,7 @@ msgstr "关闭"
 msgid "Off delivers raw transcripts. Which style is applied is chosen on the Styles tab."
 msgstr "关闭时传递原始转录文本。应用哪种风格在“风格”标签页中选择。"
 
-#: src/features/overview/overview-page.tsx:157
+#: src/features/overview/overview-page.tsx:158
 #: src/features/shell/components/app-shell.tsx:178
 msgid "Offline"
 msgstr "离线"
@@ -1367,7 +1383,7 @@ msgstr "打开菜单"
 msgid "Open releases page"
 msgstr "打开发布页面"
 
-#: src/features/overview/overview-page.tsx:179
+#: src/features/overview/overview-page.tsx:180
 msgid "Open session from {time}"
 msgstr "{time} 开始的会议"
 
@@ -1404,7 +1420,7 @@ msgstr "指示器条的整体尺寸。"
 msgid "Overall progress"
 msgstr "总体进展"
 
-#: src/features/history/components/history-table.tsx:235
+#: src/features/history/components/history-table.tsx:230
 msgid "Pagination"
 msgstr "分页"
 
@@ -1506,7 +1522,7 @@ msgstr "按下你的组合键——长按 Esc 或点击别处取消"
 msgid "Press your hotkey, speak, then press it again. The text is typed into whatever app you were using."
 msgstr "按下快捷键说话，然后再按一次。文字会输入到你当时使用的应用中。"
 
-#: src/features/history/components/history-table.tsx:243
+#: src/features/history/components/history-table.tsx:238
 msgid "Prev"
 msgstr "上一页"
 
@@ -1514,7 +1530,7 @@ msgstr "上一页"
 msgid "Prevent moving the pill by dragging it."
 msgstr "禁止通过拖动移动指示器。"
 
-#: src/features/history/components/history-table.tsx:241
+#: src/features/history/components/history-table.tsx:236
 msgid "Previous page"
 msgstr "上一页"
 
@@ -1651,10 +1667,6 @@ msgstr "正在使用 CPU"
 msgid "Runs whisper.cpp on-device. Choose a model size below."
 msgstr "在本机运行 whisper.cpp。请在下方选择模型大小。"
 
-#: src/features/overview/overview-page.tsx:190
-msgid "s"
-msgstr "s"
-
 #: src/features/dictionary/components/dictionary-table.tsx:121
 #: src/features/styles/components/style-editor-modal.tsx:220
 msgid "Save"
@@ -1664,8 +1676,8 @@ msgstr "保存"
 msgid "Save changes"
 msgstr "保存更改"
 
-#: src/features/history/components/history-table.tsx:412
-#: src/features/history/components/session-detail-modal.tsx:76
+#: src/features/history/components/history-table.tsx:405
+#: src/features/history/components/session-detail-modal.tsx:70
 msgid "Save Transcript"
 msgstr "保存转写结果"
 
@@ -1693,15 +1705,15 @@ msgstr "将触发词作为整句说出即可展开"
 msgid "Search sessions"
 msgstr "搜索会话"
 
-#: src/features/history/components/history-table.tsx:131
+#: src/features/history/components/history-table.tsx:126
 msgid "Search transcripts"
 msgstr "搜索转写结果"
 
-#: src/features/history/components/history-table.tsx:130
+#: src/features/history/components/history-table.tsx:125
 msgid "Search transcripts…"
 msgstr "搜索转写结果…"
 
-#: src/features/history/components/history-table.tsx:172
+#: src/features/history/components/history-table.tsx:167
 msgid "Select all sessions on this page"
 msgstr "选择本页所有会话"
 
@@ -1709,7 +1721,7 @@ msgstr "选择本页所有会话"
 msgid "Select required models"
 msgstr "选择需要的型号"
 
-#: src/features/history/components/history-table.tsx:440
+#: src/features/history/components/history-table.tsx:433
 msgid "Select session"
 msgstr "选择会话"
 
@@ -1734,11 +1746,11 @@ msgstr "把音频发送到你配置的 OpenAI 兼容接口——可以是你自�
 msgid "Sends transcripts to an OpenAI-compatible endpoint you configure — Ollama, llama-server or LM Studio locally, or a hosted API."
 msgstr "把转写结果发送到你配置的 OpenAI 兼容接口——本地的 Ollama、llama-server 或 LM Studio，也可以是托管 API。"
 
-#: src/features/overview/overview-page.tsx:145
+#: src/features/overview/overview-page.tsx:146
 msgid "session"
 msgstr "会议"
 
-#: src/features/history/components/session-detail-modal.tsx:196
+#: src/features/history/components/session-detail-modal.tsx:190
 msgid "Session details"
 msgstr "会议���情"
 
@@ -1746,7 +1758,7 @@ msgstr "会议���情"
 msgid "Session timed out — backend may be unresponsive"
 msgstr "会话超时——后端可能无响应"
 
-#: src/features/overview/overview-page.tsx:145
+#: src/features/overview/overview-page.tsx:146
 msgid "sessions"
 msgstr "会议"
 
@@ -1785,7 +1797,7 @@ msgstr "在所有工作区显示"
 msgid "Showing {0} of {totalSessions} sessions"
 msgstr "显示 {totalSessions} 条中的 {0} 条"
 
-#: src/features/history/components/history-table.tsx:213
+#: src/features/history/components/history-table.tsx:208
 msgid "Showing {start}–{end} of {visibleCount} sessions"
 msgstr "显示第 {start}–{end} 条，共 {visibleCount} 条会话"
 
@@ -1837,7 +1849,7 @@ msgstr "声音"
 msgid "Sound cues"
 msgstr "提示音"
 
-#: src/features/overview/overview-page.tsx:107
+#: src/features/overview/overview-page.tsx:108
 msgid "Speaking time"
 msgstr "说话时长"
 
@@ -1903,12 +1915,12 @@ msgstr "停止口授"
 msgid "Stop dictation"
 msgstr "停止听写"
 
-#: src/features/history/components/history-table.tsx:232
+#: src/features/history/components/history-table.tsx:227
 #: src/features/overview/overview-page.tsx:371
 msgid "Stored on this device"
 msgstr "存储在此设备上"
 
-#: src/features/history/components/session-detail-modal.tsx:166
+#: src/features/history/components/session-detail-modal.tsx:160
 msgid "Style"
 msgstr "风格"
 
@@ -1999,16 +2011,16 @@ msgstr "这只会发生一次。在此期间您可以继续使用您的计算机
 msgid "This only takes a moment."
 msgstr "只需片刻。"
 
-#: src/features/history/components/history-table.tsx:293
+#: src/features/history/components/history-table.tsx:288
 msgid "This will permanently remove the selected dictation sessions and their transcripts."
 msgstr "这将永久删除所选的听写会话及其转录文本。"
 
-#: src/features/history/components/history-table.tsx:506
-#: src/features/history/components/session-detail-modal.tsx:204
+#: src/features/history/components/history-table.tsx:499
+#: src/features/history/components/session-detail-modal.tsx:198
 msgid "This will permanently remove this dictation session and its transcript."
 msgstr "这将永久删除该听写会话及其记录。"
 
-#: src/features/history/components/history-table.tsx:176
+#: src/features/history/components/history-table.tsx:171
 #: src/features/overview/overview-page.tsx:220
 msgid "Time"
 msgstr "时间"
@@ -2025,7 +2037,7 @@ msgstr "标题"
 msgid "to start dictating"
 msgstr "开始听写"
 
-#: src/features/overview/overview-page.tsx:139
+#: src/features/overview/overview-page.tsx:140
 msgid "Today"
 msgstr "今天"
 
@@ -2053,7 +2065,7 @@ msgstr "左上"
 msgid "Top right"
 msgstr "右上"
 
-#: src/features/overview/overview-page.tsx:90
+#: src/features/overview/overview-page.tsx:91
 msgid "Total words"
 msgstr "总词数"
 
@@ -2065,7 +2077,7 @@ msgstr "正在转写你说的内容…"
 msgid "Transcribing…"
 msgstr "正在转写…"
 
-#: src/features/history/components/history-table.tsx:177
+#: src/features/history/components/history-table.tsx:172
 #: src/features/overview/overview-page.tsx:221
 msgid "Transcript"
 msgstr "转写结果"
@@ -2193,7 +2205,7 @@ msgstr "显示"
 msgid "Voice model"
 msgstr "语音模型"
 
-#: src/features/overview/overview-page.tsx:133
+#: src/features/overview/overview-page.tsx:134
 msgid "vs all-time avg"
 msgstr "对比总体平均"
 
@@ -2268,17 +2280,17 @@ msgstr "Whisper 模型大小"
 msgid "whisper.cpp running on-device. Choose a size to trade speed for accuracy."
 msgstr "whisper.cpp 在设备端运行。选择一个大小以在速度与准确性之间权衡。"
 
-#: src/features/history/components/history-table.tsx:484
+#: src/features/history/components/history-table.tsx:477
 msgid "words"
 msgstr "字"
 
-#: src/features/history/components/history-table.tsx:179
-#: src/features/history/components/session-detail-modal.tsx:163
+#: src/features/history/components/history-table.tsx:174
+#: src/features/history/components/session-detail-modal.tsx:157
 #: src/features/overview/overview-page.tsx:222
 msgid "Words"
 msgstr "字"
 
-#: src/features/overview/overview-page.tsx:121
+#: src/features/overview/overview-page.tsx:122
 msgid "WPM"
 msgstr "WPM"
 

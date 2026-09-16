@@ -15,6 +15,7 @@ import {
   Search,
 } from 'lucide-react';
 import { LIMITS } from '../../lib/backend/generated/limits';
+import { formatDuration } from '../../lib/session-format';
 import {
   getSessionStats,
   getTodayStats,
@@ -186,8 +187,7 @@ function SessionRow({ session }: { session: HistorySession }) {
             {session.words}
           </span>
           <span className="ov-num text-right text-sm tabular-nums text-content-subtle">
-            {session.seconds}
-            {t`s`}
+            {formatDuration(session.seconds)}
           </span>
         </button>
       )}

@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
+import { plural } from '@lingui/core/macro';
 import { useLingui } from '@lingui/react/macro';
 import { invoke } from '@tauri-apps/api/core';
 import {
@@ -15,29 +16,13 @@ import {
 } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { ConfirmDialog } from '../../../components/feedback/confirm-dialog';
+import { formatDuration, transcriptFileName } from '../../../lib/session-format';
 import { formatBackend } from '../../../store/workspace-mappers';
 import { type HistorySession, removeHistorySession } from '../../../store/workspace-store';
 
 interface SessionDetailModalProps {
   session: HistorySession;
   children: (open: () => void) => React.ReactNode;
-}
-
-function formatDuration(seconds: number): string {
-  const m = Math.floor(seconds / 60);
-  const s = seconds % 60;
-  return `${m}:${s.toString().padStart(2, '0')}`;
-}
-
-function relativeTime(iso: string): string {
-  const diff = Date.now() - new Date(iso).getTime();
-  const mins = Math.floor(diff / 60_000);
-  if (mins < 1) return 'Just now';
-  if (mins < 60) return `${mins}m ago`;
-  const hours = Math.floor(mins / 60);
-  if (hours < 24) return `${hours}h ago`;
-  const days = Math.floor(hours / 24);
-  return `${days}d ago`;
 }
 
 /**
@@ -58,21 +43,30 @@ export function SessionDetailContent({ session }: { session: HistorySession }) {
     day: 'numeric',
   });
   const time = startDate.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
-  const relative = relativeTime(session.startedAt);
+  const relative = relativeTime(startDate);
 
   const isCompleted = session.status === 'Completed';
   const isFailed = session.status.startsWith('Failed');
 
+  /** How long ago the session started, in the coarsest unit that is not zero. */
+  function relativeTime(started: Date): string {
+    const mins = Math.floor((Date.now() - started.getTime()) / 60_000);
+    if (mins < 1) return t`Just now`;
+    if (mins < 60) return plural(mins, { one: '# minute ago', other: '# minutes ago' });
+    const hours = Math.floor(mins / 60);
+    if (hours < 24) return plural(hours, { one: '# hour ago', other: '# hours ago' });
+    const days = Math.floor(hours / 24);
+    return plural(days, { one: '# day ago', other: '# days ago' });
+  }
+
   async function handleDownload() {
     if (!session.transcript) return;
-    const d = new Date(session.startedAt);
-    const stamp = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}-${String(d.getHours()).padStart(2, '0')}${String(d.getMinutes()).padStart(2, '0')}`;
     try {
       // The save dialog runs in Rust: the chosen path never passes through
       // here, so this side can only suggest a name, never a destination.
       await invoke('export_transcript', {
         transcript: session.transcript,
-        defaultName: `lune-${stamp}.txt`,
+        defaultName: transcriptFileName(session.startedAt),
         title: t`Save Transcript`,
       });
     } catch (e) {

@@ -26,6 +26,7 @@ import {
   useListFilterHotkey,
 } from '../../../components/ui/list-card';
 import { LIMITS } from '../../../lib/backend/generated/limits';
+import { formatDuration, transcriptFileName } from '../../../lib/session-format';
 import { formatBackend } from '../../../store/workspace-mappers';
 import {
   fetchHistoryPage,
@@ -36,12 +37,6 @@ import {
   workspaceActions,
   workspaceStore,
 } from '../../../store/workspace-store';
-
-function formatDuration(seconds: number): string {
-  const m = Math.floor(seconds / 60);
-  const s = seconds % 60;
-  return `${m}:${s.toString().padStart(2, '0')}`;
-}
 
 /**
  * Sessions table — the whole history surface in one card: integrated search,
@@ -401,14 +396,12 @@ function SessionRows({ session, expanded, selected, onSelect, onToggle }: Sessio
 
   async function download() {
     if (!session.transcript) return;
-    const d = new Date(session.startedAt);
-    const stamp = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}-${String(d.getHours()).padStart(2, '0')}${String(d.getMinutes()).padStart(2, '0')}`;
     try {
       // The save dialog runs in Rust: the chosen path never passes through
       // here, so this side can only suggest a name, never a destination.
       await invoke('export_transcript', {
         transcript: session.transcript,
-        defaultName: `lune-${stamp}.txt`,
+        defaultName: transcriptFileName(session.startedAt),
         title: t`Save Transcript`,
       });
     } catch (e) {
