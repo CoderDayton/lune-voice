@@ -270,25 +270,7 @@ export const terminalModes: DescriptiveOptionData<TerminalModeValue>[] = [
   },
 ];
 
-export type PrivacyModeValue = 'LocalOnly' | 'LocalPreferred' | 'AllowRemote';
-
-export const privacyModes: DescriptiveOptionData<PrivacyModeValue>[] = [
-  {
-    value: 'LocalOnly',
-    label: msg`Local only`,
-    description: msg`Never send audio or text to a remote service. Remote transcription and styling are disabled.`,
-  },
-  {
-    value: 'LocalPreferred',
-    label: msg`Local preferred`,
-    description: msg`Prefer on-device processing, but allow a remote service where you have configured one.`,
-  },
-  {
-    value: 'AllowRemote',
-    label: msg`Allow remote`,
-    description: msg`Allow remote transcription and styling wherever you have configured them.`,
-  },
-];
+export type PrivacyModeValue = 'LocalOnly' | 'AllowRemote';
 
 export type HistoryRetentionValue = 'off' | '7' | '30' | '90' | '365' | 'forever';
 

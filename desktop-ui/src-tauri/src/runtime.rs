@@ -1671,7 +1671,7 @@ async fn build_pipeline(
             AsrBackendConfig::OpenAiCompatible { .. }
         )
     {
-        return Err("privacy mode is set to local-only, but transcription is configured to use a remote service. Switch transcription back to Whisper, or allow remote processing in Settings.".into());
+        return Err("remote services are turned off, but transcription is set to use one. Switch transcription back to Whisper, or turn on Allow remote services in Settings → General.".into());
     }
     // Whisper model load takes seconds on the larger models; keep it off the
     // async workers so IPC and the UI stay responsive during startup/reload.
@@ -1782,9 +1782,8 @@ fn load_settings(paths: &AppPaths) -> Result<UserSettings, String> {
 
 /// Whether `privacy_mode` forbids sending audio or text to a remote service.
 ///
-/// Only `LocalOnly` denies. `LocalPreferred` treats configuring a remote
-/// backend as the explicit opt-in it describes, and `AllowRemote` imposes
-/// nothing.
+/// Only `LocalOnly` denies. Under `AllowRemote` a remote service still runs
+/// only once it is configured.
 fn remote_backends_denied(mode: PrivacyMode) -> bool {
     matches!(mode, PrivacyMode::LocalOnly)
 }
@@ -2264,7 +2263,6 @@ mod tests {
     #[test]
     fn only_local_only_denies_remote_backends() {
         assert!(remote_backends_denied(PrivacyMode::LocalOnly));
-        assert!(!remote_backends_denied(PrivacyMode::LocalPreferred));
         assert!(!remote_backends_denied(PrivacyMode::AllowRemote));
     }
 

@@ -91,23 +91,23 @@ msgstr "## 会议 — {date}\n"
 "与会者：\n"
 "- "
 
-#: src/features/settings/data/settings-data.ts:300
+#: src/features/settings/data/settings-data.ts:282
 msgid "1 year"
 msgstr "1 年"
 
-#: src/features/settings/data/settings-data.ts:298
+#: src/features/settings/data/settings-data.ts:280
 msgid "30 days"
 msgstr "30 天"
 
-#: src/features/settings/data/settings-data.ts:297
+#: src/features/settings/data/settings-data.ts:279
 msgid "7 days"
 msgstr "7 天"
 
-#: src/features/settings/data/settings-data.ts:299
+#: src/features/settings/data/settings-data.ts:281
 msgid "90 days"
 msgstr "90 天"
 
-#: src/features/settings/sections/pill-section.tsx:218
+#: src/features/settings/sections/pill-section.tsx:221
 msgid "A vertical pill hugs the side of the screen."
 msgstr "竖向指示器紧贴屏幕边缘。"
 
@@ -154,23 +154,23 @@ msgstr "添加修复后，Lune Voice 会在您每次听写时应用它。尝试�
 msgid "Add snippet"
 msgstr "添加片段"
 
-#: src/features/settings/data/settings-data.ts:334
+#: src/features/settings/data/settings-data.ts:316
 msgid "After 1 hour"
 msgstr "1 小时后"
 
-#: src/features/settings/data/settings-data.ts:332
+#: src/features/settings/data/settings-data.ts:314
 msgid "After 15 minutes"
 msgstr "15 分钟后"
 
-#: src/features/settings/data/settings-data.ts:335
+#: src/features/settings/data/settings-data.ts:317
 msgid "After 2 hours"
 msgstr "2 小时后"
 
-#: src/features/settings/data/settings-data.ts:333
+#: src/features/settings/data/settings-data.ts:315
 msgid "After 30 minutes"
 msgstr "30 分钟后"
 
-#: src/features/settings/data/settings-data.ts:331
+#: src/features/settings/data/settings-data.ts:313
 msgid "After 5 minutes"
 msgstr "5 分钟后"
 
@@ -191,13 +191,10 @@ msgstr "全部 · 今天"
 msgid "Allow"
 msgstr "允许"
 
-#: src/features/settings/data/settings-data.ts:288
-msgid "Allow remote"
-msgstr ""
-
-#: src/features/settings/data/settings-data.ts:289
-msgid "Allow remote transcription and styling wherever you have configured them."
-msgstr ""
+#: src/features/settings/sections/general-section.tsx:96
+#: src/features/settings/sections/general-section.tsx:109
+msgid "Allow remote services"
+msgstr "允许远程服务"
 
 #: src/features/settings/data/settings-data.ts:97
 msgid "Always"
@@ -270,7 +267,7 @@ msgid "Auto-detect"
 msgstr "自动检测"
 
 #: src/features/settings/data/settings-data.ts:258
-#: src/features/settings/sections/pill-section.tsx:54
+#: src/features/settings/sections/pill-section.tsx:55
 msgid "Automatic"
 msgstr "自动"
 
@@ -364,17 +361,17 @@ msgstr "更换引擎"
 msgid "Change theme"
 msgstr "更换主题"
 
-#: src/features/settings/sections/general-section.tsx:140
+#: src/features/settings/sections/general-section.tsx:159
 #: src/features/shell/components/sidebar-quick-actions.tsx:78
 msgid "Check for updates"
 msgstr "检查更新"
 
-#: src/features/settings/sections/general-section.tsx:111
-#: src/features/settings/sections/general-section.tsx:121
+#: src/features/settings/sections/general-section.tsx:130
+#: src/features/settings/sections/general-section.tsx:140
 msgid "Check for updates on launch"
 msgstr "启动时检查更新"
 
-#: src/features/settings/sections/general-section.tsx:131
+#: src/features/settings/sections/general-section.tsx:150
 msgid "Check whether a newer version has been released."
 msgstr "检查是否已发布更新版本。"
 
@@ -391,7 +388,7 @@ msgid "Checking installed models…"
 msgstr "检查已安装的型号..."
 
 #: src/features/settings/components/asr-engine-cards.tsx:227
-#: src/features/settings/sections/general-section.tsx:140
+#: src/features/settings/sections/general-section.tsx:159
 #: src/features/welcome/components/ready-checks.tsx:113
 msgid "Checking…"
 msgstr "检查中…"
@@ -408,7 +405,7 @@ msgstr "选择如何将完成的文本插入到您当前使用的应用程序中
 msgid "Choose how Lune Voice looks."
 msgstr "选择 Lune Voice 的外观。"
 
-#: src/features/settings/sections/styling-engine-section.tsx:51
+#: src/features/settings/sections/styling-engine-section.tsx:40
 msgid "Choose how transcripts are restyled — sent to an OpenAI-compatible endpoint you configure, local or hosted, or left off entirely."
 msgstr "选择如何润色转写结果 — 发送到你配置的 OpenAI 兼容端点（本地或托管均可），或者完全关闭。"
 
@@ -472,7 +469,7 @@ msgstr "完全的"
 msgid "Connecting"
 msgstr "正在连接"
 
-#: src/features/settings/sections/general-section.tsx:112
+#: src/features/settings/sections/general-section.tsx:131
 msgid "Contact the release server shortly after startup and tell you only when a newer version exists. Off by default — dictation itself never needs the network."
 msgstr "启动后不久联系发布服务器，仅在存在更新版本时才提示你。默认关闭 — 听写本身从不需要联网。"
 
@@ -500,22 +497,22 @@ msgstr "复制到剪贴板"
 
 #: src/features/history/components/session-detail-modal.tsx:135
 msgid "Copy transcript"
-msgstr "复制成绩单"
+msgstr "复制转写结果"
 
-#: src/features/settings/sections/pill-section.tsx:235
+#: src/features/settings/sections/pill-section.tsx:238
 msgid "Corner rounding of the pill bar."
 msgstr "指示器条的圆角程度。"
 
-#: src/features/settings/sections/pill-section.tsx:234
+#: src/features/settings/sections/pill-section.tsx:237
 msgid "Corners"
 msgstr "圆角"
 
-#: src/features/settings/sections/transcription-section.tsx:117
+#: src/features/settings/sections/transcription-section.tsx:122
 msgid "Correction"
 msgstr "校正"
 
-#: src/features/settings/sections/transcription-section.tsx:122
-#: src/features/settings/sections/transcription-section.tsx:137
+#: src/features/settings/sections/transcription-section.tsx:127
+#: src/features/settings/sections/transcription-section.tsx:142
 msgid "Correction sensitivity"
 msgstr "校正灵敏度"
 
@@ -655,16 +652,16 @@ msgstr "在任何 AI 样式之前应用确定性修复。"
 msgid "Dictation"
 msgstr "听写"
 
-#: src/features/settings/sections/transcription-section.tsx:66
-#: src/features/settings/sections/transcription-section.tsx:72
+#: src/features/settings/sections/transcription-section.tsx:71
+#: src/features/settings/sections/transcription-section.tsx:77
 msgid "Dictation language"
 msgstr "听写语言"
 
-#: src/features/settings/sections/pill-section.tsx:72
+#: src/features/settings/sections/pill-section.tsx:73
 msgid "Dictation pill"
 msgstr "听写指示器"
 
-#: src/features/settings/sections/pill-section.tsx:83
+#: src/features/settings/sections/pill-section.tsx:84
 msgid "Dictation pill visibility"
 msgstr "听写指示器可见性"
 
@@ -692,7 +689,7 @@ msgstr "磁盘使用情况"
 msgid "Dismiss error"
 msgstr "消除错误"
 
-#: src/features/settings/data/settings-data.ts:296
+#: src/features/settings/data/settings-data.ts:278
 msgid "Don't save history"
 msgstr "不保存历史"
 
@@ -732,7 +729,7 @@ msgstr "下载���度"
 
 #: src/features/history/components/session-detail-modal.tsx:127
 msgid "Download transcript"
-msgstr "下载成绩单"
+msgstr "下载转写结果"
 
 #: src/features/welcome/welcome-page.tsx:204
 msgid "Downloading models"
@@ -765,11 +762,11 @@ msgstr "时长"
 msgid "e.g. Meeting notes"
 msgstr "例如会议记录"
 
-#: src/features/settings/sections/pill-section.tsx:127
+#: src/features/settings/sections/pill-section.tsx:130
 msgid "Edge distance"
 msgstr "边缘距离"
 
-#: src/features/settings/sections/pill-section.tsx:145
+#: src/features/settings/sections/pill-section.tsx:148
 msgid "Edge distance in pixels"
 msgstr "边缘距离（像素）"
 
@@ -808,7 +805,7 @@ msgstr "启用润色"
 
 #: src/features/history/components/history-table.tsx:184
 #: src/features/history/components/session-detail-modal.tsx:165
-#: src/features/settings/sections/styling-engine-section.tsx:69
+#: src/features/settings/sections/styling-engine-section.tsx:44
 msgid "Engine"
 msgstr "引擎"
 
@@ -864,7 +861,7 @@ msgstr "筛选片段"
 msgid "Filter snippets…"
 msgstr "筛选片段…"
 
-#: src/features/settings/sections/transcription-section.tsx:118
+#: src/features/settings/sections/transcription-section.tsx:123
 msgid "Fix recognizer errors with your dictionary and known vocabulary, on your device. It uses per-word confidence and statistical patterns — no AI model, and it never rewrites what you said."
 msgstr "在您的设备上，用您的词典和已知词汇修正识别错误。它使用逐词置信度和统计模式——无 AI 模型，也绝不会改写您所说的内容。"
 
@@ -876,7 +873,7 @@ msgstr "对所有应用强制使用标准粘贴快捷键。"
 msgid "Force the terminal paste shortcut. Use on COSMIC if you mostly dictate into terminals."
 msgstr "强制使用终端粘贴快捷键。若主要在终端里听写，可在 COSMIC 上使用。"
 
-#: src/features/settings/sections/pill-section.tsx:180
+#: src/features/settings/sections/pill-section.tsx:183
 msgid "Forget where you dragged the pill and return it to its preset spot."
 msgstr "忘记你拖动指示器的位置，并将其恢复到预设位置。"
 
@@ -885,8 +882,8 @@ msgstr "忘记你拖动指示器的位置，并将其恢复到预设位置。"
 msgid "Formatting"
 msgstr "格式化"
 
-#: src/features/settings/sections/transcription-section.tsx:96
-#: src/features/settings/sections/transcription-section.tsx:102
+#: src/features/settings/sections/transcription-section.tsx:101
+#: src/features/settings/sections/transcription-section.tsx:107
 msgid "Free the model when idle"
 msgstr "空闲时释放模型"
 
@@ -894,14 +891,14 @@ msgstr "空闲时释放模型"
 msgid "Fully round"
 msgstr "全圆角"
 
-#: src/features/settings/sections/pill-section.tsx:128
+#: src/features/settings/sections/pill-section.tsx:131
 msgid "Gap between the pill and the screen edge, so it clears a taskbar or dock."
 msgstr "指示器与屏幕边缘之间的间距，以便避开任务栏或程序坞。"
 
 #: src/features/settings/sections/general-section.tsx:62
 #: src/features/settings/settings-page.tsx:71
 msgid "General"
-msgstr "一般的"
+msgstr "通用"
 
 #: src/components/feedback/help-feedback-dialog.tsx:64
 msgid "General feedback"
@@ -920,7 +917,7 @@ msgstr "github"
 msgid "GitHub"
 msgstr "GitHub"
 
-#: src/features/settings/sections/transcription-section.tsx:97
+#: src/features/settings/sections/transcription-section.tsx:102
 msgid "Give the memory back after a quiet spell. The next dictation reloads the model, which adds up to a second before it starts listening — your speech is recorded during the wait, so nothing is lost."
 msgstr "闲置一段时间后释放内存。下次听写会重新加载模型，开始聆听前最多多出一秒——等待期间语音照样录制，不会丢失内容。"
 
@@ -966,8 +963,8 @@ msgstr "历史记录保留 {historyDays} 天"
 msgid "History kept forever"
 msgstr "历史记录永久保留"
 
-#: src/features/settings/sections/general-section.tsx:96
-#: src/features/settings/sections/general-section.tsx:102
+#: src/features/settings/sections/general-section.tsx:115
+#: src/features/settings/sections/general-section.tsx:121
 msgid "History retention"
 msgstr "历史记录保留"
 
@@ -995,7 +992,7 @@ msgstr "按住快捷键说话，然后松开。文字会输入到你当时使用
 msgid "Horizontal"
 msgstr "横向"
 
-#: src/features/settings/sections/general-section.tsx:97
+#: src/features/settings/sections/general-section.tsx:116
 msgid "How long finished dictations are kept on this device."
 msgstr "已完成的听写在此设备上保留的时长。"
 
@@ -1003,7 +1000,7 @@ msgstr "已完成的听写在此设备上保留的时长。"
 msgid "How loud the dictation sounds play."
 msgstr "听写提示音的播放音量。"
 
-#: src/features/settings/sections/pill-section.tsx:199
+#: src/features/settings/sections/pill-section.tsx:202
 msgid "How the pill bar looks. Changes apply immediately."
 msgstr "指示器条的外观。更改会立即生效。"
 
@@ -1059,11 +1056,11 @@ msgstr "指示"
 msgid "Join the discussions"
 msgstr "参与讨论"
 
-#: src/features/settings/data/settings-data.ts:301
+#: src/features/settings/data/settings-data.ts:283
 msgid "Keep forever"
 msgstr "永久保留"
 
-#: src/features/settings/data/settings-data.ts:328
+#: src/features/settings/data/settings-data.ts:310
 msgid "Keep loaded"
 msgstr "保持加载"
 
@@ -1071,7 +1068,7 @@ msgstr "保持加载"
 msgid "Keep the dictated text on the clipboard after every dictation, so you can paste it again yourself."
 msgstr "每次听写后将听写的文本保留在剪贴板中，以便您自己再次粘贴。"
 
-#: src/features/settings/sections/pill-section.tsx:92
+#: src/features/settings/sections/pill-section.tsx:94
 msgid "Keep the pill with you when you switch workspaces or virtual desktops."
 msgstr "切换工作区或虚拟桌面时，指示器始终跟随显示。"
 
@@ -1099,7 +1096,7 @@ msgstr "大"
 
 #: src/features/settings/data/settings-data.ts:191
 msgid "Large v3 Turbo"
-msgstr ""
+msgstr "Large v3 Turbo"
 
 #: src/features/updates/update-dialog.tsx:261
 #: src/features/updates/update-dialog.tsx:275
@@ -1115,7 +1112,11 @@ msgstr "启动到系统托盘而不是打开主窗口。当 Lune Voice 在登录
 msgid "Length"
 msgstr "长度"
 
-#: src/features/settings/sections/general-section.tsx:148
+#: src/features/settings/sections/general-section.tsx:97
+msgid "Let transcription and styling use a remote endpoint you set up. When off, audio and text never leave this device: remote transcription is refused and styling is skipped."
+msgstr "允许转写和润色使用你配置的远程端点。关闭时，音频和文本不会离开本设备：远程转写会被拒绝，润色会被跳过。"
+
+#: src/features/settings/sections/general-section.tsx:167
 msgid "License"
 msgstr "许可证"
 
@@ -1141,20 +1142,8 @@ msgstr "正在聆听 — 请说出该短语…"
 msgid "Listening…"
 msgstr "正在听……"
 
-#: src/features/settings/data/settings-data.ts:278
-msgid "Local only"
-msgstr ""
-
-#: src/features/settings/sections/styling-engine-section.tsx:56
-msgid "Local only disables styling even if an engine is selected below — the transcript is delivered raw instead."
-msgstr ""
-
-#: src/features/settings/data/settings-data.ts:283
-msgid "Local preferred"
-msgstr ""
-
-#: src/features/settings/sections/pill-section.tsx:166
-#: src/features/settings/sections/pill-section.tsx:174
+#: src/features/settings/sections/pill-section.tsx:169
+#: src/features/settings/sections/pill-section.tsx:177
 msgid "Lock position"
 msgstr "锁定位置"
 
@@ -1183,7 +1172,7 @@ msgstr "Lune Voice 添加了一条系统规则，以便向其他应用输入文�
 msgid "Lune Voice can type into your other apps."
 msgstr "Lune Voice 可以在你的其他应用中输入文字。"
 
-#: src/features/settings/sections/general-section.tsx:149
+#: src/features/settings/sections/general-section.tsx:168
 msgid "Lune Voice is free software under the GNU General Public License, version 3 or later, and comes with no warranty. You may copy, change and share it under those terms; the source code is at {REPO_URL}."
 msgstr "Lune Voice 是依据 GNU 通用公共许可证第 3 版或更高版本发布的自由软件，不提供任何担保。你可以按照这些条款复制、修改和分享它；源代码位于 {REPO_URL}。"
 
@@ -1243,7 +1232,7 @@ msgstr "型号"
 msgid "Models are stored locally. No telemetry, no accounts."
 msgstr "模型存储在本地。没有遥测，没有账户。"
 
-#: src/features/settings/sections/pill-section.tsx:152
+#: src/features/settings/sections/pill-section.tsx:155
 msgid "Monitor"
 msgstr "显示器"
 
@@ -1262,10 +1251,6 @@ msgstr "名称过长。"
 #: src/features/settings/data/settings-data.ts:99
 msgid "Never"
 msgstr "从不显示"
-
-#: src/features/settings/data/settings-data.ts:279
-msgid "Never send audio or text to a remote service. Remote transcription and styling are disabled."
-msgstr ""
 
 #: src/features/snippets/snippets-page.tsx:206
 #: src/features/snippets/snippets-page.tsx:244
@@ -1316,7 +1301,7 @@ msgstr "还没有会议"
 
 #: src/features/history/components/history-table.tsx:153
 msgid "No sessions yet. Start dictating to see your transcripts here."
-msgstr "还没有会议。开始听写并在此处查看您的成绩单。"
+msgstr "还没有会话。开始听写后，转写结果会显示在这里。"
 
 #: src/features/snippets/snippets-page.tsx:428
 msgid "No snippets match “{query}”."
@@ -1333,7 +1318,7 @@ msgstr "不做风格处理——转写结果原样输出。"
 #: src/features/history/components/history-table.tsx:479
 #: src/features/history/components/session-detail-modal.tsx:156
 msgid "No transcript"
-msgstr "没有成绩单"
+msgstr "没有转写结果"
 
 #: src/features/history/components/history-table.tsx:491
 #: src/features/history/components/session-detail-modal.tsx:166
@@ -1344,7 +1329,7 @@ msgstr "无"
 msgid "Normalizes microphone level before voice detection. Helps quiet mics and noisy rooms. Recommended."
 msgstr "在语音检测之前标准化麦克风电平。有助于安静的麦克风和嘈杂的房间。受到推崇的。"
 
-#: src/features/settings/sections/pill-section.tsx:65
+#: src/features/settings/sections/pill-section.tsx:66
 msgid "not connected"
 msgstr "未连接"
 
@@ -1361,7 +1346,7 @@ msgstr "未安装任���内容"
 msgid "Off"
 msgstr "关闭"
 
-#: src/features/settings/sections/styling-engine-section.tsx:70
+#: src/features/settings/sections/styling-engine-section.tsx:45
 msgid "Off delivers raw transcripts. Which style is applied is chosen on the Styles tab."
 msgstr "关闭时传递原始转录文本。应用哪种风格在“风格”标签页中选择。"
 
@@ -1386,7 +1371,7 @@ msgstr "打开发布页面"
 msgid "Open session from {time}"
 msgstr "{time} 开始的会议"
 
-#: src/features/settings/data/settings-data.ts:372
+#: src/features/settings/data/settings-data.ts:354
 msgid "OpenAI-compatible"
 msgstr "OpenAI 兼容"
 
@@ -1403,7 +1388,7 @@ msgstr "选修的"
 msgid "or send directly"
 msgstr "或直接发送"
 
-#: src/features/settings/sections/pill-section.tsx:217
+#: src/features/settings/sections/pill-section.tsx:220
 msgid "Orientation"
 msgstr "方向"
 
@@ -1411,7 +1396,7 @@ msgstr "方向"
 msgid "Output"
 msgstr "输出"
 
-#: src/features/settings/sections/pill-section.tsx:204
+#: src/features/settings/sections/pill-section.tsx:207
 msgid "Overall footprint of the pill bar."
 msgstr "指示器条的整体尺寸。"
 
@@ -1423,7 +1408,7 @@ msgstr "总体进展"
 msgid "Pagination"
 msgstr "分页"
 
-#: src/features/settings/data/settings-data.ts:376
+#: src/features/settings/data/settings-data.ts:358
 msgid "Paste"
 msgstr "粘贴"
 
@@ -1453,27 +1438,27 @@ msgstr "短语"
 msgid "Pill"
 msgstr "指示器"
 
-#: src/features/settings/sections/pill-section.tsx:240
+#: src/features/settings/sections/pill-section.tsx:243
 msgid "Pill corners"
 msgstr "指示器圆角"
 
-#: src/features/settings/sections/pill-section.tsx:158
+#: src/features/settings/sections/pill-section.tsx:161
 msgid "Pill monitor"
 msgstr "指示器显示器"
 
-#: src/features/settings/sections/pill-section.tsx:223
+#: src/features/settings/sections/pill-section.tsx:226
 msgid "Pill orientation"
 msgstr "指示器方向"
 
-#: src/features/settings/sections/pill-section.tsx:119
+#: src/features/settings/sections/pill-section.tsx:122
 msgid "Pill position preset"
 msgstr "指示器预设位置"
 
-#: src/features/settings/sections/pill-section.tsx:209
+#: src/features/settings/sections/pill-section.tsx:212
 msgid "Pill size"
 msgstr "指示器大小"
 
-#: src/features/settings/sections/pill-section.tsx:108
+#: src/features/settings/sections/pill-section.tsx:111
 msgid "Placement"
 msgstr "放置"
 
@@ -1485,15 +1470,11 @@ msgstr "听写开始、完成或遇到错误时播放一小段声音。"
 msgid "Please keep the app open until downloads finish"
 msgstr "请保持应用程序打开直至下载完成"
 
-#: src/features/settings/sections/pill-section.tsx:113
+#: src/features/settings/sections/pill-section.tsx:116
 msgid "Position"
 msgstr "位置"
 
-#: src/features/settings/data/settings-data.ts:284
-msgid "Prefer on-device processing, but allow a remote service where you have configured one."
-msgstr ""
-
-#: src/features/settings/sections/pill-section.tsx:114
+#: src/features/settings/sections/pill-section.tsx:117
 msgid "Preset corner or edge the pill starts at."
 msgstr "指示器起始的预设边角或边缘。"
 
@@ -1529,7 +1510,7 @@ msgstr "按下快捷键说话，然后再按一次。文字会输入到你当时
 msgid "Prev"
 msgstr "上一页"
 
-#: src/features/settings/sections/pill-section.tsx:167
+#: src/features/settings/sections/pill-section.tsx:170
 msgid "Prevent moving the pill by dragging it."
 msgstr "禁止通过拖动移动指示器。"
 
@@ -1537,7 +1518,7 @@ msgstr "禁止通过拖动移动指示器。"
 msgid "Previous page"
 msgstr "上一页"
 
-#: src/features/settings/sections/pill-section.tsx:57
+#: src/features/settings/sections/pill-section.tsx:58
 msgid "primary"
 msgstr "主显示器"
 
@@ -1546,11 +1527,6 @@ msgstr "主显示器"
 #: src/features/dictionary/components/priority-picker.tsx:56
 msgid "Priority"
 msgstr "优先事项"
-
-#: src/features/settings/sections/styling-engine-section.tsx:55
-#: src/features/settings/sections/styling-engine-section.tsx:61
-msgid "Privacy"
-msgstr ""
 
 #: src/features/dictation/dictation-pill.tsx:63
 #: src/features/dictation/dictation-pill.tsx:69
@@ -1595,6 +1571,14 @@ msgstr "录音模式"
 msgid "Refresh few-shot examples"
 msgstr "刷新少样本示例"
 
+#: src/features/settings/sections/transcription-section.tsx:67
+msgid "Remote services are turned off, so dictation cannot start with this engine. Turn on Allow remote services in General, or switch back to Whisper."
+msgstr "远程服务已关闭，因此无法使用此引擎开始听写。请在“通用”中开启“允许远程服务”，或切换回 Whisper。"
+
+#: src/features/settings/sections/styling-engine-section.tsx:73
+msgid "Remote services are turned off, so transcripts are delivered without styling. Turn on Allow remote services in General to use this endpoint."
+msgstr "远程服务已关闭，因此转写结果将不经润色直接输入。如需使用此端点，请在“通用”中开启“允许远程服务”。"
+
 #: src/components/feedback/confirm-dialog.tsx:39
 #: src/components/feedback/confirm-dialog.tsx:42
 #: src/features/settings/components/uinput-rule-row.tsx:106
@@ -1627,11 +1611,11 @@ msgstr "报告问题、提出想法，或者只是聊聊使用感受。"
 msgid "Required"
 msgstr "必需的"
 
-#: src/features/settings/sections/pill-section.tsx:191
+#: src/features/settings/sections/pill-section.tsx:194
 msgid "Reset"
 msgstr "重置"
 
-#: src/features/settings/sections/pill-section.tsx:179
+#: src/features/settings/sections/pill-section.tsx:182
 msgid "Reset position"
 msgstr "重置位置"
 
@@ -1683,7 +1667,7 @@ msgstr "保存更改"
 #: src/features/history/components/history-table.tsx:412
 #: src/features/history/components/session-detail-modal.tsx:76
 msgid "Save Transcript"
-msgstr "保存成绩单"
+msgstr "保存转写结果"
 
 #: src/features/snippets/snippets-page.tsx:496
 msgid "Save your signature, a meeting header, or anything you type often — then speak its trigger to drop it into any app."
@@ -1711,11 +1695,11 @@ msgstr "搜索会话"
 
 #: src/features/history/components/history-table.tsx:131
 msgid "Search transcripts"
-msgstr "搜索成绩单"
+msgstr "搜索转写结果"
 
 #: src/features/history/components/history-table.tsx:130
 msgid "Search transcripts…"
-msgstr "搜索成绩单..."
+msgstr "搜索转写结果…"
 
 #: src/features/history/components/history-table.tsx:172
 msgid "Select all sessions on this page"
@@ -1758,7 +1742,7 @@ msgstr "会议"
 msgid "Session details"
 msgstr "会议���情"
 
-#: src/store/workspace-store.ts:207
+#: src/store/workspace-store.ts:208
 msgid "Session timed out — backend may be unresponsive"
 msgstr "会话超时——后端可能无响应"
 
@@ -1770,7 +1754,7 @@ msgstr "会议"
 msgid "Set hotkey"
 msgstr "设置热键"
 
-#: src/features/settings/sections/transcription-section.tsx:67
+#: src/features/settings/sections/transcription-section.tsx:72
 msgid "Set the language you speak. Auto uses detection from speech."
 msgstr "设置您所说的语言。 Auto 使用语音检测。"
 
@@ -1791,8 +1775,8 @@ msgstr "设置部分"
 msgid "Shortcuts"
 msgstr "快捷方式"
 
-#: src/features/settings/sections/pill-section.tsx:91
-#: src/features/settings/sections/pill-section.tsx:101
+#: src/features/settings/sections/pill-section.tsx:93
+#: src/features/settings/sections/pill-section.tsx:103
 msgid "Show on all workspaces"
 msgstr "在所有工作区显示"
 
@@ -1813,11 +1797,11 @@ msgstr "逐个字符模拟按键。在禁止粘贴的地方也能用。"
 msgid "Single letter keys require at least one modifier (Ctrl, Shift, Alt, or Meta)."
 msgstr "单字母键至少需要一个修饰键（Ctrl、Shift、Alt 或 Meta）。"
 
-#: src/features/settings/sections/pill-section.tsx:203
+#: src/features/settings/sections/pill-section.tsx:206
 msgid "Size"
 msgstr "大小"
 
-#: src/features/settings/sections/pill-section.tsx:198
+#: src/features/settings/sections/pill-section.tsx:201
 msgid "Size & shape"
 msgstr "大小与形状"
 
@@ -1932,7 +1916,7 @@ msgstr "风格"
 msgid "Styling"
 msgstr "润色"
 
-#: src/features/settings/sections/styling-engine-section.tsx:50
+#: src/features/settings/sections/styling-engine-section.tsx:39
 msgid "Styling engine"
 msgstr "润色引擎"
 
@@ -1967,7 +1951,7 @@ msgstr "文本传递"
 msgid "Thanks — your feedback was sent."
 msgstr "谢谢，你的反馈已发送。"
 
-#: src/features/settings/sections/pill-section.tsx:73
+#: src/features/settings/sections/pill-section.tsx:74
 msgid "The floating status pill you see while dictating."
 msgstr "听写时显示的浮动状态指示器。"
 
@@ -1983,11 +1967,11 @@ msgstr "用于语音输入的主要快捷方式。单击绑定以更改它。"
 msgid "The microphone is in use"
 msgstr "麦克风正在使用中"
 
-#: src/features/settings/data/settings-data.ts:329
+#: src/features/settings/data/settings-data.ts:311
 msgid "The model stays in memory. Every dictation starts instantly."
 msgstr "模型常驻内存。每次听写都能立即开始。"
 
-#: src/features/settings/sections/transcription-section.tsx:123
+#: src/features/settings/sections/transcription-section.tsx:128
 msgid "The words the recognizer is least sure about are checked against your dictionary and vocabulary. Higher checks more words; lower trusts the raw transcription."
 msgstr "识别器最不确定的词语会与您的词典和词汇进行核对。数值越高核对的词越多；越低则越信任原始转录��"
 
@@ -2084,7 +2068,7 @@ msgstr "正在转写…"
 #: src/features/history/components/history-table.tsx:177
 #: src/features/overview/overview-page.tsx:221
 msgid "Transcript"
-msgstr "成绩单"
+msgstr "转写结果"
 
 #: src/features/settings/sections/transcription-section.tsx:44
 #: src/features/settings/settings-page.tsx:75
@@ -2125,7 +2109,7 @@ msgstr "触发短语"
 msgid "Try again"
 msgstr "重试"
 
-#: src/features/settings/data/settings-data.ts:377
+#: src/features/settings/data/settings-data.ts:359
 msgid "Type"
 msgstr "输入"
 
@@ -2141,7 +2125,7 @@ msgstr "输入到应用"
 msgid "Types as"
 msgstr "输入为"
 
-#: src/store/workspace-store.ts:664
+#: src/store/workspace-store.ts:665
 msgid "Unable to reach the desktop backend."
 msgstr "无法连接到桌面后端。"
 
@@ -2158,7 +2142,7 @@ msgstr "检查更新失败"
 msgid "Update failed"
 msgstr "更新失败"
 
-#: src/features/settings/sections/general-section.tsx:127
+#: src/features/settings/sections/general-section.tsx:146
 msgid "Updates"
 msgstr "更新"
 
@@ -2166,8 +2150,8 @@ msgstr "更新"
 msgid "Use GPU acceleration"
 msgstr "使用 GPU 加速"
 
-#: src/features/settings/sections/transcription-section.tsx:83
-#: src/features/settings/sections/transcription-section.tsx:91
+#: src/features/settings/sections/transcription-section.tsx:88
+#: src/features/settings/sections/transcription-section.tsx:96
 msgid "Use hardware acceleration"
 msgstr "使用硬件加速"
 
@@ -2193,7 +2177,7 @@ msgstr "查看"
 msgid "View all"
 msgstr "查看全部"
 
-#: src/features/settings/sections/general-section.tsx:159
+#: src/features/settings/sections/general-section.tsx:178
 msgid "View source"
 msgstr "查看源代码"
 
@@ -2201,7 +2185,7 @@ msgstr "查看源代码"
 msgid "View style"
 msgstr "查看样式"
 
-#: src/features/settings/sections/pill-section.tsx:77
+#: src/features/settings/sections/pill-section.tsx:78
 msgid "Visibility"
 msgstr "显示"
 
@@ -2239,7 +2223,7 @@ msgstr "这是关于什么的？"
 msgid "What's new"
 msgstr "更新内容"
 
-#: src/features/settings/sections/transcription-section.tsx:84
+#: src/features/settings/sections/transcription-section.tsx:89
 msgid "When available, this can make transcription finish faster."
 msgstr "如果可用，这可以使转录更快完成。"
 
@@ -2247,11 +2231,11 @@ msgstr "如果可用，这可以使转录更快完成。"
 msgid "When dictating"
 msgstr "听写时显示"
 
-#: src/features/settings/sections/pill-section.tsx:78
+#: src/features/settings/sections/pill-section.tsx:79
 msgid "When the pill appears while you dictate."
 msgstr "听写时指示器何时出现。"
 
-#: src/features/settings/sections/pill-section.tsx:109
+#: src/features/settings/sections/pill-section.tsx:112
 msgid "Where the pill sits on screen. Dragging it overrides the preset until you reset."
 msgstr "指示器在屏幕上的位置。拖动它会覆盖预设位置，直到你重置为止。"
 
@@ -2263,11 +2247,11 @@ msgstr "听写从哪个输入设备采���。更改会立即生效。"
 msgid "Which paste shortcut to send. Automatic detects terminals; override if paste lands in the wrong place."
 msgstr "发送哪个粘贴快捷键。「自动」会检测终端；如果粘贴出现在错误的位置，请覆盖。"
 
-#: src/features/settings/sections/pill-section.tsx:153
+#: src/features/settings/sections/pill-section.tsx:156
 msgid "Which screen the pill appears on."
 msgstr "指示器显示在哪个屏幕上。"
 
-#: src/features/settings/data/settings-data.ts:371
+#: src/features/settings/data/settings-data.ts:353
 #: src/features/welcome/components/engine-step.tsx:55
 msgid "Whisper"
 msgstr "Whisper"
@@ -2302,7 +2286,7 @@ msgstr "WPM"
 msgid "Yes"
 msgstr "是的"
 
-#: src/features/settings/sections/general-section.tsx:130
+#: src/features/settings/sections/general-section.tsx:149
 msgid "You are running version {version}."
 msgstr "你正在使用版本 {version}。"
 

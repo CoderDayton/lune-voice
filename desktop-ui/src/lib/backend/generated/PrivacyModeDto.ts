@@ -7,6 +7,7 @@
  * `LocalOnly` is the default and it *overrides* a configured remote backend:
  * styling silently degrades to the raw transcript and remote transcription
  * is refused outright. That makes it the one setting that can make a
- * correctly-configured API key do nothing, so it has to be visible.
+ * correctly-configured API key do nothing, so it has to be visible. The UI
+ * shows it as a single switch.
  */
-export type PrivacyModeDto = "LocalOnly" | "LocalPreferred" | "AllowRemote";
+export type PrivacyModeDto = "LocalOnly" | "AllowRemote";

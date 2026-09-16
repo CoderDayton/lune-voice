@@ -47,7 +47,7 @@ First launch downloads about 540 MB of Whisper models. After that, dictation nee
 
 On its own the app makes three kinds of network request: the Whisper model download on first launch, the CUDA plugin download if you ask for GPU acceleration, and the update check. The update check runs only when you ask for it — from the tray menu or Settings — unless you turn on "Check for updates on launch", which is off by default. Local transcription, dictionary correction, and formatting never reach the network.
 
-Two settings can send your words out, and only once you pick them: remote styling, and a remote transcription backend in place of local Whisper. Pointing either at a local endpoint keeps transcripts on your machine.
+Two settings can send your words out, and only once you pick them: remote styling, and a remote transcription backend in place of local Whisper. Neither runs until you also turn on "Allow remote services", which is off by default. Pointing either at a local endpoint keeps transcripts on your machine.
 
 The app collects no telemetry and no analytics. Since the source is public, you do not have to take that on faith.
 

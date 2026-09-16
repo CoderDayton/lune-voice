@@ -82,10 +82,10 @@ Work down this list:
    `dropping garbage segment` at WARN. Usually a mic gain problem.
 4. **Backend not compiled in.** An error containing `not compiled in` means the
    binary was built without `whisper-cpp`. Rebuild with `cgs build`.
-5. **Remote transcription under local-only privacy.** An error naming
-   `privacy mode` means transcription points at a remote service while
-   `privacy_mode = "LocalOnly"`. Switch transcription back to Whisper, or
-   change the privacy mode.
+5. **Remote transcription with remote services off.** An error saying
+   `remote services are turned off` means transcription points at a remote
+   service while `privacy_mode = "LocalOnly"`. Switch transcription back to
+   Whisper, or turn on **Allow remote services** in Settings → General.
 
 ---
 

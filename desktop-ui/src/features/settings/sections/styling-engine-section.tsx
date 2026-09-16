@@ -2,21 +2,10 @@
 
 import { useLingui } from '@lingui/react/macro';
 import { Check, type LucideIcon, PowerOff, Server, Wand2 } from 'lucide-react';
-import { DescriptiveDropdown } from '../../../components/ui/descriptive-dropdown';
-import { saveWorkspaceSetting, saveWorkspaceSettings } from '../../../store/workspace-store';
+import { saveWorkspaceSettings } from '../../../store/workspace-store';
 import { OpenAiFields } from '../components/openai-fields';
-import {
-  SettingsBlock,
-  type SettingsProps,
-  SettingsRow,
-  SettingsSection,
-} from '../components/section';
-import {
-  type LlmEngineValue,
-  llmEngines,
-  localizeOptions,
-  privacyModes,
-} from '../data/settings-data';
+import { SettingsBlock, type SettingsProps, SettingsSection } from '../components/section';
+import { type LlmEngineValue, llmEngines, localizeOptions } from '../data/settings-data';
 
 function engineIcon(value: LlmEngineValue): LucideIcon {
   // A server, not a cloud: the endpoint may well be on localhost.
@@ -51,20 +40,6 @@ export function StylingEngineSection({ settings }: SettingsProps) {
         description={t`Choose how transcripts are restyled — sent to an OpenAI-compatible endpoint you configure, local or hosted, or left off entirely.`}
         icon={Wand2}
       >
-        <SettingsRow
-          label={t`Privacy`}
-          description={t`Local only disables styling even if an engine is selected below — the transcript is delivered raw instead.`}
-          control={
-            <DescriptiveDropdown
-              value={settings.privacyMode}
-              options={localizeOptions(i18n, privacyModes)}
-              ariaLabel={t`Privacy`}
-              onChange={(next) =>
-                void saveWorkspaceSetting('privacyMode', next as typeof settings.privacyMode)
-              }
-            />
-          }
-        />
         <SettingsBlock
           label={t`Engine`}
           description={t`Off delivers raw transcripts. Which style is applied is chosen on the Styles tab.`}
@@ -92,6 +67,11 @@ export function StylingEngineSection({ settings }: SettingsProps) {
             modelDescription="Styling model name, e.g. gpt-4o-mini."
             modelPlaceholder="gpt-4o-mini"
           />
+        )}
+        {current === 'OpenAiCompatible' && settings.privacyMode === 'LocalOnly' && (
+          <div role="alert" className="alert alert-warning alert-soft sm:flex-row">
+            <span>{t`Remote services are turned off, so transcripts are delivered without styling. Turn on Allow remote services in General to use this endpoint.`}</span>
+          </div>
         )}
       </SettingsSection>
     </div>

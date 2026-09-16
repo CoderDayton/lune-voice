@@ -29,10 +29,9 @@ language = "auto"
 # "auto" detects from speech; otherwise a BCP-47 tag like "en-US", "es", "ja".
 dictation_language = "auto"
 
-# Privacy policy for backend selection.
-# "LocalOnly"       — Reject any remote backend. (default)
-# "LocalPreferred"  — Use remote only if explicitly configured and consented.
-# "AllowRemote"     — Use whatever backend is configured.
+# Whether remote backends may be used (Settings → General → Allow remote services).
+# "LocalOnly"    — Reject any remote backend. (default)
+# "AllowRemote"  — Allow remote backends; each still needs to be configured.
 privacy_mode = "LocalOnly"
 
 # How finalized text reaches the focused window.

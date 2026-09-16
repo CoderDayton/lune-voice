@@ -5,12 +5,13 @@ use serde::{Deserialize, Serialize};
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
 #[non_exhaustive]
 pub enum PrivacyMode {
-    /// Reject any remote backend usage.
+    /// Never contact a remote service: remote transcription is refused and
+    /// remote styling degrades to the raw transcript.
     #[default]
     LocalOnly,
-    /// Use remote only if explicitly configured + consented.
-    LocalPreferred,
-    /// Use whatever is configured.
+    /// Remote services may be used. None runs unless it is configured.
+    /// `LocalPreferred` is a former name for this same behaviour.
+    #[serde(alias = "LocalPreferred")]
     AllowRemote,
 }
 
@@ -136,7 +137,6 @@ impl std::fmt::Display for PrivacyMode {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::LocalOnly => f.write_str("LocalOnly"),
-            Self::LocalPreferred => f.write_str("LocalPreferred"),
             Self::AllowRemote => f.write_str("AllowRemote"),
         }
     }
@@ -147,8 +147,7 @@ impl std::str::FromStr for PrivacyMode {
     fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
         match s {
             "LocalOnly" => Ok(Self::LocalOnly),
-            "LocalPreferred" => Ok(Self::LocalPreferred),
-            "AllowRemote" => Ok(Self::AllowRemote),
+            "AllowRemote" | "LocalPreferred" => Ok(Self::AllowRemote),
             _ => Err(privacy_mode_parse_err(s)),
         }
     }
@@ -157,7 +156,7 @@ impl std::str::FromStr for PrivacyMode {
 #[cold]
 #[inline(never)]
 fn privacy_mode_parse_err(s: &str) -> String {
-    format!("unknown privacy mode: {s} (expected LocalOnly|LocalPreferred|AllowRemote)")
+    format!("unknown privacy mode: {s} (expected LocalOnly|AllowRemote)")
 }
 
 /// Controls how the delivery system detects terminal windows for paste chords.

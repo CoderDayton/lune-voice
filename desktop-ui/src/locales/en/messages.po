@@ -91,23 +91,23 @@ msgstr "## Meeting — {date}\n"
 "Attendees:\n"
 "- "
 
-#: src/features/settings/data/settings-data.ts:300
+#: src/features/settings/data/settings-data.ts:282
 msgid "1 year"
 msgstr "1 year"
 
-#: src/features/settings/data/settings-data.ts:298
+#: src/features/settings/data/settings-data.ts:280
 msgid "30 days"
 msgstr "30 days"
 
-#: src/features/settings/data/settings-data.ts:297
+#: src/features/settings/data/settings-data.ts:279
 msgid "7 days"
 msgstr "7 days"
 
-#: src/features/settings/data/settings-data.ts:299
+#: src/features/settings/data/settings-data.ts:281
 msgid "90 days"
 msgstr "90 days"
 
-#: src/features/settings/sections/pill-section.tsx:218
+#: src/features/settings/sections/pill-section.tsx:221
 msgid "A vertical pill hugs the side of the screen."
 msgstr "A vertical pill hugs the side of the screen."
 
@@ -154,23 +154,23 @@ msgstr "Add a fix and Lune Voice applies it every time you dictate. Try a starte
 msgid "Add snippet"
 msgstr "Add snippet"
 
-#: src/features/settings/data/settings-data.ts:334
+#: src/features/settings/data/settings-data.ts:316
 msgid "After 1 hour"
 msgstr "After 1 hour"
 
-#: src/features/settings/data/settings-data.ts:332
+#: src/features/settings/data/settings-data.ts:314
 msgid "After 15 minutes"
 msgstr "After 15 minutes"
 
-#: src/features/settings/data/settings-data.ts:335
+#: src/features/settings/data/settings-data.ts:317
 msgid "After 2 hours"
 msgstr "After 2 hours"
 
-#: src/features/settings/data/settings-data.ts:333
+#: src/features/settings/data/settings-data.ts:315
 msgid "After 30 minutes"
 msgstr "After 30 minutes"
 
-#: src/features/settings/data/settings-data.ts:331
+#: src/features/settings/data/settings-data.ts:313
 msgid "After 5 minutes"
 msgstr "After 5 minutes"
 
@@ -191,13 +191,10 @@ msgstr "all-time · today"
 msgid "Allow"
 msgstr "Allow"
 
-#: src/features/settings/data/settings-data.ts:288
-msgid "Allow remote"
-msgstr "Allow remote"
-
-#: src/features/settings/data/settings-data.ts:289
-msgid "Allow remote transcription and styling wherever you have configured them."
-msgstr "Allow remote transcription and styling wherever you have configured them."
+#: src/features/settings/sections/general-section.tsx:96
+#: src/features/settings/sections/general-section.tsx:109
+msgid "Allow remote services"
+msgstr "Allow remote services"
 
 #: src/features/settings/data/settings-data.ts:97
 msgid "Always"
@@ -270,7 +267,7 @@ msgid "Auto-detect"
 msgstr "Auto-detect"
 
 #: src/features/settings/data/settings-data.ts:258
-#: src/features/settings/sections/pill-section.tsx:54
+#: src/features/settings/sections/pill-section.tsx:55
 msgid "Automatic"
 msgstr "Automatic"
 
@@ -364,17 +361,17 @@ msgstr "Change engine"
 msgid "Change theme"
 msgstr "Change theme"
 
-#: src/features/settings/sections/general-section.tsx:140
+#: src/features/settings/sections/general-section.tsx:159
 #: src/features/shell/components/sidebar-quick-actions.tsx:78
 msgid "Check for updates"
 msgstr "Check for updates"
 
-#: src/features/settings/sections/general-section.tsx:111
-#: src/features/settings/sections/general-section.tsx:121
+#: src/features/settings/sections/general-section.tsx:130
+#: src/features/settings/sections/general-section.tsx:140
 msgid "Check for updates on launch"
 msgstr "Check for updates on launch"
 
-#: src/features/settings/sections/general-section.tsx:131
+#: src/features/settings/sections/general-section.tsx:150
 msgid "Check whether a newer version has been released."
 msgstr "Check whether a newer version has been released."
 
@@ -391,7 +388,7 @@ msgid "Checking installed models…"
 msgstr "Checking installed models…"
 
 #: src/features/settings/components/asr-engine-cards.tsx:227
-#: src/features/settings/sections/general-section.tsx:140
+#: src/features/settings/sections/general-section.tsx:159
 #: src/features/welcome/components/ready-checks.tsx:113
 msgid "Checking…"
 msgstr "Checking…"
@@ -408,7 +405,7 @@ msgstr "Choose how finished text is inserted into the app you are currently usin
 msgid "Choose how Lune Voice looks."
 msgstr "Choose how Lune Voice looks."
 
-#: src/features/settings/sections/styling-engine-section.tsx:51
+#: src/features/settings/sections/styling-engine-section.tsx:40
 msgid "Choose how transcripts are restyled — sent to an OpenAI-compatible endpoint you configure, local or hosted, or left off entirely."
 msgstr "Choose how transcripts are restyled — sent to an OpenAI-compatible endpoint you configure, local or hosted, or left off entirely."
 
@@ -472,7 +469,7 @@ msgstr "Completed"
 msgid "Connecting"
 msgstr "Connecting"
 
-#: src/features/settings/sections/general-section.tsx:112
+#: src/features/settings/sections/general-section.tsx:131
 msgid "Contact the release server shortly after startup and tell you only when a newer version exists. Off by default — dictation itself never needs the network."
 msgstr "Contact the release server shortly after startup and tell you only when a newer version exists. Off by default — dictation itself never needs the network."
 
@@ -502,20 +499,20 @@ msgstr "Copy to clipboard"
 msgid "Copy transcript"
 msgstr "Copy transcript"
 
-#: src/features/settings/sections/pill-section.tsx:235
+#: src/features/settings/sections/pill-section.tsx:238
 msgid "Corner rounding of the pill bar."
 msgstr "Corner rounding of the pill bar."
 
-#: src/features/settings/sections/pill-section.tsx:234
+#: src/features/settings/sections/pill-section.tsx:237
 msgid "Corners"
 msgstr "Corners"
 
-#: src/features/settings/sections/transcription-section.tsx:117
+#: src/features/settings/sections/transcription-section.tsx:122
 msgid "Correction"
 msgstr "Correction"
 
-#: src/features/settings/sections/transcription-section.tsx:122
-#: src/features/settings/sections/transcription-section.tsx:137
+#: src/features/settings/sections/transcription-section.tsx:127
+#: src/features/settings/sections/transcription-section.tsx:142
 msgid "Correction sensitivity"
 msgstr "Correction sensitivity"
 
@@ -655,16 +652,16 @@ msgstr "Deterministic fixes applied before any AI styling."
 msgid "Dictation"
 msgstr "Dictation"
 
-#: src/features/settings/sections/transcription-section.tsx:66
-#: src/features/settings/sections/transcription-section.tsx:72
+#: src/features/settings/sections/transcription-section.tsx:71
+#: src/features/settings/sections/transcription-section.tsx:77
 msgid "Dictation language"
 msgstr "Dictation language"
 
-#: src/features/settings/sections/pill-section.tsx:72
+#: src/features/settings/sections/pill-section.tsx:73
 msgid "Dictation pill"
 msgstr "Dictation pill"
 
-#: src/features/settings/sections/pill-section.tsx:83
+#: src/features/settings/sections/pill-section.tsx:84
 msgid "Dictation pill visibility"
 msgstr "Dictation pill visibility"
 
@@ -692,7 +689,7 @@ msgstr "Disk usage"
 msgid "Dismiss error"
 msgstr "Dismiss error"
 
-#: src/features/settings/data/settings-data.ts:296
+#: src/features/settings/data/settings-data.ts:278
 msgid "Don't save history"
 msgstr "Don't save history"
 
@@ -765,11 +762,11 @@ msgstr "Duration"
 msgid "e.g. Meeting notes"
 msgstr "e.g. Meeting notes"
 
-#: src/features/settings/sections/pill-section.tsx:127
+#: src/features/settings/sections/pill-section.tsx:130
 msgid "Edge distance"
 msgstr "Edge distance"
 
-#: src/features/settings/sections/pill-section.tsx:145
+#: src/features/settings/sections/pill-section.tsx:148
 msgid "Edge distance in pixels"
 msgstr "Edge distance in pixels"
 
@@ -808,7 +805,7 @@ msgstr "Enable styling"
 
 #: src/features/history/components/history-table.tsx:184
 #: src/features/history/components/session-detail-modal.tsx:165
-#: src/features/settings/sections/styling-engine-section.tsx:69
+#: src/features/settings/sections/styling-engine-section.tsx:44
 msgid "Engine"
 msgstr "Engine"
 
@@ -864,7 +861,7 @@ msgstr "Filter snippets"
 msgid "Filter snippets…"
 msgstr "Filter snippets…"
 
-#: src/features/settings/sections/transcription-section.tsx:118
+#: src/features/settings/sections/transcription-section.tsx:123
 msgid "Fix recognizer errors with your dictionary and known vocabulary, on your device. It uses per-word confidence and statistical patterns — no AI model, and it never rewrites what you said."
 msgstr "Fix recognizer errors with your dictionary and known vocabulary, on your device. It uses per-word confidence and statistical patterns — no AI model, and it never rewrites what you said."
 
@@ -876,7 +873,7 @@ msgstr "Force the standard paste shortcut for every app."
 msgid "Force the terminal paste shortcut. Use on COSMIC if you mostly dictate into terminals."
 msgstr "Force the terminal paste shortcut. Use on COSMIC if you mostly dictate into terminals."
 
-#: src/features/settings/sections/pill-section.tsx:180
+#: src/features/settings/sections/pill-section.tsx:183
 msgid "Forget where you dragged the pill and return it to its preset spot."
 msgstr "Forget where you dragged the pill and return it to its preset spot."
 
@@ -885,8 +882,8 @@ msgstr "Forget where you dragged the pill and return it to its preset spot."
 msgid "Formatting"
 msgstr "Formatting"
 
-#: src/features/settings/sections/transcription-section.tsx:96
-#: src/features/settings/sections/transcription-section.tsx:102
+#: src/features/settings/sections/transcription-section.tsx:101
+#: src/features/settings/sections/transcription-section.tsx:107
 msgid "Free the model when idle"
 msgstr "Free the model when idle"
 
@@ -894,7 +891,7 @@ msgstr "Free the model when idle"
 msgid "Fully round"
 msgstr "Fully round"
 
-#: src/features/settings/sections/pill-section.tsx:128
+#: src/features/settings/sections/pill-section.tsx:131
 msgid "Gap between the pill and the screen edge, so it clears a taskbar or dock."
 msgstr "Gap between the pill and the screen edge, so it clears a taskbar or dock."
 
@@ -920,7 +917,7 @@ msgstr "github"
 msgid "GitHub"
 msgstr "GitHub"
 
-#: src/features/settings/sections/transcription-section.tsx:97
+#: src/features/settings/sections/transcription-section.tsx:102
 msgid "Give the memory back after a quiet spell. The next dictation reloads the model, which adds up to a second before it starts listening — your speech is recorded during the wait, so nothing is lost."
 msgstr "Give the memory back after a quiet spell. The next dictation reloads the model, which adds up to a second before it starts listening — your speech is recorded during the wait, so nothing is lost."
 
@@ -966,8 +963,8 @@ msgstr "History kept {historyDays} days"
 msgid "History kept forever"
 msgstr "History kept forever"
 
-#: src/features/settings/sections/general-section.tsx:96
-#: src/features/settings/sections/general-section.tsx:102
+#: src/features/settings/sections/general-section.tsx:115
+#: src/features/settings/sections/general-section.tsx:121
 msgid "History retention"
 msgstr "History retention"
 
@@ -995,7 +992,7 @@ msgstr "Hold your hotkey, speak, then let go. The text is typed into whatever ap
 msgid "Horizontal"
 msgstr "Horizontal"
 
-#: src/features/settings/sections/general-section.tsx:97
+#: src/features/settings/sections/general-section.tsx:116
 msgid "How long finished dictations are kept on this device."
 msgstr "How long finished dictations are kept on this device."
 
@@ -1003,7 +1000,7 @@ msgstr "How long finished dictations are kept on this device."
 msgid "How loud the dictation sounds play."
 msgstr "How loud the dictation sounds play."
 
-#: src/features/settings/sections/pill-section.tsx:199
+#: src/features/settings/sections/pill-section.tsx:202
 msgid "How the pill bar looks. Changes apply immediately."
 msgstr "How the pill bar looks. Changes apply immediately."
 
@@ -1059,11 +1056,11 @@ msgstr "Instructions"
 msgid "Join the discussions"
 msgstr "Join the discussions"
 
-#: src/features/settings/data/settings-data.ts:301
+#: src/features/settings/data/settings-data.ts:283
 msgid "Keep forever"
 msgstr "Keep forever"
 
-#: src/features/settings/data/settings-data.ts:328
+#: src/features/settings/data/settings-data.ts:310
 msgid "Keep loaded"
 msgstr "Keep loaded"
 
@@ -1071,7 +1068,7 @@ msgstr "Keep loaded"
 msgid "Keep the dictated text on the clipboard after every dictation, so you can paste it again yourself."
 msgstr "Keep the dictated text on the clipboard after every dictation, so you can paste it again yourself."
 
-#: src/features/settings/sections/pill-section.tsx:92
+#: src/features/settings/sections/pill-section.tsx:94
 msgid "Keep the pill with you when you switch workspaces or virtual desktops."
 msgstr "Keep the pill with you when you switch workspaces or virtual desktops."
 
@@ -1115,7 +1112,11 @@ msgstr "Launch into the system tray instead of opening the main window. Useful w
 msgid "Length"
 msgstr "Length"
 
-#: src/features/settings/sections/general-section.tsx:148
+#: src/features/settings/sections/general-section.tsx:97
+msgid "Let transcription and styling use a remote endpoint you set up. When off, audio and text never leave this device: remote transcription is refused and styling is skipped."
+msgstr "Let transcription and styling use a remote endpoint you set up. When off, audio and text never leave this device: remote transcription is refused and styling is skipped."
+
+#: src/features/settings/sections/general-section.tsx:167
 msgid "License"
 msgstr "License"
 
@@ -1141,20 +1142,8 @@ msgstr "Listening — say the phrase…"
 msgid "Listening…"
 msgstr "Listening…"
 
-#: src/features/settings/data/settings-data.ts:278
-msgid "Local only"
-msgstr "Local only"
-
-#: src/features/settings/sections/styling-engine-section.tsx:56
-msgid "Local only disables styling even if an engine is selected below — the transcript is delivered raw instead."
-msgstr "Local only disables styling even if an engine is selected below — the transcript is delivered raw instead."
-
-#: src/features/settings/data/settings-data.ts:283
-msgid "Local preferred"
-msgstr "Local preferred"
-
-#: src/features/settings/sections/pill-section.tsx:166
-#: src/features/settings/sections/pill-section.tsx:174
+#: src/features/settings/sections/pill-section.tsx:169
+#: src/features/settings/sections/pill-section.tsx:177
 msgid "Lock position"
 msgstr "Lock position"
 
@@ -1183,7 +1172,7 @@ msgstr "Lune Voice added a system rule so it can type into other apps. It also l
 msgid "Lune Voice can type into your other apps."
 msgstr "Lune Voice can type into your other apps."
 
-#: src/features/settings/sections/general-section.tsx:149
+#: src/features/settings/sections/general-section.tsx:168
 msgid "Lune Voice is free software under the GNU General Public License, version 3 or later, and comes with no warranty. You may copy, change and share it under those terms; the source code is at {REPO_URL}."
 msgstr "Lune Voice is free software under the GNU General Public License, version 3 or later, and comes with no warranty. You may copy, change and share it under those terms; the source code is at {REPO_URL}."
 
@@ -1243,7 +1232,7 @@ msgstr "Models"
 msgid "Models are stored locally. No telemetry, no accounts."
 msgstr "Models are stored locally. No telemetry, no accounts."
 
-#: src/features/settings/sections/pill-section.tsx:152
+#: src/features/settings/sections/pill-section.tsx:155
 msgid "Monitor"
 msgstr "Monitor"
 
@@ -1262,10 +1251,6 @@ msgstr "Name is too long."
 #: src/features/settings/data/settings-data.ts:99
 msgid "Never"
 msgstr "Never"
-
-#: src/features/settings/data/settings-data.ts:279
-msgid "Never send audio or text to a remote service. Remote transcription and styling are disabled."
-msgstr "Never send audio or text to a remote service. Remote transcription and styling are disabled."
 
 #: src/features/snippets/snippets-page.tsx:206
 #: src/features/snippets/snippets-page.tsx:244
@@ -1344,7 +1329,7 @@ msgstr "None"
 msgid "Normalizes microphone level before voice detection. Helps quiet mics and noisy rooms. Recommended."
 msgstr "Normalizes microphone level before voice detection. Helps quiet mics and noisy rooms. Recommended."
 
-#: src/features/settings/sections/pill-section.tsx:65
+#: src/features/settings/sections/pill-section.tsx:66
 msgid "not connected"
 msgstr "not connected"
 
@@ -1361,7 +1346,7 @@ msgstr "Nothing installed"
 msgid "Off"
 msgstr "Off"
 
-#: src/features/settings/sections/styling-engine-section.tsx:70
+#: src/features/settings/sections/styling-engine-section.tsx:45
 msgid "Off delivers raw transcripts. Which style is applied is chosen on the Styles tab."
 msgstr "Off delivers raw transcripts. Which style is applied is chosen on the Styles tab."
 
@@ -1386,7 +1371,7 @@ msgstr "Open releases page"
 msgid "Open session from {time}"
 msgstr "Open session from {time}"
 
-#: src/features/settings/data/settings-data.ts:372
+#: src/features/settings/data/settings-data.ts:354
 msgid "OpenAI-compatible"
 msgstr "OpenAI-compatible"
 
@@ -1403,7 +1388,7 @@ msgstr "Optional"
 msgid "or send directly"
 msgstr "or send directly"
 
-#: src/features/settings/sections/pill-section.tsx:217
+#: src/features/settings/sections/pill-section.tsx:220
 msgid "Orientation"
 msgstr "Orientation"
 
@@ -1411,7 +1396,7 @@ msgstr "Orientation"
 msgid "Output"
 msgstr "Output"
 
-#: src/features/settings/sections/pill-section.tsx:204
+#: src/features/settings/sections/pill-section.tsx:207
 msgid "Overall footprint of the pill bar."
 msgstr "Overall footprint of the pill bar."
 
@@ -1423,7 +1408,7 @@ msgstr "Overall progress"
 msgid "Pagination"
 msgstr "Pagination"
 
-#: src/features/settings/data/settings-data.ts:376
+#: src/features/settings/data/settings-data.ts:358
 msgid "Paste"
 msgstr "Paste"
 
@@ -1453,27 +1438,27 @@ msgstr "Phrase"
 msgid "Pill"
 msgstr "Pill"
 
-#: src/features/settings/sections/pill-section.tsx:240
+#: src/features/settings/sections/pill-section.tsx:243
 msgid "Pill corners"
 msgstr "Pill corners"
 
-#: src/features/settings/sections/pill-section.tsx:158
+#: src/features/settings/sections/pill-section.tsx:161
 msgid "Pill monitor"
 msgstr "Pill monitor"
 
-#: src/features/settings/sections/pill-section.tsx:223
+#: src/features/settings/sections/pill-section.tsx:226
 msgid "Pill orientation"
 msgstr "Pill orientation"
 
-#: src/features/settings/sections/pill-section.tsx:119
+#: src/features/settings/sections/pill-section.tsx:122
 msgid "Pill position preset"
 msgstr "Pill position preset"
 
-#: src/features/settings/sections/pill-section.tsx:209
+#: src/features/settings/sections/pill-section.tsx:212
 msgid "Pill size"
 msgstr "Pill size"
 
-#: src/features/settings/sections/pill-section.tsx:108
+#: src/features/settings/sections/pill-section.tsx:111
 msgid "Placement"
 msgstr "Placement"
 
@@ -1485,15 +1470,11 @@ msgstr "Play a short sound when dictation starts, finishes, or runs into an erro
 msgid "Please keep the app open until downloads finish"
 msgstr "Please keep the app open until downloads finish"
 
-#: src/features/settings/sections/pill-section.tsx:113
+#: src/features/settings/sections/pill-section.tsx:116
 msgid "Position"
 msgstr "Position"
 
-#: src/features/settings/data/settings-data.ts:284
-msgid "Prefer on-device processing, but allow a remote service where you have configured one."
-msgstr "Prefer on-device processing, but allow a remote service where you have configured one."
-
-#: src/features/settings/sections/pill-section.tsx:114
+#: src/features/settings/sections/pill-section.tsx:117
 msgid "Preset corner or edge the pill starts at."
 msgstr "Preset corner or edge the pill starts at."
 
@@ -1529,7 +1510,7 @@ msgstr "Press your hotkey, speak, then press it again. The text is typed into wh
 msgid "Prev"
 msgstr "Prev"
 
-#: src/features/settings/sections/pill-section.tsx:167
+#: src/features/settings/sections/pill-section.tsx:170
 msgid "Prevent moving the pill by dragging it."
 msgstr "Prevent moving the pill by dragging it."
 
@@ -1537,7 +1518,7 @@ msgstr "Prevent moving the pill by dragging it."
 msgid "Previous page"
 msgstr "Previous page"
 
-#: src/features/settings/sections/pill-section.tsx:57
+#: src/features/settings/sections/pill-section.tsx:58
 msgid "primary"
 msgstr "primary"
 
@@ -1546,11 +1527,6 @@ msgstr "primary"
 #: src/features/dictionary/components/priority-picker.tsx:56
 msgid "Priority"
 msgstr "Priority"
-
-#: src/features/settings/sections/styling-engine-section.tsx:55
-#: src/features/settings/sections/styling-engine-section.tsx:61
-msgid "Privacy"
-msgstr "Privacy"
 
 #: src/features/dictation/dictation-pill.tsx:63
 #: src/features/dictation/dictation-pill.tsx:69
@@ -1595,6 +1571,14 @@ msgstr "Recording mode"
 msgid "Refresh few-shot examples"
 msgstr "Refresh few-shot examples"
 
+#: src/features/settings/sections/transcription-section.tsx:67
+msgid "Remote services are turned off, so dictation cannot start with this engine. Turn on Allow remote services in General, or switch back to Whisper."
+msgstr "Remote services are turned off, so dictation cannot start with this engine. Turn on Allow remote services in General, or switch back to Whisper."
+
+#: src/features/settings/sections/styling-engine-section.tsx:73
+msgid "Remote services are turned off, so transcripts are delivered without styling. Turn on Allow remote services in General to use this endpoint."
+msgstr "Remote services are turned off, so transcripts are delivered without styling. Turn on Allow remote services in General to use this endpoint."
+
 #: src/components/feedback/confirm-dialog.tsx:39
 #: src/components/feedback/confirm-dialog.tsx:42
 #: src/features/settings/components/uinput-rule-row.tsx:106
@@ -1627,11 +1611,11 @@ msgstr "Report a problem, suggest an idea, or just tell us how it's going."
 msgid "Required"
 msgstr "Required"
 
-#: src/features/settings/sections/pill-section.tsx:191
+#: src/features/settings/sections/pill-section.tsx:194
 msgid "Reset"
 msgstr "Reset"
 
-#: src/features/settings/sections/pill-section.tsx:179
+#: src/features/settings/sections/pill-section.tsx:182
 msgid "Reset position"
 msgstr "Reset position"
 
@@ -1758,7 +1742,7 @@ msgstr "session"
 msgid "Session details"
 msgstr "Session details"
 
-#: src/store/workspace-store.ts:207
+#: src/store/workspace-store.ts:208
 msgid "Session timed out — backend may be unresponsive"
 msgstr "Session timed out — backend may be unresponsive"
 
@@ -1770,7 +1754,7 @@ msgstr "sessions"
 msgid "Set hotkey"
 msgstr "Set hotkey"
 
-#: src/features/settings/sections/transcription-section.tsx:67
+#: src/features/settings/sections/transcription-section.tsx:72
 msgid "Set the language you speak. Auto uses detection from speech."
 msgstr "Set the language you speak. Auto uses detection from speech."
 
@@ -1791,8 +1775,8 @@ msgstr "Settings sections"
 msgid "Shortcuts"
 msgstr "Shortcuts"
 
-#: src/features/settings/sections/pill-section.tsx:91
-#: src/features/settings/sections/pill-section.tsx:101
+#: src/features/settings/sections/pill-section.tsx:93
+#: src/features/settings/sections/pill-section.tsx:103
 msgid "Show on all workspaces"
 msgstr "Show on all workspaces"
 
@@ -1813,11 +1797,11 @@ msgstr "Simulates keystrokes one character at a time. Works where paste is block
 msgid "Single letter keys require at least one modifier (Ctrl, Shift, Alt, or Meta)."
 msgstr "Single letter keys require at least one modifier (Ctrl, Shift, Alt, or Meta)."
 
-#: src/features/settings/sections/pill-section.tsx:203
+#: src/features/settings/sections/pill-section.tsx:206
 msgid "Size"
 msgstr "Size"
 
-#: src/features/settings/sections/pill-section.tsx:198
+#: src/features/settings/sections/pill-section.tsx:201
 msgid "Size & shape"
 msgstr "Size & shape"
 
@@ -1932,7 +1916,7 @@ msgstr "Style"
 msgid "Styling"
 msgstr "Styling"
 
-#: src/features/settings/sections/styling-engine-section.tsx:50
+#: src/features/settings/sections/styling-engine-section.tsx:39
 msgid "Styling engine"
 msgstr "Styling engine"
 
@@ -1967,7 +1951,7 @@ msgstr "Text delivery"
 msgid "Thanks — your feedback was sent."
 msgstr "Thanks — your feedback was sent."
 
-#: src/features/settings/sections/pill-section.tsx:73
+#: src/features/settings/sections/pill-section.tsx:74
 msgid "The floating status pill you see while dictating."
 msgstr "The floating status pill you see while dictating."
 
@@ -1983,11 +1967,11 @@ msgstr "The main shortcut used for voice typing. Click the binding to change it.
 msgid "The microphone is in use"
 msgstr "The microphone is in use"
 
-#: src/features/settings/data/settings-data.ts:329
+#: src/features/settings/data/settings-data.ts:311
 msgid "The model stays in memory. Every dictation starts instantly."
 msgstr "The model stays in memory. Every dictation starts instantly."
 
-#: src/features/settings/sections/transcription-section.tsx:123
+#: src/features/settings/sections/transcription-section.tsx:128
 msgid "The words the recognizer is least sure about are checked against your dictionary and vocabulary. Higher checks more words; lower trusts the raw transcription."
 msgstr "The words the recognizer is least sure about are checked against your dictionary and vocabulary. Higher checks more words; lower trusts the raw transcription."
 
@@ -2125,7 +2109,7 @@ msgstr "Trigger phrase"
 msgid "Try again"
 msgstr "Try again"
 
-#: src/features/settings/data/settings-data.ts:377
+#: src/features/settings/data/settings-data.ts:359
 msgid "Type"
 msgstr "Type"
 
@@ -2141,7 +2125,7 @@ msgstr "Type into app"
 msgid "Types as"
 msgstr "Types as"
 
-#: src/store/workspace-store.ts:664
+#: src/store/workspace-store.ts:665
 msgid "Unable to reach the desktop backend."
 msgstr "Unable to reach the desktop backend."
 
@@ -2158,7 +2142,7 @@ msgstr "Update check failed"
 msgid "Update failed"
 msgstr "Update failed"
 
-#: src/features/settings/sections/general-section.tsx:127
+#: src/features/settings/sections/general-section.tsx:146
 msgid "Updates"
 msgstr "Updates"
 
@@ -2166,8 +2150,8 @@ msgstr "Updates"
 msgid "Use GPU acceleration"
 msgstr "Use GPU acceleration"
 
-#: src/features/settings/sections/transcription-section.tsx:83
-#: src/features/settings/sections/transcription-section.tsx:91
+#: src/features/settings/sections/transcription-section.tsx:88
+#: src/features/settings/sections/transcription-section.tsx:96
 msgid "Use hardware acceleration"
 msgstr "Use hardware acceleration"
 
@@ -2193,7 +2177,7 @@ msgstr "View"
 msgid "View all"
 msgstr "View all"
 
-#: src/features/settings/sections/general-section.tsx:159
+#: src/features/settings/sections/general-section.tsx:178
 msgid "View source"
 msgstr "View source"
 
@@ -2201,7 +2185,7 @@ msgstr "View source"
 msgid "View style"
 msgstr "View style"
 
-#: src/features/settings/sections/pill-section.tsx:77
+#: src/features/settings/sections/pill-section.tsx:78
 msgid "Visibility"
 msgstr "Visibility"
 
@@ -2239,7 +2223,7 @@ msgstr "What is this about?"
 msgid "What's new"
 msgstr "What's new"
 
-#: src/features/settings/sections/transcription-section.tsx:84
+#: src/features/settings/sections/transcription-section.tsx:89
 msgid "When available, this can make transcription finish faster."
 msgstr "When available, this can make transcription finish faster."
 
@@ -2247,11 +2231,11 @@ msgstr "When available, this can make transcription finish faster."
 msgid "When dictating"
 msgstr "When dictating"
 
-#: src/features/settings/sections/pill-section.tsx:78
+#: src/features/settings/sections/pill-section.tsx:79
 msgid "When the pill appears while you dictate."
 msgstr "When the pill appears while you dictate."
 
-#: src/features/settings/sections/pill-section.tsx:109
+#: src/features/settings/sections/pill-section.tsx:112
 msgid "Where the pill sits on screen. Dragging it overrides the preset until you reset."
 msgstr "Where the pill sits on screen. Dragging it overrides the preset until you reset."
 
@@ -2263,11 +2247,11 @@ msgstr "Which input device dictation captures from. Changes apply right away."
 msgid "Which paste shortcut to send. Automatic detects terminals; override if paste lands in the wrong place."
 msgstr "Which paste shortcut to send. Automatic detects terminals; override if paste lands in the wrong place."
 
-#: src/features/settings/sections/pill-section.tsx:153
+#: src/features/settings/sections/pill-section.tsx:156
 msgid "Which screen the pill appears on."
 msgstr "Which screen the pill appears on."
 
-#: src/features/settings/data/settings-data.ts:371
+#: src/features/settings/data/settings-data.ts:353
 #: src/features/welcome/components/engine-step.tsx:55
 msgid "Whisper"
 msgstr "Whisper"
@@ -2302,7 +2286,7 @@ msgstr "WPM"
 msgid "Yes"
 msgstr "Yes"
 
-#: src/features/settings/sections/general-section.tsx:130
+#: src/features/settings/sections/general-section.tsx:149
 msgid "You are running version {version}."
 msgstr "You are running version {version}."
 

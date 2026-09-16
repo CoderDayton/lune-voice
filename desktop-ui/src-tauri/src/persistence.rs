@@ -1139,7 +1139,6 @@ fn terminal_mode_from_dto(dto: TerminalModeDto) -> TerminalMode {
 fn privacy_mode_to_dto(mode: PrivacyMode) -> PrivacyModeDto {
     match mode {
         PrivacyMode::LocalOnly => PrivacyModeDto::LocalOnly,
-        PrivacyMode::LocalPreferred => PrivacyModeDto::LocalPreferred,
         PrivacyMode::AllowRemote => PrivacyModeDto::AllowRemote,
         // `PrivacyMode` is `#[non_exhaustive]`; the strictest option is the
         // only safe thing to show for a variant this build does not know.
@@ -1150,7 +1149,6 @@ fn privacy_mode_to_dto(mode: PrivacyMode) -> PrivacyModeDto {
 fn privacy_mode_from_dto(dto: PrivacyModeDto) -> PrivacyMode {
     match dto {
         PrivacyModeDto::LocalOnly => PrivacyMode::LocalOnly,
-        PrivacyModeDto::LocalPreferred => PrivacyMode::LocalPreferred,
         PrivacyModeDto::AllowRemote => PrivacyMode::AllowRemote,
     }
 }

@@ -93,6 +93,25 @@ export function GeneralSection({ settings }: { settings: WorkspaceSettings }) {
       />
 
       <SettingsRow
+        label={t`Allow remote services`}
+        description={t`Let transcription and styling use a remote endpoint you set up. When off, audio and text never leave this device: remote transcription is refused and styling is skipped.`}
+        control={
+          <input
+            type="checkbox"
+            className="toggle toggle-primary"
+            checked={settings.privacyMode === 'AllowRemote'}
+            onChange={() =>
+              void saveWorkspaceSetting(
+                'privacyMode',
+                settings.privacyMode === 'AllowRemote' ? 'LocalOnly' : 'AllowRemote',
+              )
+            }
+            aria-label={t`Allow remote services`}
+          />
+        }
+      />
+
+      <SettingsRow
         label={t`History retention`}
         description={t`How long finished dictations are kept on this device.`}
         control={

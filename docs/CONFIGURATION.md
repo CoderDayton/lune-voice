@@ -166,7 +166,7 @@ streaming = "HttpPolling"
 | `model` | string | — | Model identifier |
 | `streaming` | enum | — | `"WebSocket"` or `"HttpPolling"` |
 
-> **Privacy note:** Remote backends send audio data to external servers, so they require `privacy_mode = "LocalPreferred"` or `"AllowRemote"`. See [Privacy Mode](#privacy-mode).
+> **Privacy note:** Remote backends send audio data to external servers, so they require `privacy_mode = "AllowRemote"` (**Allow remote services** in Settings → General). See [Privacy Mode](#privacy-mode).
 
 > **Confidence:** Remote backends do not expose per-token confidence. Styling is still applied based on the style preset.
 
@@ -203,7 +203,7 @@ max_tokens = 512
 | `model` | string | — | Model identifier |
 | `max_tokens` | u32 | — | Maximum output tokens |
 
-> Sends transcript text to the configured endpoint, so it requires `privacy_mode = "LocalPreferred"` or `"AllowRemote"`. See [Privacy Mode](#privacy-mode).
+> Sends transcript text to the configured endpoint, so it requires `privacy_mode = "AllowRemote"` (**Allow remote services** in Settings → General). See [Privacy Mode](#privacy-mode).
 
 ---
 
@@ -229,7 +229,8 @@ See [docs/GPU_PLUGIN.md](GPU_PLUGIN.md) for how detection and installation work,
 
 ## Privacy Mode
 
-Controls whether remote backends are allowed.
+Controls whether remote backends are allowed. In the app this is the
+**Allow remote services** switch under Settings → General.
 
 ```toml
 privacy_mode = "LocalOnly"
@@ -238,8 +239,9 @@ privacy_mode = "LocalOnly"
 | Mode | Behavior |
 |------|----------|
 | `LocalOnly` | Rejects every remote backend. **(default)** |
-| `LocalPreferred` | Allows remote backends, which only run when explicitly configured |
-| `AllowRemote` | Use whatever is configured — no restrictions |
+| `AllowRemote` | Allows remote backends. Each one still runs only once it is configured |
+
+`LocalPreferred` is a former name for `AllowRemote` and still loads as it.
 
 Under `LocalOnly`, a remote transcription backend fails the pipeline build with
 an actionable message — there is no local fallback to silently substitute.

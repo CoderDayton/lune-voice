@@ -62,6 +62,11 @@ export function TranscriptionSection({
             modelPlaceholder="whisper-1"
           />
         )}
+        {settings.asrBackend === 'OpenAiCompatible' && settings.privacyMode === 'LocalOnly' && (
+          <div role="alert" className="alert alert-warning alert-soft sm:flex-row">
+            <span>{t`Remote services are turned off, so dictation cannot start with this engine. Turn on Allow remote services in General, or switch back to Whisper.`}</span>
+          </div>
+        )}
         <SettingsRow
           label={t`Dictation language`}
           description={t`Set the language you speak. Auto uses detection from speech.`}

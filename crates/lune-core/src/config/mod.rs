@@ -61,6 +61,20 @@ mod tests {
         assert_eq!(mode, PrivacyMode::LocalOnly);
     }
 
+    /// `LocalPreferred` behaved exactly like `AllowRemote` and was merged into
+    /// it. A file that still names it must keep remote services allowed:
+    /// `lenient` would otherwise read the unknown value as the `LocalOnly`
+    /// default and quietly switch off a service the user had turned on.
+    #[test]
+    fn a_saved_local_preferred_privacy_mode_still_allows_remote() {
+        let parsed: UserSettings = toml::from_str("privacy_mode = \"LocalPreferred\"\n").unwrap();
+        assert_eq!(parsed.privacy_mode, PrivacyMode::AllowRemote);
+        assert_eq!(
+            "LocalPreferred".parse::<PrivacyMode>(),
+            Ok(PrivacyMode::AllowRemote)
+        );
+    }
+
     #[test]
     fn builtin_presets_unique_ids() {
         let presets = StylePreset::all_builtin();

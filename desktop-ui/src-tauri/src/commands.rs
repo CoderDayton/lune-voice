@@ -118,8 +118,8 @@ async fn check_styling_llm_configured() -> Result<(), String> {
         // is remote-only, so this setting alone decides whether it can run.
         if matches!(settings.privacy_mode, PrivacyMode::LocalOnly) {
             return Err(
-                "Privacy mode is set to local-only, so styling cannot send text to \
-                        a remote service. Allow remote processing in Settings → Privacy."
+                "Remote services are turned off, so styling cannot send text to \
+                        its endpoint. Turn on Allow remote services in Settings → General."
                     .to_string(),
             );
         }

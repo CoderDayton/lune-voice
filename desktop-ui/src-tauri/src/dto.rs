@@ -195,16 +195,15 @@ pub enum TerminalModeDto {
 /// `LocalOnly` is the default and it *overrides* a configured remote backend:
 /// styling silently degrades to the raw transcript and remote transcription
 /// is refused outright. That makes it the one setting that can make a
-/// correctly-configured API key do nothing, so it has to be visible.
+/// correctly-configured API key do nothing, so it has to be visible. The UI
+/// shows it as a single switch.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize, TS)]
 #[ts(export, export_to = "../../src/lib/backend/generated/")]
 pub enum PrivacyModeDto {
     /// Never contact a remote service.
     #[default]
     LocalOnly,
-    /// Use a remote service only where one was explicitly configured.
-    LocalPreferred,
-    /// Use whatever is configured.
+    /// Remote services may be used; each still needs to be configured.
     AllowRemote,
 }
 
