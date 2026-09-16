@@ -271,12 +271,33 @@ pub struct WorkspaceSnapshot {
     #[ts(type = "string")]
     pub ipc_flavor: &'static str,
     pub service_status: String,
+    pub capabilities: PlatformCapabilitiesDto,
     pub settings: WorkspaceSettingsDto,
     pub history: Vec<HistoryItemDto>,
     pub dictionary: Vec<DictionaryItemDto>,
     pub snippets: Vec<SnippetItemDto>,
     pub style_presets: Vec<StylePresetDto>,
     pub stats: SessionStatsDto,
+}
+
+/// What the running platform's window system can do. A capability that is
+/// false means the setting exists but has no effect there, so the UI hides the
+/// control rather than offering one that silently does nothing.
+#[derive(Debug, Clone, Copy, Serialize, TS)]
+#[ts(export, export_to = "../../src/lib/backend/generated/")]
+#[serde(rename_all = "camelCase")]
+pub struct PlatformCapabilitiesDto {
+    /// A window can be pinned to every workspace / virtual desktop. Windows has
+    /// no such call, so `pill_all_workspaces` is inert there.
+    pub pill_all_workspaces: bool,
+}
+
+impl PlatformCapabilitiesDto {
+    pub const fn current() -> Self {
+        Self {
+            pill_all_workspaces: !cfg!(target_os = "windows"),
+        }
+    }
 }
 
 #[derive(Debug, Clone, Copy, Default, Serialize, TS)]

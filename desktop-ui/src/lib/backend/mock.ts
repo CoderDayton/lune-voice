@@ -22,6 +22,7 @@ function createMockSnapshot(): WorkspaceSnapshot {
   return {
     ipcFlavor: 'mock',
     serviceStatus: 'ready',
+    capabilities: { pillAllWorkspaces: true },
     settings: {
       activationMode: 'Toggle',
       dictationMode: 'Clipboard',

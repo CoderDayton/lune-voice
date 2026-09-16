@@ -147,6 +147,7 @@ export const workspaceActions = {
       runtime: {
         ipcFlavor: snapshot.ipcFlavor,
         serviceStatus: snapshot.serviceStatus,
+        capabilities: snapshot.capabilities ?? DEFAULT_RUNTIME.capabilities,
         activeSessionId: isActiveServiceStatus(snapshot.serviceStatus)
           ? s.runtime.activeSessionId
           : null,

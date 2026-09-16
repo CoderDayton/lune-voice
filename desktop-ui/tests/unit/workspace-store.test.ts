@@ -39,6 +39,7 @@ function makeSnapshot(overrides: Partial<WorkspaceSnapshot> = {}): WorkspaceSnap
       openaiAsrModel: null,
       openaiAsrApiKeySet: false,
     },
+    capabilities: { pillAllWorkspaces: true },
     history: [],
     dictionary: [],
     stylePresets: [],
@@ -118,6 +119,17 @@ describe("workspace store", () => {
     expect(workspaceStore.state.runtime.activeSessionId).toBeNull();
     expect(workspaceStore.state.runtime.liveTranscript).toBe("");
     expect(workspaceStore.state.runtime.audioLevel).toBe(0);
+  });
+
+  // Windows' window backend cannot show a window on every virtual desktop, so
+  // the snapshot carries the capability and the UI drops the control rather
+  // than offering a toggle that does nothing.
+  test("hydrate carries the platform capability flags", () => {
+    workspaceActions.hydrate(makeSnapshot({ capabilities: { pillAllWorkspaces: false } }));
+    expect(workspaceStore.state.runtime.capabilities.pillAllWorkspaces).toBe(false);
+
+    workspaceActions.hydrate(makeSnapshot({ capabilities: { pillAllWorkspaces: true } }));
+    expect(workspaceStore.state.runtime.capabilities.pillAllWorkspaces).toBe(true);
   });
 
   test("saveWorkspaceSetting resyncs from backend on failed optimistic save", async () => {

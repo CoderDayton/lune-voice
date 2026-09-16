@@ -38,6 +38,7 @@ export type {
   PillSizeDto,
   PillSnapshotDto,
   PillVisibilityDto,
+  PlatformCapabilitiesDto,
   PrivacyModeDto,
   SaveWorkspaceSettingsInput,
   SessionStatsDto,

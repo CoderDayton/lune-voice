@@ -15,7 +15,11 @@ import type {
   TerminalModeValue,
   WhisperModelValue,
 } from '../features/settings/data/settings-data';
-import type { FormatTogglesDto, SnippetItemDto } from '../lib/backend/types';
+import type {
+  FormatTogglesDto,
+  PlatformCapabilitiesDto,
+  SnippetItemDto,
+} from '../lib/backend/types';
 
 export interface WorkspaceSettings {
   activationMode: ActivationModeValue;
@@ -83,6 +87,9 @@ export interface HistorySession {
 export interface WorkspaceRuntimeState {
   ipcFlavor: string;
   serviceStatus: string;
+  /** What the host platform's window system supports. Controls for an
+   *  unsupported capability are not rendered. */
+  capabilities: PlatformCapabilitiesDto;
   activeSessionId: string | null;
   liveTranscript: string;
   audioLevel: number;
@@ -185,6 +192,7 @@ export const DEFAULT_SETTINGS: WorkspaceSettings = {
 export const DEFAULT_RUNTIME: WorkspaceRuntimeState = {
   ipcFlavor: 'unknown',
   serviceStatus: 'Connecting',
+  capabilities: { pillAllWorkspaces: true },
   activeSessionId: null,
   liveTranscript: '',
   audioLevel: 0,

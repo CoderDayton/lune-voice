@@ -31,6 +31,7 @@ const AUTO_MONITOR = '';
 export function PillSection() {
   const { t, i18n } = useLingui();
   const settings = useStore(workspaceStore, (s) => s.settings);
+  const capabilities = useStore(workspaceStore, (s) => s.runtime.capabilities);
   const [monitors, setMonitors] = useState<MonitorInfoDto[]>([]);
   const [edgeMargin, setEdgeMargin] = useDebouncedSetting(
     'pillEdgeMargin',
@@ -87,21 +88,23 @@ export function PillSection() {
             />
           }
         />
-        <SettingsRow
-          label={t`Show on all workspaces`}
-          description={t`Keep the pill with you when you switch workspaces or virtual desktops.`}
-          control={
-            <input
-              type="checkbox"
-              className="toggle toggle-primary"
-              checked={settings.pillAllWorkspaces}
-              onChange={() =>
-                void saveWorkspaceSetting('pillAllWorkspaces', !settings.pillAllWorkspaces)
-              }
-              aria-label={t`Show on all workspaces`}
-            />
-          }
-        />
+        {capabilities.pillAllWorkspaces && (
+          <SettingsRow
+            label={t`Show on all workspaces`}
+            description={t`Keep the pill with you when you switch workspaces or virtual desktops.`}
+            control={
+              <input
+                type="checkbox"
+                className="toggle toggle-primary"
+                checked={settings.pillAllWorkspaces}
+                onChange={() =>
+                  void saveWorkspaceSetting('pillAllWorkspaces', !settings.pillAllWorkspaces)
+                }
+                aria-label={t`Show on all workspaces`}
+              />
+            }
+          />
+        )}
       </SettingsSection>
 
       <SettingsSection

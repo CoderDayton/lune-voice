@@ -16,10 +16,10 @@ use crate::dto::{
     ActivationModeDto, AsrBackendTypeDto, CreateCustomStyleInput, CreateDictionaryEntryInput,
     DevicePolicyDto, DictationModeDto, DictionaryItemDto, HistoryItemDto, HistoryPageDto,
     LlmBackendTypeDto, PillAnchorDto, PillCornerDto, PillOrientationDto, PillSizeDto,
-    PillVisibilityDto, PrivacyModeDto, SaveSnippetInput, SaveWorkspaceSettingsInput,
-    SessionStatsDto, SettingsCoreDto, SnippetItemDto, StylePresetDto, TerminalModeDto,
-    UpdateCustomStyleInput, UpdateDictionaryEntryInput, WhisperModelDto, WorkspaceSettingsDto,
-    WorkspaceSnapshot,
+    PillVisibilityDto, PlatformCapabilitiesDto, PrivacyModeDto, SaveSnippetInput,
+    SaveWorkspaceSettingsInput, SessionStatsDto, SettingsCoreDto, SnippetItemDto, StylePresetDto,
+    TerminalModeDto, UpdateCustomStyleInput, UpdateDictionaryEntryInput, WhisperModelDto,
+    WorkspaceSettingsDto, WorkspaceSnapshot,
 };
 
 /// Page size ceiling for `list_history_page`, which is what the History tab
@@ -703,6 +703,7 @@ fn build_snapshot(
     Ok(WorkspaceSnapshot {
         ipc_flavor: "tauri",
         service_status: "ready".into(),
+        capabilities: PlatformCapabilitiesDto::current(),
         settings: settings_to_dto(&settings),
         history,
         dictionary,

@@ -38,6 +38,7 @@ function makeSnapshot(overrides: Partial<WorkspaceSnapshot> = {}): WorkspaceSnap
       openaiAsrModel: null,
       openaiAsrApiKeySet: false,
     },
+    capabilities: { pillAllWorkspaces: true },
     history: [],
     dictionary: [],
     stylePresets: [],
