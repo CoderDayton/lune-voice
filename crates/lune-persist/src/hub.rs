@@ -114,6 +114,7 @@ impl ModelSpec {
         let Self::Directory { local_name, .. } = self;
         match local_name.as_str() {
             model_dirs::DIR_WHISPER_VAD => "Whisper VAD (silero)",
+            model_dirs::DIR_WHISPER_BASE => WhisperModel::Base.display_name(),
             model_dirs::DIR_WHISPER_SMALL => WhisperModel::Small.display_name(),
             model_dirs::DIR_WHISPER_MEDIUM => WhisperModel::Medium.display_name(),
             model_dirs::DIR_WHISPER_LARGE_V3_TURBO => WhisperModel::LargeV3Turbo.display_name(),
@@ -471,6 +472,12 @@ struct PinnedFile {
 /// the host that serves the file. Changing a model means updating its row
 /// here from the Hugging Face tree API at the new commit.
 const PINNED_FILES: &[PinnedFile] = &[
+    PinnedFile {
+        repo_id: WhisperModel::REPO_ID,
+        file: "ggml-base-q8_0.bin",
+        size: 81_768_585,
+        sha256: "c577b9a86e7e048a0b7eada054f4dd79a56bbfa911fbdacf900ac5b567cbb7d9",
+    },
     PinnedFile {
         repo_id: WhisperModel::REPO_ID,
         file: "ggml-small-q5_1.bin",
@@ -1142,18 +1149,15 @@ mod tests {
     /// The library always lists every Whisper size and never the bundled VAD model.
     fn assert_full_library(statuses: &[ModelStatus]) {
         let names: Vec<&str> = statuses.iter().map(|s| s.local_name.as_str()).collect();
-        assert!(names.contains(&WhisperModel::Small.dir()), "{names:?}");
-        assert!(names.contains(&WhisperModel::Medium.dir()), "{names:?}");
-        assert!(
-            names.contains(&WhisperModel::LargeV3Turbo.dir()),
-            "{names:?}"
-        );
+        for model in WhisperModel::ALL {
+            assert!(names.contains(&model.dir()), "{names:?}");
+        }
         assert!(
             !names.contains(&lune_core::models::DIR_WHISPER_VAD),
             "VAD must stay out of the library: {names:?}"
         );
         // Whisper sizes only, no more.
-        assert_eq!(statuses.len(), 3, "{names:?}");
+        assert_eq!(statuses.len(), WhisperModel::ALL.len(), "{names:?}");
     }
 
     fn in_use_names(statuses: &[ModelStatus]) -> Vec<&str> {

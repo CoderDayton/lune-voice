@@ -49,7 +49,7 @@ After-speech wait = poll_final (Silero endpoint trim + whisper.cpp decode) + opt
 
 **GPU impact:** a registered CUDA device moves ASR inference to the GPU and substantially reduces decode time. On Linux that comes from the downloadable GPU plugin ([docs/GPU_PLUGIN.md](GPU_PLUGIN.md)); a `whisper-cuda` build does the same thing statically. Without one, whisper.cpp uses its AVX2-optimized GGML kernels (portable baseline; compile flags: `GGML_AVX2=ON GGML_FMA=ON GGML_F16C=ON`). Plugin builds instead use `GGML_CPU_ALL_VARIANTS=ON`, which compiles per-microarchitecture CPU backends and picks the best one at runtime.
 
-**Model size trade-off:** `Small` (~190 MB) is fastest; `LargeV3Turbo` (~874 MB) provides the best accuracy with whisper's turbo decoder keeping latency closer to `Medium` (~539 MB) than to the full `Large` model.
+**Model size trade-off:** `Base` (~78 MB) is fastest and the choice for low-end hardware; `Small` (~190 MB) is next; `LargeV3Turbo` (~874 MB) provides the best accuracy with whisper's turbo decoder keeping latency closer to `Medium` (~539 MB) than to the full `Large` model.
 
 ---
 

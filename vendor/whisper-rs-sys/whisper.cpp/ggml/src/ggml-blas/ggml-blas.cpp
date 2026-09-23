@@ -1,3 +1,4 @@
+#include "ggml.h"
 #include "ggml-impl.h"
 #include "ggml-blas.h"
 #include "ggml-backend-impl.h"
@@ -121,6 +122,8 @@ static void ggml_backend_blas_mul_mat(ggml_backend_blas_context * ctx, struct gg
     bli_thread_set_num_threads(ctx->n_threads);
 #elif defined(GGML_BLAS_USE_NVPL)
     nvpl_blas_set_num_threads(ctx->n_threads);
+#elif defined(GGML_BLAS_USE_MKL)
+    mkl_set_num_threads(ctx->n_threads);
 #endif
 
     for (int64_t i13 = 0; i13 < ne13; i13++) {
@@ -226,6 +229,10 @@ static enum ggml_status ggml_backend_blas_graph_compute(ggml_backend_t backend, 
     for (int i = 0; i < cgraph->n_nodes; i++) {
         struct ggml_tensor * node = cgraph->nodes[i];
 
+        if ((node->flags & GGML_TENSOR_FLAG_COMPUTE) == 0) {
+            continue;
+        }
+
         switch (node->op) {
             case GGML_OP_MUL_MAT:
                 ggml_backend_blas_mul_mat(ctx, node);
@@ -257,6 +264,8 @@ static struct ggml_backend_i blas_backend_i = {
     /* .free                    = */ ggml_backend_blas_free,
     /* .set_tensor_async        = */ NULL,
     /* .get_tensor_async        = */ NULL,
+    /* .set_tensor_2d_async     = */ NULL,
+    /* .get_tensor_2d_async     = */ NULL,
     /* .cpy_tensor_async        = */ NULL,
     /* .synchronize             = */ NULL,
     /* .graph_plan_create       = */ NULL,
@@ -335,8 +344,8 @@ static const char * ggml_backend_blas_device_get_description(ggml_backend_dev_t 
 }
 
 static void ggml_backend_blas_device_get_memory(ggml_backend_dev_t dev, size_t * free, size_t * total) {
-    // TODO
-    *free = 0;
+    // no memory to report
+    *free  = 0;
     *total = 0;
 
     GGML_UNUSED(dev);
@@ -358,6 +367,7 @@ static void ggml_backend_blas_device_get_props(ggml_backend_dev_t dev, struct gg
         /* .host_buffer           = */ false,
         /* .buffer_from_host_ptr  = */ true,
         /* .events                = */ false,
+        /* .mmap_support          = */ true,
     };
 }
 
@@ -406,6 +416,12 @@ static bool ggml_backend_blas_device_supports_op(ggml_backend_dev_t dev, const s
 
             // TODO: find the optimal value
             const int64_t min_batch = 32;
+
+            // default back to CPU fast path
+            // see: https://github.com/ggml-org/llama.cpp/issues/25565
+            if (ggml_get_op_params_i32(op, 1) == GGML_HINT_SRC0_IS_HADAMARD) {
+                return false;
+            }
 
             return ggml_is_contiguous(src0) &&
                    ggml_is_contiguous(src1) &&

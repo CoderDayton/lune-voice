@@ -187,9 +187,10 @@ impl ModelSource {
 }
 
 /// Parse a whisper model override from `WHISPER_MODEL` (or `--whisper` /
-/// `--whisper=<v>`). Accepts `small`, `medium`, and `large`/`turbo`.
+/// `--whisper=<v>`). Accepts `base`, `small`, `medium`, and `large`/`turbo`.
 fn parse_whisper_model(raw: &str) -> Option<WhisperModel> {
     match raw.trim().to_ascii_lowercase().as_str() {
+        "base" => Some(WhisperModel::Base),
         "small" => Some(WhisperModel::Small),
         "medium" => Some(WhisperModel::Medium),
         "large" | "largev3turbo" | "large-v3-turbo" | "turbo" => Some(WhisperModel::LargeV3Turbo),

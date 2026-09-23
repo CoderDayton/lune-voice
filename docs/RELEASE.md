@@ -8,9 +8,20 @@ styling LLM is remote-only (OpenAI-compatible HTTP) — no native build step.
 The `whisper-rs` `*-sys` crate **vendors and compiles the native C/C++ library
 from source at `cargo build` time** (CMake + a C++ toolchain + `libclang` for
 bindgen). It is vendored under `vendor/whisper-rs-sys/` via `[patch.crates-io]`,
-with two modified files, both marked `LUNE FORK`: `build.rs` adds
-`GGML_BACKEND_DL` support, and `src/lib.rs` adds a lint allow for the bindgen
-output.
+with whisper.cpp v1.9.4 inside it. Three files are modified, every change
+marked `LUNE FORK`:
+
+- `build.rs` adds `GGML_BACKEND_DL` support, refreshes the compiled copy of
+  whisper.cpp whenever the vendored tree changes, and reads the 1.9 version
+  declaration.
+- `src/lib.rs` adds a lint allow for the bindgen output.
+- `whisper.cpp/src/whisper.cpp` makes language auto-detection honour
+  `audio_ctx` and reuse its encode for the first window, so `language = "auto"`
+  costs no second encoder pass.
+
+To upgrade whisper.cpp, copy the same subset of upstream over
+`vendor/whisper-rs-sys/whisper.cpp/`, reapply the `LUNE FORK` hunk in
+`src/whisper.cpp`, and run the `whisper_lang_detect` test.
 
 ## Distribution model
 

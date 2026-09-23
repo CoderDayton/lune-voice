@@ -379,12 +379,15 @@ impl Default for UserSettings {
 /// This is the single source of truth tying a user-facing selection to its
 /// on-disk directory, its HuggingFace filename, and its display name; both the
 /// downloader (`lune-persist`) and the backend loader (`lune-asr`) read it so
-/// the mapping never drifts. All three are multilingual quantizations from
-/// `ggerganov/whisper.cpp`: q5 for Small and Medium, q8_0 for Large v3 Turbo.
+/// the mapping never drifts. All are multilingual quantizations from
+/// `ggerganov/whisper.cpp`: q8_0 for Base and Large v3 Turbo, q5 for Small and
+/// Medium.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
 #[non_exhaustive]
 pub enum WhisperModel {
-    /// ~190 MB. Fast, lowest accuracy of the three.
+    /// ~78 MB. For low-end hardware; lowest accuracy.
+    Base,
+    /// ~190 MB. Fast, less accurate than Medium.
     Small,
     /// ~539 MB. Balanced accuracy/speed.
     #[default]
@@ -399,11 +402,12 @@ impl WhisperModel {
 
     /// Every selectable model, in ascending size order. Drives the downloader's
     /// spec list and the settings selector.
-    pub const ALL: [WhisperModel; 3] = [Self::Small, Self::Medium, Self::LargeV3Turbo];
+    pub const ALL: [WhisperModel; 4] = [Self::Base, Self::Small, Self::Medium, Self::LargeV3Turbo];
 
     /// Local `models/` subdirectory holding this model's GGML file.
     pub fn dir(self) -> &'static str {
         match self {
+            Self::Base => crate::models::DIR_WHISPER_BASE,
             Self::Small => crate::models::DIR_WHISPER_SMALL,
             Self::Medium => crate::models::DIR_WHISPER_MEDIUM,
             Self::LargeV3Turbo => crate::models::DIR_WHISPER_LARGE_V3_TURBO,
@@ -413,6 +417,7 @@ impl WhisperModel {
     /// Filename to download from [`WhisperModel::REPO_ID`] and to load from disk.
     pub fn ggml_file(self) -> &'static str {
         match self {
+            Self::Base => "ggml-base-q8_0.bin",
             Self::Small => "ggml-small-q5_1.bin",
             Self::Medium => "ggml-medium-q5_0.bin",
             Self::LargeV3Turbo => "ggml-large-v3-turbo-q8_0.bin",
@@ -422,20 +427,26 @@ impl WhisperModel {
     /// Human-readable name for UI and model-status cards.
     pub fn display_name(self) -> &'static str {
         match self {
+            Self::Base => "Whisper Base (q8_0)",
             Self::Small => "Whisper Small (q5_1)",
             Self::Medium => "Whisper Medium (q5_0)",
             Self::LargeV3Turbo => "Whisper Large v3 Turbo (q8_0)",
         }
     }
 
-    /// Size/accuracy-specific blurb for model-status cards. All three run
+    /// Size/accuracy-specific blurb for model-status cards. All of them run
     /// fully on-device via whisper.cpp; audio never leaves the machine.
     pub fn description(self) -> &'static str {
         match self {
+            Self::Base => {
+                "Smallest Whisper model (~78 MB). Lowest accuracy — \
+                 for older or low-power computers where the larger \
+                 models are too slow. Runs fully on-device."
+            }
             Self::Small => {
-                "Fastest, lightest Whisper model (~190 MB). \
-                            Lowest accuracy of the three — best for quick \
-                            notes or low-end hardware. Runs fully on-device."
+                "Fast, light Whisper model (~190 MB). Less accurate \
+                            than Medium — good for quick notes on modest \
+                            hardware. Runs fully on-device."
             }
             Self::Medium => {
                 "Balanced Whisper model (~539 MB). Good accuracy \
@@ -683,6 +694,13 @@ impl DevicePolicy {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn base_is_the_smallest_whisper_model_offered() {
+        assert_eq!(WhisperModel::ALL[0], WhisperModel::Base);
+        assert_eq!(WhisperModel::Base.ggml_file(), "ggml-base-q8_0.bin");
+        assert_eq!(WhisperModel::Base.dir(), "whisper-base-q8_0");
+    }
 
     fn local(url: &str) -> bool {
         is_local_endpoint(&Url::parse(url).expect("valid url"))

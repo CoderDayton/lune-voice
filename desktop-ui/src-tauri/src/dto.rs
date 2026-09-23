@@ -84,6 +84,7 @@ impl From<AsrBackendTypeDto> for lune_core::asr::AsrBackendKind {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize, TS)]
 #[ts(export, export_to = "../../src/lib/backend/generated/")]
 pub enum WhisperModelDto {
+    Base,
     Small,
     #[default]
     Medium,
@@ -94,6 +95,7 @@ impl From<lune_core::config::WhisperModel> for WhisperModelDto {
     fn from(model: lune_core::config::WhisperModel) -> Self {
         use lune_core::config::WhisperModel;
         match model {
+            WhisperModel::Base => Self::Base,
             WhisperModel::Small => Self::Small,
             WhisperModel::Medium => Self::Medium,
             WhisperModel::LargeV3Turbo => Self::LargeV3Turbo,
@@ -110,6 +112,7 @@ impl From<lune_core::config::WhisperModel> for WhisperModelDto {
 impl From<WhisperModelDto> for lune_core::config::WhisperModel {
     fn from(dto: WhisperModelDto) -> Self {
         match dto {
+            WhisperModelDto::Base => Self::Base,
             WhisperModelDto::Small => Self::Small,
             WhisperModelDto::Medium => Self::Medium,
             WhisperModelDto::LargeV3Turbo => Self::LargeV3Turbo,

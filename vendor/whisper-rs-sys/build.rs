@@ -125,16 +125,21 @@ fn main() {
     let out = PathBuf::from(env::var("OUT_DIR").unwrap());
     let whisper_root = out.join("whisper.cpp");
 
-    if !whisper_root.exists() {
-        std::fs::create_dir_all(&whisper_root).unwrap();
-        fs_extra::dir::copy("./whisper.cpp", &out, &Default::default()).unwrap_or_else(|e| {
-            panic!(
-                "Failed to copy whisper sources into {}: {}",
-                whisper_root.display(),
-                e
-            )
-        });
+    // LUNE FORK: upstream copies the sources only when OUT_DIR has none and
+    // reruns only on `wrapper.h`, so an edit to or upgrade of the vendored
+    // tree kept compiling the stale copy. Watch the tree and refresh the copy.
+    println!("cargo:rerun-if-changed=whisper.cpp");
+    if whisper_root.exists() {
+        std::fs::remove_dir_all(&whisper_root).unwrap();
     }
+    std::fs::create_dir_all(&whisper_root).unwrap();
+    fs_extra::dir::copy("./whisper.cpp", &out, &Default::default()).unwrap_or_else(|e| {
+        panic!(
+            "Failed to copy whisper sources into {}: {}",
+            whisper_root.display(),
+            e
+        )
+    });
 
     if env::var("WHISPER_DONT_GENERATE_BINDINGS").is_ok() {
         let _: u64 = std::fs::copy("src/bindings.rs", out.join("bindings.rs"))
@@ -435,17 +440,24 @@ fn add_link_search_path(dir: &std::path::Path) -> std::io::Result<()> {
     Ok(())
 }
 
+// LUNE FORK: whisper.cpp 1.9 declares its version as
+// `set(WHISPER_VERSION_MAJOR 1)` / `_MINOR` / `_PATCH` rather than in `project()`.
 fn get_whisper_cpp_version(whisper_root: &std::path::Path) -> std::io::Result<Option<String>> {
     let cmake_lists = BufReader::new(File::open(whisper_root.join("CMakeLists.txt"))?);
+    let mut parts: [Option<String>; 3] = Default::default();
 
     for line in cmake_lists.lines() {
         let line = line?;
-
-        if let Some(suffix) = line.strip_prefix(r#"project("whisper.cpp" VERSION "#) {
-            let whisper_cpp_version = suffix.trim_end_matches(')');
-            return Ok(Some(whisper_cpp_version.into()));
+        for (slot, key) in parts.iter_mut().zip(["MAJOR", "MINOR", "PATCH"]) {
+            let prefix = format!("set(WHISPER_VERSION_{key} ");
+            if let Some(suffix) = line.strip_prefix(&prefix) {
+                *slot = Some(suffix.trim_end_matches(')').to_string());
+            }
         }
     }
 
-    Ok(None)
+    Ok(match parts {
+        [Some(major), Some(minor), Some(patch)] => Some(format!("{major}.{minor}.{patch}")),
+        _ => None,
+    })
 }

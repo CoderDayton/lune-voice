@@ -103,19 +103,19 @@ msgstr "## 회의 — {date}\n"
 "참석자:\n"
 "- "
 
-#: src/features/settings/data/settings-data.ts:282
+#: src/features/settings/data/settings-data.ts:289
 msgid "1 year"
 msgstr "1년"
 
-#: src/features/settings/data/settings-data.ts:280
+#: src/features/settings/data/settings-data.ts:287
 msgid "30 days"
 msgstr "30일"
 
-#: src/features/settings/data/settings-data.ts:279
+#: src/features/settings/data/settings-data.ts:286
 msgid "7 days"
 msgstr "7일"
 
-#: src/features/settings/data/settings-data.ts:281
+#: src/features/settings/data/settings-data.ts:288
 msgid "90 days"
 msgstr "90일"
 
@@ -166,23 +166,23 @@ msgstr "수정 규칙을 추가하면 Lune Voice가 받아쓰기할 때마다 �
 msgid "Add snippet"
 msgstr "스니펫 추가"
 
-#: src/features/settings/data/settings-data.ts:316
+#: src/features/settings/data/settings-data.ts:323
 msgid "After 1 hour"
 msgstr "1시간 후"
 
-#: src/features/settings/data/settings-data.ts:314
+#: src/features/settings/data/settings-data.ts:321
 msgid "After 15 minutes"
 msgstr "15분 후"
 
-#: src/features/settings/data/settings-data.ts:317
+#: src/features/settings/data/settings-data.ts:324
 msgid "After 2 hours"
 msgstr "2시간 후"
 
-#: src/features/settings/data/settings-data.ts:315
+#: src/features/settings/data/settings-data.ts:322
 msgid "After 30 minutes"
 msgstr "30분 후"
 
-#: src/features/settings/data/settings-data.ts:313
+#: src/features/settings/data/settings-data.ts:320
 msgid "After 5 minutes"
 msgstr "5분 후"
 
@@ -212,11 +212,11 @@ msgstr "원격 서비스 허용"
 msgid "Always"
 msgstr "항상"
 
-#: src/features/settings/data/settings-data.ts:268
+#: src/features/settings/data/settings-data.ts:275
 msgid "Always Ctrl+Shift+V"
 msgstr "항상 Ctrl+Shift+V"
 
-#: src/features/settings/data/settings-data.ts:263
+#: src/features/settings/data/settings-data.ts:270
 msgid "Always Ctrl+V"
 msgstr "항상 Ctrl+V"
 
@@ -274,11 +274,11 @@ msgstr "받아쓰기가 시작, 완료 또는 오류가 발생할 때 재생되�
 msgid "Auto-capitalize sentences"
 msgstr "문장 자동 대문자화"
 
-#: src/features/settings/data/settings-data.ts:238
+#: src/features/settings/data/settings-data.ts:245
 msgid "Auto-detect"
 msgstr "자동 감지"
 
-#: src/features/settings/data/settings-data.ts:258
+#: src/features/settings/data/settings-data.ts:265
 #: src/features/settings/sections/pill-section.tsx:55
 msgid "Automatic"
 msgstr "자동"
@@ -287,15 +287,19 @@ msgstr "자동"
 msgid "Automatic updates are off"
 msgstr "자동 업데이트가 꺼져 있습니다"
 
-#: src/features/settings/data/settings-data.ts:185
+#: src/features/settings/data/settings-data.ts:192
 msgid "Balanced accuracy and speed."
 msgstr "정확도와 속도의 균형."
+
+#: src/features/settings/data/settings-data.ts:177
+msgid "Base"
+msgstr "기본"
 
 #: src/features/welcome/components/ready-checks.tsx:87
 msgid "Before you start"
 msgstr "시작하기 전에"
 
-#: src/features/settings/data/settings-data.ts:192
+#: src/features/settings/data/settings-data.ts:199
 msgid "Best accuracy; turbo decoder keeps it fast."
 msgstr "최고 정확도. 터보 디코더로 속도도 유지합니다."
 
@@ -648,11 +652,11 @@ msgstr "설명"
 msgid "Description is too long."
 msgstr "설명이 너무 깁니다."
 
-#: src/features/settings/data/settings-data.ts:259
+#: src/features/settings/data/settings-data.ts:266
 msgid "Detects terminals and picks the matching paste shortcut. Works on most compositors."
 msgstr "터미널을 감지해 알맞은 붙여넣기 단축키를 고릅니다. 대부분의 컴포지터에서 동작합니다."
 
-#: src/features/settings/data/settings-data.ts:239
+#: src/features/settings/data/settings-data.ts:246
 msgid "Detects the spoken language each session."
 msgstr "세션마다 말한 언어를 감지합니다."
 
@@ -701,7 +705,7 @@ msgstr "디스크 사용량"
 msgid "Dismiss error"
 msgstr "오류 무시"
 
-#: src/features/settings/data/settings-data.ts:278
+#: src/features/settings/data/settings-data.ts:285
 msgid "Don't save history"
 msgstr "기록을 저장하지 않음"
 
@@ -837,9 +841,13 @@ msgstr "예시는 스타일 지정 엔진에 사용자의 스타일을 학습시
 msgid "Expand sidebar"
 msgstr "사이드바 확장"
 
+#: src/features/settings/data/settings-data.ts:185
+msgid "Fast; less accurate than Medium."
+msgstr "빠르지만 중간보다 정확도가 낮습니다."
+
 #: src/features/settings/data/settings-data.ts:178
-msgid "Fastest, lowest accuracy."
-msgstr "가장 빠르지만 정확도는 가장 낮습니다."
+msgid "Fastest, lowest accuracy. For older or low-power computers."
+msgstr "가장 빠르지만 정확도는 가장 낮습니다. 오래되었거나 저사양인 컴퓨터용입니다."
 
 #: src/components/feedback/help-feedback-dialog.tsx:62
 msgid "Feature request"
@@ -877,11 +885,11 @@ msgstr "스니펫 필터…"
 msgid "Fix recognizer errors with your dictionary and known vocabulary, on your device. It uses per-word confidence and statistical patterns — no AI model, and it never rewrites what you said."
 msgstr "사전과 알려진 어휘를 사용하여 인식기 오류를 기기에서 수정합니다. 단어별 신뢰도와 통계 패턴을 사용하며 — AI 모델이 없고, 사용자가 말한 내용을 절대 다시 쓰지 않습니다."
 
-#: src/features/settings/data/settings-data.ts:264
+#: src/features/settings/data/settings-data.ts:271
 msgid "Force the standard paste shortcut for every app."
 msgstr "모든 앱에서 표준 붙여넣기 단축키를 사용합니다."
 
-#: src/features/settings/data/settings-data.ts:269
+#: src/features/settings/data/settings-data.ts:276
 msgid "Force the terminal paste shortcut. Use on COSMIC if you mostly dictate into terminals."
 msgstr "터미널용 붙여넣기 단축키를 강제합니다. 주로 터미널에 받아쓰기한다면 COSMIC에서 사용하세요."
 
@@ -1072,11 +1080,11 @@ msgstr "토론에 참여하기"
 msgid "Just now"
 msgstr "방금 전"
 
-#: src/features/settings/data/settings-data.ts:283
+#: src/features/settings/data/settings-data.ts:290
 msgid "Keep forever"
 msgstr "계속 보관"
 
-#: src/features/settings/data/settings-data.ts:310
+#: src/features/settings/data/settings-data.ts:317
 msgid "Keep loaded"
 msgstr "계속 불러둠"
 
@@ -1110,7 +1118,7 @@ msgstr "언어"
 msgid "Large"
 msgstr "크게"
 
-#: src/features/settings/data/settings-data.ts:191
+#: src/features/settings/data/settings-data.ts:198
 msgid "Large v3 Turbo"
 msgstr "Large v3 Turbo"
 
@@ -1208,7 +1216,7 @@ msgstr "Lune Voice 출력"
 msgid "Manage in Models"
 msgstr "모델에서 관리"
 
-#: src/features/settings/data/settings-data.ts:184
+#: src/features/settings/data/settings-data.ts:191
 msgid "Medium"
 msgstr "중간"
 
@@ -1387,7 +1395,7 @@ msgstr "릴리스 페이지 열기"
 msgid "Open session from {time}"
 msgstr "{time}에서 세션 열기"
 
-#: src/features/settings/data/settings-data.ts:354
+#: src/features/settings/data/settings-data.ts:361
 msgid "OpenAI-compatible"
 msgstr "OpenAI 호환"
 
@@ -1424,7 +1432,7 @@ msgstr "전반적인 진행 상황"
 msgid "Pagination"
 msgstr "쪽수 매기기"
 
-#: src/features/settings/data/settings-data.ts:358
+#: src/features/settings/data/settings-data.ts:365
 msgid "Paste"
 msgstr "붙여넣기"
 
@@ -1433,7 +1441,7 @@ msgstr "붙여넣기"
 msgid "Paste compatibility"
 msgstr "붙여넣기 호환성"
 
-#: src/features/settings/data/settings-data.ts:210
+#: src/features/settings/data/settings-data.ts:217
 msgid "Paste into app"
 msgstr "앱에 붙여넣기"
 
@@ -1734,7 +1742,7 @@ msgstr "보내기"
 msgid "Send method"
 msgstr "전송 방법"
 
-#: src/features/settings/data/settings-data.ts:211
+#: src/features/settings/data/settings-data.ts:218
 msgid "Sends a paste shortcut into the focused app. Fastest for long dictations."
 msgstr "활성 앱에 붙여넣기 단축키를 보냅니다. 긴 받아쓰기에 가장 빠릅니다."
 
@@ -1801,7 +1809,7 @@ msgstr "{totalSessions}개 중 {0}개 표시"
 msgid "Showing {start}–{end} of {visibleCount} sessions"
 msgstr "세션 {visibleCount}개 중 {start}–{end}개 표시"
 
-#: src/features/settings/data/settings-data.ts:217
+#: src/features/settings/data/settings-data.ts:224
 msgid "Simulates keystrokes one character at a time. Works where paste is blocked."
 msgstr "한 글자씩 키 입력을 흉내 냅니다. 붙여넣기가 막힌 곳에서도 동작합니다."
 
@@ -1827,7 +1835,7 @@ msgstr "지금은 건너뛰기"
 msgid "Skip to main content"
 msgstr "주요 콘텐츠로 건너뛰기"
 
-#: src/features/settings/data/settings-data.ts:177
+#: src/features/settings/data/settings-data.ts:184
 msgid "Small"
 msgstr "작게"
 
@@ -1979,7 +1987,7 @@ msgstr "음성 입력에 사용되는 주요 단축키입니다. 바인딩을 �
 msgid "The microphone is in use"
 msgstr "마이크가 사용 중입니다"
 
-#: src/features/settings/data/settings-data.ts:311
+#: src/features/settings/data/settings-data.ts:318
 msgid "The model stays in memory. Every dictation starts instantly."
 msgstr "모델이 메모리에 남습니다. 매번 바로 받아쓰기가 시작됩니다."
 
@@ -2121,7 +2129,7 @@ msgstr "트리거 문구"
 msgid "Try again"
 msgstr "다시 시도"
 
-#: src/features/settings/data/settings-data.ts:359
+#: src/features/settings/data/settings-data.ts:366
 msgid "Type"
 msgstr "입력"
 
@@ -2129,7 +2137,7 @@ msgstr "입력"
 msgid "Type a phrase, or tap the mic to capture it exactly as Lune Voice hears it."
 msgstr "문구를 입력하거나, 마이크를 눌러 Lune Voice가 듣는 그대로 등록하세요."
 
-#: src/features/settings/data/settings-data.ts:216
+#: src/features/settings/data/settings-data.ts:223
 msgid "Type into app"
 msgstr "앱에 입력"
 
@@ -2263,7 +2271,7 @@ msgstr "보낼 붙여넣기 단축키. '자동'은 터미널을 감지합니다.
 msgid "Which screen the pill appears on."
 msgstr "표시기가 나타나는 화면입니다."
 
-#: src/features/settings/data/settings-data.ts:353
+#: src/features/settings/data/settings-data.ts:360
 #: src/features/welcome/components/engine-step.tsx:55
 msgid "Whisper"
 msgstr "Whisper"

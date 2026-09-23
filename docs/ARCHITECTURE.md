@@ -93,11 +93,12 @@ The `WhisperCppBackend` wraps `whisper-rs`, which vendors and compiles `whisper.
 - **Per-token confidence:** whisper exposes per-token probabilities. `poll_final` folds them into `AsrSegment::confidence` (mean) and `min_token_confidence` (minimum), excluding special tokens. Segments whose mean confidence falls below `GARBAGE_DROP_THRESHOLD` (0.25) are dropped by the capture layer before reaching the session.
 - Language detection: the `language` field from `AsrSessionConfig` is passed to `set_language`; `None` uses `"auto"` (whisper detects from audio).
 
-Three GGML model sizes are available, all from `ggerganov/whisper.cpp`:
+Four GGML model sizes are available, all from `ggerganov/whisper.cpp`:
 
 
 | Variant              | File                           | Size    | Directory                     |
 | -------------------- | ------------------------------ | ------- | ----------------------------- |
+| `Base`               | `ggml-base-q8_0.bin`           | ~78 MB  | `whisper-base-q8_0`           |
 | `Small`              | `ggml-small-q5_1.bin`          | ~190 MB | `whisper-small-q5_1`          |
 | `Medium` *(default)* | `ggml-medium-q5_0.bin`         | ~539 MB | `whisper-medium-q5_0`         |
 | `LargeV3Turbo`       | `ggml-large-v3-turbo-q8_0.bin` | ~874 MB | `whisper-large-v3-turbo-q8_0` |

@@ -4,4 +4,4 @@
  * Which local whisper.cpp model the WhisperCpp backend uses. Mirrors
  * [`lune_core::config::WhisperModel`].
  */
-export type WhisperModelDto = "Small" | "Medium" | "LargeV3Turbo";
+export type WhisperModelDto = "Base" | "Small" | "Medium" | "LargeV3Turbo";

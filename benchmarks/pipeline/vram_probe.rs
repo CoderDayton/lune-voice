@@ -124,6 +124,7 @@ async fn toggle_loop(cuda: bool, audio: &[f32], cycles: usize) {
     let model = std::env::var("WHISPER_MODEL")
         .ok()
         .and_then(|v| match v.as_str() {
+            "base" => Some(WhisperModel::Base),
             "small" => Some(WhisperModel::Small),
             "medium" => Some(WhisperModel::Medium),
             "large" => Some(WhisperModel::LargeV3Turbo),

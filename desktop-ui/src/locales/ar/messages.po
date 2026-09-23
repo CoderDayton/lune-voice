@@ -103,19 +103,19 @@ msgstr "## اجتماع — {date}\n"
 "الحاضرون:\n"
 "- "
 
-#: src/features/settings/data/settings-data.ts:282
+#: src/features/settings/data/settings-data.ts:289
 msgid "1 year"
 msgstr "سنة واحدة"
 
-#: src/features/settings/data/settings-data.ts:280
+#: src/features/settings/data/settings-data.ts:287
 msgid "30 days"
 msgstr "30 يومًا"
 
-#: src/features/settings/data/settings-data.ts:279
+#: src/features/settings/data/settings-data.ts:286
 msgid "7 days"
 msgstr "7 أيام"
 
-#: src/features/settings/data/settings-data.ts:281
+#: src/features/settings/data/settings-data.ts:288
 msgid "90 days"
 msgstr "90 يومًا"
 
@@ -166,23 +166,23 @@ msgstr "أضف تصحيحًا وسيطبقه Lune Voice في كل مرة تمل�
 msgid "Add snippet"
 msgstr "إضافة مقتطف"
 
-#: src/features/settings/data/settings-data.ts:316
+#: src/features/settings/data/settings-data.ts:323
 msgid "After 1 hour"
 msgstr "بعد ساعة"
 
-#: src/features/settings/data/settings-data.ts:314
+#: src/features/settings/data/settings-data.ts:321
 msgid "After 15 minutes"
 msgstr "بعد 15 دقيقة"
 
-#: src/features/settings/data/settings-data.ts:317
+#: src/features/settings/data/settings-data.ts:324
 msgid "After 2 hours"
 msgstr "بعد ساعتين"
 
-#: src/features/settings/data/settings-data.ts:315
+#: src/features/settings/data/settings-data.ts:322
 msgid "After 30 minutes"
 msgstr "بعد 30 دقيقة"
 
-#: src/features/settings/data/settings-data.ts:313
+#: src/features/settings/data/settings-data.ts:320
 msgid "After 5 minutes"
 msgstr "بعد 5 دقائق"
 
@@ -212,11 +212,11 @@ msgstr "السماح بالخدمات البعيدة"
 msgid "Always"
 msgstr "دائمًا"
 
-#: src/features/settings/data/settings-data.ts:268
+#: src/features/settings/data/settings-data.ts:275
 msgid "Always Ctrl+Shift+V"
 msgstr "دائمًا Ctrl+Shift+V"
 
-#: src/features/settings/data/settings-data.ts:263
+#: src/features/settings/data/settings-data.ts:270
 msgid "Always Ctrl+V"
 msgstr "دائمًا Ctrl+V"
 
@@ -274,11 +274,11 @@ msgstr "تعليقات صوتية تُشغَّل عند بدء الإملاء أ
 msgid "Auto-capitalize sentences"
 msgstr "بدء الجمل بحرف كبير تلقائيًا"
 
-#: src/features/settings/data/settings-data.ts:238
+#: src/features/settings/data/settings-data.ts:245
 msgid "Auto-detect"
 msgstr "كشف تلقائي"
 
-#: src/features/settings/data/settings-data.ts:258
+#: src/features/settings/data/settings-data.ts:265
 #: src/features/settings/sections/pill-section.tsx:55
 msgid "Automatic"
 msgstr "تلقائي"
@@ -287,15 +287,19 @@ msgstr "تلقائي"
 msgid "Automatic updates are off"
 msgstr "التحديثات التلقائية متوقفة"
 
-#: src/features/settings/data/settings-data.ts:185
+#: src/features/settings/data/settings-data.ts:192
 msgid "Balanced accuracy and speed."
 msgstr "توازن بين الدقة والسرعة."
+
+#: src/features/settings/data/settings-data.ts:177
+msgid "Base"
+msgstr "أساسي"
 
 #: src/features/welcome/components/ready-checks.tsx:87
 msgid "Before you start"
 msgstr "قبل أن تبدأ"
 
-#: src/features/settings/data/settings-data.ts:192
+#: src/features/settings/data/settings-data.ts:199
 msgid "Best accuracy; turbo decoder keeps it fast."
 msgstr "أعلى دقة؛ ومفكك الترميز التوربيني يُبقيها سريعة."
 
@@ -648,11 +652,11 @@ msgstr "وصف"
 msgid "Description is too long."
 msgstr "الوصف طويل جدًا."
 
-#: src/features/settings/data/settings-data.ts:259
+#: src/features/settings/data/settings-data.ts:266
 msgid "Detects terminals and picks the matching paste shortcut. Works on most compositors."
 msgstr "يكتشف الطرفيات ويختار اختصار اللصق المناسب. يعمل مع معظم مُركِّبات العرض."
 
-#: src/features/settings/data/settings-data.ts:239
+#: src/features/settings/data/settings-data.ts:246
 msgid "Detects the spoken language each session."
 msgstr "يكتشف اللغة المنطوقة في كل جلسة."
 
@@ -701,7 +705,7 @@ msgstr "استخدام القرص"
 msgid "Dismiss error"
 msgstr "تجاهل الخطأ"
 
-#: src/features/settings/data/settings-data.ts:278
+#: src/features/settings/data/settings-data.ts:285
 msgid "Don't save history"
 msgstr "عدم حفظ السجل"
 
@@ -837,9 +841,13 @@ msgstr "تُعلّم الأمثلة محرك التنسيق أسلوبك. أعد
 msgid "Expand sidebar"
 msgstr "قم بتوسيع الشريط الجانبي"
 
+#: src/features/settings/data/settings-data.ts:185
+msgid "Fast; less accurate than Medium."
+msgstr "سريع؛ أقل دقة من المتوسط."
+
 #: src/features/settings/data/settings-data.ts:178
-msgid "Fastest, lowest accuracy."
-msgstr "الأسرع، والأقل دقة."
+msgid "Fastest, lowest accuracy. For older or low-power computers."
+msgstr "الأسرع، والأقل دقة. للأجهزة القديمة أو منخفضة الأداء."
 
 #: src/components/feedback/help-feedback-dialog.tsx:62
 msgid "Feature request"
@@ -877,11 +885,11 @@ msgstr "تصفية المقتطفات…"
 msgid "Fix recognizer errors with your dictionary and known vocabulary, on your device. It uses per-word confidence and statistical patterns — no AI model, and it never rewrites what you said."
 msgstr "صحّح أخطاء التعرّف باستخدام قاموسك والمفردات المعروفة، على جهازك. يعتمد على درجة الثقة لكل كلمة وأنماط إحصائية — بلا نموذج ذكاء اصطناعي، ولا يعيد صياغة ما قلته أبدًا."
 
-#: src/features/settings/data/settings-data.ts:264
+#: src/features/settings/data/settings-data.ts:271
 msgid "Force the standard paste shortcut for every app."
 msgstr "فرض اختصار اللصق القياسي في كل التطبيقات."
 
-#: src/features/settings/data/settings-data.ts:269
+#: src/features/settings/data/settings-data.ts:276
 msgid "Force the terminal paste shortcut. Use on COSMIC if you mostly dictate into terminals."
 msgstr "فرض اختصار اللصق الخاص بالطرفية. استخدمه في COSMIC إذا كنت تُملي في الطرفيات غالبًا."
 
@@ -1072,11 +1080,11 @@ msgstr "انضم إلى النقاشات"
 msgid "Just now"
 msgstr "الآن"
 
-#: src/features/settings/data/settings-data.ts:283
+#: src/features/settings/data/settings-data.ts:290
 msgid "Keep forever"
 msgstr "الاحتفاظ دائمًا"
 
-#: src/features/settings/data/settings-data.ts:310
+#: src/features/settings/data/settings-data.ts:317
 msgid "Keep loaded"
 msgstr "إبقاؤه محمَّلًا"
 
@@ -1110,7 +1118,7 @@ msgstr "لغة"
 msgid "Large"
 msgstr "كبير"
 
-#: src/features/settings/data/settings-data.ts:191
+#: src/features/settings/data/settings-data.ts:198
 msgid "Large v3 Turbo"
 msgstr "Large v3 Turbo"
 
@@ -1208,7 +1216,7 @@ msgstr "سيكتب Lune Voice"
 msgid "Manage in Models"
 msgstr "الإدارة من قسم النماذج"
 
-#: src/features/settings/data/settings-data.ts:184
+#: src/features/settings/data/settings-data.ts:191
 msgid "Medium"
 msgstr "متوسط"
 
@@ -1387,7 +1395,7 @@ msgstr "فتح صفحة الإصدارات"
 msgid "Open session from {time}"
 msgstr "فتح جلسة {time}"
 
-#: src/features/settings/data/settings-data.ts:354
+#: src/features/settings/data/settings-data.ts:361
 msgid "OpenAI-compatible"
 msgstr "متوافق مع OpenAI"
 
@@ -1424,7 +1432,7 @@ msgstr "التقدم الشامل"
 msgid "Pagination"
 msgstr "ترقيم الصفحات"
 
-#: src/features/settings/data/settings-data.ts:358
+#: src/features/settings/data/settings-data.ts:365
 msgid "Paste"
 msgstr "لصق"
 
@@ -1433,7 +1441,7 @@ msgstr "لصق"
 msgid "Paste compatibility"
 msgstr "توافق اللصق"
 
-#: src/features/settings/data/settings-data.ts:210
+#: src/features/settings/data/settings-data.ts:217
 msgid "Paste into app"
 msgstr "اللصق في التطبيق"
 
@@ -1734,7 +1742,7 @@ msgstr "إرسال"
 msgid "Send method"
 msgstr "طريقة الإرسال"
 
-#: src/features/settings/data/settings-data.ts:211
+#: src/features/settings/data/settings-data.ts:218
 msgid "Sends a paste shortcut into the focused app. Fastest for long dictations."
 msgstr "يُرسل اختصار لصق إلى التطبيق النشط. الأسرع للإملاء الطويل."
 
@@ -1801,7 +1809,7 @@ msgstr "عرض {0} من {totalSessions} جلسة"
 msgid "Showing {start}–{end} of {visibleCount} sessions"
 msgstr "عرض {start}–{end} من {visibleCount} جلسة"
 
-#: src/features/settings/data/settings-data.ts:217
+#: src/features/settings/data/settings-data.ts:224
 msgid "Simulates keystrokes one character at a time. Works where paste is blocked."
 msgstr "يحاكي ضغطات المفاتيح حرفًا بحرف. يعمل حيث يكون اللصق ممنوعًا."
 
@@ -1827,7 +1835,7 @@ msgstr "تخطي الآن"
 msgid "Skip to main content"
 msgstr "انتقل إلى المحتوى الرئيسي"
 
-#: src/features/settings/data/settings-data.ts:177
+#: src/features/settings/data/settings-data.ts:184
 msgid "Small"
 msgstr "صغير"
 
@@ -1979,7 +1987,7 @@ msgstr "الاختصار الرئيسي المستخدم للكتابة الصو
 msgid "The microphone is in use"
 msgstr "الميكروفون قيد الاستخدام"
 
-#: src/features/settings/data/settings-data.ts:311
+#: src/features/settings/data/settings-data.ts:318
 msgid "The model stays in memory. Every dictation starts instantly."
 msgstr "يبقى النموذج في الذاكرة. كل إملاء يبدأ فورًا."
 
@@ -2121,7 +2129,7 @@ msgstr "عبارة التشغيل"
 msgid "Try again"
 msgstr "إعادة المحاولة"
 
-#: src/features/settings/data/settings-data.ts:359
+#: src/features/settings/data/settings-data.ts:366
 msgid "Type"
 msgstr "كتابة"
 
@@ -2129,7 +2137,7 @@ msgstr "كتابة"
 msgid "Type a phrase, or tap the mic to capture it exactly as Lune Voice hears it."
 msgstr "اكتب عبارة، أو انقر على الميكروفون لالتقاطها تمامًا كما يسمعها Lune Voice."
 
-#: src/features/settings/data/settings-data.ts:216
+#: src/features/settings/data/settings-data.ts:223
 msgid "Type into app"
 msgstr "الكتابة في التطبيق"
 
@@ -2263,7 +2271,7 @@ msgstr "اختصار اللصق المراد إرساله. «تلقائي» يك
 msgid "Which screen the pill appears on."
 msgstr "الشاشة التي يظهر عليها المؤشر."
 
-#: src/features/settings/data/settings-data.ts:353
+#: src/features/settings/data/settings-data.ts:360
 #: src/features/welcome/components/engine-step.tsx:55
 msgid "Whisper"
 msgstr "Whisper"

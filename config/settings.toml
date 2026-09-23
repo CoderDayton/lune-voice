@@ -84,7 +84,7 @@ start_minimized = false
 #
 # Supported types:
 #   "WhisperCpp"        — Local whisper.cpp GGML model. (default, local)
-#                         Optional `model = "Small" | "Medium" | "LargeV3Turbo"` (default Medium).
+#                         Optional `model = "Base" | "Small" | "Medium" | "LargeV3Turbo"` (default Medium).
 #   "OpenAiCompatible"  — Remote Whisper-compatible HTTP endpoint.
 #
 [asr_backend]

@@ -23,7 +23,7 @@
 //! needs no adjustment before being used as a timeout budget.
 //!
 //! Run: `cgs bench --env TYPE=modelload` (add `--env REPEATS=n` for more
-//! samples, `--env WHISPER_MODEL=small|medium|large` to probe one model
+//! samples, `--env WHISPER_MODEL=base|small|medium|large` to probe one model
 //! instead of every model on disk).
 
 #[path = "../bench_utils.rs"]
@@ -277,6 +277,7 @@ fn main() {
     // disk, so a single run produces the whole table the timeout is chosen from.
     let requested = std::env::var("WHISPER_MODEL").ok().and_then(|v| {
         match v.trim().to_ascii_lowercase().as_str() {
+            "base" => Some(WhisperModel::Base),
             "small" => Some(WhisperModel::Small),
             "medium" => Some(WhisperModel::Medium),
             "large" | "large-v3-turbo" | "turbo" => Some(WhisperModel::LargeV3Turbo),

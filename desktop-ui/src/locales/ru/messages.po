@@ -103,19 +103,19 @@ msgstr "## Встреча — {date}\n"
 "Участники:\n"
 "- "
 
-#: src/features/settings/data/settings-data.ts:282
+#: src/features/settings/data/settings-data.ts:289
 msgid "1 year"
 msgstr "1 год"
 
-#: src/features/settings/data/settings-data.ts:280
+#: src/features/settings/data/settings-data.ts:287
 msgid "30 days"
 msgstr "30 дней"
 
-#: src/features/settings/data/settings-data.ts:279
+#: src/features/settings/data/settings-data.ts:286
 msgid "7 days"
 msgstr "7 дней"
 
-#: src/features/settings/data/settings-data.ts:281
+#: src/features/settings/data/settings-data.ts:288
 msgid "90 days"
 msgstr "90 дней"
 
@@ -166,23 +166,23 @@ msgstr "Добавьте исправление, и Lune Voice применяе�
 msgid "Add snippet"
 msgstr "Добавить фрагмент"
 
-#: src/features/settings/data/settings-data.ts:316
+#: src/features/settings/data/settings-data.ts:323
 msgid "After 1 hour"
 msgstr "Через 1 час"
 
-#: src/features/settings/data/settings-data.ts:314
+#: src/features/settings/data/settings-data.ts:321
 msgid "After 15 minutes"
 msgstr "Через 15 минут"
 
-#: src/features/settings/data/settings-data.ts:317
+#: src/features/settings/data/settings-data.ts:324
 msgid "After 2 hours"
 msgstr "Через 2 часа"
 
-#: src/features/settings/data/settings-data.ts:315
+#: src/features/settings/data/settings-data.ts:322
 msgid "After 30 minutes"
 msgstr "Через 30 минут"
 
-#: src/features/settings/data/settings-data.ts:313
+#: src/features/settings/data/settings-data.ts:320
 msgid "After 5 minutes"
 msgstr "Через 5 минут"
 
@@ -212,11 +212,11 @@ msgstr "Разрешить удалённые сервисы"
 msgid "Always"
 msgstr "Всегда"
 
-#: src/features/settings/data/settings-data.ts:268
+#: src/features/settings/data/settings-data.ts:275
 msgid "Always Ctrl+Shift+V"
 msgstr "Всегда Ctrl+Shift+V"
 
-#: src/features/settings/data/settings-data.ts:263
+#: src/features/settings/data/settings-data.ts:270
 msgid "Always Ctrl+V"
 msgstr "Всегда Ctrl+V"
 
@@ -274,11 +274,11 @@ msgstr "Звуковой отклик при запуске, завершени�
 msgid "Auto-capitalize sentences"
 msgstr "Автоматически писать предложения с заглавной буквы"
 
-#: src/features/settings/data/settings-data.ts:238
+#: src/features/settings/data/settings-data.ts:245
 msgid "Auto-detect"
 msgstr "Определять автоматически"
 
-#: src/features/settings/data/settings-data.ts:258
+#: src/features/settings/data/settings-data.ts:265
 #: src/features/settings/sections/pill-section.tsx:55
 msgid "Automatic"
 msgstr "Автоматически"
@@ -287,15 +287,19 @@ msgstr "Автоматически"
 msgid "Automatic updates are off"
 msgstr "Автоматические обновления отключены"
 
-#: src/features/settings/data/settings-data.ts:185
+#: src/features/settings/data/settings-data.ts:192
 msgid "Balanced accuracy and speed."
 msgstr "Баланс точности и скорости."
+
+#: src/features/settings/data/settings-data.ts:177
+msgid "Base"
+msgstr "Базовая"
 
 #: src/features/welcome/components/ready-checks.tsx:87
 msgid "Before you start"
 msgstr "Перед началом"
 
-#: src/features/settings/data/settings-data.ts:192
+#: src/features/settings/data/settings-data.ts:199
 msgid "Best accuracy; turbo decoder keeps it fast."
 msgstr "Наибольшая точность; турбо-декодер сохраняет скорость."
 
@@ -648,11 +652,11 @@ msgstr "Описание"
 msgid "Description is too long."
 msgstr "Описание слишком длинное."
 
-#: src/features/settings/data/settings-data.ts:259
+#: src/features/settings/data/settings-data.ts:266
 msgid "Detects terminals and picks the matching paste shortcut. Works on most compositors."
 msgstr "Определяет терминалы и подбирает подходящее сочетание для вставки. Работает в большинстве композиторов."
 
-#: src/features/settings/data/settings-data.ts:239
+#: src/features/settings/data/settings-data.ts:246
 msgid "Detects the spoken language each session."
 msgstr "Определяет язык речи в каждом сеансе."
 
@@ -701,7 +705,7 @@ msgstr "Использование диска"
 msgid "Dismiss error"
 msgstr "Ошибка закрытия"
 
-#: src/features/settings/data/settings-data.ts:278
+#: src/features/settings/data/settings-data.ts:285
 msgid "Don't save history"
 msgstr "Не сохранять историю"
 
@@ -837,9 +841,13 @@ msgstr "Примеры обучают движок стилизации ваше
 msgid "Expand sidebar"
 msgstr "Развернуть боковую панель"
 
+#: src/features/settings/data/settings-data.ts:185
+msgid "Fast; less accurate than Medium."
+msgstr "Быстрая; менее точная, чем Средняя."
+
 #: src/features/settings/data/settings-data.ts:178
-msgid "Fastest, lowest accuracy."
-msgstr "Самая быстрая, но наименее точная."
+msgid "Fastest, lowest accuracy. For older or low-power computers."
+msgstr "Самая быстрая, но наименее точная. Для старых или маломощных компьютеров."
 
 #: src/components/feedback/help-feedback-dialog.tsx:62
 msgid "Feature request"
@@ -877,11 +885,11 @@ msgstr "Фильтр фрагментов…"
 msgid "Fix recognizer errors with your dictionary and known vocabulary, on your device. It uses per-word confidence and statistical patterns — no AI model, and it never rewrites what you said."
 msgstr "Исправляет ошибки распознавания с помощью вашего словаря и известной лексики — прямо на устройстве. Использует пословную уверенность и статистические закономерности — без модели ИИ, и никогда не переписывает сказанное вами."
 
-#: src/features/settings/data/settings-data.ts:264
+#: src/features/settings/data/settings-data.ts:271
 msgid "Force the standard paste shortcut for every app."
 msgstr "Всегда использовать стандартное сочетание вставки во всех приложениях."
 
-#: src/features/settings/data/settings-data.ts:269
+#: src/features/settings/data/settings-data.ts:276
 msgid "Force the terminal paste shortcut. Use on COSMIC if you mostly dictate into terminals."
 msgstr "Всегда использовать терминальное сочетание вставки. Пригодится в COSMIC, если вы диктуете в основном в терминалы."
 
@@ -1072,11 +1080,11 @@ msgstr "Присоединиться к обсуждениям"
 msgid "Just now"
 msgstr "Только что"
 
-#: src/features/settings/data/settings-data.ts:283
+#: src/features/settings/data/settings-data.ts:290
 msgid "Keep forever"
 msgstr "Хранить всегда"
 
-#: src/features/settings/data/settings-data.ts:310
+#: src/features/settings/data/settings-data.ts:317
 msgid "Keep loaded"
 msgstr "Держать загруженной"
 
@@ -1110,7 +1118,7 @@ msgstr "Язык"
 msgid "Large"
 msgstr "Большой"
 
-#: src/features/settings/data/settings-data.ts:191
+#: src/features/settings/data/settings-data.ts:198
 msgid "Large v3 Turbo"
 msgstr "Large v3 Turbo"
 
@@ -1208,7 +1216,7 @@ msgstr "Lune Voice пишет"
 msgid "Manage in Models"
 msgstr "Управление в разделе Модели"
 
-#: src/features/settings/data/settings-data.ts:184
+#: src/features/settings/data/settings-data.ts:191
 msgid "Medium"
 msgstr "Средняя"
 
@@ -1387,7 +1395,7 @@ msgstr "Открыть страницу релизов"
 msgid "Open session from {time}"
 msgstr "Открытая сессия от {time}"
 
-#: src/features/settings/data/settings-data.ts:354
+#: src/features/settings/data/settings-data.ts:361
 msgid "OpenAI-compatible"
 msgstr "Совместимо с OpenAI"
 
@@ -1424,7 +1432,7 @@ msgstr "Общий прогресс"
 msgid "Pagination"
 msgstr "Пагинация"
 
-#: src/features/settings/data/settings-data.ts:358
+#: src/features/settings/data/settings-data.ts:365
 msgid "Paste"
 msgstr "Вставка"
 
@@ -1433,7 +1441,7 @@ msgstr "Вставка"
 msgid "Paste compatibility"
 msgstr "Совместимость вставки"
 
-#: src/features/settings/data/settings-data.ts:210
+#: src/features/settings/data/settings-data.ts:217
 msgid "Paste into app"
 msgstr "Вставлять в приложение"
 
@@ -1734,7 +1742,7 @@ msgstr "Отправить"
 msgid "Send method"
 msgstr "Метод отправки"
 
-#: src/features/settings/data/settings-data.ts:211
+#: src/features/settings/data/settings-data.ts:218
 msgid "Sends a paste shortcut into the focused app. Fastest for long dictations."
 msgstr "Отправляет сочетание вставки в активное приложение. Самый быстрый способ для длинных диктовок."
 
@@ -1801,7 +1809,7 @@ msgstr "Показано {0} из {totalSessions} сессий"
 msgid "Showing {start}–{end} of {visibleCount} sessions"
 msgstr "Показаны {start}–{end} из {visibleCount} сеансов"
 
-#: src/features/settings/data/settings-data.ts:217
+#: src/features/settings/data/settings-data.ts:224
 msgid "Simulates keystrokes one character at a time. Works where paste is blocked."
 msgstr "Имитирует нажатия клавиш посимвольно. Работает там, где вставка запрещена."
 
@@ -1827,7 +1835,7 @@ msgstr "Пропустить сейчас"
 msgid "Skip to main content"
 msgstr "Перейти к основному содержанию"
 
-#: src/features/settings/data/settings-data.ts:177
+#: src/features/settings/data/settings-data.ts:184
 msgid "Small"
 msgstr "Маленькая"
 
@@ -1979,7 +1987,7 @@ msgstr "Основной ярлык, используемый для голос�
 msgid "The microphone is in use"
 msgstr "Микрофон занят"
 
-#: src/features/settings/data/settings-data.ts:311
+#: src/features/settings/data/settings-data.ts:318
 msgid "The model stays in memory. Every dictation starts instantly."
 msgstr "Модель остаётся в памяти. Каждая диктовка начинается мгновенно."
 
@@ -2121,7 +2129,7 @@ msgstr "Ключевая фраза"
 msgid "Try again"
 msgstr "Повторить"
 
-#: src/features/settings/data/settings-data.ts:359
+#: src/features/settings/data/settings-data.ts:366
 msgid "Type"
 msgstr "Ввод"
 
@@ -2129,7 +2137,7 @@ msgstr "Ввод"
 msgid "Type a phrase, or tap the mic to capture it exactly as Lune Voice hears it."
 msgstr "Введите фразу или коснитесь микрофона, чтобы записать её ровно так, как её слышит Lune Voice."
 
-#: src/features/settings/data/settings-data.ts:216
+#: src/features/settings/data/settings-data.ts:223
 msgid "Type into app"
 msgstr "Печатать в приложении"
 
@@ -2263,7 +2271,7 @@ msgstr "Какое сочетание клавиш вставки отправл
 msgid "Which screen the pill appears on."
 msgstr "На каком экране появляется индикатор."
 
-#: src/features/settings/data/settings-data.ts:353
+#: src/features/settings/data/settings-data.ts:360
 #: src/features/welcome/components/engine-step.tsx:55
 msgid "Whisper"
 msgstr "Whisper"

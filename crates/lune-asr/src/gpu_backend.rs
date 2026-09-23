@@ -423,6 +423,26 @@ mod imp {
         }
     }
 
+    /// Whether ggml's registry holds a device whisper.cpp would decode on when
+    /// asked to use the GPU: a discrete or integrated GPU, the same test as
+    /// `whisper_backend_init_gpu`. Only meaningful after [`load_plugins`].
+    pub fn gpu_device_registered() -> bool {
+        use whisper_rs::whisper_rs_sys as sys;
+        // SAFETY: as in `device_names`: a count, then handles for indices
+        // below it.
+        unsafe {
+            (0..sys::ggml_backend_dev_count()).any(|i| {
+                let dev = sys::ggml_backend_dev_get(i);
+                !dev.is_null()
+                    && matches!(
+                        sys::ggml_backend_dev_type(dev),
+                        sys::ggml_backend_dev_type_GGML_BACKEND_DEVICE_TYPE_GPU
+                            | sys::ggml_backend_dev_type_GGML_BACKEND_DEVICE_TYPE_IGPU
+                    )
+            })
+        }
+    }
+
     /// Current GPU state for the setup UI. Loading is a side effect when a
     /// plugin is installed, which is what makes "installed" and "actually
     /// working" distinguishable rather than assumed.
@@ -484,6 +504,9 @@ mod imp {
 }
 
 pub use imp::{load_plugins, state};
+
+#[cfg(feature = "whisper-cpp")]
+pub(crate) use imp::gpu_device_registered;
 
 /// Whether CUDA can actually be used for a decode right now.
 ///

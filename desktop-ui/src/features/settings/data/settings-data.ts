@@ -8,7 +8,7 @@ import type { ComponentType } from 'react';
 export type ActivationModeValue = 'Toggle' | 'Hold';
 export type AsrBackendValue = 'OpenAiCompatible' | 'WhisperCpp';
 
-export type WhisperModelValue = 'Small' | 'Medium' | 'LargeV3Turbo';
+export type WhisperModelValue = 'Base' | 'Small' | 'Medium' | 'LargeV3Turbo';
 
 export type DictationModeValue = 'TypeInPlace' | 'Clipboard';
 export type PillVisibilityValue = 'Always' | 'WhenDictating' | 'Never';
@@ -173,9 +173,16 @@ export interface WhisperModelOption extends DescriptiveOptionData<WhisperModelVa
 /** whisper.cpp GGML model options (quantized multilingual), smallest to largest. */
 export const whisperModels: WhisperModelOption[] = [
   {
+    value: 'Base',
+    label: msg`Base`,
+    description: msg`Fastest, lowest accuracy. For older or low-power computers.`,
+    localName: 'whisper-base-q8_0',
+    size: '78 MB',
+  },
+  {
     value: 'Small',
     label: msg`Small`,
-    description: msg`Fastest, lowest accuracy.`,
+    description: msg`Fast; less accurate than Medium.`,
     localName: 'whisper-small-q5_1',
     size: '190 MB',
   },

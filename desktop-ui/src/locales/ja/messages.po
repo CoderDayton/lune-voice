@@ -103,19 +103,19 @@ msgstr "## 会議 — {date}\n"
 "出席者:\n"
 "- "
 
-#: src/features/settings/data/settings-data.ts:282
+#: src/features/settings/data/settings-data.ts:289
 msgid "1 year"
 msgstr "1 年"
 
-#: src/features/settings/data/settings-data.ts:280
+#: src/features/settings/data/settings-data.ts:287
 msgid "30 days"
 msgstr "30 日"
 
-#: src/features/settings/data/settings-data.ts:279
+#: src/features/settings/data/settings-data.ts:286
 msgid "7 days"
 msgstr "7 日"
 
-#: src/features/settings/data/settings-data.ts:281
+#: src/features/settings/data/settings-data.ts:288
 msgid "90 days"
 msgstr "90 日"
 
@@ -166,23 +166,23 @@ msgstr "修正を追加すると、音声入力のたびに Lune Voice が適用
 msgid "Add snippet"
 msgstr "スニペッ���を追加"
 
-#: src/features/settings/data/settings-data.ts:316
+#: src/features/settings/data/settings-data.ts:323
 msgid "After 1 hour"
 msgstr "1 時間後"
 
-#: src/features/settings/data/settings-data.ts:314
+#: src/features/settings/data/settings-data.ts:321
 msgid "After 15 minutes"
 msgstr "15 分後"
 
-#: src/features/settings/data/settings-data.ts:317
+#: src/features/settings/data/settings-data.ts:324
 msgid "After 2 hours"
 msgstr "2 時間後"
 
-#: src/features/settings/data/settings-data.ts:315
+#: src/features/settings/data/settings-data.ts:322
 msgid "After 30 minutes"
 msgstr "30 分後"
 
-#: src/features/settings/data/settings-data.ts:313
+#: src/features/settings/data/settings-data.ts:320
 msgid "After 5 minutes"
 msgstr "5 分後"
 
@@ -212,11 +212,11 @@ msgstr "リモートサービスを許可"
 msgid "Always"
 msgstr "常に表示"
 
-#: src/features/settings/data/settings-data.ts:268
+#: src/features/settings/data/settings-data.ts:275
 msgid "Always Ctrl+Shift+V"
 msgstr "常に Ctrl+Shift+V"
 
-#: src/features/settings/data/settings-data.ts:263
+#: src/features/settings/data/settings-data.ts:270
 msgid "Always Ctrl+V"
 msgstr "常に Ctrl+V"
 
@@ -274,11 +274,11 @@ msgstr "音声入力の開始・完了・エラー時に再生される音声フ
 msgid "Auto-capitalize sentences"
 msgstr "文頭を自動的に大文字にする"
 
-#: src/features/settings/data/settings-data.ts:238
+#: src/features/settings/data/settings-data.ts:245
 msgid "Auto-detect"
 msgstr "自動検出"
 
-#: src/features/settings/data/settings-data.ts:258
+#: src/features/settings/data/settings-data.ts:265
 #: src/features/settings/sections/pill-section.tsx:55
 msgid "Automatic"
 msgstr "自動"
@@ -287,15 +287,19 @@ msgstr "自動"
 msgid "Automatic updates are off"
 msgstr "自動更新はオフです"
 
-#: src/features/settings/data/settings-data.ts:185
+#: src/features/settings/data/settings-data.ts:192
 msgid "Balanced accuracy and speed."
 msgstr "精度と速度のバランス型。"
+
+#: src/features/settings/data/settings-data.ts:177
+msgid "Base"
+msgstr "ベース"
 
 #: src/features/welcome/components/ready-checks.tsx:87
 msgid "Before you start"
 msgstr "始める前に"
 
-#: src/features/settings/data/settings-data.ts:192
+#: src/features/settings/data/settings-data.ts:199
 msgid "Best accuracy; turbo decoder keeps it fast."
 msgstr "最高精度。ターボデコーダーで速度も保ちます。"
 
@@ -648,11 +652,11 @@ msgstr "説明"
 msgid "Description is too long."
 msgstr "説明が長すぎます。"
 
-#: src/features/settings/data/settings-data.ts:259
+#: src/features/settings/data/settings-data.ts:266
 msgid "Detects terminals and picks the matching paste shortcut. Works on most compositors."
 msgstr "端末を検出して適切な貼り付けショートカットを選びます。ほとんどのコンポジターで動作します。"
 
-#: src/features/settings/data/settings-data.ts:239
+#: src/features/settings/data/settings-data.ts:246
 msgid "Detects the spoken language each session."
 msgstr "セッションごとに話した言語を検出します。"
 
@@ -701,7 +705,7 @@ msgstr "ディスク使用量"
 msgid "Dismiss error"
 msgstr "エラーを無視する"
 
-#: src/features/settings/data/settings-data.ts:278
+#: src/features/settings/data/settings-data.ts:285
 msgid "Don't save history"
 msgstr "履歴を保存しない"
 
@@ -837,9 +841,13 @@ msgstr "サンプルはスタイル調整エンジンにあなたのスタイル
 msgid "Expand sidebar"
 msgstr "サイドバーを展開する"
 
+#: src/features/settings/data/settings-data.ts:185
+msgid "Fast; less accurate than Medium."
+msgstr "高速ですが、「中」より精度は低くなります。"
+
 #: src/features/settings/data/settings-data.ts:178
-msgid "Fastest, lowest accuracy."
-msgstr "最速ですが精度は最も低くなります。"
+msgid "Fastest, lowest accuracy. For older or low-power computers."
+msgstr "最速ですが精度は最も低くなります。古いPCや低性能なPC向けです。"
 
 #: src/components/feedback/help-feedback-dialog.tsx:62
 msgid "Feature request"
@@ -877,11 +885,11 @@ msgstr "スニペットを絞り込む…"
 msgid "Fix recognizer errors with your dictionary and known vocabulary, on your device. It uses per-word confidence and statistical patterns — no AI model, and it never rewrites what you said."
 msgstr "認識エラーを、お使いのデバイス上で辞書と既知の語彙を使って修正します。単語ごとの信頼度と統計的パターンを利用します — AI モデルは使わず、あなたが話した内容を書き換えることは決してありません。"
 
-#: src/features/settings/data/settings-data.ts:264
+#: src/features/settings/data/settings-data.ts:271
 msgid "Force the standard paste shortcut for every app."
 msgstr "すべてのアプリで標準の貼り付けショートカットを使います。"
 
-#: src/features/settings/data/settings-data.ts:269
+#: src/features/settings/data/settings-data.ts:276
 msgid "Force the terminal paste shortcut. Use on COSMIC if you mostly dictate into terminals."
 msgstr "端末用の貼り付けショートカットを強制します。主に端末へ音声入力する場合、COSMIC で使用してください。"
 
@@ -1072,11 +1080,11 @@ msgstr "ディスカッションに参加"
 msgid "Just now"
 msgstr "たった今"
 
-#: src/features/settings/data/settings-data.ts:283
+#: src/features/settings/data/settings-data.ts:290
 msgid "Keep forever"
 msgstr "ずっと保存"
 
-#: src/features/settings/data/settings-data.ts:310
+#: src/features/settings/data/settings-data.ts:317
 msgid "Keep loaded"
 msgstr "読み込んだままにする"
 
@@ -1110,7 +1118,7 @@ msgstr "言語"
 msgid "Large"
 msgstr "大"
 
-#: src/features/settings/data/settings-data.ts:191
+#: src/features/settings/data/settings-data.ts:198
 msgid "Large v3 Turbo"
 msgstr "Large v3 Turbo"
 
@@ -1208,7 +1216,7 @@ msgstr "Lune Voice の出力"
 msgid "Manage in Models"
 msgstr "「モデル」で管理"
 
-#: src/features/settings/data/settings-data.ts:184
+#: src/features/settings/data/settings-data.ts:191
 msgid "Medium"
 msgstr "中"
 
@@ -1387,7 +1395,7 @@ msgstr "リリースページを開く"
 msgid "Open session from {time}"
 msgstr "{time} のセッションを開く"
 
-#: src/features/settings/data/settings-data.ts:354
+#: src/features/settings/data/settings-data.ts:361
 msgid "OpenAI-compatible"
 msgstr "OpenAI 互換"
 
@@ -1424,7 +1432,7 @@ msgstr "全体の進捗"
 msgid "Pagination"
 msgstr "ページネーション"
 
-#: src/features/settings/data/settings-data.ts:358
+#: src/features/settings/data/settings-data.ts:365
 msgid "Paste"
 msgstr "貼り付け"
 
@@ -1433,7 +1441,7 @@ msgstr "貼り付け"
 msgid "Paste compatibility"
 msgstr "貼り付けの互換性"
 
-#: src/features/settings/data/settings-data.ts:210
+#: src/features/settings/data/settings-data.ts:217
 msgid "Paste into app"
 msgstr "アプリに貼り付け"
 
@@ -1734,7 +1742,7 @@ msgstr "送信"
 msgid "Send method"
 msgstr "送信方法"
 
-#: src/features/settings/data/settings-data.ts:211
+#: src/features/settings/data/settings-data.ts:218
 msgid "Sends a paste shortcut into the focused app. Fastest for long dictations."
 msgstr "アクティブなアプリに貼り付けショートカットを送ります。長い音声入力に最速です。"
 
@@ -1801,7 +1809,7 @@ msgstr "{totalSessions} 件中 {0} 件を表示"
 msgid "Showing {start}–{end} of {visibleCount} sessions"
 msgstr "{visibleCount} 件中 {start}–{end} 件を表示"
 
-#: src/features/settings/data/settings-data.ts:217
+#: src/features/settings/data/settings-data.ts:224
 msgid "Simulates keystrokes one character at a time. Works where paste is blocked."
 msgstr "1 文字ずつキー入力を再現します。貼り付けが禁止されている場所でも動作します。"
 
@@ -1827,7 +1835,7 @@ msgstr "今はスキップ"
 msgid "Skip to main content"
 msgstr "メインコンテンツにスキップ"
 
-#: src/features/settings/data/settings-data.ts:177
+#: src/features/settings/data/settings-data.ts:184
 msgid "Small"
 msgstr "小"
 
@@ -1979,7 +1987,7 @@ msgstr "音声入力に使用される主なショートカット。バインデ
 msgid "The microphone is in use"
 msgstr "マイクは使用中です"
 
-#: src/features/settings/data/settings-data.ts:311
+#: src/features/settings/data/settings-data.ts:318
 msgid "The model stays in memory. Every dictation starts instantly."
 msgstr "モデルはメモリに残ります。毎回すぐに音声入力を始められます。"
 
@@ -2121,7 +2129,7 @@ msgstr "トリガーフレーズ"
 msgid "Try again"
 msgstr "再試行"
 
-#: src/features/settings/data/settings-data.ts:359
+#: src/features/settings/data/settings-data.ts:366
 msgid "Type"
 msgstr "入力"
 
@@ -2129,7 +2137,7 @@ msgstr "入力"
 msgid "Type a phrase, or tap the mic to capture it exactly as Lune Voice hears it."
 msgstr "フレーズを入力するか、マイクをタッ���して Lune Voice が聞き取ったとおりに登録してください。"
 
-#: src/features/settings/data/settings-data.ts:216
+#: src/features/settings/data/settings-data.ts:223
 msgid "Type into app"
 msgstr "アプリに入力"
 
@@ -2263,7 +2271,7 @@ msgstr "送信する貼り付けショートカッ���。「自動」はタ
 msgid "Which screen the pill appears on."
 msgstr "インジケーターを表示するモニター。"
 
-#: src/features/settings/data/settings-data.ts:353
+#: src/features/settings/data/settings-data.ts:360
 #: src/features/welcome/components/engine-step.tsx:55
 msgid "Whisper"
 msgstr "Whisper"

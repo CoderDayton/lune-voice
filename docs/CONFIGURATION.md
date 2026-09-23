@@ -127,13 +127,14 @@ model = "Medium"
 
 | Field | Values | Default | Description |
 |-------|--------|---------|-------------|
-| `model` | `Small`, `Medium`, `LargeV3Turbo` | `Medium` | Which GGML model to load |
+| `model` | `Base`, `Small`, `Medium`, `LargeV3Turbo` | `Medium` | Which GGML model to load |
 
 **Available models** (multilingual):
 
 | `model` value | File | Size | Speed / Accuracy |
 |---------------|------|------|-----------------|
-| `Small` | `ggml-small-q5_1.bin` | ~190 MB | Fastest; lowest accuracy |
+| `Base` | `ggml-base-q8_0.bin` | ~78 MB | Fastest; lowest accuracy. For low-end hardware |
+| `Small` | `ggml-small-q5_1.bin` | ~190 MB | Fast; less accurate than Medium |
 | `Medium` | `ggml-medium-q5_0.bin` | ~539 MB | Balanced (recommended) |
 | `LargeV3Turbo` | `ggml-large-v3-turbo-q8_0.bin` | ~874 MB | Best accuracy; turbo decoder keeps it fast |
 
@@ -512,6 +513,7 @@ Models are downloaded automatically on first run from HuggingFace Hub.
 
 | Model | HuggingFace repo | Directory | Files | Size |
 |-------|-----------------|-----------|-------|------|
+| Whisper Base | `ggerganov/whisper.cpp` | `whisper-base-q8_0` | `ggml-base-q8_0.bin` | ~78 MB |
 | Whisper Small | `ggerganov/whisper.cpp` | `whisper-small-q5_1` | `ggml-small-q5_1.bin` | ~190 MB |
 | Whisper Medium *(default)* | `ggerganov/whisper.cpp` | `whisper-medium-q5_0` | `ggml-medium-q5_0.bin` | ~539 MB |
 | Whisper Large v3 Turbo | `ggerganov/whisper.cpp` | `whisper-large-v3-turbo-q8_0` | `ggml-large-v3-turbo-q8_0.bin` | ~874 MB |

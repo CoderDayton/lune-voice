@@ -9,7 +9,9 @@
 //!
 //! Design notes (batch decoder, like Qwen3):
 //! - The model ([`whisper_rs::WhisperContext`]) is loaded **once** at backend
-//!   construction and shared by every session; per-session `WhisperState` is cheap.
+//!   construction and shared by every session. Each session creates its own
+//!   `WhisperState`, which allocates KV caches and compute buffers (hundreds
+//!   of MB on the larger models, tens of ms to build).
 //! - Pipeline audio is already 16 kHz mono `f32` — exactly whisper's input
 //!   format — so `push_audio` is a buffer append with no resample or conversion.
 //! - Each session owns its audio buffer; both `poll_final` and `reset_context`
@@ -91,6 +93,58 @@ pub fn check_ggml_file(path: &std::path::Path) -> Result<()> {
     Ok(())
 }
 
+/// How a decode runs, chosen once from the device the model runs on.
+///
+/// On a CPU the fixed 30 s encoder window dominates a short dictation, and
+/// fitting it to the clip costs no accuracy. On a GPU the full window is
+/// already fast, and flash attention (slower on a CPU) roughly halves encode
+/// time and its buffer.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[cfg_attr(not(feature = "whisper-cpp"), allow(dead_code))]
+pub(crate) struct DecodeProfile {
+    pub flash_attn: bool,
+    /// Size the encoder window to the clip ([`fitted_audio_ctx`]) instead of
+    /// whisper's fixed 30 s.
+    pub fit_audio_ctx: bool,
+}
+
+#[cfg_attr(not(feature = "whisper-cpp"), allow(dead_code))]
+impl DecodeProfile {
+    pub(crate) fn for_device(on_gpu: bool) -> Self {
+        Self {
+            flash_attn: on_gpu,
+            fit_audio_ctx: !on_gpu,
+        }
+    }
+}
+
+/// whisper's full encoder window: 1500 frames of 20 ms, i.e. 30 s.
+const AUDIO_CTX_FULL: usize = 1500;
+
+/// Smallest fitted window, about 15 s. Smaller windows made whisper repeat
+/// short clips ("Scratch that. Scratch that.") or fall back to its slow
+/// temperature retries.
+const AUDIO_CTX_MIN: i32 = 768;
+
+/// Frames kept past the end of the clip, about 2.6 s.
+const AUDIO_CTX_MARGIN: usize = 128;
+
+/// 16 kHz input samples per 20 ms encoder frame.
+const SAMPLES_PER_ENCODER_FRAME: usize = 320;
+
+/// `audio_ctx` for a clip of `samples`: its length plus a margin, in whole
+/// blocks of 64 frames, never below [`AUDIO_CTX_MIN`]. `0` (whisper's full
+/// window) once that reaches 30 s.
+#[cfg_attr(not(feature = "whisper-cpp"), allow(dead_code))]
+pub(crate) fn fitted_audio_ctx(samples: usize) -> i32 {
+    let frames =
+        (samples.div_ceil(SAMPLES_PER_ENCODER_FRAME) + AUDIO_CTX_MARGIN).next_multiple_of(64);
+    if frames >= AUDIO_CTX_FULL {
+        return 0;
+    }
+    (frames as i32).max(AUDIO_CTX_MIN)
+}
+
 /// Route whisper.cpp + ggml native logs into `tracing` instead of raw stderr,
 /// so they obey the global log filter.
 ///
@@ -110,7 +164,10 @@ pub fn install_logging_hooks() {}
 
 #[cfg(feature = "whisper-cpp")]
 mod imp {
-    use super::{AsrSessionConfig, Result, WhisperCppConfig, check_ggml_file};
+    use super::{
+        AsrSessionConfig, DecodeProfile, Result, WhisperCppConfig, check_ggml_file,
+        fitted_audio_ctx,
+    };
 
     use std::sync::Mutex;
 
@@ -241,6 +298,7 @@ mod imp {
     pub struct WhisperCppBackend {
         ctx: WhisperContext,
         n_threads: i32,
+        profile: DecodeProfile,
         /// Standalone silero VAD for endpoint trimming (loaded once, reused).
         /// `None` => decode the full buffer (model absent or failed to load).
         vad: Option<Mutex<WhisperVadContext>>,
@@ -273,8 +331,14 @@ mod imp {
             // it can still be reported.
             check_ggml_file(&config.model_path)?;
 
+            // whisper.cpp falls back to the CPU when asked for a GPU it cannot
+            // find, so the profile follows the device it will actually use.
+            let on_gpu = config.use_gpu && crate::gpu_backend::gpu_device_registered();
+            let profile = DecodeProfile::for_device(on_gpu);
             let mut params = WhisperContextParameters::default();
             params.use_gpu(config.use_gpu);
+            // whisper-rs defaults this off, overriding whisper.cpp's own default.
+            params.flash_attn(profile.flash_attn);
             let ctx = WhisperContext::new_with_params(&config.model_path, params).map_err(|e| {
                 Error::asr(format!(
                     "load whisper model {}: {e}",
@@ -309,9 +373,11 @@ mod imp {
                     }
                 }
             });
+            tracing::info!(on_gpu, ?profile, "whisper decode profile");
             Ok(Self {
                 ctx,
                 n_threads,
+                profile,
                 vad,
             })
         }
@@ -323,7 +389,9 @@ mod imp {
 
         async fn start_session(&self, config: AsrSessionConfig) -> Result<Self::SessionHandle> {
             // State allocation (KV cache and scratch buffers) is not cheap on
-            // the larger models — keep it off the async workers too.
+            // the larger models — keep it off the async workers too. A fresh
+            // state per session is deliberate: a reused one decodes the same
+            // audio differently depending on the previous dictation.
             let state = run_blocking(|| self.ctx.create_state())
                 .map_err(|e| Error::asr(format!("whisper create_state: {e}")))?;
             Ok(Mutex::new(WhisperCppSession {
@@ -365,7 +433,8 @@ mod imp {
             run_blocking(|| {
                 // BeamSearch is whisper.cpp's accuracy-oriented default (beam 5).
                 // Worth the extra CPU here: decoding is one-shot per utterance, and
-                // accuracy is the whole reason for offering the larger models.
+                // greedy decoding loses words beam search gets right ("ESLint" →
+                // "ES and Lint"). A slow machine is better served by a smaller model.
                 let mut params = FullParams::new(SamplingStrategy::BeamSearch {
                     beam_size: 5,
                     patience: -1.0,
@@ -465,6 +534,9 @@ mod imp {
                 // prompt biases the decode toward a spurious continuation, so skip it.
                 if decode_slice.len() >= PROMPT_MIN_SAMPLES {
                     params.set_initial_prompt(PUNCTUATION_PROMPT);
+                }
+                if self.profile.fit_audio_ctx {
+                    params.set_audio_ctx(fitted_audio_ctx(decode_slice.len()));
                 }
 
                 state
@@ -623,8 +695,59 @@ pub use imp::WhisperCppBackend;
 
 #[cfg(test)]
 mod tests {
-    use super::{GGML_MAGIC, MIN_GGML_BYTES, check_ggml_file};
+    use super::{
+        AUDIO_CTX_MIN, DecodeProfile, GGML_MAGIC, MIN_GGML_BYTES, check_ggml_file, fitted_audio_ctx,
+    };
     use std::io::Write;
+
+    const SECOND: usize = 16_000;
+
+    #[test]
+    fn a_gpu_decode_keeps_the_full_window_and_uses_flash_attention() {
+        assert_eq!(
+            DecodeProfile::for_device(true),
+            DecodeProfile {
+                flash_attn: true,
+                fit_audio_ctx: false,
+            }
+        );
+    }
+
+    #[test]
+    fn a_cpu_decode_fits_the_window_to_the_clip() {
+        assert_eq!(
+            DecodeProfile::for_device(false),
+            DecodeProfile {
+                flash_attn: false,
+                fit_audio_ctx: true,
+            }
+        );
+    }
+
+    #[test]
+    fn a_short_clip_is_encoded_in_the_minimum_window() {
+        // Below about 15 s whisper starts repeating itself, so short
+        // commands never get a smaller window than this.
+        assert_eq!(fitted_audio_ctx(0), AUDIO_CTX_MIN);
+        assert_eq!(fitted_audio_ctx(3 * SECOND), AUDIO_CTX_MIN);
+    }
+
+    #[test]
+    fn a_longer_clip_gets_its_length_plus_a_margin() {
+        // 20 s is 1000 encoder frames; the window must cover it with room to
+        // spare, in whole blocks of 64 frames.
+        let ctx = fitted_audio_ctx(20 * SECOND);
+        assert!(ctx >= 1000 + 64, "{ctx} leaves no margin past the clip");
+        assert_eq!(ctx % 64, 0);
+        assert!(ctx < 1500);
+    }
+
+    #[test]
+    fn a_clip_near_thirty_seconds_uses_the_full_window() {
+        // 0 means whisper's own 30 s window.
+        assert_eq!(fitted_audio_ctx(29 * SECOND), 0);
+        assert_eq!(fitted_audio_ctx(90 * SECOND), 0);
+    }
 
     fn write_temp(name: &str, bytes: &[u8]) -> std::path::PathBuf {
         let path = std::env::temp_dir().join(format!("lune-ggml-check-{name}"));
