@@ -119,21 +119,17 @@ restore_ownership() {
         /root/.rustup \
         /root/.bun \
         /work/desktop-ui/node_modules \
+        /work/desktop-ui/src-tauri/runtime \
         /work/desktop-ui/dist 2>/dev/null || true
 }
 trap restore_ownership EXIT
 
 cd /work/desktop-ui
 bun install --frozen-lockfile
-# --features whisper-cpp compiles the local whisper.cpp backend into the shipped
-# bundle. The GGML_* flags force a portable AVX2 CPU baseline instead of ggml's
-# default -march=native, which would SIGILL on user CPUs older than the builder.
-# NOTE: these only apply on a FRESH whisper-rs-sys build — its build.rs has no
-# rerun-if-env-changed, so cmake's cache wins on a warm target. Release container
-# caches start clean for whisper (correct on first build); if you change these
-# flags later, wipe the cached target dirs first.
-GGML_NATIVE=OFF GGML_AVX2=ON GGML_FMA=ON GGML_F16C=ON \
-    bun tauri build --bundles deb,appimage,rpm --features whisper-cpp
+# The distributable build: ggml's CPU backend as an AVX2 and an SSE4.2 plugin,
+# chosen at runtime, bundled with the ggml libraries. Shared with CI and the release
+# workflow.
+bash /work/scripts/release/build-bundles.sh --bundles deb,appimage,rpm
 INNER
 
     local count=0 f dest
@@ -141,12 +137,10 @@ INNER
     for f in "$TARGET_UBUNTU/release/bundle/deb/"*.deb \
              "$TARGET_UBUNTU/release/bundle/appimage/"*.AppImage \
              "$TARGET_UBUNTU/release/bundle/rpm/"*.rpm; do
-        # Tauri names bundles after `productName`, which is "Lune Voice" — a
-        # space in a download URL becomes %20 and breaks naive installers and
-        # shell one-liners. The name inside the package is already `lune-voice`,
-        # so this only fixes the file name.
+        # Tauri names bundles after `productName` ("LuneVoice"); release file
+        # names use the package name `lune-voice`.
         dest="$(basename "$f")"
-        dest="${dest//Lune Voice/lune-voice}"
+        dest="${dest//LuneVoice/lune-voice}"
         cp "$f" "$ARTIFACTS_DIR/$dest"
         count=$((count + 1))
     done
@@ -162,7 +156,7 @@ INNER
 # The portable archive is the .deb payload, not a second compile: same binary,
 # same old-glibc baseline, minus dpkg. Tauri resolves its resource directory
 # relative to the executable's prefix (`<prefix>/bin/lune-voice` ->
-# `<prefix>/lib/Lune Voice`), so keeping the deb's `usr/` tree intact is what
+# `<prefix>/lib/LuneVoice`), so keeping the deb's `usr/` tree intact is what
 # lets an extracted copy find its resources with no install step.
 build_tarball() {
     shopt -s nullglob
@@ -244,8 +238,8 @@ Speech models are downloaded by the app on first run into
 This archive does not update itself. When a new version is out, the app says
 so; download the new archive and extract it over this one.
 
-Licences: usr/lib/Lune Voice/THIRD_PARTY_NOTICES.md and
-usr/lib/Lune Voice/THIRD_PARTY_LICENSES.md
+Licences: usr/lib/LuneVoice/THIRD_PARTY_NOTICES.md and
+usr/lib/LuneVoice/THIRD_PARTY_LICENSES.md
 README
 
     tar -czf "$ARTIFACTS_DIR/$name.tar.gz" -C "$stage" "$name"

@@ -79,13 +79,9 @@ fn run_once(
 
     // Stage 1 — session create.
     let t0 = Instant::now();
-    let lang = BenchmarkHarness::language_for_fixture(fixture.name);
-    let session_config = AsrSessionConfig {
-        language: Some(lang.into()),
-        ..Default::default()
-    };
+    // Auto-detect, as the app's default `dictation_language = "auto"` does.
     let session = rt
-        .block_on(asr.start_session(session_config))
+        .block_on(asr.start_session(AsrSessionConfig::default()))
         .expect("start session");
     let sess_ms = t0.elapsed().as_secs_f64() * 1000.0;
 

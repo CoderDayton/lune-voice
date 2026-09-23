@@ -38,6 +38,38 @@ export function asrModelLocalName(_backend: AsrBackendValue, whisper: WhisperMod
 }
 
 /**
+ * CPU threads from which Small decodes a dictation in reasonable time without a
+ * GPU. whisper.cpp uses at most 8 threads, so more does not change the answer.
+ */
+const SMALL_MODEL_MIN_CPU_THREADS = 8;
+
+export interface SetupHardware {
+  /** Whisper will decode on a GPU. */
+  gpu: boolean;
+  cpuThreads: number;
+}
+
+/**
+ * The Whisper size the engine step starts on.
+ *
+ * On a first run — no Whisper model on disk yet — it is picked from the
+ * hardware: Medium with a GPU, Small on a CPU with enough threads, Base below
+ * that. Once any Whisper model is installed the saved choice stands, so
+ * re-running setup never swaps the user's model. `models` is the full
+ * `check_model_status` library, not the in-use subset.
+ */
+export function initialWhisperModel(
+  saved: WhisperModelValue,
+  models: ModelStatus[],
+  hw: SetupHardware,
+): WhisperModelValue {
+  const whisperDirs = new Set(whisperModels.map((m) => m.localName));
+  if (models.some((m) => m.ready && whisperDirs.has(m.localName))) return saved;
+  if (hw.gpu) return 'Medium';
+  return hw.cpuThreads >= SMALL_MODEL_MIN_CPU_THREADS ? 'Small' : 'Base';
+}
+
+/**
  * Models to pre-select for the download step: the chosen engine's own model
  * (always required to finish) plus any already-installed or backend-required
  * models.

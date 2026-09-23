@@ -7,7 +7,10 @@ fn main() {
     // binary needs `$ORIGIN` on its run path or it cannot start outside the
     // build tree. `$ORIGIN` is expanded by the loader, so the literal dollar
     // sign has to survive both make and the shell: `-Wl,-z,origin` marks the
-    // object as needing that expansion.
+    // object as needing that expansion. Installed bundles (deb, rpm, AppImage,
+    // tarball) keep them in Tauri's resource directory instead,
+    // `<prefix>/lib/<productName>` beside `<prefix>/bin`; that name is also
+    // `LINUX_RESOURCE_DIR` in `crates/lune-asr/src/gpu_backend.rs`.
     //
     // Keyed off `CARGO_CFG_TARGET_OS`, not `cfg!(target_os = ..)`: inside a
     // build script the `cfg` macro describes the *host*, so cross-building for
@@ -16,6 +19,7 @@ fn main() {
         println!("cargo:rustc-link-arg=-Wl,-z,origin");
         println!("cargo:rustc-link-arg=-Wl,-rpath,$ORIGIN");
         println!("cargo:rustc-link-arg=-Wl,-rpath,$ORIGIN/lib");
+        println!("cargo:rustc-link-arg=-Wl,-rpath,$ORIGIN/../lib/LuneVoice");
     }
 
     // `tauri_build` puts its app manifest in a resource linked into binaries

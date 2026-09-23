@@ -230,10 +230,6 @@ jobs:
     # clippy/test matrix, but it should not burn a runner on unformatted code.
     needs: [fmt]
     if: github.event_name != 'schedule'
-    env:
-      # Portable baseline (AVX2 + FMA + F16C), matching the GGML_* flags below.
-      # Overrides the workspace-wide empty RUSTFLAGS at the top of this file.
-      RUSTFLAGS: "-C target-cpu=x86-64-v3"
     steps:
       - uses: actions/checkout@v5
 
@@ -271,19 +267,14 @@ jobs:
         working-directory: desktop-ui
         run: bun install --frozen-lockfile
 
-      # Mirrors the PORTABLE branch of `[scripts.build]` in Scripts.toml.
-      # GGML_NATIVE=OFF + the explicit ISA flags stop ggml defaulting to
-      # `-march=native`, which would SIGILL on any user CPU older than the
-      # runner. Bundles come from tauri.conf.json: deb, rpm, appimage.
+      # The same build script as the release workflow and `cgs package`, which
+      # also pins the Rust codegen baseline over the workspace-wide empty
+      # RUSTFLAGS at the top of this file. Bundles come from tauri.conf.json:
+      # deb, rpm, appimage.
       - name: Build bundle
-        working-directory: desktop-ui
         env:
-          GGML_NATIVE: "OFF"
-          GGML_AVX2: "ON"
-          GGML_FMA: "ON"
-          GGML_F16C: "ON"
           APPIMAGE_EXTRACT_AND_RUN: "1"
-        run: bun tauri build --features whisper-cpp
+        run: bash scripts/release/build-bundles.sh
 
       # A bundle that built but produced no installable file is still a broken
       # release; assert each configured target actually landed.
@@ -322,6 +313,27 @@ jobs:
             exit 1
           fi
           echo "ok: udev rule present in $deb"
+
+      # The executable links libwhisper/libggml dynamically and ggml has no
+      # CPU code without a backend plugin, so a bundle missing either starts
+      # and cannot transcribe, or does not start at all.
+      - name: Verify the ggml runtime is packaged and resolves
+        run: |
+          set -euo pipefail
+          deb=$(compgen -G 'target/release/bundle/deb/*.deb' | head -1)
+          root=$(mktemp -d)
+          dpkg-deb -x "$deb" "$root"
+          res="$root/usr/lib/LuneVoice"
+          for f in libwhisper.so.1 libggml.so.0 libggml-base.so.0 \
+                   backends/libggml-cpu-sse42.so backends/libggml-cpu-haswell.so; do
+            [ -f "$res/$f" ] || { echo "::error::$f missing from $deb"; ls -R "$res"; exit 1; }
+          done
+          deps=$(env -u LD_LIBRARY_PATH ldd "$root/usr/bin/lune-voice")
+          if grep -F 'not found' <<<"$deps"; then
+            echo "::error::the packaged binary has unresolved libraries"
+            exit 1
+          fi
+          echo "ok: CPU backends $(ls "$res/backends" | tr '\n' ' '); binary resolves its libraries"
 
       - uses: actions/upload-artifact@v4
         with:

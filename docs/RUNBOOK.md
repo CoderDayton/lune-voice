@@ -255,7 +255,7 @@ matched app's icon in the dash and overview. On a native-Wayland session
 (COSMIC, wlroots) there is no `_NET_WM_ICON` at all and the desktop entry is
 the only source.
 
-An installed `.deb` is fine: it ships `Lune Voice.desktop` carrying
+An installed `.deb` is fine: it ships `LuneVoice.desktop` carrying
 `StartupWMClass=lune-voice`, which is what gnome-shell matches X11 windows
 against. For a locally built binary, install a user-level entry:
 

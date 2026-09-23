@@ -80,11 +80,6 @@ jobs:
     # Bundles link against the build host's glibc — building on -latest would
     # silently raise the minimum glibc for every user.
     runs-on: ubuntu-22.04
-    env:
-      # PORTABLE baseline (AVX2 + FMA + F16C), matching the GGML_* flags below.
-      # Without this the Rust half is built for the runner's CPU and SIGILLs on
-      # older user hardware.
-      RUSTFLAGS: "-C target-cpu=x86-64-v3"
     # No build cache: a release compiles from scratch, so nothing another ref
     # wrote into a shared cache can end up in the shipped binary.
     steps:
@@ -128,30 +123,26 @@ jobs:
       - name: Third-party licences are current
         run: bash scripts/release/third-party-licenses.sh --check
 
-      # Mirrors the PORTABLE branch of `[scripts.build]` in Scripts.toml.
-      # GGML_NATIVE=OFF plus the explicit ISA flags stop ggml defaulting to
-      # `-march=native`. Targets come from tauri.conf.json: deb, rpm, appimage.
+      # The distributable build, shared with `cgs package` and CI: ggml's CPU
+      # backends are bundled plugins picked per CPU at runtime, and the
+      # script pins the Rust codegen baseline. Targets come from
+      # tauri.conf.json: deb, rpm, appimage.
       - name: Build bundles
-        working-directory: desktop-ui
         env:
-          GGML_NATIVE: "OFF"
-          GGML_AVX2: "ON"
-          GGML_FMA: "ON"
-          GGML_F16C: "ON"
           APPIMAGE_EXTRACT_AND_RUN: "1"
-        run: bun tauri build --features whisper-cpp
+        run: bash scripts/release/build-bundles.sh
 
       - name: Collect artifacts
         run: |
           set -euo pipefail
           mkdir -p release-artifacts
           # Same names as `cgs package`: tauri names bundles after
-          # `productName` ("Lune Voice"), and the space breaks download URLs.
+          # `productName` ("LuneVoice"); release files use `lune-voice`.
           for f in target/release/bundle/deb/*.deb \
                    target/release/bundle/rpm/*.rpm \
                    target/release/bundle/appimage/*.AppImage; do
             dest="$(basename "$f")"
-            cp "$f" "release-artifacts/${dest//Lune Voice/lune-voice}"
+            cp "$f" "release-artifacts/${dest//LuneVoice/lune-voice}"
           done
           (cd release-artifacts && sha256sum ./* > SHA256SUMS)
           ls -la release-artifacts
@@ -167,10 +158,6 @@ jobs:
     name: Windows bundle
     needs: [verify-version]
     runs-on: windows-latest
-    env:
-      # Same portability floor as the Linux bundle: without it the Rust half is
-      # built for the runner's CPU and faults on older user hardware.
-      RUSTFLAGS: "-C target-cpu=x86-64-v3"
     # No build cache, for the same reason as the Linux job.
     steps:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
@@ -186,17 +173,13 @@ jobs:
         run: bun install --frozen-lockfile
 
       # whisper.cpp needs cmake plus libclang for bindgen. Both ship on the
-      # runner image; bindgen only needs to be told where clang lives.
+      # runner image; bindgen only needs to be told where clang lives. Same
+      # build script as Linux; the ggml DLLs land beside the executable.
       - name: Build bundle
-        working-directory: desktop-ui
         shell: bash
         env:
           LIBCLANG_PATH: "C:\\Program Files\\LLVM\\bin"
-          GGML_NATIVE: "OFF"
-          GGML_AVX2: "ON"
-          GGML_FMA: "ON"
-          GGML_F16C: "ON"
-        run: bun tauri build --features whisper-cpp
+        run: bash scripts/release/build-bundles.sh
 
       - name: Collect artifacts
         shell: bash
@@ -205,7 +188,7 @@ jobs:
           mkdir -p release-artifacts
           for f in target/release/bundle/nsis/*-setup.exe; do
             dest="$(basename "$f")"
-            cp "$f" "release-artifacts/${dest//Lune Voice/lune-voice}"
+            cp "$f" "release-artifacts/${dest//LuneVoice/lune-voice}"
           done
           (cd release-artifacts && sha256sum ./* > SHA256SUMS-windows)
           ls -la release-artifacts

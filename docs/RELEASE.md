@@ -50,9 +50,9 @@ bundle.
 
 | Target | OS / arch | Backend | Cargo features | Status |
 |---|---|---|---|---|
-| Linux | Linux x86_64 | CPU (AVX2 baseline) | `whisper-cpp` | **Supported** |
+| Linux | Linux x86_64 | CPU (any x86-64-v2; best CPU variant picked at runtime) | `whisper-cpp` | **Supported** |
 | Linux GPU plugin | Linux x86_64 + NVIDIA | CUDA, downloaded at runtime | — (built by `cgs gpu-plugin`) | **Supported** |
-| Windows CPU | Windows x86_64 | CPU (AVX2 baseline) | `whisper-cpp` | **Supported** (NSIS installer) |
+| Windows CPU | Windows x86_64 | CPU (any x86-64-v2; best CPU variant picked at runtime) | `whisper-cpp` | **Supported** (NSIS installer) |
 | Windows GPU plugin | Windows x86_64 + NVIDIA | CUDA, downloaded at runtime | — (built by `cgs gpu-plugin-windows`) | **Wired; archive not published yet** |
 | macOS Metal | macOS arm64 (Apple Silicon) | Metal | `whisper-metal` | **Planned** (see below) |
 
@@ -88,48 +88,52 @@ links that box's libraries and is not distributable. `--env BUNDLE=1` bundles
 locally anyway, for testing the package layout itself.
 
 It has two profiles. The default is a **native** build tuned to the build host
-(fast, low memory); **release artifacts** must add `--env PORTABLE=1`. Backend
-(CPU vs CUDA) auto-detects unless pinned with `--env BACKEND`.
+(fast, low memory); **release artifacts** are `--env PORTABLE=1`. Backend
+(CPU vs CUDA) auto-detects for native builds unless pinned with `--env BACKEND`;
+PORTABLE is CPU only, because GPU ships as the downloadable plugin.
 
 ```bash
-# Local build (default): NATIVE — ggml targets only this machine's CPU + GPU
-# arch. ~8x smaller CUDA compile, won't exhaust RAM. NOT portable to other HW.
+# Local build (default): NATIVE — static, ggml targets only this machine's CPU +
+# GPU arch. ~8x smaller CUDA compile, won't exhaust RAM. NOT portable to other HW.
 cgs build
 
-# Distributable release artifact (what CI uses, per target): PORTABLE —
-# AVX2 CPU baseline + every common NVIDIA CUDA arch (heavy; needs lots of RAM).
-cgs build --env PORTABLE=1 --env BACKEND=cpu
-cgs build --env PORTABLE=1 --env BACKEND=cuda
+# Distributable release artifact (what CI and `cgs package` build): PORTABLE.
+cgs build --env PORTABLE=1
 
 # Installers, in a container (see Linux bundles below).
 cgs package
 ```
 
-> **Why two profiles:** with `GGML_NATIVE=OFF` (PORTABLE) ggml compiles ~8 CUDA
-> architectures; at high `-j` each `nvcc`/`cicc` job needs several GB and the
-> build can exhaust RAM and crash (`cicc` SIGSEGV). Native builds one arch and
-> avoids this. For PORTABLE on a many-core host, cap jobs with `CARGO_BUILD_JOBS`.
-
-Under the hood that runs, from `desktop-ui/`:
+Native runs, from `desktop-ui/`:
 
 ```bash
-# Native (default): tuned to this machine's CPU + GPU
 GGML_NATIVE=ON bun tauri build --features "whisper-cuda"
-
-# Portable (PORTABLE=1): portable CPU baseline + all common CUDA archs
-RUSTFLAGS="-C target-cpu=x86-64-v3" \
-  GGML_NATIVE=OFF GGML_AVX2=ON GGML_FMA=ON GGML_F16C=ON \
-  bun tauri build --features "whisper-cuda"
 ```
 
-For PORTABLE, `GGML_NATIVE=OFF` + the explicit AVX2/FMA/F16C flags force a
-portable CPU baseline instead of ggml's default `-march=native` (which would
-`SIGILL` on any user CPU older than the build host) and make ggml build all
-common CUDA archs. The native default skips both — one CPU target, one GPU arch.
+PORTABLE runs `scripts/release/build-bundles.sh`, which every distributable
+build shares — `cgs build`, `cgs package`, CI and the release workflow:
 
-`RUSTFLAGS` covers the other half of the binary — the GGML flags do nothing for
-the Rust code. `x86-64-v3` is the same AVX2 + FMA + F16C baseline the GGML flags
-request; on a non-x86_64 host `cgs build` sets it empty instead.
+- ggml is built as shared libraries with `GGML_BACKEND_DL=ON`, and the bundle
+  ships two CPU backend plugins: `haswell` (AVX2 + FMA + F16C + BMI2) and
+  `sse42` for CPUs without AVX2. ggml loads the best one the CPU supports at
+  startup. ggml cannot build a chosen subset, so `GGML_CPU_ALL_VARIANTS=ON`
+  compiles every x86 variant and the script stages only those two
+  (`CPU_VARIANTS`). The same layout is what lets the downloaded CUDA plugin
+  load (docs/GPU_PLUGIN.md).
+- The Rust half has one baseline, `RUSTFLAGS=-C target-cpu=x86-64-v2`
+  (SSE4.2 + POPCNT), which the script sets; that is the oldest CPU a release
+  runs on.
+- It builds twice: `tauri build --no-bundle` compiles everything, the ggml
+  libraries and CPU plugins are staged into `desktop-ui/src-tauri/runtime/`,
+  and a second `tauri build` with `tauri.runtime.conf.json` bundles that
+  directory as resources. Only the app crate recompiles.
+
+Installed, the libraries sit in Tauri's resource directory —
+`<prefix>/lib/LuneVoice/` on Linux, which the executable's `RUNPATH` names,
+and the install directory itself on Windows, where the loader finds DLLs beside
+the executable. The CPU plugins are in `backends/` below it. A PORTABLE binary
+run from the build tree needs them staged there first:
+`cgs stage-runtime --env PROFILE=release`.
 
 Host-tuned codegen is opt-in per build, not pinned in `.cargo/config.toml`: a
 committed `build.rustflags` would apply to a packager's plain `cargo build
@@ -139,13 +143,11 @@ host. `cgs dev` and the native branch of `cgs build` export
 
 ### Windows specifics
 
-On Windows, run the equivalent in PowerShell from `desktop-ui\`:
+On Windows, run the same script from Git Bash at the repository root, in a
+shell where MSVC, CMake and LLVM are on `PATH` (`LIBCLANG_PATH` set):
 
-```powershell
-$env:RUSTFLAGS="-C target-cpu=x86-64-v3"
-$env:GGML_NATIVE="OFF"; $env:GGML_AVX2="ON"; $env:GGML_FMA="ON"; $env:GGML_F16C="ON"
-bun tauri build --features "whisper-cpp"     # CPU
-bun tauri build --features "whisper-cuda"    # CUDA (needs CUDA Toolkit)
+```bash
+bash scripts/release/build-bundles.sh
 ```
 
 Tauri produces the `.msi`/`.exe` (NSIS) installers configured in
@@ -180,12 +182,12 @@ binary runs on the newer ones too. The `.rpm`'s `Requires` come from
 
 The `.tar.gz` is the `.deb` payload repacked, not a second compile: the deb's
 `usr/` tree is kept intact (tauri resolves resources as
-`<prefix>/bin/lune-voice` -> `<prefix>/lib/Lune Voice`) with a top-level
+`<prefix>/bin/lune-voice` -> `<prefix>/lib/LuneVoice`) with a top-level
 `lune-voice` launcher and a `README.txt` covering the udev rule. The binary's
 tauri bundle stamp is reset from `.deb` to "no bundle" (same length, and the
 script refuses unless exactly one stamp is found), so the portable copy offers
 a manual download instead of running `dpkg -i` through pkexec. Bundle file
-names are normalized from `Lune Voice_...` to `lune-voice_...`, by
+names are normalized from `LuneVoice_...` to `lune-voice_...`, by
 `package-all.sh` and by the release workflow alike.
 
 | `--env TYPE=` | Produces |
@@ -219,9 +221,10 @@ Two workflows cover the build.
 **`.github/workflows/ci.yml`** gates every push and PR. Alongside fmt, clippy,
 tests, DTO drift, the frontend and the dependency audits, a **`bundle`** job
 builds the real Linux artifact on `ubuntu-22.04` — the same PORTABLE CPU build
-`cgs build --env PORTABLE=1 --env BACKEND=cpu` produces — then asserts a `.deb`,
-`.rpm` and `.AppImage` all landed and that the udev rule is actually inside the
-`.deb`. Every other job compiles the whisper *stub*, so without this job a
+`cgs build --env PORTABLE=1` produces — then asserts a `.deb`, `.rpm` and
+`.AppImage` all landed, that the udev rule is actually inside the `.deb`, and
+that the `.deb` carries the ggml libraries and CPU plugins and its binary
+resolves them. Every other job compiles the whisper *stub*, so without this job a
 feature-passthrough typo, a broken `resources` path or a missing icon passed CI
 and failed at release time instead.
 
@@ -408,8 +411,8 @@ setting on and start the `cgs updater-test` build against the local endpoint.
 ## Third-party notices
 
 `whisper.cpp` and `ggml` are MIT-licensed. They are statically linked into the
-Windows and default `cgs build` artifacts, and shipped as separate shared
-objects wherever `GGML_BACKEND_DL` is enabled. The GPU plugin archive also
+default (native) `cgs build` artifact, and shipped as separate shared objects
+in every release bundle and wherever else `GGML_BACKEND_DL` is enabled. The GPU plugin archive also
 carries NVIDIA's redistributable CUDA runtime libraries. Keep
 `THIRD_PARTY_NOTICES.md` in sync with the bundled upstream when its version
 changes.

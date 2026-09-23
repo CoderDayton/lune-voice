@@ -4,8 +4,8 @@
 # committed `build.rustflags` applies to every `cargo build` in this repo,
 # including a packager's plain `cargo build --release`, and the resulting binary
 # SIGILLs on any CPU older than the build host. `cgs dev` and the native branch
-# of `cgs build` export `RUSTFLAGS=-C target-cpu=native` for themselves; the
-# PORTABLE branch exports the `x86-64-v3` baseline instead.
+# of `cgs build` export `RUSTFLAGS=-C target-cpu=native` for themselves; release
+# builds (scripts/release/build-bundles.sh) export the `x86-64-v2` baseline.
 
 # C toolchain for the Windows cross-check (`cgs check-windows`), so the whole
 # workspace can be type-checked for Windows from a Linux box. `zig cc` stands in

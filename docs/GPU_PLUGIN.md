@@ -30,7 +30,7 @@ What does work is ggml's own plugin mode:
 `GGML_BACKEND_DL` requires `BUILD_SHARED_LIBS=ON` and is incompatible with
 `GGML_NATIVE`, so plugin builds pass `GGML_NATIVE=OFF` and use
 `GGML_CPU_ALL_VARIANTS=ON` to get per-microarchitecture CPU plugins dispatched
-at runtime.
+at runtime. Release bundles ship two of them, AVX2 and SSE4.2.
 
 ## Two plugin directories
 
@@ -39,7 +39,11 @@ at runtime.
 | `<exe dir>/backends/` | CPU backends | Bundled with the app. Not optional: without them there is no compute backend at all. |
 | `<data dir>/backends/` | `libggml-cuda.so` + NVIDIA runtime | Downloaded on request. Absent until the user opts in. |
 
-On Linux the data dir is `~/.local/share/lune-voice/`.
+On Linux the data dir is `~/.local/share/lune-voice/`. An installed Linux bundle
+keeps its CPU backends in Tauri's resource directory instead,
+`<prefix>/lib/LuneVoice/backends/`, which `bundled_plugin_dir` falls back to
+when there is no `backends/` beside the executable. How release builds produce
+and stage them: [Build commands](RELEASE.md#build-commands).
 
 Both are scanned at startup by `lune_asr::gpu_backend::load_plugins`, which
 **must run before the first `WhisperContext` is created** — ggml picks a device
@@ -259,16 +263,6 @@ cuobjdump -lelf libggml-cuda.so | grep -oP 'sm_\K[0-9]+[a-z]*' | sort -u
 cuobjdump -lptx libggml-cuda.so | grep -oP 'sm_\K[0-9]+[a-z]*' | sort -u
 ```
 
-## Known limitation
-
-`cgs build` still produces a **static** artifact. The `GGML_BACKEND_DL` layout
-needs the ggml shared objects and CPU plugins staged next to the executable so
-`$ORIGIN` resolves, and Tauri's `resources` mechanism stages into the resource
-directory rather than the bin directory. Until that is wired and a bundle is
-verified end to end, `cgs build` keeps producing the known-good static build.
-
-`cgs dev` and `cgs stage-runtime` do exercise the plugin path.
-
 ## Running a dev build on the GPU
 
 `cgs dev` sets `GGML_BACKEND_DL=ON`, so a CUDA dev build emits the CUDA backend
@@ -281,5 +275,5 @@ cgs stage-runtime            # copies it into target/debug/backends/
 ```
 
 `stage-runtime` reports whether CUDA was among the plugins it staged. This is
-only needed for `cgs dev`; `cgs build` links CUDA in statically and needs no
-staging.
+only needed for `cgs dev`; the native `cgs build` links CUDA in statically and
+needs no staging.

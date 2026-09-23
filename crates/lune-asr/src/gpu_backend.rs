@@ -66,11 +66,36 @@ const NVIDIA_DRIVER_SONAME: &str = "libcuda.so.1";
 #[cfg(target_os = "windows")]
 const NVIDIA_DRIVER_DLL: &str = "nvcuda.dll";
 
+/// Tauri's resource directory name on Linux: the `productName` in
+/// `desktop-ui/src-tauri/tauri.conf.json`. Installed bundles keep the ggml
+/// libraries and CPU backends there, as `<prefix>/lib/<productName>`; the
+/// executable's run path in `desktop-ui/src-tauri/build.rs` names it too.
+const LINUX_RESOURCE_DIR: &str = "LuneVoice";
+
 /// Plugin directory shipped inside the application bundle, resolved relative to
 /// the running executable. `None` when the executable path is unavailable.
 pub fn bundled_plugin_dir() -> Option<PathBuf> {
-    let exe = std::env::current_exe().ok()?;
-    Some(exe.parent()?.join(DIR_GPU_BACKEND))
+    bundled_plugin_dir_for(&std::env::current_exe().ok()?)
+}
+
+/// [`bundled_plugin_dir`] for an executable at `exe`: `<exe dir>/backends` (a
+/// build tree, the Windows install directory) unless only the Linux bundle's
+/// resource directory has one.
+fn bundled_plugin_dir_for(exe: &Path) -> Option<PathBuf> {
+    let bin = exe.parent()?;
+    let beside = bin.join(DIR_GPU_BACKEND);
+    if !beside.is_dir()
+        && let Some(prefix) = bin.parent()
+    {
+        let resources = prefix
+            .join("lib")
+            .join(LINUX_RESOURCE_DIR)
+            .join(DIR_GPU_BACKEND);
+        if resources.is_dir() {
+            return Some(resources);
+        }
+    }
+    Some(beside)
 }
 
 /// Plugin directory the GPU download installs into.
@@ -529,6 +554,32 @@ mod tests {
         assert_eq!(
             downloaded_plugin_dir(Path::new("/data")),
             Path::new("/data").join(DIR_GPU_BACKEND)
+        );
+    }
+
+    #[test]
+    fn an_installed_linux_bundle_keeps_its_plugins_in_the_resource_dir() {
+        // deb, rpm, AppImage and the tarball put the binary in `<prefix>/bin`
+        // and Tauri's resources in `<prefix>/lib/<productName>`.
+        let prefix = std::env::temp_dir().join("lune-bundle-layout/usr");
+        let backends = prefix
+            .join("lib")
+            .join(LINUX_RESOURCE_DIR)
+            .join(DIR_GPU_BACKEND);
+        std::fs::create_dir_all(&backends).expect("create bundle layout");
+        assert_eq!(
+            bundled_plugin_dir_for(&prefix.join("bin/lune-voice")),
+            Some(backends)
+        );
+    }
+
+    #[test]
+    fn without_a_resource_dir_the_plugins_sit_next_to_the_executable() {
+        // A build tree, `cgs stage-runtime`, and the Windows install directory.
+        let bin = std::env::temp_dir().join("lune-build-tree-layout/release");
+        assert_eq!(
+            bundled_plugin_dir_for(&bin.join("lune-voice")),
+            Some(bin.join(DIR_GPU_BACKEND))
         );
     }
 

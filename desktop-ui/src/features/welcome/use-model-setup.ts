@@ -21,6 +21,7 @@ import {
   type GpuAccelerationOffer,
   gpuAccelerationOffer,
   hasOptionalModels,
+  initialWhisperModel,
   type ModelStatus,
   relevantSetupModels,
   shouldInstallGpuDuringSetup,
@@ -293,9 +294,6 @@ export function useModelSetup({ onFinish }: { onFinish: () => void }): ModelSetu
         // local backend (the remote OpenAI option lives in Settings).
         const backend: AsrBackendValue = 'WhisperCpp';
         setEngineBackend(backend);
-        setEngineWhisper(cur.whisperModel);
-        const asrName = asrModelLocalName(backend, cur.whisperModel);
-        setAsrLocalName(asrName);
         setUseGpuState(cur.useGpu);
         // Runtime GPU state gates the acceptance card; treat a probe failure as
         // "no GPU" so a transient error never wrongly offers acceleration.
@@ -305,10 +303,20 @@ export function useModelSetup({ onFinish }: { onFinish: () => void }): ModelSetu
           downloadBytes: 0,
         }));
         if (cancelled) return;
-        setGpuOffer(gpuAccelerationOffer(gpu.state, gpu.downloadAvailable));
+        const offer = gpuAccelerationOffer(gpu.state, gpu.downloadAvailable);
+        setGpuOffer(offer);
         setGpuStatus(gpu);
-        const s = relevantSetupModels(await invoke<ModelStatus[]>('check_model_status'));
+        const library = await invoke<ModelStatus[]>('check_model_status');
         if (cancelled) return;
+        // First run: start the engine step on a size this machine can run.
+        const whisper = initialWhisperModel(cur.whisperModel, library, {
+          gpu: cur.useGpu && offer !== null,
+          cpuThreads: navigator.hardwareConcurrency || 1,
+        });
+        setEngineWhisper(whisper);
+        const asrName = asrModelLocalName(backend, whisper);
+        setAsrLocalName(asrName);
+        const s = relevantSetupModels(library);
         setModels(s);
         setSelected(buildInitialSelection(asrName, s));
 

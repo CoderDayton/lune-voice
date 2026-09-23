@@ -6,6 +6,7 @@ import {
   buildInitialSelection,
   gpuAccelerationOffer,
   hasOptionalModels,
+  initialWhisperModel,
   isSetupSatisfiable,
   type ModelStatus,
   relevantSetupModels,
@@ -28,6 +29,37 @@ describe('asrModelLocalName', () => {
     expect(asrModelLocalName('WhisperCpp', 'Small')).toBe('whisper-small-q5_1');
     expect(asrModelLocalName('WhisperCpp', 'Medium')).toBe('whisper-medium-q5_0');
     expect(asrModelLocalName('WhisperCpp', 'LargeV3Turbo')).toBe('whisper-large-v3-turbo-q8_0');
+  });
+});
+
+describe('initialWhisperModel', () => {
+  const noneInstalled = [model('whisper-medium-q5_0'), model('whisper-small-q5_1')];
+
+  test('a machine with a GPU keeps the balanced default', () => {
+    expect(initialWhisperModel('Medium', noneInstalled, { gpu: true, cpuThreads: 4 })).toBe(
+      'Medium',
+    );
+  });
+
+  test('a CPU-only machine with enough threads starts on Small', () => {
+    expect(initialWhisperModel('Medium', noneInstalled, { gpu: false, cpuThreads: 8 })).toBe(
+      'Small',
+    );
+  });
+
+  test('a low-end CPU-only machine starts on Base', () => {
+    expect(initialWhisperModel('Medium', noneInstalled, { gpu: false, cpuThreads: 4 })).toBe(
+      'Base',
+    );
+  });
+
+  test('an installed Whisper model means the saved choice stands', () => {
+    // Past the first run the user has chosen; re-running setup must not
+    // quietly switch them to a different model.
+    const installed = [model('whisper-medium-q5_0', { ready: true }), model('whisper-small-q5_1')];
+    expect(initialWhisperModel('Medium', installed, { gpu: false, cpuThreads: 2 })).toBe(
+      'Medium',
+    );
   });
 });
 

@@ -47,7 +47,7 @@ After-speech wait = poll_final (Silero endpoint trim + whisper.cpp decode) + opt
 | 2 | LLM styling call | A few hundred milliseconds per utterance; skipped entirely when no style preset is selected |
 | 3 | Memory footprint | whisper.cpp holds its model weights in VRAM/RAM; the remote styling LLM adds no local memory footprint |
 
-**GPU impact:** a registered CUDA device moves ASR inference to the GPU and substantially reduces decode time. On Linux that comes from the downloadable GPU plugin ([docs/GPU_PLUGIN.md](GPU_PLUGIN.md)); a `whisper-cuda` build does the same thing statically. Without one, whisper.cpp uses its AVX2-optimized GGML kernels (portable baseline; compile flags: `GGML_AVX2=ON GGML_FMA=ON GGML_F16C=ON`). Plugin builds instead use `GGML_CPU_ALL_VARIANTS=ON`, which compiles per-microarchitecture CPU backends and picks the best one at runtime.
+**GPU impact:** a registered CUDA device moves ASR inference to the GPU and substantially reduces decode time. On Linux that comes from the downloadable GPU plugin ([docs/GPU_PLUGIN.md](GPU_PLUGIN.md)); a `whisper-cuda` build does the same thing statically. Without one, whisper.cpp runs on the CPU. Release builds ship two CPU backends and load the one the machine supports: `haswell` (AVX2 + FMA + F16C) for Intel since 2013 and AMD since 2015, and `sse42` for older or low-end CPUs without AVX2. AVX-512 is not used. The native `cgs build` compiles one backend for the build host.
 
 **Model size trade-off:** `Base` (~78 MB) is fastest and the choice for low-end hardware; `Small` (~190 MB) is next; `LargeV3Turbo` (~874 MB) provides the best accuracy with whisper's turbo decoder keeping latency closer to `Medium` (~539 MB) than to the full `Large` model.
 

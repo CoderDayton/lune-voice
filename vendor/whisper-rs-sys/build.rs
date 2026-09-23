@@ -337,6 +337,12 @@ fn main() {
         // reasoning as above: pin it off rather than let a previous plugin
         // build's cached `ON` fail the next static one.
         config.define("GGML_CPU_ALL_VARIANTS", "OFF");
+    } else if target.contains("linux") {
+        // LUNE FORK: the CPU backends install to `backends/` one level below
+        // `libggml-base`, and each links against it. Without a RUNPATH they
+        // resolve only because the process has already loaded it, and any
+        // per-file dependency walk (linuxdeploy, `ldd`) fails.
+        config.define("CMAKE_INSTALL_RPATH", "$ORIGIN:$ORIGIN/..");
     }
 
     if cfg!(not(feature = "openmp")) {

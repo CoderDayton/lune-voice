@@ -167,21 +167,39 @@ interpreter = "bash"
 # anything — this produces the artifact they'd run).
 #
 # TWO build profiles:
-#   • Default (NATIVE): `GGML_NATIVE=ON` tunes ggml to THIS machine's CPU and,
-#     for CUDA, only the build host's GPU arch (e.g. sm_89). The CUDA compile is
-#     ~8x smaller and won't exhaust RAM. The binary runs great here but is NOT
-#     portable to other CPUs/GPUs. This is the right local build.
-#   • PORTABLE (`--env PORTABLE=1`): a distributable artifact — portable AVX2 CPU
-#     baseline + every common NVIDIA CUDA arch. Much heavier: ggml compiles ~8
-#     CUDA archs, so build on a runner with plenty of RAM (or cap CARGO_BUILD_JOBS
-#     to avoid OOM). This is what release/CI uses per target.
+#   • Default (NATIVE): a static build with `GGML_NATIVE=ON`, tuned to THIS
+#     machine's CPU and, for CUDA, only the build host's GPU arch (e.g. sm_89).
+#     The CUDA compile is ~8x smaller and won't exhaust RAM. The binary runs
+#     great here but is NOT portable to other CPUs/GPUs. The right local build.
+#   • PORTABLE (`--env PORTABLE=1`): the distributable build release and CI use,
+#     via scripts/release/build-bundles.sh. CPU only: ggml as shared libraries
+#     with two CPU backend plugins, AVX2 and SSE4.2, picked at runtime, so it
+#     runs on any x86-64-v2 CPU; GPU arrives as the downloadable CUDA plugin
+#     (docs/GPU_PLUGIN.md). Run it from the build tree with
+#     `cgs stage-runtime --env PROFILE=release`.
 #
-# Backend AUTO-DETECTS: if `BACKEND` is unset and both nvcc and a working
-# nvidia-smi are present, CUDA is built; otherwise CPU. Force with
+# Backend AUTO-DETECTS for NATIVE: if `BACKEND` is unset and both nvcc and a
+# working nvidia-smi are present, CUDA is built; otherwise CPU. Force with
 # `--env BACKEND=cpu|cuda`. macOS Metal and the full release matrix: docs/RELEASE.md.
 # Build host needs: cmake, a C++ toolchain, and libclang (for bindgen); plus the
 # CUDA toolkit for a `cuda` build.
 command = '''
+# Compile only. The shippable installers are `cgs package`, which builds them in
+# containers against an old glibc so they install on other distros — a bundle
+# made here links this machine's libraries and is not distributable. Pass
+# --env BUNDLE=1 to bundle locally anyway, for testing the .deb layout itself.
+if [ -n "${BUNDLE:-}" ]; then
+  BUNDLE_ARGS="--bundles ${BUNDLES:-deb appimage}"
+else
+  BUNDLE_ARGS="--no-bundle"
+fi
+if [ -n "${PORTABLE:-}" ]; then
+  if [ "${BACKEND:-cpu}" != "cpu" ]; then
+    echo "PORTABLE builds are CPU only; GPU ships as the CUDA plugin (cgs gpu-plugin)"; exit 1
+  fi
+  APPIMAGE_EXTRACT_AND_RUN=1 bash scripts/release/build-bundles.sh $BUNDLE_ARGS
+  exit $?
+fi
 cd desktop-ui
 BACKEND="${BACKEND:-}"
 if [ -z "$BACKEND" ]; then
@@ -196,45 +214,15 @@ case "$BACKEND" in
   cuda) FEATURES="whisper-cuda" ;;
   *)    echo "BACKEND must be cpu|cuda (macOS Metal: see docs/RELEASE.md)"; exit 1 ;;
 esac
-if [ -n "${PORTABLE:-}" ]; then
-  # Distributable: portable AVX2 CPU baseline + every common NVIDIA CUDA arch (~8).
-  # NOTE: deliberately still a static build. The GGML_BACKEND_DL layout needs
-  # the ggml shared objects and backend plugins staged into the bundle next to
-  # the executable ($ORIGIN), which tauri's `resources` does not do — it stages
-  # into the resource dir, not the bin dir. Until that is wired and a bundle is
-  # verified end to end, `cgs build` keeps producing the known-good static
-  # artifact. `cgs dev` + `cgs stage-runtime` exercise the plugin path.
-  GGML_FLAGS="GGML_NATIVE=OFF GGML_AVX2=ON GGML_FMA=ON GGML_F16C=ON"
-  # The GGML flags above make only the C++ half portable; this pins the Rust
-  # half to the same baseline. x86-64-v3 is AVX2 + FMA + F16C.
-  case "$(uname -m)" in
-    x86_64) export RUSTFLAGS="-C target-cpu=x86-64-v3" ;;
-    *)      export RUSTFLAGS="" ;;
-  esac
-  echo "Building PORTABLE $BACKEND release: --features \"$FEATURES\" RUSTFLAGS=\"$RUSTFLAGS\""
-else
-  # Local (default): native to this machine — ggml targets only the build host's
-  # CPU and GPU arch, so the CUDA compile stays small and won't exhaust RAM.
-  # Static, for the same reason as the PORTABLE branch above.
-  GGML_FLAGS="GGML_NATIVE=ON"
-  # Host-tuned Rust codegen to match GGML_NATIVE. This is opt-in per build
-  # rather than pinned in `.cargo/config.toml`, so a plain `cargo build
-  # --release` stays portable.
-  export RUSTFLAGS="${RUSTFLAGS:--C target-cpu=native}"
-  echo "Building NATIVE $BACKEND build (this machine only): --features \"$FEATURES\" RUSTFLAGS=\"$RUSTFLAGS\""
-fi
-# Compile only. The shippable installers are `cgs package`, which builds them in
-# containers against an old glibc so they install on other distros — a bundle
-# made here links this machine's libraries and is not distributable. Pass
-# --env BUNDLE=1 to bundle locally anyway, for testing the .deb layout itself.
-if [ -n "${BUNDLE:-}" ]; then
-  BUNDLE_ARGS="--bundles ${BUNDLES:-deb appimage}"
-else
-  BUNDLE_ARGS="--no-bundle"
-fi
+GGML_FLAGS="GGML_NATIVE=ON"
+# Host-tuned Rust codegen to match GGML_NATIVE. This is opt-in per build
+# rather than pinned in `.cargo/config.toml`, so a plain `cargo build
+# --release` stays portable.
+export RUSTFLAGS="${RUSTFLAGS:--C target-cpu=native}"
+echo "Building NATIVE $BACKEND build (this machine only): --features \"$FEATURES\" RUSTFLAGS=\"$RUSTFLAGS\""
 env $GGML_FLAGS APPIMAGE_EXTRACT_AND_RUN=1 bun tauri build --features "$FEATURES" $BUNDLE_ARGS
 '''
-info = "Compile the desktop app, no installers — native to this machine (CUDA auto-detected). --env PORTABLE=1 for portable codegen; --env BACKEND=cpu|cuda to force; --env BUNDLE=1 to also bundle locally. Installers: cgs package. See docs/RELEASE.md"
+info = "Compile the desktop app, no installers — native to this machine (CUDA auto-detected). --env PORTABLE=1 for the distributable CPU build; --env BACKEND=cpu|cuda to force; --env BUNDLE=1 to also bundle locally. Installers: cgs package. See docs/RELEASE.md"
 requires = ["bun"]
 
 [scripts.stage-runtime]

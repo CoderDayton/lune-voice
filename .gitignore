@@ -1,6 +1,8 @@
 /target
 /dist
 desktop-ui/src-tauri/onnx-libs/
+# ggml libraries staged for bundling by scripts/release/build-bundles.sh
+desktop-ui/src-tauri/runtime/
 **/*.rs.bk
 *.swp
 *.swo
