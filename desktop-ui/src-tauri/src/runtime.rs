@@ -413,24 +413,8 @@ impl AppRuntime {
         let models_ready =
             lune_persist::has_required_models(&paths.models_dir(), &settings.asr_backend);
 
-        let (pipeline, llm_service, settings) = if models_ready {
-            build_pipeline(paths.clone(), settings, None).await?
-        } else {
-            info!("models not yet downloaded — deferring pipeline build");
-            let settings = Arc::new(RwLock::new(settings));
-            let null_svc: Arc<dyn LlmService> = Arc::new(NullPostProcessor::new());
-            let pipeline = LivePipeline {
-                paths,
-                manager: None,
-                asr: None,
-                state: PipelineState::Idle,
-                abort_pending_start: false,
-                session_id: None,
-                reload: ReloadScope::Full,
-                focus_target: None,
-            };
-            (pipeline, null_svc, settings)
-        };
+        let (pipeline, llm_service, settings) =
+            initial_pipeline(paths, settings, models_ready).await;
 
         let terminal_mode = settings.read().await.terminal_mode;
         let delivery = DeliveryService::new(terminal_mode)?;
@@ -710,24 +694,15 @@ impl AppRuntime {
     /// A settings save. Only a change to the transcription backend or the
     /// device policy invalidates the loaded model; everything else on the
     /// settings page is config-scope.
-    pub async fn mark_settings_changed(&self) {
-        let paths = { self.inner.pipeline.lock().await.paths.clone() };
-        let scope = match load_settings(&paths) {
-            Ok(next) => {
-                let current = self.inner.settings.read().await;
-                if next.device != current.device
-                    || asr_backend_needs_reload(&current.asr_backend, &next.asr_backend)
-                {
-                    ReloadScope::Full
-                } else {
-                    ReloadScope::Config
-                }
-            }
-            // Can't tell what changed — reload everything rather than keep
-            // running against something that may now be wrong.
-            Err(error) => {
-                warn!(%error, "settings reload scope undecidable; rebuilding everything");
+    pub async fn mark_settings_changed(&self, next: &UserSettings) {
+        let scope = {
+            let current = self.inner.settings.read().await;
+            if next.device != current.device
+                || asr_backend_needs_reload(&current.asr_backend, &next.asr_backend)
+            {
                 ReloadScope::Full
+            } else {
+                ReloadScope::Config
             }
         };
         self.request_reload(scope).await;
@@ -1650,6 +1625,53 @@ impl Clone for AppRuntime {
     }
 }
 
+/// The pipeline the app starts with: built now when the models are on disk,
+/// otherwise left for the first dictation to build.
+///
+/// Infallible on purpose. Startup runs inside Tauri's `setup`, which panics
+/// on an error, so a pipeline that cannot build (a truncated model, remote
+/// transcription while remote services are off, no GPU memory) would stop
+/// the app from ever opening — and with it the settings that fix the cause.
+/// A failed build is deferred instead; the next dictation retries it and
+/// reports the reason.
+async fn initial_pipeline(
+    paths: AppPaths,
+    settings: UserSettings,
+    models_ready: bool,
+) -> (LivePipeline, Arc<dyn LlmService>, Arc<RwLock<UserSettings>>) {
+    if !models_ready {
+        info!("models not yet downloaded — deferring pipeline build");
+        return deferred_pipeline(paths, settings);
+    }
+    match build_pipeline(paths.clone(), settings.clone(), None).await {
+        Ok(built) => built,
+        Err(error) => {
+            warn!(%error, "pipeline build failed at startup; deferring it to the first dictation");
+            deferred_pipeline(paths, settings)
+        }
+    }
+}
+
+/// A pipeline with nothing loaded and a full rebuild pending, so the next
+/// start builds it.
+fn deferred_pipeline(
+    paths: AppPaths,
+    settings: UserSettings,
+) -> (LivePipeline, Arc<dyn LlmService>, Arc<RwLock<UserSettings>>) {
+    let null_svc: Arc<dyn LlmService> = Arc::new(NullPostProcessor::new());
+    let pipeline = LivePipeline {
+        paths,
+        manager: None,
+        asr: None,
+        state: PipelineState::Idle,
+        abort_pending_start: false,
+        session_id: None,
+        reload: ReloadScope::Full,
+        focus_target: None,
+    };
+    (pipeline, null_svc, Arc::new(RwLock::new(settings)))
+}
+
 /// Build a fresh pipeline.
 ///
 /// `reuse_asr` carries the already-loaded backend forward for a
@@ -2258,6 +2280,31 @@ mod tests {
         // ~874 MB of weights for it is the cost this check exists to avoid.
         assert!(!asr_backend_needs_reload(&small, &small));
         assert!(asr_backend_needs_reload(&small, &medium));
+    }
+
+    /// Startup runs inside Tauri's `setup`, which panics on any error. A
+    /// pipeline that cannot build — here, remote transcription saved while
+    /// remote services are off — must leave the app running with the build
+    /// deferred, so the next dictation reports the reason instead.
+    #[tokio::test]
+    async fn a_pipeline_that_cannot_build_does_not_stop_the_app_starting() {
+        let root = std::env::temp_dir().join("lune-startup-build-failure");
+        let paths = lune_persist::AppPaths::from_dirs(root.join("config"), root.join("data"));
+        let settings = lune_core::config::UserSettings {
+            privacy_mode: PrivacyMode::LocalOnly,
+            asr_backend: AsrBackendConfig::OpenAiCompatible {
+                base_url: "https://api.example.test/v1".parse().expect("url"),
+                api_key: lune_core::config::RedactedString::new("key"),
+                model: "whisper-1".into(),
+                streaming: lune_core::config::StreamingMode::HttpPolling,
+            },
+            ..Default::default()
+        };
+
+        let (pipeline, _, _) = super::initial_pipeline(paths, settings, true).await;
+        assert!(pipeline.manager.is_none());
+        assert_eq!(pipeline.reload, ReloadScope::Full);
+        assert_eq!(pipeline.state, PipelineState::Idle);
     }
 
     #[test]

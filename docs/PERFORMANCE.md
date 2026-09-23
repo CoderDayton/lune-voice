@@ -97,7 +97,7 @@ baseline. Model-backed targets compile whisper.cpp and need a model on disk. Num
 | Technique | Location | Impact |
 |-----------|----------|--------|
 | **Blocking-pool inference** | `crates/lune-asr/src/backend/whisper_cpp.rs` | Whisper decode runs via `block_in_place` (the `!Send` session can't `spawn_blocking`), so model execution never starves the async runtime or the audio capture loop |
-| **Shared model, per-session state (ASR)** | `crates/lune-asr/src/backend/whisper_cpp.rs` | `WhisperContext` (model weights) is `Arc`-shared; `WhisperState` (decode scratch) is lightweight and per-session |
+| **Shared model, per-session state (ASR)** | `crates/lune-asr/src/backend/whisper_cpp.rs` | `WhisperContext` (model weights) is `Arc`-shared; `WhisperState` is per-session and allocates its own decode and KV-cache buffers on creation |
 | **Plain async HTTP (LLM)** | `crates/lune-llm/src/backend/openai.rs` | The remote styling call is a single `async-openai` request on the async runtime — no local model, no blocking pool |
 
 ---
@@ -108,7 +108,7 @@ These live in the `[pipeline]` section of `settings.toml`. For the full list of 
 
 | Parameter | Default | Effect | Tradeoff |
 |-----------|---------|--------|----------|
-| `max_speech_secs` | 60 | Auto-end the session after this many seconds of audio; longer utterances accumulate more audio for whisper to decode | Higher allows longer single dictations at the cost of a proportionally longer decode |
+| `max_speech_secs` | 300 (local Whisper), 120 (remote) | Auto-end the session after this many seconds of audio; longer utterances accumulate more audio for whisper to decode | Higher allows longer single dictations at the cost of a proportionally longer decode |
 | `llm_timeout_secs` | 30 | Fall back to unstyled (dictionary-seeded) text if the styling call exceeds this | Lower bounds worst-case latency; too low will skip styling on slow CPU runs |
 
 ### Recommended Profiles

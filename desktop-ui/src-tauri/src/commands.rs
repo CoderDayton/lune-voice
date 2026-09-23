@@ -169,16 +169,15 @@ pub async fn load_pill_snapshot(
     runtime: State<'_, AppRuntime>,
 ) -> Result<PillSnapshotDto, String> {
     require_window_access(&window, &["pill"])?;
-    let mut snapshot = run_persist("load pill snapshot", || {
-        crate::persistence::load_workspace_snapshot()
+    let settings = run_persist("load pill snapshot", || {
+        crate::persistence::load_workspace_settings()
     })
     .await?;
-    snapshot.service_status = runtime.service_status().await;
     Ok(PillSnapshotDto {
-        service_status: snapshot.service_status,
-        activation_mode: snapshot.settings.core.activation_mode,
-        pill_visibility: snapshot.settings.core.pill_visibility,
-        pill_locked: snapshot.settings.core.pill_locked,
+        service_status: runtime.service_status().await,
+        activation_mode: settings.core.activation_mode,
+        pill_visibility: settings.core.pill_visibility,
+        pill_locked: settings.core.pill_locked,
     })
 }
 
@@ -189,11 +188,11 @@ pub async fn save_workspace_settings(
     input: SaveWorkspaceSettingsInput,
 ) -> Result<WorkspaceSnapshot, String> {
     require_window_access(&window, &["main"])?;
-    let mut snapshot = run_persist("save workspace settings", move || {
+    let (mut snapshot, saved) = run_persist("save workspace settings", move || {
         crate::persistence::save_workspace_settings(input)
     })
     .await?;
-    runtime.mark_settings_changed().await;
+    runtime.mark_settings_changed(&saved).await;
     // Hot-reload the hotkey listener — trigger key, modifiers, cancel key, and
     // activation mode all apply immediately, no restart required. The
     // controller covers every case: a live native backend re-targets in place,
@@ -201,27 +200,12 @@ pub async fn save_workspace_settings(
     // start here, so a binding repaired in the UI takes effect at once.
     {
         use tauri::Manager;
-        if let Some(paths) = lune_persist::AppPaths::resolve() {
-            // TOML read + parse is blocking disk I/O; keep it off the Tokio
-            // worker running this command, like every other I/O in this file.
-            let loaded = run_persist("reload settings for hotkey update", move || {
-                lune_persist::SettingsStore::new(paths.settings_file())
-                    .load()
-                    .map_err(|e| e.to_string())
-            })
-            .await;
-            match loaded {
-                Ok(s) => {
-                    if let Some(live) = runtime
-                        .app_handle()
-                        .try_state::<std::sync::Arc<crate::hotkey::HotkeyController>>()
-                    {
-                        if let Err(e) = live.update(&s.hotkey, s.activation_mode) {
-                            tracing::warn!(error = %e, "hotkey hot-reload rejected");
-                        }
-                    }
-                }
-                Err(e) => tracing::warn!(error = %e, "settings reload for hotkey update failed"),
+        if let Some(live) = runtime
+            .app_handle()
+            .try_state::<std::sync::Arc<crate::hotkey::HotkeyController>>()
+        {
+            if let Err(e) = live.update(&saved.hotkey, saved.activation_mode) {
+                tracing::warn!(error = %e, "hotkey hot-reload rejected");
             }
         }
     }
@@ -255,18 +239,7 @@ pub async fn save_workspace_settings(
             crate::persistence::pill_visibility_from_dto(snapshot.settings.core.pill_visibility);
         let status = runtime.service_status().await;
         let show_after = crate::pill::should_show_pill(vis, &status);
-        if let Some(paths) = lune_persist::AppPaths::resolve() {
-            let loaded = run_persist("reload settings for pill update", move || {
-                lune_persist::SettingsStore::new(paths.settings_file())
-                    .load()
-                    .map_err(|e| e.to_string())
-            })
-            .await;
-            match loaded {
-                Ok(s) => crate::pill::apply_pill_settings(runtime.app_handle(), &s, show_after),
-                Err(e) => tracing::warn!(error = %e, "settings reload for pill update failed"),
-            }
-        }
+        crate::pill::apply_pill_settings(runtime.app_handle(), &saved, show_after);
     }
     // Create or destroy the pill overlay window to match the new visibility.
     // "Never" must free the webview process, not merely hide it; switching back

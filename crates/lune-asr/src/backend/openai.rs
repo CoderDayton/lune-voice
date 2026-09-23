@@ -20,7 +20,8 @@ pub struct OpenAiAsrConfig {
     pub api_key: RedactedString,
     /// Model name, e.g. `"whisper-1"`.
     pub model: String,
-    /// Per-request timeout (default 30 s).
+    /// Base per-request deadline (default 30 s). Each request adds its clip's
+    /// duration to it.
     pub timeout: Duration,
     /// Minimum PCM samples buffered before triggering a request.
     ///
@@ -95,9 +96,10 @@ impl OpenAiCompatibleAsrBackend {
         // Refuse redirects, for the same reason `lune-llm`'s client does: the
         // HTTPS/locality check above inspects `base_url` only, so a 302 to a
         // plaintext or third-party host would carry the recorded audio past it.
+        // No client-wide deadline: each request gets one sized to its audio,
+        // see `request_timeout`.
         let client = reqwest::Client::builder()
             .connect_timeout(retry::CONNECT_TIMEOUT)
-            .timeout(config.timeout)
             .redirect(reqwest::redirect::Policy::none())
             .build()
             .map_err(|e| Error::asr(format!("build http client: {e}")))?;
@@ -221,6 +223,7 @@ impl OpenAiCompatibleAsrBackend {
         // of audio) buffer on every retry.
         let wav: bytes::Bytes = encode_wav_16bit(pcm, sample_rate).into();
         let wav_len = wav.len() as u64;
+        let deadline = request_timeout(self.config.timeout, pcm.len(), sample_rate);
 
         let mut last_err = String::new();
         let mut delay = retry::INITIAL_BACKOFF;
@@ -256,12 +259,22 @@ impl OpenAiCompatibleAsrBackend {
             let resp = self
                 .client
                 .post(self.transcription_url.clone())
+                .timeout(deadline)
                 .header("Authorization", self.auth_header.expose())
                 .multipart(form)
                 .send()
                 .await;
 
             match resp {
+                // The request already used the whole deadline; sending the
+                // same audio again would only double the wait. A connect
+                // timeout is cheap and bounded, so it still retries.
+                Err(e) if e.is_timeout() && !e.is_connect() => {
+                    return Err(Error::asr(format!(
+                        "the transcription endpoint did not answer within {}s",
+                        deadline.as_secs_f64().ceil()
+                    )));
+                }
                 Err(e) => {
                     last_err = e.to_string();
                     tracing::warn!(attempt, error = %e, "ASR request failed");
@@ -295,6 +308,17 @@ impl OpenAiCompatibleAsrBackend {
             retry::MAX_ATTEMPTS
         )))
     }
+}
+
+/// Deadline for one transcription request: `base` plus the clip's own
+/// duration, since the server has to receive and transcribe all of it. A
+/// fixed deadline fails every long dictation on a slow uplink or a
+/// self-hosted CPU server, where transcription runs near real time.
+fn request_timeout(base: Duration, samples: usize, sample_rate: u32) -> Duration {
+    if sample_rate == 0 {
+        return base;
+    }
+    base + Duration::from_secs_f64(samples as f64 / f64::from(sample_rate))
 }
 
 /// Ceiling on a successful response body.
@@ -600,6 +624,63 @@ mod tests {
         // "no speech detected" upstream and hide the API outage.
         let err = backend.poll_final(&session).await.unwrap_err();
         assert!(err.to_string().contains("ASR failed"), "got: {err}");
+    }
+
+    /// The server has to receive and transcribe the whole clip inside the
+    /// deadline, so a fixed one fails every long dictation on a slow link or
+    /// a self-hosted CPU server.
+    #[test]
+    fn a_long_utterance_gets_time_in_proportion_to_its_length() {
+        let base = Duration::from_secs(30);
+        assert_eq!(
+            request_timeout(base, 120 * 16_000, 16_000),
+            Duration::from_secs(150)
+        );
+        assert!(request_timeout(base, 1_600, 16_000) < Duration::from_secs(31));
+        assert_eq!(request_timeout(base, 16_000, 0), base);
+    }
+
+    /// A timed-out request already took the full deadline. Sending the same
+    /// audio again only makes the user wait that long again, so it is not
+    /// retried.
+    #[tokio::test]
+    async fn a_server_that_times_out_is_not_asked_again() {
+        use std::sync::Arc;
+        use std::sync::atomic::{AtomicUsize, Ordering};
+
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let port = listener.local_addr().unwrap().port();
+        let accepted = Arc::new(AtomicUsize::new(0));
+        let counter = Arc::clone(&accepted);
+        tokio::spawn(async move {
+            let mut held = Vec::new();
+            while let Ok((stream, _)) = listener.accept().await {
+                counter.fetch_add(1, Ordering::SeqCst);
+                held.push(stream); // never answer
+            }
+        });
+
+        let config = OpenAiAsrConfig {
+            base_url: format!("http://127.0.0.1:{port}/v1").parse().unwrap(),
+            timeout: Duration::from_millis(200),
+            min_samples_before_request: 0,
+            ..Default::default()
+        };
+        let backend = OpenAiCompatibleAsrBackend::new(config).unwrap();
+        let session = backend
+            .start_session(AsrSessionConfig::default())
+            .await
+            .unwrap();
+        backend.push_audio(&session, &[0.0f32; 100]).await.unwrap();
+
+        let err = backend
+            .poll_final(&session)
+            .await
+            .expect_err("server never answers");
+        // A sub-second deadline rounds up, never down to "0s".
+        assert!(err.to_string().contains("within 1s"), "{err}");
+        tokio::time::sleep(Duration::from_millis(200)).await;
+        assert_eq!(accepted.load(Ordering::SeqCst), 1);
     }
 
     #[tokio::test]

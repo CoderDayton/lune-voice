@@ -120,7 +120,8 @@ fn rms_of(samples: &[f32]) -> f32 {
 /// error event, hotkey would feel broken until process restart.
 const ASR_START_TIMEOUT: Duration = Duration::from_secs(15);
 
-/// Hard ceiling on the final decode.
+/// Base ceiling on the final decode; [`final_decode_ceiling`] adds the clip's
+/// duration.
 ///
 /// Deliberately generous: a long utterance on a large model genuinely takes
 /// tens of seconds on CPU, and cutting a real transcription short is worse than
@@ -129,6 +130,16 @@ const ASR_START_TIMEOUT: Duration = Duration::from_secs(15);
 /// still up. Cancellation, not this ceiling, is what a user actually reaches
 /// for; the two are raced together.
 const POLL_FINAL_TIMEOUT: Duration = Duration::from_secs(180);
+
+/// The final-decode ceiling for a clip of `speech_samples`:
+/// [`POLL_FINAL_TIMEOUT`] plus the clip's duration.
+///
+/// The remote backend gives each request its own deadline of a base plus the
+/// clip's duration, so a fixed ceiling would cut a long request off before
+/// that deadline, however much the user raised `max_speech_secs`.
+fn final_decode_ceiling(speech_samples: usize) -> Duration {
+    POLL_FINAL_TIMEOUT + Duration::from_secs((speech_samples / SAMPLE_RATE) as u64)
+}
 
 /// How the final decode ended.
 enum PollOutcome {
@@ -497,7 +508,8 @@ pub(crate) async fn run_capture<A: AsrBackend + 'static>(
         // and the local decode is bounded by the utterance anyway; the remote
         // one, which is genuinely unbounded, is the case that needed this.
         let decode = asr.poll_final(&asr_session);
-        let ceiling = tokio::time::sleep(POLL_FINAL_TIMEOUT);
+        let ceiling_after = final_decode_ceiling(speech_samples);
+        let ceiling = tokio::time::sleep(ceiling_after);
         tokio::pin!(decode, ceiling);
         let mut listening = true;
         let outcome = loop {
@@ -535,7 +547,7 @@ pub(crate) async fn run_capture<A: AsrBackend + 'static>(
                 warn!(%session_id, poll_final_ms, "transcription timed out");
                 first_asr_error.get_or_insert(format!(
                     "transcription did not finish within {}s",
-                    POLL_FINAL_TIMEOUT.as_secs()
+                    ceiling_after.as_secs()
                 ));
             }
             PollOutcome::Cancelled => {
@@ -566,7 +578,21 @@ pub(crate) async fn run_capture<A: AsrBackend + 'static>(
 
 #[cfg(test)]
 mod tests {
-    use super::is_speech_content;
+    use super::{POLL_FINAL_TIMEOUT, final_decode_ceiling, is_speech_content};
+    use lune_core::audio::SAMPLE_RATE;
+    use std::time::Duration;
+
+    #[test]
+    fn a_long_utterance_extends_the_final_decode_ceiling() {
+        assert_eq!(final_decode_ceiling(0), POLL_FINAL_TIMEOUT);
+        // A remote request's own deadline is 30 s plus the clip, so the outer
+        // ceiling has to grow with the clip too or it cuts that request short.
+        let clip = 200 * SAMPLE_RATE;
+        assert_eq!(
+            final_decode_ceiling(clip),
+            POLL_FINAL_TIMEOUT + Duration::from_secs(200)
+        );
+    }
 
     #[test]
     fn keeps_ordinary_speech() {

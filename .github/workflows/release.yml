@@ -26,8 +26,10 @@ on:
   # Allows a dry run against a branch without cutting a tag.
   workflow_dispatch:
 
+# Read-only by default. Only `publish` writes to the release; the build jobs
+# run `bun install` and crate build scripts, so they never hold a write token.
 permissions:
-  contents: write
+  contents: read
 
 env:
   CARGO_TERM_COLOR: always
@@ -44,7 +46,7 @@ jobs:
     name: Verify version
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
 
       - name: Tag matches tauri.conf.json / Cargo.toml / package.json
         run: |
@@ -83,16 +85,14 @@ jobs:
       # Without this the Rust half is built for the runner's CPU and SIGILLs on
       # older user hardware.
       RUSTFLAGS: "-C target-cpu=x86-64-v3"
+    # No build cache: a release compiles from scratch, so nothing another ref
+    # wrote into a shared cache can end up in the shipped binary.
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
 
-      - uses: dtolnay/rust-toolchain@stable
+      - uses: dtolnay/rust-toolchain@6bed0761d98439e5a578e2877258200ad565ba87 # stable
 
-      - uses: Swatinem/rust-cache@v2
-        with:
-          prefix-key: release-linux-cpu
-
-      - uses: oven-sh/setup-bun@v2
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
         with:
           bun-version: '1.4.0'
 
@@ -156,64 +156,28 @@ jobs:
           (cd release-artifacts && sha256sum ./* > SHA256SUMS)
           ls -la release-artifacts
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: lune-voice-linux-x86_64
           path: release-artifacts/*
           if-no-files-found: error
 
-      # Draft, not published: `latest.json` still has to be signed locally and
-      # uploaded before this is visible to the updater. See the header comment.
-      - name: Create draft release
-        if: github.ref_type == 'tag'
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          set -euo pipefail
-          notes="$(mktemp)"
-          cat > "$notes" <<'EOF'
-          > **Draft — not ready to publish.**
-          > `latest.json` is not attached yet, so the in-app updater cannot see
-          > this release. Sign and attach it before undrafting:
-          >
-          > ```
-          > gh release download TAG -D release-artifacts
-          > cgs updater-manifest --env TAG=TAG
-          > gh release upload TAG release-artifacts/latest.json
-          > gh release edit TAG --draft=false
-          > ```
-          EOF
-          # Re-running the workflow on an existing tag re-uploads rather than
-          # failing on a duplicate release.
-          if ! gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1; then
-            gh release create "$GITHUB_REF_NAME" \
-              --draft \
-              --title "$GITHUB_REF_NAME" \
-              --notes-file "$notes"
-          fi
-          gh release upload "$GITHUB_REF_NAME" release-artifacts/* --clobber
-
   # ── Windows bundle (CPU; the CUDA plugin is Linux-only for now) ───────────
   build-windows:
     name: Windows bundle
-    # Serialised behind the Linux job so only one of them can create the draft
-    # release; this one only ever uploads into a release that already exists.
-    needs: [verify-version, build-linux]
+    needs: [verify-version]
     runs-on: windows-latest
     env:
       # Same portability floor as the Linux bundle: without it the Rust half is
       # built for the runner's CPU and faults on older user hardware.
       RUSTFLAGS: "-C target-cpu=x86-64-v3"
+    # No build cache, for the same reason as the Linux job.
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
 
-      - uses: dtolnay/rust-toolchain@stable
+      - uses: dtolnay/rust-toolchain@6bed0761d98439e5a578e2877258200ad565ba87 # stable
 
-      - uses: Swatinem/rust-cache@v2
-        with:
-          prefix-key: release-windows-cpu
-
-      - uses: oven-sh/setup-bun@v2
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
         with:
           bun-version: '1.4.0'
 
@@ -246,18 +210,56 @@ jobs:
           (cd release-artifacts && sha256sum ./* > SHA256SUMS-windows)
           ls -la release-artifacts
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: lune-voice-windows-x86_64
           path: release-artifacts/*
           if-no-files-found: error
 
-      # The draft already exists (see `needs`), so this only attaches to it.
-      - name: Attach to draft release
-        if: github.ref_type == 'tag'
-        shell: bash
+  # ── Draft release ─────────────────────────────────────────────────────────
+  # The one job with a write token. It runs no project code: it collects what
+  # the build jobs uploaded and attaches it to the draft.
+  publish:
+    name: Draft release
+    needs: [build-linux, build-windows]
+    if: github.ref_type == 'tag'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          path: release-artifacts
+          merge-multiple: true
+
+      # Draft, not published: `latest.json` still has to be signed locally and
+      # uploaded before this is visible to the updater. See the header comment.
+      - name: Create draft release
         env:
           GH_TOKEN: ${{ github.token }}
+          # No checkout here, so `gh` cannot read the repo from a git remote.
+          GH_REPO: ${{ github.repository }}
         run: |
           set -euo pipefail
+          notes="$(mktemp)"
+          cat > "$notes" <<'EOF'
+          > **Draft — not ready to publish.**
+          > `latest.json` is not attached yet, so the in-app updater cannot see
+          > this release. Sign and attach it before undrafting:
+          >
+          > ```
+          > gh release download TAG -D release-artifacts
+          > cgs updater-manifest --env TAG=TAG
+          > gh release upload TAG release-artifacts/latest.json
+          > gh release edit TAG --draft=false
+          > ```
+          EOF
+          # Re-running the workflow on an existing tag re-uploads rather than
+          # failing on a duplicate release.
+          if ! gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1; then
+            gh release create "$GITHUB_REF_NAME" \
+              --draft \
+              --title "$GITHUB_REF_NAME" \
+              --notes-file "$notes"
+          fi
           gh release upload "$GITHUB_REF_NAME" release-artifacts/* --clobber

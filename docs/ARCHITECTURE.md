@@ -86,7 +86,7 @@ Both backends implement the same `AsrBackend` trait, so the session code does no
 
 The `WhisperCppBackend` wraps `whisper-rs`, which vendors and compiles `whisper.cpp`:
 
-- The `WhisperContext` (model weights) is loaded **once** at backend construction and shared across all sessions. Per-session `WhisperState` is lightweight (a decode context).
+- The `WhisperContext` (model weights) is loaded **once** at backend construction and shared across all sessions. Per-session `WhisperState` is a decode context that allocates its own KV-cache and compute buffers when created.
 - `push_audio` appends PCM to a per-session buffer pre-allocated for 30 s of audio (grows once for longer utterances; reset without freeing after each decode).
 - `poll_final` decodes the entire buffer in one shot using **BeamSearch** (beam size 5) — whisper.cpp's accuracy-oriented default. Decoding is one-shot per utterance, so the extra compute is worthwhile.
 - **Silero endpoint trim:** when the VAD model is present (`models/whisper-vad-silero/ggml-silero-v5.1.2.bin`), `poll_final` first runs `WhisperVadContext::segments_from_samples` over the buffer and decodes only the span between the first and last speech segment. Internal pauses are kept, because whisper reads them as punctuation cues. whisper.cpp's in-decode `enable_vad` is deliberately **not** used — it concatenates speech spans and strips those pauses, producing run-ons. The VAD context always runs on CPU (silero is tiny, and a GPU context crashed at init). If the model file is missing, the backend logs a warning and decodes the whole buffer.
@@ -344,7 +344,8 @@ dedicated OS threads
 
 The runtime is **tokio multi-thread** (Tauri's default). The `WhisperContext` is
 wrapped in an `Arc` and shared across all sessions. Each session creates a
-lightweight `WhisperState` via `ctx.create_state()`. The state is held behind a
+`WhisperState` via `ctx.create_state()`, which allocates that session's KV-cache
+and compute buffers. The state is held behind a
 `Mutex<WhisperCppSession>` so the async and blocking layers can both access it
 safely.
 

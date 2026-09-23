@@ -21,6 +21,7 @@
 use std::collections::BTreeMap;
 use std::io::Read;
 use std::path::{Component, Path, PathBuf};
+use std::sync::atomic::{AtomicBool, Ordering};
 
 use sha2::{Digest, Sha256};
 
@@ -237,7 +238,34 @@ fn is_versioned_soname(file: &str, soname: &str) -> bool {
     !version.is_empty() && version.chars().all(|c| c.is_ascii_digit() || c == '.')
 }
 
+/// Set while an [`install`] runs. Every install writes the same
+/// `.gpu-plugin.tar.gz.part` and unpacks into the same directory, so a second
+/// one would interleave its bytes with the first and fail both digests.
+static INSTALL_IN_FLIGHT: AtomicBool = AtomicBool::new(false);
+
+/// Holds [`INSTALL_IN_FLIGHT`] and clears it on drop, which also covers an
+/// install whose future is dropped mid-download.
+struct InstallGuard;
+
+impl InstallGuard {
+    fn acquire() -> Option<Self> {
+        INSTALL_IN_FLIGHT
+            .compare_exchange(false, true, Ordering::AcqRel, Ordering::Acquire)
+            .ok()
+            .map(|_| Self)
+    }
+}
+
+impl Drop for InstallGuard {
+    fn drop(&mut self) {
+        INSTALL_IN_FLIGHT.store(false, Ordering::Release);
+    }
+}
+
 /// Download, verify, and unpack the GPU backend into `dest_dir`.
+///
+/// One install runs at a time; a call made while another is in flight is
+/// refused.
 ///
 /// The archive is streamed to a temporary file next to the destination and
 /// hashed as it arrives, so a corrupt or tampered download never reaches the
@@ -256,6 +284,12 @@ where
              upload it to the GitHub release, and pin its SHA-256 in gpu_plugin.rs",
         )));
     }
+    let Some(_in_flight) = InstallGuard::acquire() else {
+        return Err(PersistError::GpuPlugin(
+            "GPU support is already being installed — wait for that download to finish."
+                .to_string(),
+        ));
+    };
     std::fs::create_dir_all(dest_dir)?;
 
     let archive = dest_dir.join(".gpu-plugin.tar.gz.part");
@@ -869,6 +903,56 @@ mod tests {
             err.to_string().contains("cgs gpu-plugin"),
             "error should say how to publish one: {err}"
         );
+    }
+
+    #[tokio::test]
+    async fn a_second_install_is_refused_while_one_is_running() {
+        // A server that accepts the download and never answers, so the first
+        // install stays in flight for as long as the test needs.
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0")
+            .await
+            .expect("bind");
+        let addr = listener.local_addr().expect("addr");
+        let (accepted_tx, mut accepted_rx) = tokio::sync::mpsc::unbounded_channel();
+        let server = tokio::spawn(async move {
+            let mut held = Vec::new();
+            while let Ok((stream, _)) = listener.accept().await {
+                held.push(stream);
+                let _ = accepted_tx.send(());
+            }
+        });
+
+        let url: &'static str = Box::leak(format!("http://{addr}/plugin.tar.gz").into_boxed_str());
+        let release: &'static GpuPluginRelease = Box::leak(Box::new(GpuPluginRelease {
+            url,
+            sha256: "00",
+            download_bytes: 1,
+            cuda_major: 13,
+        }));
+        let tmp = tempfile::tempdir().expect("tempdir");
+        let dest = tmp.path().to_path_buf();
+
+        let first = tokio::spawn({
+            let dest = dest.clone();
+            async move { install(release, &dest, |_| {}).await }
+        });
+        accepted_rx.recv().await.expect("first install connects");
+
+        let second = tokio::time::timeout(
+            std::time::Duration::from_secs(5),
+            install(release, &dest, |_| {}),
+        )
+        .await
+        .expect("the second install must not wait on the first");
+        let err = second.expect_err("a concurrent install must be refused");
+        assert!(
+            err.to_string().contains("already"),
+            "error should say an install is running: {err}"
+        );
+
+        first.abort();
+        let _ = first.await;
+        server.abort();
     }
 
     /// No release is downloadable while the repo is private: GitHub serves a

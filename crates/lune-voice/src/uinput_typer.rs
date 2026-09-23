@@ -108,15 +108,18 @@ pub fn remove_uinput_rule() -> Result<bool, String> {
         return Ok(false);
     }
 
-    let status = Command::new("pkexec")
-        .args(["rm", "-f", UDEV_RULE_PATH])
-        .status()
-        .map_err(|e| format!("pkexec spawn failed: {e}"))?;
+    let script = remove_script();
+    let Some(status) =
+        crate::probe::status_with_timeout("pkexec", &["/bin/sh", "-c", &script], PKEXEC_TIMEOUT)
+    else {
+        return Err(format!(
+            "no answer from pkexec within {}s — is a polkit agent running?",
+            PKEXEC_TIMEOUT.as_secs()
+        ));
+    };
     if !status.success() {
         return Err("pkexec authentication cancelled or failed".into());
     }
-
-    reload_udev_rules();
 
     if uinput_rule_is_self_installed() {
         return Err("the udev rule is still present after removal".into());
@@ -143,22 +146,26 @@ struct PasteTarget {
 /// is a bound on "no agent ever answers", not on human speed.
 const PKEXEC_TIMEOUT: Duration = Duration::from_secs(120);
 
-/// Ask udevd to re-read its rules and re-apply them to existing devices.
+/// Make a rule change take effect on `/dev/uinput` now rather than at the
+/// next boot. Best-effort, so it never fails the script: if it does not
+/// apply, the access check afterwards reports that a reboot is needed.
 ///
-/// Best-effort on purpose: both halves failing means the change lands on the
-/// next boot rather than now, which is worth a warning and nothing more.
-fn reload_udev_rules() {
-    let reload = crate::probe::status_with_timeout(
-        "pkexec",
-        &["udevadm", "control", "--reload-rules"],
-        PKEXEC_TIMEOUT,
-    );
-    let trigger =
-        crate::probe::status_with_timeout("pkexec", &["udevadm", "trigger"], PKEXEC_TIMEOUT);
-    if reload.map(|s| !s.success()).unwrap_or(true) || trigger.map(|s| !s.success()).unwrap_or(true)
-    {
-        warn!("udevadm reload/trigger may have failed — the change may require a reboot");
-    }
+/// The trigger is filtered to the uinput node. An unfiltered `udevadm
+/// trigger` replays a change event for every device on the machine.
+const APPLY_UDEV_RULES: &str = "udevadm control --reload-rules; \
+     udevadm trigger --subsystem-match=misc --sysname-match=uinput; exit 0";
+
+/// Root half of [`grant_uinput_access`], run as `pkexec /bin/sh -c`: write
+/// the rule from stdin, then apply it. One `pkexec` is one password prompt,
+/// so everything that needs root happens in this one call. A failed write
+/// exits non-zero; applying is best-effort.
+fn grant_script() -> String {
+    format!("cat > {UDEV_RULE_PATH} || exit 1; {APPLY_UDEV_RULES}")
+}
+
+/// Root half of [`remove_uinput_rule`], shaped like [`grant_script`].
+fn remove_script() -> String {
+    format!("rm -f {UDEV_RULE_PATH} || exit 1; {APPLY_UDEV_RULES}")
 }
 
 fn ensure_kernel_access() -> Result<(), String> {
@@ -170,7 +177,7 @@ fn ensure_kernel_access() -> Result<(), String> {
 
     use std::io::Write;
     let mut child = Command::new("pkexec")
-        .args(["tee", UDEV_RULE_PATH])
+        .args(["/bin/sh", "-c", &grant_script()])
         .stdin(std::process::Stdio::piped())
         .stdout(std::process::Stdio::null())
         .spawn()
@@ -179,7 +186,7 @@ fn ensure_kernel_access() -> Result<(), String> {
     if let Some(ref mut stdin) = child.stdin {
         wrote = stdin.write_all(UDEV_RULE.as_bytes()).is_ok();
     }
-    // `tee` only sees EOF once every write end is closed, and the `Child`
+    // `cat` only sees EOF once every write end is closed, and the `Child`
     // holds one.
     child.stdin.take();
     // Bounded: with no polkit agent running — bare Sway or Hyprland without
@@ -196,7 +203,7 @@ fn ensure_kernel_access() -> Result<(), String> {
     if !status.success() {
         return Err("pkexec authentication cancelled or failed".into());
     }
-    // `tee` exits 0 having written an empty file if the pipe broke, which would
+    // `cat` exits 0 having written an empty file if the pipe broke, which would
     // otherwise leave a silently useless root-owned rule in /etc.
     if !wrote {
         let _ = crate::probe::status_with_timeout(
@@ -206,8 +213,6 @@ fn ensure_kernel_access() -> Result<(), String> {
         );
         return Err("could not write the udev rule".into());
     }
-
-    reload_udev_rules();
 
     // Give udevd 500ms to apply the new ACL.
     std::thread::sleep(Duration::from_millis(500));
@@ -1133,6 +1138,40 @@ mod tests {
         PASTE_THRESHOLD_CHARS, is_long_enough_to_paste, is_safe_mime, keystroke_fallback_allowed,
         needs_paste_delivery, pipe_text_to_command, tabs_to_spaces,
     };
+
+    /// Each `pkexec` is its own password prompt, so writing the rule and
+    /// applying it are one root command, not three.
+    #[test]
+    fn a_rule_change_is_one_root_command() {
+        for (script, action) in [
+            (super::grant_script(), "cat > "),
+            (super::remove_script(), "rm -f "),
+        ] {
+            assert!(
+                script.contains(&format!("{action}{}", super::UDEV_RULE_PATH)),
+                "{script}"
+            );
+            assert!(
+                script.contains("udevadm control --reload-rules"),
+                "{script}"
+            );
+            assert!(script.contains("udevadm trigger"), "{script}");
+        }
+    }
+
+    /// An unfiltered `udevadm trigger` replays a change event for every
+    /// device on the machine; only the uinput node needs its ACL refreshed.
+    #[test]
+    fn a_rule_change_retriggers_only_the_uinput_node() {
+        for script in [super::grant_script(), super::remove_script()] {
+            let trigger = script
+                .split(';')
+                .find(|step| step.contains("udevadm trigger"))
+                .expect("a trigger step");
+            assert!(trigger.contains("--subsystem-match=misc"), "{trigger}");
+            assert!(trigger.contains("--sysname-match=uinput"), "{trigger}");
+        }
+    }
 
     /// A short phrase types faster than the clipboard round trip and leaves the
     /// clipboard alone; a paragraph does not, and at ~8 ms per character it

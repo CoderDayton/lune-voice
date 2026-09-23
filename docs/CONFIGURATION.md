@@ -485,7 +485,7 @@ These live in the `[pipeline]` section of `settings.toml` (`PipelineOverrides`);
 | Parameter | Default | Effect | Tradeoff |
 |-----------|---------|--------|----------|
 | `word_confidence_threshold` | 0.50 (whisper.cpp) | Words below this count as low-confidence, gating single-word fuzzy dictionary matches | Higher gates more aggressively |
-| `max_speech_secs` | 60 | Auto-end the session after this many seconds of audio | Higher allows longer single dictations |
+| `max_speech_secs` | 300 (local Whisper), 120 (remote) | Auto-end the session after this many seconds of audio | Higher allows longer single dictations |
 | `llm_timeout_secs` | 30 | Fall back to unstyled text if LLM styling takes too long | Lower bounds worst-case latency |
 
 There are no VAD timing knobs: the utterance is bounded by the hotkey, and whisper's own VAD only trims leading and trailing silence.

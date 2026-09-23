@@ -99,7 +99,7 @@ impl ModelSpec {
     /// absent, so it's optional.
     pub fn vad_model() -> Self {
         Self::Directory {
-            repo_id: "ggml-org/whisper-vad".into(),
+            repo_id: VAD_REPO_ID.into(),
             required_files: vec![model_dirs::WHISPER_VAD_GGML.into()],
             suffix_patterns: vec![],
             local_name: model_dirs::DIR_WHISPER_VAD.into(),
@@ -132,6 +132,7 @@ impl ModelSpec {
     /// only presence can be checked.
     pub fn is_ready(&self, models_dir: &Path) -> bool {
         let Self::Directory {
+            repo_id,
             required_files,
             local_name,
             ..
@@ -143,11 +144,11 @@ impl ModelSpec {
         let manifest = load_integrity_manifest(&dir);
         required_files.iter().all(|f| {
             let path = dir.join(f);
+            let expected = pinned_meta(repo_id, f)
+                .and_then(|m| m.size)
+                .or_else(|| manifest.get(file_basename(f)).and_then(|m| m.size));
             match std::fs::metadata(&path) {
-                Ok(meta) if meta.is_file() => manifest
-                    .get(file_basename(f))
-                    .and_then(|m| m.size)
-                    .is_none_or(|expected| meta.len() == expected),
+                Ok(meta) if meta.is_file() => expected.is_none_or(|size| meta.len() == size),
                 _ => false,
             }
         })
@@ -413,7 +414,8 @@ pub fn download_model(
 /// carries repo-relative paths, matching `/tree`'s `path` field, so callers
 /// can match either against `required_files` interchangeably.
 fn list_repo_files(repo_id: &str) -> PersistResult<Vec<String>> {
-    let url = format!("https://huggingface.co/api/models/{repo_id}");
+    let rev = revision(repo_id);
+    let url = format!("https://huggingface.co/api/models/{repo_id}/revision/{rev}");
     let info: RepoInfo = get_json(&url)
         .map_err(|e| PersistError::ModelDownload(format!("{repo_id}: repo info: {e}")))?;
     Ok(info.siblings.into_iter().map(|s| s.rfilename).collect())
@@ -439,6 +441,103 @@ struct RepoSibling {
 struct FileMetadata {
     size: Option<u64>,
     sha256: Option<String>,
+}
+
+/// Hugging Face repository of whisper.cpp's silero VAD model.
+const VAD_REPO_ID: &str = "ggml-org/whisper-vad";
+
+/// Commit each model repository is downloaded at. A fixed commit keeps the
+/// digests below valid if upstream re-uploads a file on `main`.
+const PINNED_REVISIONS: &[(&str, &str)] = &[
+    (
+        WhisperModel::REPO_ID,
+        "5359861c739e955e79d9a303bcbc70fb988958b1",
+    ),
+    (VAD_REPO_ID, "9ffd54a1e1ee413ddf265af9913beaf518d1639b"),
+];
+
+/// A model file whose exact bytes are known ahead of time.
+struct PinnedFile {
+    repo_id: &'static str,
+    file: &'static str,
+    size: u64,
+    sha256: &'static str,
+}
+
+/// Size and SHA-256 of every file the app offers, at [`PINNED_REVISIONS`].
+///
+/// These are the trust root for model bytes. whisper.cpp's loader parses the
+/// file in C++, so the digest has to come from this source rather than from
+/// the host that serves the file. Changing a model means updating its row
+/// here from the Hugging Face tree API at the new commit.
+const PINNED_FILES: &[PinnedFile] = &[
+    PinnedFile {
+        repo_id: WhisperModel::REPO_ID,
+        file: "ggml-small-q5_1.bin",
+        size: 190_085_487,
+        sha256: "ae85e4a935d7a567bd102fe55afc16bb595bdb618e11b2fc7591bc08120411bb",
+    },
+    PinnedFile {
+        repo_id: WhisperModel::REPO_ID,
+        file: "ggml-medium-q5_0.bin",
+        size: 539_212_467,
+        sha256: "19fea4b380c3a618ec4723c3eef2eb785ffba0d0538cf43f8f235e7b3b34220f",
+    },
+    PinnedFile {
+        repo_id: WhisperModel::REPO_ID,
+        file: "ggml-large-v3-turbo-q8_0.bin",
+        size: 874_188_075,
+        sha256: "317eb69c11673c9de1e1f0d459b253999804ec71ac4c23c17ecf5fbe24e259a1",
+    },
+    PinnedFile {
+        repo_id: VAD_REPO_ID,
+        file: "ggml-silero-v5.1.2.bin",
+        size: 885_098,
+        sha256: "29940d98d42b91fbd05ce489f3ecf7c72f0a42f027e4875919a28fb4c04ea2cf",
+    },
+];
+
+/// The pinned commit for `repo_id`, or `main` for a repository with none.
+fn revision(repo_id: &str) -> &'static str {
+    PINNED_REVISIONS
+        .iter()
+        .find(|(repo, _)| *repo == repo_id)
+        .map_or("main", |(_, rev)| rev)
+}
+
+/// The pinned size and digest of `filename` in `repo_id`, if it has one.
+fn pinned_meta(repo_id: &str, filename: &str) -> Option<FileMetadata> {
+    PINNED_FILES
+        .iter()
+        .find(|p| p.repo_id == repo_id && p.file == filename)
+        .map(|p| FileMetadata {
+            size: Some(p.size),
+            sha256: Some(p.sha256.to_owned()),
+        })
+}
+
+/// Download URL for `filename` at the repository's pinned commit.
+fn resolve_url(repo_id: &str, filename: &str) -> String {
+    let rev = revision(repo_id);
+    format!("https://huggingface.co/{repo_id}/resolve/{rev}/{filename}")
+}
+
+/// Whether a finished download is the file `expected` describes, judged by
+/// the length and digest measured while it streamed, so a multi-hundred-MB
+/// model is not read back from disk just to hash it again. With nothing
+/// expected, any non-empty body passes.
+fn download_matches(expected: &FileMetadata, observed: &FileMetadata) -> bool {
+    if expected.size.is_none() && expected.sha256.is_none() {
+        return observed.size.is_some_and(|n| n > 0);
+    }
+    let size_ok = expected.size.is_none_or(|n| observed.size == Some(n));
+    let sha_ok = expected.sha256.as_deref().is_none_or(|want| {
+        observed
+            .sha256
+            .as_deref()
+            .is_some_and(|got| got.eq_ignore_ascii_case(want))
+    });
+    size_ok && sha_ok
 }
 
 /// True when `path` looks like a complete download of `meta`.
@@ -553,19 +652,23 @@ fn save_integrity_manifest(dir: &Path, manifest: &HashMap<String, FileMetadata>)
     }
 }
 
-/// Expected metadata for `filename`, in trust order: the HF tree API
-/// (authoritative, repo-path keyed) → the persisted manifest from the last
-/// verified download (basename keyed) → empty (legacy non-empty acceptance,
-/// only for files that have never been verified).
+/// Expected metadata for `filename`, in trust order: the pin in this source
+/// ([`PINNED_FILES`]) → the HF tree API (repo-path keyed) → the persisted
+/// manifest from the last verified download (basename keyed) → empty (legacy
+/// non-empty acceptance, only for files that have never been verified).
 fn effective_meta(
+    repo_id: &str,
     remote: &HashMap<String, FileMetadata>,
     manifest: &HashMap<String, FileMetadata>,
     filename: &str,
 ) -> FileMetadata {
-    remote
-        .get(filename)
-        .or_else(|| manifest.get(file_basename(filename)))
-        .cloned()
+    pinned_meta(repo_id, filename)
+        .or_else(|| {
+            remote
+                .get(filename)
+                .or_else(|| manifest.get(file_basename(filename)))
+                .cloned()
+        })
         .unwrap_or_default()
 }
 
@@ -662,7 +765,8 @@ fn get_json<T: serde::de::DeserializeOwned>(url: &str) -> Result<T, String> {
 /// rather than blocking downloads when HF is unreachable or rate-limits us.
 /// We log the failure once per repo at WARN so it's visible in support logs.
 fn fetch_repo_file_metadata(repo_id: &str) -> HashMap<String, FileMetadata> {
-    let url = format!("https://huggingface.co/api/models/{repo_id}/tree/main?recursive=true");
+    let rev = revision(repo_id);
+    let url = format!("https://huggingface.co/api/models/{repo_id}/tree/{rev}?recursive=true");
     let entries: Vec<TreeEntry> = match get_json(&url) {
         Ok(v) => v,
         Err(e) => {
@@ -717,7 +821,7 @@ fn download_file_direct(
     dst: &Path,
     cancel: &AtomicBool,
 ) -> PersistResult<FileMetadata> {
-    let url = format!("https://huggingface.co/{repo_id}/resolve/main/{filename}");
+    let url = resolve_url(repo_id, filename);
     let mut resp = hub_get(&url)
         .map_err(|e| PersistError::ModelDownload(format!("{repo_id}/{filename}: {e}")))?;
 
@@ -815,7 +919,7 @@ fn ensure_directory_model_with_progress(
         && required_files.iter().all(|f| {
             local_file_complete(
                 &local_dir.join(file_basename(f)),
-                &effective_meta(&remote_meta, &manifest, f),
+                &effective_meta(repo_id, &remote_meta, &manifest, f),
             )
         })
     {
@@ -857,7 +961,7 @@ fn ensure_directory_model_with_progress(
         // Flatten nested paths: "onnx/model.onnx" → "model.onnx" locally.
         let basename = file_basename(filename);
         let dst = local_dir.join(basename);
-        let meta = effective_meta(&remote_meta, &manifest, filename);
+        let meta = effective_meta(repo_id, &remote_meta, &manifest, filename);
         if local_file_complete(&dst, &meta) {
             record_verified(&mut manifest, basename, &meta, &dst, None);
             on_file(filename, idx, total);
@@ -873,7 +977,7 @@ fn ensure_directory_model_with_progress(
         // hung this thread forever with no way to cancel, on the
         // multi-hundred-MB model transfers.
         let observed = match download_file_direct(repo_id, filename, &dst, cancel) {
-            Ok(hash) => Some(hash),
+            Ok(observed) => observed,
             Err(e @ PersistError::ModelDownloadCancelled) => {
                 // Same reason as the between-files check above, and this is the
                 // path that actually runs: the flag is polled every 256 KiB, so
@@ -893,13 +997,13 @@ fn ensure_directory_model_with_progress(
         // mid-stream failure that left bytes on disk; refuse rather than ship a
         // broken model. (Without metadata, a truncated direct download has
         // already been rejected against the response's Content-Length.)
-        if !local_file_complete(&dst, &meta) {
+        if !download_matches(&meta, &observed) {
             let _ = std::fs::remove_file(&dst);
             return Err(PersistError::ModelDownload(format!(
                 "{repo_id}/{filename}: downloaded file failed integrity check (size/sha mismatch)"
             )));
         }
-        record_verified(&mut manifest, basename, &meta, &dst, observed);
+        record_verified(&mut manifest, basename, &meta, &dst, Some(observed));
     }
 
     // Persist what was just verified so later runs (possibly offline) check
@@ -1207,6 +1311,9 @@ mod tests {
         assert!(load_integrity_manifest(tmp.path()).is_empty());
     }
 
+    /// A repository with no pins, so the remote and manifest tiers decide.
+    const UNPINNED_REPO: &str = "example/unpinned";
+
     #[test]
     fn effective_meta_prefers_remote_then_manifest() {
         let mut remote = HashMap::new();
@@ -1227,17 +1334,17 @@ mod tests {
         );
         // Remote (repo-path keyed) wins when present.
         assert_eq!(
-            effective_meta(&remote, &manifest, "onnx/model.onnx").size,
+            effective_meta(UNPINNED_REPO, &remote, &manifest, "onnx/model.onnx").size,
             Some(10)
         );
         // Manifest (basename keyed) fills in when the remote fetch failed.
         assert_eq!(
-            effective_meta(&HashMap::new(), &manifest, "onnx/model.onnx").size,
+            effective_meta(UNPINNED_REPO, &HashMap::new(), &manifest, "onnx/model.onnx").size,
             Some(20)
         );
         // Neither → default (legacy non-empty acceptance).
         assert_eq!(
-            effective_meta(&HashMap::new(), &HashMap::new(), "other").size,
+            effective_meta(UNPINNED_REPO, &HashMap::new(), &HashMap::new(), "other").size,
             None
         );
     }
@@ -1260,12 +1367,12 @@ mod tests {
         let no_remote = HashMap::new();
         assert!(local_file_complete(
             &p,
-            &effective_meta(&no_remote, &manifest, "model.bin")
+            &effective_meta(UNPINNED_REPO, &no_remote, &manifest, "model.bin")
         ));
         std::fs::write(&p, b"01234").unwrap(); // truncated
         assert!(!local_file_complete(
             &p,
-            &effective_meta(&no_remote, &manifest, "model.bin")
+            &effective_meta(UNPINNED_REPO, &no_remote, &manifest, "model.bin")
         ));
     }
 
@@ -1387,6 +1494,82 @@ mod tests {
             full_len,
             "truncated file must be healed"
         );
+    }
+
+    /// Every file the app offers is fetched at a fixed commit and checked
+    /// against a digest in this source, not one served by the same host.
+    #[test]
+    fn every_offered_model_file_is_pinned() {
+        for spec in ModelSpec::all() {
+            let ModelSpec::Directory {
+                repo_id,
+                required_files,
+                ..
+            } = &spec;
+            assert_ne!(revision(repo_id), "main", "{repo_id} has no pinned commit");
+            for file in required_files {
+                let pin = pinned_meta(repo_id, file)
+                    .unwrap_or_else(|| panic!("{repo_id}/{file} has no pinned digest"));
+                assert!(pin.size.is_some_and(|s| s > 0), "{file}");
+                assert!(
+                    pin.sha256
+                        .as_deref()
+                        .is_some_and(|s| s.len() == 64 && s.chars().all(|c| c.is_ascii_hexdigit())),
+                    "{file}"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn a_pinned_digest_outranks_what_the_hub_reports() {
+        let file = WhisperModel::Small.ggml_file();
+        let mut remote = HashMap::new();
+        remote.insert(
+            file.to_string(),
+            FileMetadata {
+                size: Some(1),
+                sha256: Some("0".repeat(64)),
+            },
+        );
+        let pinned = pinned_meta(WhisperModel::REPO_ID, file).expect("pinned");
+        assert_eq!(
+            effective_meta(WhisperModel::REPO_ID, &remote, &HashMap::new(), file),
+            pinned
+        );
+    }
+
+    #[test]
+    fn downloads_fetch_the_pinned_commit_not_main() {
+        let url = resolve_url(WhisperModel::REPO_ID, WhisperModel::Small.ggml_file());
+        assert!(url.contains(revision(WhisperModel::REPO_ID)), "{url}");
+        assert!(!url.contains("/main/"), "{url}");
+    }
+
+    /// The digest is computed while the body streams, so the finished file is
+    /// judged on that rather than read back from disk a second time.
+    #[test]
+    fn a_download_is_verified_from_what_was_streamed() {
+        let expected = FileMetadata {
+            size: Some(5),
+            sha256: Some("AB".repeat(32)),
+        };
+        let observed = |size, sha: &str| FileMetadata {
+            size: Some(size),
+            sha256: Some(sha.to_string()),
+        };
+        assert!(download_matches(&expected, &observed(5, &"ab".repeat(32))));
+        assert!(!download_matches(&expected, &observed(5, &"cd".repeat(32))));
+        assert!(!download_matches(&expected, &observed(4, &"ab".repeat(32))));
+        // Nothing expected: any non-empty body passes.
+        assert!(download_matches(
+            &FileMetadata::default(),
+            &observed(5, "x")
+        ));
+        assert!(!download_matches(
+            &FileMetadata::default(),
+            &observed(0, "x")
+        ));
     }
 
     #[test]

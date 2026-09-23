@@ -110,9 +110,18 @@ pub fn load_workspace_snapshot() -> Result<WorkspaceSnapshot, String> {
     build_snapshot(loaded.settings, &mut database)
 }
 
+/// The settings half of the workspace snapshot, without the database reads
+/// and retention pass the full snapshot carries.
+pub fn load_workspace_settings() -> Result<WorkspaceSettingsDto, String> {
+    let paths = resolve_paths()?;
+    Ok(settings_to_dto(&load_settings(&paths)?))
+}
+
+/// Save the settings and return the new snapshot along with the settings as
+/// written, so callers apply them without reading the file back.
 pub fn save_workspace_settings(
     input: SaveWorkspaceSettingsInput,
-) -> Result<WorkspaceSnapshot, String> {
+) -> Result<(WorkspaceSnapshot, UserSettings), String> {
     let paths = resolve_paths()?;
     let mut settings = load_settings(&paths)?;
     let mut database = open_database(&paths)?;
@@ -122,7 +131,8 @@ pub fn save_workspace_settings(
     // history" must clear what is already stored rather than wait for the next
     // window load.
     enforce_retention(&mut database, &settings, SettingsTrust::AsWritten);
-    build_snapshot(settings, &mut database)
+    let snapshot = build_snapshot(settings.clone(), &mut database)?;
+    Ok((snapshot, settings))
 }
 
 use crate::limits::{
