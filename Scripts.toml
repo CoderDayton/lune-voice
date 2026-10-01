@@ -349,6 +349,12 @@ for lib in libcudart libcublas libcublasLt; do
   cp -aL "$src" "$STAGE/"
 done
 
+# The app loads the plugin only when this stamp equals its own `ggml_version()`:
+# a plugin built against another ggml registers its device and then crashes.
+GGML_VERSION=$(sed -nE 's/^set\(GGML_VERSION_(MAJOR|MINOR|PATCH) ([0-9]+)\)$/\2/p' "$SRC/ggml/CMakeLists.txt" | paste -sd.)
+[[ "$GGML_VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || { echo "could not read the ggml version from $SRC/ggml/CMakeLists.txt" >&2; exit 1; }
+printf '%s\n' "$GGML_VERSION" > "$STAGE/ggml-version"
+
 # Debug info in the plugin is dead weight in a download; NVIDIA's libraries
 # arrive stripped already. nvprune cannot help with the rest: it only operates
 # on relocatable device code, and the shipped cuBLAS objects are final.
@@ -478,12 +484,17 @@ for lib in cudart cublas cublasLt; do
   cp -a "$src" "$STAGE/"
 done
 
+# Same stamp as the Linux plugin: the app refuses a plugin without it.
+GGML_VERSION=$(sed -nE 's/^set\(GGML_VERSION_(MAJOR|MINOR|PATCH) ([0-9]+)\)$/\2/p' "$SRC/ggml/CMakeLists.txt" | paste -sd.)
+[[ "$GGML_VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || { echo "could not read the ggml version from $SRC/ggml/CMakeLists.txt" >&2; exit 1; }
+printf '%s\n' "$GGML_VERSION" > "$STAGE/ggml-version"
+
 # The app refuses any archive member outside its allowlist, so a stray file
 # here becomes a failed install for every user. Check it now instead.
 for f in "$STAGE"/*; do
   base=$(basename "$f")
   case "$base" in
-    ggml-cuda.dll|cudart64_*.dll|cublas64_*.dll|cublasLt64_*.dll) ;;
+    ggml-cuda.dll|cudart64_*.dll|cublas64_*.dll|cublasLt64_*.dll|ggml-version) ;;
     *) echo "unexpected file in the archive: $base" >&2; exit 1 ;;
   esac
 done

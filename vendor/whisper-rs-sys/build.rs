@@ -28,6 +28,19 @@ fn backend_dl_enabled() -> bool {
 fn main() {
     println!("cargo:rerun-if-env-changed={GGML_BACKEND_DL_ENV}");
     let target = env::var("TARGET").unwrap();
+    // LUNE FORK: tell the Rust side how ggml was linked. A static ggml must
+    // never load backend plugins: each links the shared libggml-base, which
+    // would put a second ggml in the process.
+    std::fs::write(
+        PathBuf::from(env::var("OUT_DIR").unwrap()).join("lune_build.rs"),
+        format!(
+            "/// Whether ggml was built with `GGML_BACKEND_DL` (shared libraries,\n\
+             /// backends as plugins) rather than linked statically.\n\
+             pub const GGML_BACKEND_DL: bool = {};\n",
+            backend_dl_enabled()
+        ),
+    )
+    .expect("write lune_build.rs");
     // Link C++ standard library
     if let Some(cpp_stdlib) = get_cpp_link_stdlib(&target) {
         println!("cargo:rustc-link-lib=dylib={}", cpp_stdlib);

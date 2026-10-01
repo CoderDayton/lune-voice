@@ -98,6 +98,21 @@ fn bundled_plugin_dir_for(exe: &Path) -> Option<PathBuf> {
     Some(beside)
 }
 
+/// Plugin directories to scan, bundled first. None for a statically linked
+/// ggml: every plugin links the shared libggml-base, which would put a second
+/// ggml in the process, and ggml aborts when that copy is unloaded and loaded
+/// again.
+#[cfg_attr(not(feature = "whisper-cpp"), allow(dead_code))]
+fn plugin_dirs(backend_dl: bool, bundled: Option<PathBuf>, downloaded: PathBuf) -> Vec<PathBuf> {
+    if !backend_dl {
+        return Vec::new();
+    }
+    bundled
+        .into_iter()
+        .chain(std::iter::once(downloaded))
+        .collect()
+}
+
 /// Plugin directory the GPU download installs into.
 pub fn downloaded_plugin_dir(data_dir: &Path) -> PathBuf {
     data_dir.join(DIR_GPU_BACKEND)
@@ -129,18 +144,46 @@ pub fn plugin_installed(data_dir: &Path) -> bool {
 #[cfg(feature = "whisper-cpp")]
 static PLUGIN_VERIFIED: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
 
-/// [`plugin_installed`], paid at most once per process.
+/// [`plugin_installed`] for a plugin built against the ggml this process
+/// linked, paid at most once per process. The stamp is read first: it costs
+/// one small file, where the integrity check re-hashes every library.
 #[cfg(feature = "whisper-cpp")]
 fn plugin_installed_cached(data_dir: &Path) -> bool {
     use std::sync::atomic::Ordering;
     if PLUGIN_VERIFIED.load(Ordering::Relaxed) {
         return true;
     }
-    let installed = plugin_installed(data_dir);
+    let installed = plugin_built_for(
+        &downloaded_plugin_dir(data_dir),
+        &imp::linked_ggml_version(),
+    ) && plugin_installed(data_dir);
     if installed {
         PLUGIN_VERIFIED.store(true, Ordering::Relaxed);
     }
     installed
+}
+
+/// Text file beside the downloaded plugin naming the ggml version it was
+/// compiled against, written by `cgs gpu-plugin` and covered by the install
+/// manifest. Mirrored by `lune_persist::gpu_plugin::GGML_VERSION_FILE`.
+const GGML_VERSION_FILE: &str = "ggml-version";
+
+/// The ggml version the plugin in `dir` says it was built against, if it says.
+#[cfg_attr(not(feature = "whisper-cpp"), allow(dead_code))]
+fn plugin_ggml_version(dir: &Path) -> Option<String> {
+    let stamp = std::fs::read_to_string(dir.join(GGML_VERSION_FILE)).ok()?;
+    Some(stamp.trim().to_owned())
+}
+
+/// Whether the plugin in `dir` was built against ggml `version`.
+///
+/// ggml checks only its backend API version when loading a plugin, and that
+/// does not change when the structs shared across the plugin boundary do. A
+/// plugin from another ggml therefore loads, registers its device, and crashes
+/// the process on first use. A missing stamp counts as a mismatch.
+#[cfg_attr(not(feature = "whisper-cpp"), allow(dead_code))]
+fn plugin_built_for(dir: &Path, version: &str) -> bool {
+    plugin_ggml_version(dir).as_deref() == Some(version)
 }
 
 /// Name of the digest manifest `lune_persist::gpu_plugin` writes at install
@@ -388,10 +431,11 @@ mod imp {
 
     fn load_once(data_dir: &Path, downloaded_is_intact: bool) -> Vec<String> {
         let downloaded = downloaded_plugin_dir(data_dir);
-        for dir in bundled_plugin_dir()
-            .into_iter()
-            .chain(std::iter::once(downloaded.clone()))
-        {
+        let backend_dl = whisper_rs::whisper_rs_sys::GGML_BACKEND_DL;
+        if !backend_dl {
+            debug!("ggml is linked statically; not loading backend plugins");
+        }
+        for dir in super::plugin_dirs(backend_dl, bundled_plugin_dir(), downloaded.clone()) {
             if !dir.is_dir() {
                 debug!(dir = %dir.display(), "no plugin directory; skipping");
                 continue;
@@ -402,10 +446,20 @@ mod imp {
             // against the manifest the installer wrote before anything here is
             // `dlopen`ed into this process.
             if dir == downloaded && !downloaded_is_intact {
-                warn!(
-                    dir = %dir.display(),
-                    "downloaded GPU backend does not match what was installed; refusing to load it"
-                );
+                let linked = linked_ggml_version();
+                if super::plugin_built_for(&dir, &linked) {
+                    warn!(
+                        dir = %dir.display(),
+                        "downloaded GPU backend does not match what was installed; refusing to load it"
+                    );
+                } else {
+                    warn!(
+                        dir = %dir.display(),
+                        plugin_ggml = super::plugin_ggml_version(&dir).as_deref().unwrap_or("unknown"),
+                        app_ggml = %linked,
+                        "downloaded GPU backend was built against another ggml; not loading it, decoding on the CPU"
+                    );
+                }
                 continue;
             }
             super::preload_sibling_libraries(&dir);
@@ -423,6 +477,15 @@ mod imp {
         let devices = device_names();
         info!(?devices, "ggml compute devices available");
         devices
+    }
+
+    /// The ggml version this process linked, as `ggml_version()` reports it.
+    pub(super) fn linked_ggml_version() -> String {
+        // SAFETY: `ggml_version` takes no arguments and returns a static
+        // NUL-terminated string compiled into ggml-base.
+        unsafe { CStr::from_ptr(whisper_rs::whisper_rs_sys::ggml_version()) }
+            .to_string_lossy()
+            .into_owned()
     }
 
     /// Names of every device currently in ggml's backend registry.
@@ -488,6 +551,10 @@ mod imp {
             .collect();
         if !cuda.is_empty() {
             return GpuPluginState::Ready { devices: cuda };
+        }
+        // A static ggml never loads the plugin, so there is nothing to offer.
+        if !whisper_rs::whisper_rs_sys::GGML_BACKEND_DL {
+            return GpuPluginState::Unsupported;
         }
 
         if !super::plugin_installed_cached(data_dir) {
@@ -644,6 +711,61 @@ mod tests {
         .expect("write manifest");
         assert!(installed_plugin_is_intact(&dir));
         let _ = std::fs::remove_dir_all(dir);
+    }
+
+    #[test]
+    fn a_statically_linked_ggml_scans_no_plugin_directory() {
+        // Any plugin would bring the shared libggml-base in beside the static
+        // copy, and ggml aborts when it is unloaded and loaded again.
+        let dirs = plugin_dirs(
+            false,
+            Some(PathBuf::from("/app/backends")),
+            PathBuf::from("/data/backends"),
+        );
+        assert!(dirs.is_empty(), "{dirs:?}");
+    }
+
+    #[test]
+    fn a_plugin_build_scans_the_bundled_then_the_downloaded_directory() {
+        assert_eq!(
+            plugin_dirs(
+                true,
+                Some(PathBuf::from("/app/backends")),
+                PathBuf::from("/data/backends")
+            ),
+            [
+                PathBuf::from("/app/backends"),
+                PathBuf::from("/data/backends")
+            ]
+        );
+        assert_eq!(
+            plugin_dirs(true, None, PathBuf::from("/data/backends")),
+            [PathBuf::from("/data/backends")]
+        );
+    }
+
+    #[test]
+    fn a_plugin_without_a_ggml_stamp_is_not_built_for_this_ggml() {
+        // Plugins packaged before the stamp existed are exactly the ones built
+        // against an older ggml.
+        let tmp = tempfile::tempdir().expect("tempdir");
+        assert_eq!(plugin_ggml_version(tmp.path()), None);
+        assert!(!plugin_built_for(tmp.path(), "0.23.0"));
+    }
+
+    #[test]
+    fn a_plugin_stamped_with_another_ggml_is_refused() {
+        let tmp = tempfile::tempdir().expect("tempdir");
+        std::fs::write(tmp.path().join(GGML_VERSION_FILE), "0.9.4\n").expect("write stamp");
+        assert_eq!(plugin_ggml_version(tmp.path()).as_deref(), Some("0.9.4"));
+        assert!(!plugin_built_for(tmp.path(), "0.23.0"));
+    }
+
+    #[test]
+    fn a_plugin_stamped_with_this_ggml_is_accepted() {
+        let tmp = tempfile::tempdir().expect("tempdir");
+        std::fs::write(tmp.path().join(GGML_VERSION_FILE), "0.23.0\n").expect("write stamp");
+        assert!(plugin_built_for(tmp.path(), "0.23.0"));
     }
 
     #[test]

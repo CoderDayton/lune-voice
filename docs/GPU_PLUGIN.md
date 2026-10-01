@@ -64,13 +64,14 @@ has no unload, so loading twice would register duplicate devices.
 | `libcublasLt.so.13` | 503 MB | NVIDIA. See below |
 | `libcublas.so.13` | 54 MB | NVIDIA |
 | `libcudart.so.13` | 0.8 MB | NVIDIA |
+| `ggml-version` | 7 B | The ggml version the plugin was built against |
 
 `libcuda.so.1` is deliberately **not** included. It ships with the driver, not
 the toolkit, and is not redistributable — which is why a missing driver is the
 one failure a download cannot fix.
 
 The Windows archive, `lune-voice-gpu-cuda13-windows-x86_64.tar.gz`, holds the
-same four libraries under NVIDIA's Windows names — `ggml-cuda.dll`,
+same four libraries plus `ggml-version`, under NVIDIA's Windows names — `ggml-cuda.dll`,
 `cublasLt64_13.dll`, `cublas64_13.dll`, `cudart64_13.dll` — and omits the driver
 (`nvcuda.dll`) for the same reason. It stays a `.tar.gz` rather than a `.zip` so
 both platforms share one verified extractor; only the member names differ, and
@@ -143,8 +144,16 @@ cgs gpu-plugin-windows                      # Windows — run ON Windows
 
 The Linux script builds `libggml-cuda.so`, stages it with the three NVIDIA
 redistributables, strips it, asserts `RUNPATH=$ORIGIN` is present, verifies the
-architectures against the binary, then writes the tarball and its `.sha256` into
-`release-artifacts/`.
+architectures against the binary, writes the `ggml-version` stamp (ggml's
+`MAJOR.MINOR.PATCH` from `ggml/CMakeLists.txt`), then writes the tarball and its
+`.sha256` into `release-artifacts/`.
+
+A plugin is tied to the ggml it was compiled against. ggml checks only its
+backend API version at load, and that does not change when the structs shared
+with a plugin do, so a plugin from another ggml registers its device and then
+crashes the app. The app therefore loads the downloaded plugin only when its
+stamp equals `ggml_version()`; otherwise it decodes on the CPU. Every whisper.cpp
+upgrade that moves ggml's version needs a rebuilt plugin under a new release tag.
 
 `cgs gpu-plugin-windows` is the same shape with the platform's differences: run
 it from Git Bash in a shell where MSVC and the CUDA toolkit are on `PATH`
@@ -189,9 +198,9 @@ single thing the UI can say or offer:
 
 | State | Meaning | UI |
 |---|---|---|
-| `Unsupported` | No native backend compiled in (stub build) | Section hidden entirely |
+| `Unsupported` | No native backend compiled in (stub build), or ggml linked statically without CUDA, which never loads plugins | Section hidden entirely |
 | `DriverMissing` | No NVIDIA driver. A download would not help | Explains, offers nothing |
-| `NotInstalled` | Driver present, plugin not downloaded | The offer, with size |
+| `NotInstalled` | Driver present, plugin not downloaded or built against another ggml | The offer, with size |
 | `Ready` | A CUDA device is registered | Names the device |
 | `NeedsRestart` | Plugin installed after the registry was built | Asks for a restart |
 | `Failed` | Plugin present at startup, no device appeared | Blames the driver, with the reason |
@@ -227,7 +236,7 @@ and:
 - refuses outright when the digest is `UNPUBLISHED`;
 - verifies SHA-256 against the pinned value before unpacking anything;
 - extracts only an allowlist of flat filenames (`libggml-cuda.so`,
-  `libcudart.so.*`, `libcublas.so.*`, `libcublasLt.so.*`), so a tampered archive
+  `libcudart.so.*`, `libcublas.so.*`, `libcublasLt.so.*`, `ggml-version`), so a tampered archive
   cannot write outside the plugin directory via `../` or absolute paths;
 - records a per-file SHA-256 manifest (`.integrity.json`) before publishing any
   of them.
@@ -240,6 +249,11 @@ unreadable or mismatched manifest means the directory is skipped and reported as
 not installed, which is the state that offers the download again.
 
 ## Troubleshooting
+
+**GPU is offered again, and the log says the backend "was built against another
+ggml".** The installed plugin predates the app's ggml, or has no
+`ggml-version` stamp. The app skipped it and decodes on the CPU. Install a
+plugin built from the same whisper.cpp tree as the app.
 
 **The plugin loads but no CUDA device appears.** Almost always the driver is
 older than the CUDA runtime. CUDA 13 needs r580 or newer on Linux. Check with

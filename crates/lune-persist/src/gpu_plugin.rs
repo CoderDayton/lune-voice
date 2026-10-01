@@ -62,6 +62,11 @@ const CUDA_PLUGIN_FILE: &str = "ggml-cuda.dll";
 #[cfg(not(target_os = "windows"))]
 const CUDA_PLUGIN_FILE: &str = "libggml-cuda.so";
 
+/// Text file in the archive naming the ggml version the plugin was compiled
+/// against. Mirrors `lune_asr::gpu_backend::GGML_VERSION_FILE`, which refuses
+/// to load a plugin whose stamp is missing or names another version.
+const GGML_VERSION_FILE: &str = "ggml-version";
+
 /// Digest placeholder for a release that has not been published yet. Kept as a
 /// recognisable sentinel so [`install`] can fail with an actionable message
 /// instead of downloading something it cannot verify.
@@ -76,6 +81,9 @@ pub const UNPUBLISHED: &str = "UNPUBLISHED";
 /// assets are anonymously reachable — the repo goes public, or the archives
 /// move to a host that serves them — set `CUDA_LINUX_X86_64.sha256` back to
 /// this and restore `download_bytes`.
+///
+/// That archive has no `ggml-version` stamp, so the app would refuse to load
+/// it. Pin a digest from a `cgs gpu-plugin` build instead.
 pub const CUDA_LINUX_X86_64_SHA256: &str =
     "c4fd2a60bd392a5d08a9f92fcf011880609bc40bf1ffd1654b60255036d57883";
 
@@ -180,6 +188,9 @@ fn is_permitted_member(name: &Path) -> bool {
 /// Only the dispatch is `cfg`-gated; both matchers are compiled everywhere so
 /// each is unit-tested on whichever host runs CI.
 fn permitted_file_name(file: &str) -> bool {
+    if file == GGML_VERSION_FILE {
+        return true;
+    }
     #[cfg(target_os = "windows")]
     {
         file == CUDA_PLUGIN_FILE
@@ -692,6 +703,20 @@ mod tests {
         ];
         for ok in names {
             assert!(is_permitted_member(Path::new(ok)), "{ok} should be allowed");
+        }
+    }
+
+    #[test]
+    fn the_ggml_version_stamp_is_a_permitted_member() {
+        // The app refuses a plugin without it, so the installer must keep it.
+        for ok in ["ggml-version", "./ggml-version"] {
+            assert!(is_permitted_member(Path::new(ok)), "{ok} should be allowed");
+        }
+        for bad in ["ggml-version.txt", "nested/ggml-version", "../ggml-version"] {
+            assert!(
+                !is_permitted_member(Path::new(bad)),
+                "{bad} should be refused"
+            );
         }
     }
 

@@ -7,3 +7,5 @@
 #![allow(unnecessary_transmutes)]
 
 include!(concat!(env!("OUT_DIR"), "/bindings.rs"));
+// LUNE FORK: `GGML_BACKEND_DL`, written by build.rs.
+include!(concat!(env!("OUT_DIR"), "/lune_build.rs"));
