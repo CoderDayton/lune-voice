@@ -318,6 +318,16 @@ const CAPTURE_OPEN_TIMEOUT: Duration = Duration::from_secs(5);
 /// is generous. It bounds a driver that never answers at all, not slow typing.
 const DELIVERY_OUTCOME_TIMEOUT: Duration = Duration::from_secs(120);
 
+/// The warning for a dictation that did not reach the focused app.
+fn undelivered_message(on_clipboard: bool) -> &'static str {
+    if on_clipboard {
+        "Dictation was not typed into the app — it is on the clipboard, paste it with Ctrl+V"
+    } else {
+        "Dictation was not delivered — the clipboard is unavailable and \
+         the text cannot be typed safely"
+    }
+}
+
 /// How long a dictation start waits for delivery to finish starting.
 ///
 /// Covers the hotkey being pressed in the moments after launch, where the
@@ -1107,10 +1117,10 @@ impl AppRuntime {
                                             runtime
                                                 .push_session_event(
                                                     SessionStreamEvent::SessionWarning {
-                                                        message: "Dictation was not delivered — \
-                                                                  the clipboard is unavailable and \
-                                                                  the text cannot be typed safely"
-                                                            .into(),
+                                                        message: undelivered_message(
+                                                            outcome.clipboard_has_text,
+                                                        )
+                                                        .into(),
                                                     },
                                                 )
                                                 .await;
@@ -2085,7 +2095,17 @@ mod tests {
         Arc, AsrRegistry, LivePipeline, PipelineState, PrewarmAction, ReloadScope, START_ABORTED,
         StartFailureReport, asr_backend_needs_reload, classify_start_failure, cue_for_transition,
         reconcile_prewarm, release_backend, remote_backends_denied, sanitize_error_for_frontend,
+        undelivered_message,
     };
+
+    /// A dictation that sits on the clipboard is recoverable, and the user has
+    /// to be told to paste it — blaming an unavailable clipboard would be wrong.
+    #[test]
+    fn an_undelivered_dictation_says_whether_it_is_on_the_clipboard() {
+        assert!(undelivered_message(true).contains("clipboard"));
+        assert!(undelivered_message(true).contains("paste"));
+        assert!(!undelivered_message(false).contains("paste"));
+    }
 
     /// The hotkey has already played the start cue by the time prep runs. A
     /// real prep failure has to reach the user; an abort is what they asked

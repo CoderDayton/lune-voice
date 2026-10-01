@@ -8,7 +8,7 @@ use std::sync::{Arc, Mutex, mpsc};
 use std::time::{Duration, Instant};
 
 use lune_core::config::{DictationMode, TerminalMode};
-use tracing::{debug, info, warn};
+use tracing::{debug, error, info, warn};
 use uuid::Uuid;
 
 use crate::focus::WindowTarget;
@@ -46,6 +46,59 @@ impl TypeOutcome {
         clipboard_has_text: false,
         delivered: false,
     };
+
+    /// The text did not reach the application. `on_clipboard` says whether it
+    /// was left there for the user to paste by hand.
+    #[cfg_attr(
+        all(unix, not(target_os = "linux")),
+        allow(dead_code, reason = "only the IBus and Windows drivers hand text back")
+    )]
+    pub(crate) const fn not_typed(on_clipboard: bool) -> Self {
+        Self {
+            clipboard_has_text: on_clipboard,
+            delivered: false,
+        }
+    }
+}
+
+/// How a queued delivery reaches its driver.
+enum Route<'a> {
+    /// Type into whatever holds focus now.
+    Keys,
+    /// Type into the window captured when the dictation started.
+    KeysTo(&'a WindowTarget),
+    /// Paste into whatever holds focus now.
+    Paste,
+    /// Paste into the window captured when the dictation started.
+    PasteTo(&'a WindowTarget),
+}
+
+/// Pick the driver entry point. The captured window is used in every mode, so
+/// a window of ours that took focus since the capture never receives the text.
+fn route(mode: DictationMode, target: Option<&WindowTarget>) -> Route<'_> {
+    match (mode, target) {
+        (DictationMode::TypeInPlace, Some(t)) => Route::KeysTo(t),
+        (DictationMode::TypeInPlace, None) => Route::Keys,
+        (_, Some(t)) => Route::PasteTo(t),
+        (_, None) => Route::Paste,
+    }
+}
+
+/// Run a driver call, turning a panic into a dropped delivery. The delivery
+/// thread outlives any one dictation, so one bad call must not end it.
+fn run_guarded(call: impl FnOnce() -> TypeOutcome) -> TypeOutcome {
+    std::panic::catch_unwind(std::panic::AssertUnwindSafe(call)).unwrap_or_else(|_| {
+        error!("delivery driver panicked; the text was dropped");
+        TypeOutcome::DROPPED
+    })
+}
+
+/// Least time between attempts to build a driver that failed to start. The
+/// attempt can raise a permission prompt, so it is not repeated on every poll.
+const INIT_RETRY_AFTER: Duration = Duration::from_secs(30);
+
+fn init_retry_due(last_attempt: Option<Instant>, now: Instant) -> bool {
+    last_attempt.is_none_or(|at| now.duration_since(at) >= INIT_RETRY_AFTER)
 }
 
 /// Message sent to the persistent delivery thread.
@@ -263,25 +316,46 @@ impl DeliveryService {
 
 // ─── Platform-specific delivery ──────────────────────────────────────────────
 
+/// Build the platform driver and report the result through `health`.
+///
+/// Building can take arbitrarily long (a polkit prompt on Linux) and can panic;
+/// neither may take the delivery thread down with it.
+fn start_driver(terminal_mode: TerminalMode, health: &AtomicU8) -> Option<PlatformDriver> {
+    let built = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+        PlatformDriver::new(terminal_mode)
+    }))
+    .unwrap_or_else(|_| Err("driver start panicked".into()));
+    match built {
+        Ok(driver) => {
+            info!(platform = driver.platform_name(), "delivery thread ready");
+            health.store(DeliveryHealth::READY, Ordering::Release);
+            Some(driver)
+        }
+        Err(e) => {
+            warn!(error = %e, "text delivery unavailable on this platform");
+            health.store(DeliveryHealth::STOPPED, Ordering::Release);
+            None
+        }
+    }
+}
+
 fn delivery_thread(
     rx: mpsc::Receiver<DeliveryJob>,
     terminal_mode: TerminalMode,
     busy_until: Arc<Mutex<Option<Instant>>>,
     health: Arc<AtomicU8>,
 ) {
-    let mut driver = match PlatformDriver::new(terminal_mode) {
-        Ok(d) => d,
-        Err(e) => {
-            warn!(error = %e, "text delivery unavailable on this platform");
-            health.store(DeliveryHealth::STOPPED, Ordering::Release);
-            return;
-        }
-    };
-
-    info!(platform = driver.platform_name(), "delivery thread ready");
-    health.store(DeliveryHealth::READY, Ordering::Release);
+    let mut last_attempt = Some(Instant::now());
+    let mut driver = start_driver(terminal_mode, &health);
 
     while let Ok(job) = rx.recv() {
+        // A driver that failed to start is retried when the app next polls the
+        // thread, so a permission granted since then works without a restart.
+        if driver.is_none() && init_retry_due(last_attempt, Instant::now()) {
+            health.store(DeliveryHealth::STARTING, Ordering::Release);
+            last_attempt = Some(Instant::now());
+            driver = start_driver(terminal_mode, &health);
+        }
         let msg = match job {
             // Liveness probe — nothing to do, and must not register as busy.
             DeliveryJob::Probe => continue,
@@ -289,10 +363,19 @@ fn delivery_thread(
             // background thread during the ASR window, so its subprocess cost
             // never reaches the paste hot path.
             DeliveryJob::Prime => {
-                driver.prime_clipboard();
+                if let Some(d) = driver.as_mut() {
+                    d.prime_clipboard();
+                }
                 continue;
             }
             DeliveryJob::Deliver(msg) => msg,
+        };
+        let Some(driver) = driver.as_mut() else {
+            warn!(session_id = ?msg.session_id, "delivery dropped — no working driver");
+            if let Some(tx) = msg.outcome {
+                let _ = tx.send(TypeOutcome::DROPPED);
+            }
+            continue;
         };
         // Untrusted input: the transcript has passed through the user
         // dictionary and, when styling is enabled, a remote endpoint. Strip
@@ -323,17 +406,17 @@ fn delivery_thread(
         // Delivery returns whether the dictated text now sits on the clipboard,
         // so the explicit copy below can skip re-setting it (the uinput paste
         // path with copy_to_clipboard on already leaves it there).
-        let outcome = match msg.mode {
-            DictationMode::TypeInPlace => driver.type_keys(text, keep_clipboard),
-            _ => match msg.target {
-                Some(ref target) => driver.type_text_to(text, target, keep_clipboard),
-                None => driver.type_text(text, keep_clipboard),
-            },
-        };
+        let outcome = run_guarded(|| match route(msg.mode, msg.target.as_ref()) {
+            Route::Keys => driver.type_keys(text, keep_clipboard),
+            Route::KeysTo(target) => driver.type_keys_to(text, target, keep_clipboard),
+            Route::Paste => driver.type_text(text, keep_clipboard),
+            Route::PasteTo(target) => driver.type_text_to(text, target, keep_clipboard),
+        });
         if !outcome.delivered {
             warn!(
                 session_id = ?msg.session_id,
-                "delivery dropped — text reached neither the application nor the clipboard"
+                on_clipboard = outcome.clipboard_has_text,
+                "delivery did not reach the application"
             );
         }
         // Best-effort: a caller that stopped listening just doesn't hear back.
@@ -462,11 +545,26 @@ impl PlatformDriver {
             #[cfg(target_os = "linux")]
             LinuxBackend::Ibus(t) => {
                 let committed = Self::ibus_text_with(self.terminal_mode, text, None);
-                t.commit_text(&committed);
-                TypeOutcome::delivered(false)
+                Self::ibus_commit(t, &committed)
             }
             LinuxBackend::Uinput(t) => t.type_str(text, keep_clipboard),
         }
+    }
+
+    /// Commit through IBus. When the commit did not land — the focused app has
+    /// no IBus input context, or the daemon is unreachable — the text goes on
+    /// the clipboard so the dictation is not lost, and the outcome says so.
+    #[cfg(target_os = "linux")]
+    fn ibus_commit(typer: &mut crate::ibus::IbusTyper, text: &str) -> TypeOutcome {
+        if typer.commit_text(text) {
+            return TypeOutcome::delivered(false);
+        }
+        let on_clipboard = crate::uinput_typer::set_clipboard(text).is_ok();
+        warn!(
+            on_clipboard,
+            "ibus commit did not land; the focused app may not use IBus"
+        );
+        TypeOutcome::not_typed(on_clipboard)
     }
 
     fn type_text_to(
@@ -481,8 +579,7 @@ impl PlatformDriver {
             #[cfg(target_os = "linux")]
             LinuxBackend::Ibus(t) => {
                 let committed = Self::ibus_text_with(self.terminal_mode, text, Some(target));
-                t.commit_text(&committed);
-                TypeOutcome::delivered(false)
+                Self::ibus_commit(t, &committed)
             }
             LinuxBackend::Uinput(t) => t.type_str_to(text, target, keep_clipboard),
         }
@@ -495,10 +592,26 @@ impl PlatformDriver {
             #[cfg(target_os = "linux")]
             LinuxBackend::Ibus(t) => {
                 let committed = Self::ibus_text_with(self.terminal_mode, text, None);
-                t.commit_text(&committed);
-                TypeOutcome::delivered(false)
+                Self::ibus_commit(t, &committed)
             }
-            LinuxBackend::Uinput(t) => t.type_str_keys(text, keep_clipboard),
+            LinuxBackend::Uinput(t) => t.type_str_keys(text, None, keep_clipboard),
+        }
+    }
+
+    /// [`type_keys`](Self::type_keys), aimed at the captured window.
+    fn type_keys_to(
+        &mut self,
+        text: &str,
+        target: &WindowTarget,
+        keep_clipboard: bool,
+    ) -> TypeOutcome {
+        match &mut self.backend {
+            #[cfg(target_os = "linux")]
+            LinuxBackend::Ibus(t) => {
+                let committed = Self::ibus_text_with(self.terminal_mode, text, Some(target));
+                Self::ibus_commit(t, &committed)
+            }
+            LinuxBackend::Uinput(t) => t.type_str_keys(text, Some(target), keep_clipboard),
         }
     }
 
@@ -564,11 +677,46 @@ impl PlatformDriver {
 
     fn type_text(&mut self, text: &str, keep_clipboard: bool) -> TypeOutcome {
         let flattened = self.flattened(text, None);
-        self.type_text_flattened(&flattened, keep_clipboard)
+        self.type_text_flattened(&flattened, keep_clipboard, PASTE_READ_WINDOW)
+    }
+
+    /// Stage `text` on the clipboard for the user to paste by hand, for a
+    /// target that would drop our synthetic input.
+    fn leave_on_clipboard(&mut self, text: &str) -> TypeOutcome {
+        warn!(
+            "the focused window runs at a higher privilege level and ignores synthetic input; \
+             the text is on the clipboard"
+        );
+        TypeOutcome::not_typed(self.clipboard.set_text(text).is_ok())
+    }
+
+    /// Stage `text` for a paste. A transient copy is kept out of clipboard
+    /// history and cloud sync, where Windows would otherwise record it.
+    fn stage_text(&mut self, text: &str, keep_clipboard: bool) -> Result<(), arboard::Error> {
+        #[cfg(target_os = "windows")]
+        if !keep_clipboard {
+            use arboard::SetExtWindows;
+            return self
+                .clipboard
+                .set()
+                .exclude_from_history()
+                .exclude_from_cloud()
+                .text(text.to_owned());
+        }
+        let _ = keep_clipboard;
+        self.clipboard.set_text(text)
     }
 
     /// The paste itself. Callers flatten first; this never does.
-    fn type_text_flattened(&mut self, text: &str, keep_clipboard: bool) -> TypeOutcome {
+    ///
+    /// `read_window` is how long the text stays on the clipboard after the
+    /// chord, before the user's own content goes back.
+    fn type_text_flattened(
+        &mut self,
+        text: &str,
+        keep_clipboard: bool,
+        read_window: std::time::Duration,
+    ) -> TypeOutcome {
         // Snapshot before staging ours so the user's own clipboard can go back.
         // `arboard` reads text only: an image or an app-specific format reads as
         // an error, indistinguishable from an empty clipboard, and restoring
@@ -580,13 +728,17 @@ impl PlatformDriver {
             self.clipboard.get_text().ok()
         };
 
-        if let Err(e) = self.clipboard.set_text(text) {
+        if let Err(e) = self.stage_text(text, keep_clipboard) {
             warn!(error = %e, "clipboard set failed, falling back to per-key typing");
             return self.type_keys(text, keep_clipboard);
         }
 
         std::thread::sleep(CLIPBOARD_SETTLE);
-        self.emit_paste();
+        if !self.emit_paste() {
+            // The chord did not go out, so the text is still needed: leave it
+            // where the user can paste it, and do not restore over it.
+            return TypeOutcome::not_typed(true);
+        }
 
         let Some(prior) = prior else {
             // Nothing to put back — the dictated text stays as the paste source.
@@ -594,7 +746,7 @@ impl PlatformDriver {
         };
         // The target app needs its post-paste window to read our text before
         // the user's content replaces it.
-        std::thread::sleep(PASTE_READ_WINDOW);
+        std::thread::sleep(read_window);
         if let Err(e) = self.clipboard.set_text(prior) {
             warn!(error = %e, "clipboard restore failed; dictated text left on clipboard");
             return TypeOutcome::delivered(true);
@@ -634,21 +786,33 @@ impl PlatformDriver {
         keep_clipboard: bool,
     ) -> TypeOutcome {
         debug!(class = ?target.class, is_terminal = target.is_terminal, "delivering to window");
-        // The paste chord goes to whatever holds focus, so if one of our own
-        // windows took it since the capture — a click on the pill overlay —
-        // the transcript would land in the pill. Put focus back first. A no-op
-        // when focus is already where the user left it.
+        if target.input_blocked {
+            return self.leave_on_clipboard(text);
+        }
+        Self::restore_target_focus(target);
+        let text: &str = &self.flattened(text, Some(target));
+        let read_window =
+            PASTE_READ_WINDOW.max(crate::focus::paste_read_floor(target.class.as_deref()));
+        self.type_text_flattened(text, keep_clipboard, read_window)
+    }
+
+    /// The paste chord goes to whatever holds focus, so if one of our own
+    /// windows took it since the capture — a click on the pill overlay — the
+    /// transcript would land in the pill. Put focus back first. A no-op when
+    /// focus is already where the user left it.
+    #[cfg_attr(not(target_os = "windows"), allow(unused_variables))]
+    fn restore_target_focus(target: &WindowTarget) {
         #[cfg(target_os = "windows")]
         if let Some(token) = target.focus_token.as_ref()
             && crate::focus::restore_focus(token)
         {
             std::thread::sleep(FOCUS_SWITCH_SETTLE);
         }
-        let text: &str = &self.flattened(text, Some(target));
-        self.type_text_flattened(text, keep_clipboard)
     }
 
-    fn emit_paste(&mut self) {
+    /// Send the paste chord. `false` when the system refused any of it — on
+    /// macOS, typically a missing Accessibility permission.
+    fn emit_paste(&mut self) -> bool {
         use enigo::{Direction, Key, Keyboard};
 
         // macOS: Cmd+V, Windows: Ctrl+V
@@ -658,19 +822,43 @@ impl PlatformDriver {
             Key::Control
         };
 
-        let _ = self.enigo.key(modifier, Direction::Press);
-        let _ = self.enigo.key(Key::Unicode('v'), Direction::Click);
-        let _ = self.enigo.key(modifier, Direction::Release);
+        let pressed = self.enigo.key(modifier, Direction::Press);
+        let clicked = self.enigo.key(Key::Unicode('v'), Direction::Click);
+        // Released regardless, so a refused key never leaves the modifier down.
+        let released = self.enigo.key(modifier, Direction::Release);
+        let sent = pressed.is_ok() && clicked.is_ok() && released.is_ok();
+        if !sent {
+            warn!("paste chord was refused by the system");
+        }
+        sent
     }
 
     /// Per-key typing maps `'\n'` to Enter, which submits the form or runs
     /// the shell line. Flattened for the same reason the paste path is.
     fn type_keys(&mut self, text: &str, _keep_clipboard: bool) -> TypeOutcome {
+        let flattened = self.flattened(text, None);
+        self.type_flattened_keys(&flattened)
+    }
+
+    /// [`type_keys`](Self::type_keys), aimed at the captured window.
+    fn type_keys_to(
+        &mut self,
+        text: &str,
+        target: &WindowTarget,
+        _keep_clipboard: bool,
+    ) -> TypeOutcome {
+        if target.input_blocked {
+            return self.leave_on_clipboard(text);
+        }
+        Self::restore_target_focus(target);
+        let flattened = self.flattened(text, Some(target));
+        self.type_flattened_keys(&flattened)
+    }
+
+    fn type_flattened_keys(&mut self, text: &str) -> TypeOutcome {
         use enigo::Keyboard;
 
-        let flattened = self.flattened(text, None);
-        // Fallback: type each character directly
-        if let Err(e) = self.enigo.text(&flattened) {
+        if let Err(e) = self.enigo.text(text) {
             warn!(error = %e, "per-key typing failed");
             return TypeOutcome::DROPPED;
         }
@@ -681,5 +869,62 @@ impl PlatformDriver {
         self.clipboard
             .set_text(text)
             .map_err(|e| format!("clipboard set failed: {e}"))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn some_target() -> WindowTarget {
+        WindowTarget::from_class("kitty".into(), None)
+    }
+
+    /// Typing in place has to honour the captured window like a paste does:
+    /// restore focus to it and classify it, instead of probing whatever holds
+    /// focus now.
+    #[test]
+    fn every_mode_aims_at_the_captured_window_when_there_is_one() {
+        let t = some_target();
+        assert!(matches!(
+            route(DictationMode::TypeInPlace, None),
+            Route::Keys
+        ));
+        assert!(matches!(
+            route(DictationMode::TypeInPlace, Some(&t)),
+            Route::KeysTo(_)
+        ));
+        assert!(matches!(
+            route(DictationMode::Clipboard, None),
+            Route::Paste
+        ));
+        assert!(matches!(
+            route(DictationMode::Clipboard, Some(&t)),
+            Route::PasteTo(_)
+        ));
+    }
+
+    #[test]
+    fn text_not_typed_is_reported_with_where_it_went() {
+        let on_clipboard = TypeOutcome::not_typed(true);
+        assert!(!on_clipboard.delivered && on_clipboard.clipboard_has_text);
+        let nowhere = TypeOutcome::not_typed(false);
+        assert!(!nowhere.delivered && !nowhere.clipboard_has_text);
+    }
+
+    #[test]
+    fn a_panicking_driver_drops_the_text_instead_of_ending_the_thread() {
+        let outcome = run_guarded(|| -> TypeOutcome { panic!("driver blew up") });
+        assert!(!outcome.delivered && !outcome.clipboard_has_text);
+        let ok = run_guarded(|| TypeOutcome::delivered(true));
+        assert!(ok.delivered && ok.clipboard_has_text);
+    }
+
+    #[test]
+    fn a_failed_driver_start_is_retried_but_not_on_every_probe() {
+        let now = Instant::now();
+        assert!(init_retry_due(None, now));
+        assert!(!init_retry_due(Some(now), now + Duration::from_secs(1)));
+        assert!(init_retry_due(Some(now), now + INIT_RETRY_AFTER));
     }
 }

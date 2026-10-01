@@ -127,6 +127,7 @@ fn with_token(class: Option<String>, focus_token: Option<FocusToken>) -> WindowT
         is_terminal: class.as_deref().is_some_and(is_terminal_class),
         class,
         focus_token,
+        input_blocked: false,
     }
 }
 

@@ -200,6 +200,14 @@ Terminal classification means something different on each side. On Linux it pick
 
 **Undeliverable text.** Delivery reports back whether the text reached the focused app. Multi-line text is never typed key-by-key — a newline would press Enter into whatever has focus — so if the clipboard is also unavailable the text is dropped rather than sent, and the session raises a warning instead of reporting success.
 
+**Text that could not be typed, but is recoverable.** Some failures leave the text on the clipboard instead of dropping it, and the session warning says to paste it: an IBus commit that did not land (the focused app has no IBus input context, so IBus never enables the engine — or the daemon is unreachable), a Windows target running at a higher integrity level (UIPI discards synthetic input without an error, so capture checks the target's elevation before sending), and a paste chord the system refused.
+
+**One window, every mode.** `TypeInPlace` aims at the captured window the same way `Clipboard` does: focus is restored to it first, and terminal classification comes from it rather than from a live probe.
+
+**Slow targets.** The text stays on the clipboard for at least `focus::paste_read_floor` after the chord for apps that read a paste late (Office, remote-desktop and VM clients, Electron shells). Windows also keeps a transient copy out of clipboard history and cloud sync.
+
+**Delivery thread.** A driver that fails to start (a cancelled polkit prompt, say) is retried when the app next polls `health()`, at most every 30 s. A driver call that panics drops that one delivery and the thread carries on. IBus D-Bus calls time out after 2 s.
+
 **Clipboard preservation.** The `Clipboard` path borrows the system clipboard as a transport. When `copy_to_clipboard` is off, the prior clipboard is snapshotted before delivery (its preferred MIME type and raw bytes, so images survive) and restored afterward. When `copy_to_clipboard` is on, the dictated text is kept and the otherwise-redundant re-copy is skipped. The IBus path never touches the clipboard.
 
 ---

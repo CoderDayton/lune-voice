@@ -25,6 +25,9 @@ pub struct WindowTarget {
     /// A handle for restoring focus, where the platform offers one that
     /// survives being handed to another thread.
     pub focus_token: Option<FocusToken>,
+    /// Synthetic input sent to this window is dropped without any error — on
+    /// Windows, a target running at a higher integrity level than this app.
+    pub input_blocked: bool,
 }
 
 impl WindowTarget {
@@ -43,7 +46,65 @@ impl WindowTarget {
             is_terminal: is_terminal_class(&class),
             class: Some(class),
             focus_token,
+            input_blocked: false,
         }
+    }
+}
+
+/// Whether Windows will drop our synthetic input for a target.
+///
+/// UI privilege isolation discards input sent from a lower-integrity process to
+/// a higher one, and `SendInput` still reports success, so delivery has to
+/// check before it sends.
+#[cfg_attr(not(target_os = "windows"), allow(dead_code))]
+pub(crate) fn elevation_blocks_input(target_elevated: bool, own_elevated: bool) -> bool {
+    target_elevated && !own_elevated
+}
+
+/// Apps that read a pasted clipboard late: Office, remote-desktop and VM
+/// clients, and Electron shells. Executable stems and app ids, compared by
+/// [`terminal_key`].
+const SLOW_PASTE_TARGETS: &[&str] = &[
+    "winword",
+    "excel",
+    "powerpnt",
+    "outlook",
+    "onenote",
+    "mstsc",
+    "wfica32",
+    "vmware",
+    "vmware-view",
+    "vmplayer",
+    "virtualbox",
+    "virtualboxvm",
+    "anydesk",
+    "teamviewer",
+    "remmina",
+    "code",
+    "code-insiders",
+    "cursor",
+    "slack",
+    "discord",
+    "teams",
+    "ms-teams",
+    "obsidian",
+    "notion",
+    "signal-desktop",
+    "element",
+];
+
+/// Least time to hold the dictated text on the clipboard after the paste
+/// chord, for the target. Restoring the user's clipboard earlier makes a slow
+/// app paste what the user had copied instead of the dictation.
+pub(crate) fn paste_read_floor(class: Option<&str>) -> std::time::Duration {
+    let slow = class.is_some_and(|c| {
+        let key = terminal_key(c);
+        SLOW_PASTE_TARGETS.iter().any(|t| terminal_key(t) == key)
+    });
+    if slow {
+        std::time::Duration::from_millis(400)
+    } else {
+        std::time::Duration::ZERO
     }
 }
 
@@ -352,6 +413,29 @@ mod tests {
         match class {
             Some(c) => WindowTarget::from_class(c.to_owned(), None),
             None => WindowTarget::unknown(),
+        }
+    }
+
+    /// Windows drops synthetic input aimed at a higher-integrity window without
+    /// reporting it, so the only safe moment to notice is before sending.
+    #[test]
+    fn only_an_elevated_target_under_an_unelevated_app_blocks_input() {
+        assert!(elevation_blocks_input(true, false));
+        assert!(!elevation_blocks_input(true, true));
+        assert!(!elevation_blocks_input(false, false));
+        assert!(!elevation_blocks_input(false, true));
+    }
+
+    #[test]
+    fn a_heavy_target_gets_a_longer_clipboard_hold_than_an_ordinary_one() {
+        let ordinary = paste_read_floor(Some("notepad"));
+        assert_eq!(ordinary, std::time::Duration::ZERO);
+        assert_eq!(paste_read_floor(None), ordinary);
+        for slow in ["WINWORD", "excel", "mstsc", "Code", "slack"] {
+            assert!(
+                paste_read_floor(Some(slow)) > std::time::Duration::from_millis(100),
+                "{slow}"
+            );
         }
     }
 

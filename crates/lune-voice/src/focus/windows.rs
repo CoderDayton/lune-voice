@@ -12,9 +12,13 @@
 use tracing::debug;
 
 use windows_sys::Win32::Foundation::CloseHandle;
-use windows_sys::Win32::Foundation::HWND;
+use windows_sys::Win32::Foundation::{ERROR_ACCESS_DENIED, GetLastError, HANDLE, HWND};
+use windows_sys::Win32::Security::{
+    GetTokenInformation, TOKEN_ELEVATION, TOKEN_QUERY, TokenElevation,
+};
 use windows_sys::Win32::System::Threading::{
-    OpenProcess, PROCESS_QUERY_LIMITED_INFORMATION, QueryFullProcessImageNameW,
+    GetCurrentProcess, OpenProcess, OpenProcessToken, PROCESS_QUERY_LIMITED_INFORMATION,
+    QueryFullProcessImageNameW,
 };
 use windows_sys::Win32::UI::WindowsAndMessaging::{
     GetForegroundWindow, GetWindowThreadProcessId, IsWindow, SetForegroundWindow,
@@ -54,15 +58,84 @@ pub(super) fn capture() -> WindowTarget {
         handle
     };
 
+    let input_blocked = pid != std::process::id() && target_blocks_input(pid);
+    if input_blocked {
+        debug!("foreground window runs at a higher integrity level; input to it is dropped");
+    }
+
     let Some(stem) = image_stem(pid) else {
         return WindowTarget {
             focus_token: token,
+            input_blocked,
             ..WindowTarget::unknown()
         };
     };
 
     debug!(class = %stem, "focused window detected");
-    WindowTarget::from_class(stem, token)
+    WindowTarget {
+        input_blocked,
+        ..WindowTarget::from_class(stem, token)
+    }
+}
+
+/// Whether Windows will drop our synthetic input for the process `pid` owns.
+///
+/// A process we can open but whose token we cannot read is one the system
+/// withholds from us, which is what a higher integrity level looks like. A
+/// process we cannot open at all is left unclaimed: nothing says input to it
+/// fails.
+fn target_blocks_input(pid: u32) -> bool {
+    // SAFETY: plain FFI call; a failure returns a null handle.
+    let handle = unsafe { OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, 0, pid) };
+    if handle.is_null() {
+        return false;
+    }
+    // Only "access denied" reads as a higher integrity level; any other
+    // failure says nothing about the target, so it is not claimed as blocked.
+    let target_elevated =
+        token_is_elevated(handle).unwrap_or_else(|code| code == ERROR_ACCESS_DENIED);
+    // SAFETY: `handle` came from `OpenProcess` and is closed exactly once.
+    unsafe { CloseHandle(handle) };
+    // SAFETY: returns a pseudo-handle that needs no closing.
+    let own_elevated = token_is_elevated(unsafe { GetCurrentProcess() }).unwrap_or(false);
+    super::elevation_blocks_input(target_elevated, own_elevated)
+}
+
+/// Whether the token of `process` is elevated, or the Win32 error code that
+/// stopped it being read.
+fn token_is_elevated(process: HANDLE) -> Result<bool, u32> {
+    let mut token: HANDLE = std::ptr::null_mut();
+    // SAFETY: `process` is a live handle; `token` is a live local.
+    if unsafe { OpenProcessToken(process, TOKEN_QUERY, &mut token) } == 0 {
+        // SAFETY: reads the calling thread's last error; no arguments.
+        return Err(unsafe { GetLastError() });
+    }
+    let mut elevation = TOKEN_ELEVATION { TokenIsElevated: 0 };
+    let mut returned = 0u32;
+    // SAFETY: `token` is live until `CloseHandle` below; the buffer is a
+    // `TOKEN_ELEVATION` and its size is passed alongside.
+    let ok = unsafe {
+        GetTokenInformation(
+            token,
+            TokenElevation,
+            (&mut elevation as *mut TOKEN_ELEVATION).cast(),
+            std::mem::size_of::<TOKEN_ELEVATION>() as u32,
+            &mut returned,
+        )
+    };
+    // SAFETY: reads the calling thread's last error; taken before `CloseHandle`
+    // can overwrite it.
+    let error = if ok == 0 {
+        unsafe { GetLastError() }
+    } else {
+        0
+    };
+    // SAFETY: `token` came from `OpenProcessToken` and is closed exactly once.
+    unsafe { CloseHandle(token) };
+    if ok == 0 {
+        return Err(error);
+    }
+    Ok(elevation.TokenIsElevated != 0)
 }
 
 /// Put focus back on the window the dictation started in, if one of ours took

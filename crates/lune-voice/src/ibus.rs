@@ -55,6 +55,10 @@ const ENGINE_IFACE: &str = "org.freedesktop.IBus.Engine";
 /// callback never stalls delivery for long.
 const FOCUS_WAIT: Duration = Duration::from_millis(200);
 
+/// Longest a D-Bus call to the IBus daemon may block the delivery thread. A
+/// wedged daemon otherwise stalls every later dictation behind one call.
+const METHOD_TIMEOUT: Duration = Duration::from_secs(2);
+
 // ─── Crash recovery ──────────────────────────────────────────────────────────
 
 /// File recording the engine we displaced, written before we make ours global
@@ -519,12 +523,16 @@ impl IbusTyper {
         Ok(typer)
     }
 
-    /// Commit Unicode `text` into the focused input context. Infallible from the
-    /// caller's view — logs and returns on any D-Bus error so one failed commit
-    /// never poisons the connection.
-    pub fn commit_text(&mut self, text: &str) {
+    /// Commit Unicode `text` into the focused input context. Logs and returns
+    /// on any D-Bus error so one failed commit never poisons the connection.
+    ///
+    /// Returns whether the text can have landed: the engine was enabled for a
+    /// focused input context and the commit was sent. IBus enables the engine
+    /// only for an app that has an input context, so `false` also means the
+    /// focused app does not use IBus and the commit went nowhere.
+    pub fn commit_text(&mut self, text: &str) -> bool {
         if text.is_empty() {
-            return;
+            return true;
         }
         // Restore target: the engine active right now, else the one captured at
         // startup — so we never leave the user stuck on our no-op engine.
@@ -543,12 +551,13 @@ impl IbusTyper {
         if let Err(e) = self.activate() {
             warn!(error = %e, "ibus: SetGlobalEngine failed; commit skipped");
             clear_displaced_engine();
-            return;
+            return false;
         }
         // Wait for IBus to focus/enable our engine so the commit lands. Emit
-        // anyway on timeout (the engine may enable a moment later), but say so
-        // — a silent stuck commit is otherwise invisible.
-        if !self.state.wait_active(FOCUS_WAIT) {
+        // anyway on timeout (the engine may enable a moment later), but report
+        // it — a silent stuck commit is otherwise invisible.
+        let enabled = self.state.wait_active(FOCUS_WAIT);
+        if !enabled {
             warn!(
                 timeout_ms = FOCUS_WAIT.as_millis() as u64,
                 "ibus: engine not activated before commit; text may be lost"
@@ -558,15 +567,19 @@ impl IbusTyper {
         // CommitText payload is `(v)` wrapping a serialized IBusText. A `Value`
         // signal arg is serialized as `v` automatically; don't double-wrap.
         let payload = ibus_text(text);
-        if let Err(e) = self.conn.emit_signal(
+        let sent = match self.conn.emit_signal(
             None::<&str>,
             ENGINE_PATH,
             ENGINE_IFACE,
             "CommitText",
             &(payload,),
         ) {
-            warn!(error = %e, "ibus: CommitText emit failed");
-        }
+            Ok(()) => true,
+            Err(e) => {
+                warn!(error = %e, "ibus: CommitText emit failed");
+                false
+            }
+        };
 
         // Restore the user's previous engine (never leave ours active).
         match &restore_to {
@@ -578,6 +591,7 @@ impl IbusTyper {
             },
             None => clear_displaced_engine(),
         }
+        enabled && sent
     }
 
     /// Activate our engine, rebuilding a dead connection once before giving up.
@@ -643,6 +657,7 @@ fn connect_and_register(state: &Arc<EngineState>) -> Result<Connection, String> 
     let address = discover_ibus_address()?;
     let conn = connection::Builder::address(address.as_str())
         .map_err(|e| format!("ibus address parse: {e}"))?
+        .method_timeout(METHOD_TIMEOUT)
         .serve_at(FACTORY_PATH, LuneFactory)
         .map_err(|e| format!("serve factory: {e}"))?
         .serve_at(
@@ -682,7 +697,9 @@ pub fn restore_displaced_engine_now() -> bool {
     let Ok(address) = discover_ibus_address() else {
         return false;
     };
-    let Ok(conn) = connection::Builder::address(address.as_str()).and_then(|b| b.build()) else {
+    let Ok(conn) = connection::Builder::address(address.as_str())
+        .and_then(|b| b.method_timeout(METHOD_TIMEOUT).build())
+    else {
         return false;
     };
     let restored = conn

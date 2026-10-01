@@ -138,6 +138,8 @@ struct PasteTarget {
     terminal_chord: bool,
     /// Collapse newlines and tabs before emitting anything.
     flatten: bool,
+    /// Least time to leave the dictated text on the clipboard after the chord.
+    read_floor: Duration,
 }
 
 /// How long to wait on a `pkexec` call before giving up on it.
@@ -870,6 +872,18 @@ impl UinputTyper {
         PasteTarget {
             terminal_chord,
             flatten,
+            read_floor: crate::focus::paste_read_floor(target.and_then(|t| t.class.as_deref())),
+        }
+    }
+
+    /// Put focus back on the window the dictation started in, when we hold a
+    /// handle for it.
+    fn restore_target_focus(target: &WindowTarget) {
+        if let Some(ref token) = target.focus_token {
+            if !restore_focus(token) {
+                warn!("could not restore focus to original window");
+            }
+            std::thread::sleep(Duration::from_millis(50));
         }
     }
 
@@ -884,12 +898,7 @@ impl UinputTyper {
         target: &WindowTarget,
         keep_clipboard: bool,
     ) -> TypeOutcome {
-        if let Some(ref token) = target.focus_token {
-            if !restore_focus(token) {
-                warn!("could not restore focus to original window");
-            }
-            std::thread::sleep(Duration::from_millis(50));
-        }
+        Self::restore_target_focus(target);
         let paste = self.resolve_paste_target(Some(target));
         self.do_clipboard_paste(text, paste, "emitting paste to target", keep_clipboard)
     }
@@ -1005,7 +1014,7 @@ impl UinputTyper {
             "{label}"
         );
         self.emit_paste(target.terminal_chord);
-        std::thread::sleep(self.paste_delay.delay());
+        std::thread::sleep(self.paste_delay.delay().max(target.read_floor));
 
         // Restore the user's clipboard now that the target app has had the
         // post-paste window to read our text.
@@ -1039,11 +1048,22 @@ impl UinputTyper {
     /// (accented, CJK, emoji, smart quotes) the whole string is delivered via
     /// the clipboard instead — non-ASCII transcripts are never silently
     /// dropped.
-    pub fn type_str_keys(&mut self, text: &str, keep_clipboard: bool) -> TypeOutcome {
+    ///
+    /// `target` is the window captured when the dictation started: focus goes
+    /// back to it first, and a paste decides about terminals from it.
+    pub fn type_str_keys(
+        &mut self,
+        text: &str,
+        target: Option<&WindowTarget>,
+        keep_clipboard: bool,
+    ) -> TypeOutcome {
+        if let Some(target) = target {
+            Self::restore_target_focus(target);
+        }
         // Multi-line snippet bodies are the normal source of newlines here;
         // see `needs_paste_delivery` for why they must not be typed per-key.
         if needs_paste_delivery(text) {
-            let target = self.resolve_paste_target(None);
+            let target = self.resolve_paste_target(target);
             let reason = if text.contains('\n') {
                 "multi-line text — emitting paste (Enter would submit)"
             } else {
@@ -1057,7 +1077,7 @@ impl UinputTyper {
         // per-key — it is faster than a clipboard round trip and leaves the
         // clipboard alone, which is what people expect for a quick phrase.
         if is_long_enough_to_paste(text) {
-            let target = self.resolve_paste_target(None);
+            let target = self.resolve_paste_target(target);
             return self.do_clipboard_paste(
                 text,
                 target,
