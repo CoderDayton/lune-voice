@@ -77,7 +77,7 @@ msgstr "{page} / {totalPages}"
 msgid "{saved} (unavailable)"
 msgstr "{saved} (사용 불가)"
 
-#: src/features/overview/overview-page.tsx:117
+#: src/features/overview/overview-page.tsx:118
 msgid "{todayMinutes} min today"
 msgstr "오늘 {todayMinutes}분"
 
@@ -85,7 +85,7 @@ msgstr "오늘 {todayMinutes}분"
 msgid "{totalCount} sessions"
 msgstr "{totalCount} 세션"
 
-#: src/features/overview/overview-page.tsx:340
+#: src/features/overview/overview-page.tsx:339
 msgid "{totalSessions} total"
 msgstr "총 {totalSessions}개"
 
@@ -194,7 +194,7 @@ msgstr "기기에 저장된 AI 모델입니다."
 msgid "All required models are already installed. Continue when you're ready."
 msgstr "필요한 모든 모델이 이미 설치되어 있습니다. 준비가 되면 계속하세요."
 
-#: src/features/overview/overview-page.tsx:103
+#: src/features/overview/overview-page.tsx:104
 msgid "all-time · today"
 msgstr "전체 · 오늘"
 
@@ -229,7 +229,7 @@ msgid "API key"
 msgstr "API 키"
 
 #: src/features/settings/sections/appearance-section.tsx:37
-#: src/features/settings/settings-page.tsx:72
+#: src/features/settings/settings-page.tsx:78
 msgid "Appearance"
 msgstr "모양"
 
@@ -258,7 +258,7 @@ msgstr "요청 중…"
 msgid "At least {MIN_MESSAGE_CHARS} characters."
 msgstr "{MIN_MESSAGE_CHARS}자 이상 입력하세요."
 
-#: src/features/overview/overview-page.tsx:151
+#: src/features/overview/overview-page.tsx:152
 msgid "Audio"
 msgstr "오디오"
 
@@ -373,12 +373,12 @@ msgstr "캡처 장치와 녹음이 말하는 시점을 감지하는 방식입니
 msgid "Change engine"
 msgstr "엔진 변경"
 
-#: src/features/shell/components/sidebar-quick-actions.tsx:62
+#: src/features/shell/components/sidebar-quick-actions.tsx:56
 msgid "Change theme"
 msgstr "테마 변경"
 
 #: src/features/settings/sections/general-section.tsx:159
-#: src/features/shell/components/sidebar-quick-actions.tsx:78
+#: src/features/shell/components/sidebar-quick-actions.tsx:72
 msgid "Check for updates"
 msgstr "업데이트 확인"
 
@@ -463,7 +463,7 @@ msgstr "닫기"
 msgid "Close sidebar"
 msgstr "사이드바 닫기"
 
-#: src/features/shell/components/sidebar.tsx:60
+#: src/features/shell/components/sidebar.tsx:62
 msgid "Collapse sidebar"
 msgstr "사이드바 접기"
 
@@ -479,9 +479,9 @@ msgstr "작게"
 msgid "Completed"
 msgstr "완료"
 
-#: src/features/overview/overview-page.tsx:288
-#: src/features/shell/components/app-shell.tsx:171
-#: src/features/shell/components/sidebar-widgets.tsx:46
+#: src/features/overview/overview-page.tsx:287
+#: src/features/shell/components/app-shell.tsx:167
+#: src/features/shell/components/sidebar-widgets.tsx:67
 msgid "Connecting"
 msgstr "연결 중"
 
@@ -664,7 +664,7 @@ msgstr "세션마다 말한 언어를 감지합니다."
 msgid "Deterministic fixes applied before any AI styling."
 msgstr "AI 스타일 지정 이전에 결정적 수정 사항이 적용되었습니다."
 
-#: src/features/settings/settings-page.tsx:73
+#: src/features/settings/settings-page.tsx:79
 msgid "Dictation"
 msgstr "받아쓰기"
 
@@ -693,7 +693,7 @@ msgstr "받아쓰기 취소"
 msgid "Discard the current draft and return to idle. Click the binding to change it."
 msgstr "현재 초안을 삭제하고 유휴 상태로 돌아갑니다. 바인딩을 클릭하여 변경하세요."
 
-#: src/features/overview/overview-page.tsx:288
+#: src/features/overview/overview-page.tsx:287
 msgid "Disconnected"
 msgstr "연결이 끊김"
 
@@ -811,7 +811,7 @@ msgid "Editing “{spokenTrigger}”"
 msgstr "“{spokenTrigger}” 편집 중"
 
 #: src/features/history/components/history-table.tsx:451
-#: src/features/overview/overview-page.tsx:184
+#: src/features/overview/overview-page.tsx:185
 msgid "Empty session"
 msgstr "빈 세션"
 
@@ -837,7 +837,7 @@ msgstr "프롬프트를 편집했으므로 예시가 최신 상태가 아닙니�
 msgid "Examples teach the styling engine your style. Regenerate them after editing the prompt."
 msgstr "예시는 스타일 지정 엔진에 사용자의 스타일을 학습시킵니다. 프롬프트를 편집한 후 다시 생성하세요."
 
-#: src/features/shell/components/sidebar.tsx:31
+#: src/features/shell/components/sidebar.tsx:33
 msgid "Expand sidebar"
 msgstr "사이드바 확장"
 
@@ -916,7 +916,7 @@ msgid "Gap between the pill and the screen edge, so it clears a taskbar or dock.
 msgstr "표시기와 화면 가장자리 사이의 간격입니다. 작업 표시줄이나 독을 가리지 않게 해 줍니다."
 
 #: src/features/settings/sections/general-section.tsx:62
-#: src/features/settings/settings-page.tsx:71
+#: src/features/settings/settings-page.tsx:77
 msgid "General"
 msgstr "일반"
 
@@ -941,15 +941,15 @@ msgstr "GitHub"
 msgid "Give the memory back after a quiet spell. The next dictation reloads the model, which adds up to a second before it starts listening — your speech is recorded during the wait, so nothing is lost."
 msgstr "한동안 쓰지 않으면 메모리를 반환합니다. 다음 받아쓰기에서 모델을 다시 불러오므로 듣기 시작까지 최대 1초가 더 걸립니다. 기다리는 동안에도 음성은 녹음되므로 놓치는 내용은 없습니다."
 
-#: src/features/overview/overview-page.tsx:286
+#: src/features/overview/overview-page.tsx:285
 msgid "Good afternoon."
 msgstr "좋은 오후입니다."
 
-#: src/features/overview/overview-page.tsx:286
+#: src/features/overview/overview-page.tsx:285
 msgid "Good evening."
 msgstr "좋은 저녁입니다."
 
-#: src/features/overview/overview-page.tsx:286
+#: src/features/overview/overview-page.tsx:285
 msgid "Good morning."
 msgstr "좋은 아침입니다."
 
@@ -964,22 +964,22 @@ msgid "GPU support is installed but not working."
 msgstr "GPU 지원이 설치되어 있지만 작동하지 않습니다."
 
 #: src/components/feedback/help-feedback-dialog.tsx:240
-#: src/features/shell/components/sidebar-quick-actions.tsx:88
+#: src/features/shell/components/sidebar-quick-actions.tsx:82
 msgid "Help & feedback"
 msgstr "도움말 및 피드백"
 
 #: src/features/history/components/history-table.tsx:216
-#: src/features/overview/overview-page.tsx:363
+#: src/features/overview/overview-page.tsx:362
 msgid "History isn't saved"
 msgstr "기록이 저장되지 않습니다"
 
 #: src/features/history/components/history-table.tsx:219
-#: src/features/overview/overview-page.tsx:366
+#: src/features/overview/overview-page.tsx:365
 msgid "History kept {historyDays} days"
 msgstr "기록 {historyDays}일 보관"
 
 #: src/features/history/components/history-table.tsx:218
-#: src/features/overview/overview-page.tsx:365
+#: src/features/overview/overview-page.tsx:364
 msgid "History kept forever"
 msgstr "기록을 영구 보관"
 
@@ -992,7 +992,7 @@ msgstr "기록 보존"
 msgid "Hold is unavailable right now, so the shortcut toggles recording instead. Grant keyboard access to use Hold."
 msgstr "지금은 누르고 있기를 사용할 수 없어 단축키가 녹음을 켜고 끕니다. 누르고 있기를 사용하려면 키보드 접근 권한을 허용하세요."
 
-#: src/features/overview/overview-page.tsx:299
+#: src/features/overview/overview-page.tsx:298
 msgid "Hold the hotkey and speak, and your words land wherever your cursor is."
 msgstr "단축키를 누른 채 말하면 커서가 있는 곳에 텍스트가 입력됩니다."
 
@@ -1028,7 +1028,7 @@ msgstr "표시기 막대의 모양입니다. 변경 사항은 즉시 적용됩�
 msgid "How to dictate"
 msgstr "받아쓰기 사용법"
 
-#: src/features/overview/overview-page.tsx:158
+#: src/features/overview/overview-page.tsx:159
 msgid "Idle · mic ready"
 msgstr "대기 중 · 마이크 준비됨"
 
@@ -1101,7 +1101,7 @@ msgstr "작업 공간이나 가상 데스크톱을 전환해도 표시기를 계
 msgid "Keyboard access"
 msgstr "키보드 액세스"
 
-#: src/features/shell/components/sidebar-quick-actions.tsx:69
+#: src/features/shell/components/sidebar-quick-actions.tsx:63
 msgid "Keyboard shortcuts"
 msgstr "키보드 단축키"
 
@@ -1132,7 +1132,7 @@ msgid "Launch into the system tray instead of opening the main window. Useful wh
 msgstr "기본 창을 여는 대신 시스템 트레이를 실행하세요. 로그인 시 Lune Voice가 자동으로 시작될 때 유용합니다."
 
 #: src/features/history/components/history-table.tsx:177
-#: src/features/overview/overview-page.tsx:223
+#: src/features/overview/overview-page.tsx:224
 msgid "Length"
 msgstr "길이"
 
@@ -1149,7 +1149,7 @@ msgstr "라이선스"
 msgid "Light"
 msgstr "밝게"
 
-#: src/features/shell/components/app-shell.tsx:175
+#: src/features/shell/components/app-shell.tsx:171
 msgid "Listening"
 msgstr "듣는 중"
 
@@ -1161,8 +1161,8 @@ msgstr "듣는 중 — 문구를 말한 다음 다시 클릭하면 멈춥니다.
 msgid "Listening — say the phrase…"
 msgstr "듣는 중 — 문구를 말하세요…"
 
-#: src/features/overview/overview-page.tsx:158
-#: src/features/shell/components/sidebar-widgets.tsx:53
+#: src/features/overview/overview-page.tsx:159
+#: src/features/shell/components/sidebar-widgets.tsx:74
 msgid "Listening…"
 msgstr "듣는 중…"
 
@@ -1231,11 +1231,11 @@ msgstr "회의 머리글"
 msgid "Microphone"
 msgstr "마이크"
 
-#: src/features/overview/overview-page.tsx:155
+#: src/features/overview/overview-page.tsx:156
 msgid "Microphone input level"
 msgstr "마이크 입력 레벨"
 
-#: src/features/overview/overview-page.tsx:114
+#: src/features/overview/overview-page.tsx:115
 msgid "min"
 msgstr "분"
 
@@ -1248,7 +1248,7 @@ msgid "Model size"
 msgstr "모델 크기"
 
 #: src/features/settings/sections/models-section.tsx:99
-#: src/features/settings/settings-page.tsx:78
+#: src/features/settings/settings-page.tsx:84
 msgid "Models"
 msgstr "모델"
 
@@ -1259,6 +1259,13 @@ msgstr "모델은 로컬에 저장됩니다. 원격 측정도 없고 계정도 �
 #: src/features/settings/sections/pill-section.tsx:155
 msgid "Monitor"
 msgstr "모니터"
+
+#: src/features/shell/components/sidebar-quick-actions.tsx:108
+#: src/features/shell/components/sidebar-quick-actions.tsx:109
+#: src/features/shell/components/sidebar-quick-actions.tsx:117
+#: src/features/shell/components/sidebar-quick-actions.tsx:129
+msgid "More"
+msgstr "더 보기"
 
 #: src/features/welcome/components/engine-step.tsx:56
 msgid "Multilingual · runs on-device"
@@ -1319,7 +1326,7 @@ msgstr "세션을 찾을 수 없습니다."
 msgid "No sessions match \"{0}\"."
 msgstr "\"{0}\"과(와) 일치하는 세션이 없습니다."
 
-#: src/features/overview/overview-page.tsx:208
+#: src/features/overview/overview-page.tsx:209
 msgid "No sessions yet"
 msgstr "아직 세션이 없습니다."
 
@@ -1374,8 +1381,8 @@ msgstr "끄기"
 msgid "Off delivers raw transcripts. Which style is applied is chosen on the Styles tab."
 msgstr "끄면 원본 텍스트가 전달됩니다. 적용할 스타일은 스타일 탭에서 선택합니다."
 
-#: src/features/overview/overview-page.tsx:158
-#: src/features/shell/components/app-shell.tsx:178
+#: src/features/overview/overview-page.tsx:159
+#: src/features/shell/components/app-shell.tsx:174
 msgid "Offline"
 msgstr "오프라인"
 
@@ -1391,7 +1398,7 @@ msgstr "메뉴 열기"
 msgid "Open releases page"
 msgstr "릴리스 페이지 열기"
 
-#: src/features/overview/overview-page.tsx:180
+#: src/features/overview/overview-page.tsx:181
 msgid "Open session from {time}"
 msgstr "{time}에서 세션 열기"
 
@@ -1416,7 +1423,7 @@ msgstr "또는 바로 보내기"
 msgid "Orientation"
 msgstr "방향"
 
-#: src/features/settings/settings-page.tsx:77
+#: src/features/settings/settings-page.tsx:83
 msgid "Output"
 msgstr "산출"
 
@@ -1458,7 +1465,7 @@ msgstr "성능 또는 속도"
 msgid "Phrase"
 msgstr "구절"
 
-#: src/features/settings/settings-page.tsx:74
+#: src/features/settings/settings-page.tsx:80
 msgid "Pill"
 msgstr "표시기"
 
@@ -1502,7 +1509,7 @@ msgstr "위치"
 msgid "Preset corner or edge the pill starts at."
 msgstr "표시기가 처음 나타나는 기본 모서리 또는 가장자리입니다."
 
-#: src/features/overview/overview-page.tsx:210
+#: src/features/overview/overview-page.tsx:211
 msgid "Press"
 msgstr "누르다"
 
@@ -1517,10 +1524,6 @@ msgstr "키를 누르세요…"
 #: src/features/settings/data/settings-data.ts:85
 msgid "Press the hotkey to start, press again to stop. Easiest for longer dictations."
 msgstr "단축키를 눌러 시작하고 다시 눌러 멈춥니다. 긴 받아쓰기에 가장 편합니다."
-
-#: src/features/shell/components/sidebar-widgets.tsx:56
-msgid "Press to talk"
-msgstr "눌러서 말하기"
 
 #: src/features/settings/components/key-capture-input.tsx:159
 msgid "Press your combo — hold Esc or click away to cancel"
@@ -1554,11 +1557,11 @@ msgstr "우선순위"
 
 #: src/features/dictation/dictation-pill.tsx:63
 #: src/features/dictation/dictation-pill.tsx:69
-#: src/features/shell/components/app-shell.tsx:173
+#: src/features/shell/components/app-shell.tsx:169
 msgid "Processing"
 msgstr "처리 중"
 
-#: src/features/shell/components/sidebar-widgets.tsx:53
+#: src/features/shell/components/sidebar-widgets.tsx:74
 msgid "Processing…"
 msgstr "처리 중…"
 
@@ -1566,23 +1569,16 @@ msgstr "처리 중…"
 msgid "Question or help"
 msgstr "질문 또는 도움말"
 
-#: src/features/shell/components/sidebar-quick-actions.tsx:113
-#: src/features/shell/components/sidebar-quick-actions.tsx:114
-#: src/features/shell/components/sidebar-quick-actions.tsx:122
-#: src/features/shell/components/sidebar-quick-actions.tsx:138
-msgid "Quick actions"
-msgstr "빠른 작업"
-
-#: src/features/shell/components/sidebar-quick-actions.tsx:94
+#: src/features/shell/components/sidebar-quick-actions.tsx:88
 msgid "Quit Lune Voice"
 msgstr "Lune Voice 종료"
 
-#: src/features/overview/overview-page.tsx:288
-#: src/features/shell/components/app-shell.tsx:177
+#: src/features/overview/overview-page.tsx:287
+#: src/features/shell/components/app-shell.tsx:173
 msgid "Ready"
 msgstr "준비됨"
 
-#: src/features/overview/overview-page.tsx:339
+#: src/features/overview/overview-page.tsx:338
 msgid "Recent sessions"
 msgstr "최근 세션"
 
@@ -1651,7 +1647,7 @@ msgstr "GPU를 사용하려면 Lune Voice를 다시 시작하세요."
 msgid "Restart needed"
 msgstr "재시작 필요"
 
-#: src/features/overview/overview-page.tsx:330
+#: src/features/overview/overview-page.tsx:329
 msgid "Retry"
 msgstr "다시 시도"
 
@@ -1709,7 +1705,7 @@ msgstr "<0>“{spokenTrigger}”</0>만 발화하거나 — <1>“insert {spoken
 msgid "Say a trigger as your whole utterance to expand it"
 msgstr "트리거를 발화 전체로 말하면 확장됩니다"
 
-#: src/features/overview/overview-page.tsx:375
+#: src/features/overview/overview-page.tsx:374
 msgid "Search sessions"
 msgstr "세션 검색"
 
@@ -1754,7 +1750,7 @@ msgstr "직접 설정한 OpenAI 호환 엔드포인트로 오디오를 보냅니
 msgid "Sends transcripts to an OpenAI-compatible endpoint you configure — Ollama, llama-server or LM Studio locally, or a hosted API."
 msgstr "직접 설정한 OpenAI 호환 엔드포인트로 인식 결과를 보냅니다. 로컬의 Ollama, llama-server, LM Studio도, 호스팅 API도 됩니다."
 
-#: src/features/overview/overview-page.tsx:146
+#: src/features/overview/overview-page.tsx:147
 msgid "session"
 msgstr "세션"
 
@@ -1766,11 +1762,11 @@ msgstr "세션 세부정보"
 msgid "Session timed out — backend may be unresponsive"
 msgstr "세션이 시간 초과되었습니다 — 백엔드가 응답하지 않을 수 있습니다"
 
-#: src/features/overview/overview-page.tsx:146
+#: src/features/overview/overview-page.tsx:147
 msgid "sessions"
 msgstr "세션"
 
-#: src/features/shell/components/sidebar-widgets.tsx:61
+#: src/features/shell/components/sidebar-widgets.tsx:90
 msgid "Set hotkey"
 msgstr "단축키 설정"
 
@@ -1786,7 +1782,7 @@ msgstr "GPU 가속 설정"
 msgid "Setting up your GPU"
 msgstr "GPU를 설정하는 중"
 
-#: src/features/settings/settings-page.tsx:98
+#: src/features/settings/settings-page.tsx:104
 msgid "Settings sections"
 msgstr "설정 섹션"
 
@@ -1801,7 +1797,7 @@ msgid "Show on all workspaces"
 msgstr "모든 작업 공간에 표시"
 
 #. placeholder {0}: recentSessions.length
-#: src/features/overview/overview-page.tsx:356
+#: src/features/overview/overview-page.tsx:355
 msgid "Showing {0} of {totalSessions} sessions"
 msgstr "{totalSessions}개 중 {0}개 표시"
 
@@ -1857,7 +1853,7 @@ msgstr "소리"
 msgid "Sound cues"
 msgstr "소리 신호"
 
-#: src/features/overview/overview-page.tsx:108
+#: src/features/overview/overview-page.tsx:109
 msgid "Speaking time"
 msgstr "발화 시간"
 
@@ -1881,9 +1877,9 @@ msgstr "각지게"
 msgid "Standard"
 msgstr "표준"
 
-#: src/features/shell/components/sidebar-widgets.tsx:29
-#: src/features/shell/components/sidebar-widgets.tsx:30
-#: src/features/shell/components/sidebar-widgets.tsx:46
+#: src/features/shell/components/sidebar-widgets.tsx:50
+#: src/features/shell/components/sidebar-widgets.tsx:51
+#: src/features/shell/components/sidebar-widgets.tsx:67
 msgid "Start dictating"
 msgstr "받아쓰기 시작"
 
@@ -1913,9 +1909,9 @@ msgstr "중지하고 전사"
 msgid "Stop capturing"
 msgstr "등록 중지"
 
-#: src/features/shell/components/sidebar-widgets.tsx:29
-#: src/features/shell/components/sidebar-widgets.tsx:30
-#: src/features/shell/components/sidebar-widgets.tsx:46
+#: src/features/shell/components/sidebar-widgets.tsx:50
+#: src/features/shell/components/sidebar-widgets.tsx:51
+#: src/features/shell/components/sidebar-widgets.tsx:67
 msgid "Stop dictating"
 msgstr "받아쓰기 중지"
 
@@ -1924,7 +1920,7 @@ msgid "Stop dictation"
 msgstr "받아쓰기 중지"
 
 #: src/features/history/components/history-table.tsx:227
-#: src/features/overview/overview-page.tsx:371
+#: src/features/overview/overview-page.tsx:370
 msgid "Stored on this device"
 msgstr "이 기기에 저장됨"
 
@@ -1932,7 +1928,7 @@ msgstr "이 기기에 저장됨"
 msgid "Style"
 msgstr "스타일"
 
-#: src/features/settings/settings-page.tsx:76
+#: src/features/settings/settings-page.tsx:82
 msgid "Styling"
 msgstr "스타일 지정"
 
@@ -1951,7 +1947,7 @@ msgstr "스타일 전환"
 #: src/components/ui/theme-picker.tsx:153
 #: src/features/settings/sections/appearance-section.tsx:25
 #: src/features/settings/sections/appearance-section.tsx:47
-#: src/features/shell/components/sidebar-quick-actions.tsx:54
+#: src/features/shell/components/sidebar-quick-actions.tsx:48
 msgid "System"
 msgstr "시스템"
 
@@ -1975,7 +1971,7 @@ msgstr "감사합니다. 의견이 전송되었습니다."
 msgid "The floating status pill you see while dictating."
 msgstr "받아쓰는 동안 표시되는 떠 있는 상태 표시기입니다."
 
-#: src/features/overview/overview-page.tsx:323
+#: src/features/overview/overview-page.tsx:322
 msgid "The local runtime isn't responding. The figures below are the last known values."
 msgstr "로컬 런타임이 응답하지 않습니다. 아래 수치는 마지막으로 확인된 값입니다."
 
@@ -1998,10 +1994,6 @@ msgstr "인식기가 가장 확신하지 못하는 단어를 사전과 어휘에
 #: src/features/settings/sections/appearance-section.tsx:70
 msgid "Theme"
 msgstr "테마"
-
-#: src/features/shell/components/sidebar-quick-actions.tsx:124
-msgid "Theme, shortcuts, quit"
-msgstr "테마, 단축키, 종료"
 
 #: src/features/updates/update-dialog.tsx:160
 msgid "This copy can't update itself. Download the new version from {RELEASES_URL} and replace this one. Your settings, history and models are kept."
@@ -2029,7 +2021,7 @@ msgid "This will permanently remove this dictation session and its transcript."
 msgstr "이 받아쓰기 세션과 텍스트가 영구적으로 삭제됩니다."
 
 #: src/features/history/components/history-table.tsx:171
-#: src/features/overview/overview-page.tsx:220
+#: src/features/overview/overview-page.tsx:221
 msgid "Time"
 msgstr "시간"
 
@@ -2041,11 +2033,11 @@ msgstr "호칭 약어(\"Mister\" → \"Mr.\")"
 msgid "Titles"
 msgstr "호칭"
 
-#: src/features/overview/overview-page.tsx:211
+#: src/features/overview/overview-page.tsx:212
 msgid "to start dictating"
 msgstr "받아쓰기를 시작하려면"
 
-#: src/features/overview/overview-page.tsx:140
+#: src/features/overview/overview-page.tsx:141
 msgid "Today"
 msgstr "오늘"
 
@@ -2073,7 +2065,7 @@ msgstr "왼쪽 위"
 msgid "Top right"
 msgstr "오른쪽 위"
 
-#: src/features/overview/overview-page.tsx:91
+#: src/features/overview/overview-page.tsx:92
 msgid "Total words"
 msgstr "전체 단어 수"
 
@@ -2086,12 +2078,12 @@ msgid "Transcribing…"
 msgstr "전사하는 중…"
 
 #: src/features/history/components/history-table.tsx:172
-#: src/features/overview/overview-page.tsx:221
+#: src/features/overview/overview-page.tsx:222
 msgid "Transcript"
 msgstr "받아쓰기 텍스트"
 
 #: src/features/settings/sections/transcription-section.tsx:44
-#: src/features/settings/settings-page.tsx:75
+#: src/features/settings/settings-page.tsx:81
 msgid "Transcription"
 msgstr "전사"
 
@@ -2193,7 +2185,7 @@ msgstr "세로"
 msgid "View"
 msgstr "보기"
 
-#: src/features/overview/overview-page.tsx:344
+#: src/features/overview/overview-page.tsx:343
 msgid "View all"
 msgstr "모두 보기"
 
@@ -2213,7 +2205,7 @@ msgstr "표시"
 msgid "Voice model"
 msgstr "음성 모델"
 
-#: src/features/overview/overview-page.tsx:134
+#: src/features/overview/overview-page.tsx:135
 msgid "vs all-time avg"
 msgstr "전체 평균 대비"
 
@@ -2294,11 +2286,11 @@ msgstr "단어"
 
 #: src/features/history/components/history-table.tsx:174
 #: src/features/history/components/session-detail-modal.tsx:157
-#: src/features/overview/overview-page.tsx:222
+#: src/features/overview/overview-page.tsx:223
 msgid "Words"
 msgstr "단어"
 
-#: src/features/overview/overview-page.tsx:122
+#: src/features/overview/overview-page.tsx:123
 msgid "WPM"
 msgstr "WPM"
 
@@ -2338,7 +2330,7 @@ msgstr "GPU를 사용할 준비가 되었습니다 — 더 빠른 전사에 활�
 msgid "Your GPU qualifies. Setup downloads the NVIDIA runtime, then a restart turns it on."
 msgstr "GPU가 조건을 충족합니다. 설정 과정에서 NVIDIA 런타임을 내려받고, 다시 시작하면 켜집니다."
 
-#: src/features/overview/overview-page.tsx:210
+#: src/features/overview/overview-page.tsx:211
 msgid "your hotkey"
 msgstr "단축키"
 

@@ -77,7 +77,7 @@ msgstr "{page} / {totalPages}"
 msgid "{saved} (unavailable)"
 msgstr "{saved}（不可用）"
 
-#: src/features/overview/overview-page.tsx:117
+#: src/features/overview/overview-page.tsx:118
 msgid "{todayMinutes} min today"
 msgstr "今天 {todayMinutes} 分钟"
 
@@ -85,7 +85,7 @@ msgstr "今天 {todayMinutes} 分钟"
 msgid "{totalCount} sessions"
 msgstr "{totalCount} 会话"
 
-#: src/features/overview/overview-page.tsx:340
+#: src/features/overview/overview-page.tsx:339
 msgid "{totalSessions} total"
 msgstr "共 {totalSessions} 条"
 
@@ -194,7 +194,7 @@ msgstr "AI 模型存储在您的设备上。"
 msgid "All required models are already installed. Continue when you're ready."
 msgstr "所有必需的模型均已安装。准备好后继续。"
 
-#: src/features/overview/overview-page.tsx:103
+#: src/features/overview/overview-page.tsx:104
 msgid "all-time · today"
 msgstr "全部 · 今天"
 
@@ -229,7 +229,7 @@ msgid "API key"
 msgstr "API密钥"
 
 #: src/features/settings/sections/appearance-section.tsx:37
-#: src/features/settings/settings-page.tsx:72
+#: src/features/settings/settings-page.tsx:78
 msgid "Appearance"
 msgstr "外貌"
 
@@ -258,7 +258,7 @@ msgstr "正在请求…"
 msgid "At least {MIN_MESSAGE_CHARS} characters."
 msgstr "至少 {MIN_MESSAGE_CHARS} 个字符。"
 
-#: src/features/overview/overview-page.tsx:151
+#: src/features/overview/overview-page.tsx:152
 msgid "Audio"
 msgstr "声音的"
 
@@ -373,12 +373,12 @@ msgstr "采���设备以及录音如何检测您何时说话。"
 msgid "Change engine"
 msgstr "更换引擎"
 
-#: src/features/shell/components/sidebar-quick-actions.tsx:62
+#: src/features/shell/components/sidebar-quick-actions.tsx:56
 msgid "Change theme"
 msgstr "更换主题"
 
 #: src/features/settings/sections/general-section.tsx:159
-#: src/features/shell/components/sidebar-quick-actions.tsx:78
+#: src/features/shell/components/sidebar-quick-actions.tsx:72
 msgid "Check for updates"
 msgstr "检查更新"
 
@@ -463,7 +463,7 @@ msgstr "关闭"
 msgid "Close sidebar"
 msgstr "关闭侧边栏"
 
-#: src/features/shell/components/sidebar.tsx:60
+#: src/features/shell/components/sidebar.tsx:62
 msgid "Collapse sidebar"
 msgstr "折叠侧边栏"
 
@@ -479,9 +479,9 @@ msgstr "紧凑"
 msgid "Completed"
 msgstr "完全的"
 
-#: src/features/overview/overview-page.tsx:288
-#: src/features/shell/components/app-shell.tsx:171
-#: src/features/shell/components/sidebar-widgets.tsx:46
+#: src/features/overview/overview-page.tsx:287
+#: src/features/shell/components/app-shell.tsx:167
+#: src/features/shell/components/sidebar-widgets.tsx:67
 msgid "Connecting"
 msgstr "正在连接"
 
@@ -664,7 +664,7 @@ msgstr "每次会话自动检测所说的语言。"
 msgid "Deterministic fixes applied before any AI styling."
 msgstr "在任何 AI 样式之前应用确定性修复。"
 
-#: src/features/settings/settings-page.tsx:73
+#: src/features/settings/settings-page.tsx:79
 msgid "Dictation"
 msgstr "听写"
 
@@ -693,7 +693,7 @@ msgstr "放弃听写"
 msgid "Discard the current draft and return to idle. Click the binding to change it."
 msgstr "放弃当前草稿并返回空闲状态。单击绑定以更改它。"
 
-#: src/features/overview/overview-page.tsx:288
+#: src/features/overview/overview-page.tsx:287
 msgid "Disconnected"
 msgstr "已断开连接"
 
@@ -811,7 +811,7 @@ msgid "Editing “{spokenTrigger}”"
 msgstr "正在编辑“{spokenTrigger}”"
 
 #: src/features/history/components/history-table.tsx:451
-#: src/features/overview/overview-page.tsx:184
+#: src/features/overview/overview-page.tsx:185
 msgid "Empty session"
 msgstr "空会话"
 
@@ -837,7 +837,7 @@ msgstr "自您编辑提示词后，示例已过时。"
 msgid "Examples teach the styling engine your style. Regenerate them after editing the prompt."
 msgstr "示例向润色引擎传授您的风格。编辑提示词后请重新生成它们。"
 
-#: src/features/shell/components/sidebar.tsx:31
+#: src/features/shell/components/sidebar.tsx:33
 msgid "Expand sidebar"
 msgstr "展开侧边栏"
 
@@ -916,7 +916,7 @@ msgid "Gap between the pill and the screen edge, so it clears a taskbar or dock.
 msgstr "指示器与屏幕边缘之间的间距，以便避开任务栏或程序坞。"
 
 #: src/features/settings/sections/general-section.tsx:62
-#: src/features/settings/settings-page.tsx:71
+#: src/features/settings/settings-page.tsx:77
 msgid "General"
 msgstr "通用"
 
@@ -941,15 +941,15 @@ msgstr "GitHub"
 msgid "Give the memory back after a quiet spell. The next dictation reloads the model, which adds up to a second before it starts listening — your speech is recorded during the wait, so nothing is lost."
 msgstr "闲置一段时间后释放内存。下次听写会重新加载模型，开始聆听前最多多出一秒——等待期间语音照样录制，不会丢失内容。"
 
-#: src/features/overview/overview-page.tsx:286
+#: src/features/overview/overview-page.tsx:285
 msgid "Good afternoon."
 msgstr "下午好。"
 
-#: src/features/overview/overview-page.tsx:286
+#: src/features/overview/overview-page.tsx:285
 msgid "Good evening."
 msgstr "晚上好。"
 
-#: src/features/overview/overview-page.tsx:286
+#: src/features/overview/overview-page.tsx:285
 msgid "Good morning."
 msgstr "早上好。"
 
@@ -964,22 +964,22 @@ msgid "GPU support is installed but not working."
 msgstr "GPU 支持已安装，但无法正常工作。"
 
 #: src/components/feedback/help-feedback-dialog.tsx:240
-#: src/features/shell/components/sidebar-quick-actions.tsx:88
+#: src/features/shell/components/sidebar-quick-actions.tsx:82
 msgid "Help & feedback"
 msgstr "帮助与反馈"
 
 #: src/features/history/components/history-table.tsx:216
-#: src/features/overview/overview-page.tsx:363
+#: src/features/overview/overview-page.tsx:362
 msgid "History isn't saved"
 msgstr "不保存历史记录"
 
 #: src/features/history/components/history-table.tsx:219
-#: src/features/overview/overview-page.tsx:366
+#: src/features/overview/overview-page.tsx:365
 msgid "History kept {historyDays} days"
 msgstr "历史记录保留 {historyDays} 天"
 
 #: src/features/history/components/history-table.tsx:218
-#: src/features/overview/overview-page.tsx:365
+#: src/features/overview/overview-page.tsx:364
 msgid "History kept forever"
 msgstr "历史记录永久保留"
 
@@ -992,7 +992,7 @@ msgstr "历史记录保留"
 msgid "Hold is unavailable right now, so the shortcut toggles recording instead. Grant keyboard access to use Hold."
 msgstr "按住模式当前不可用，因此快捷键改为切换录音。授予键盘访问权限即可使用按住模式。"
 
-#: src/features/overview/overview-page.tsx:299
+#: src/features/overview/overview-page.tsx:298
 msgid "Hold the hotkey and speak, and your words land wherever your cursor is."
 msgstr "按住快捷键说话，文字会输入到光标所在的位置。"
 
@@ -1028,7 +1028,7 @@ msgstr "指示器条的外观。更改会立即生效。"
 msgid "How to dictate"
 msgstr "如何听写"
 
-#: src/features/overview/overview-page.tsx:158
+#: src/features/overview/overview-page.tsx:159
 msgid "Idle · mic ready"
 msgstr "空闲 · 麦克风就绪"
 
@@ -1101,7 +1101,7 @@ msgstr "切换工作区或虚拟桌面时，指示器始终跟随显示。"
 msgid "Keyboard access"
 msgstr "键盘访问"
 
-#: src/features/shell/components/sidebar-quick-actions.tsx:69
+#: src/features/shell/components/sidebar-quick-actions.tsx:63
 msgid "Keyboard shortcuts"
 msgstr "键盘快捷键"
 
@@ -1132,7 +1132,7 @@ msgid "Launch into the system tray instead of opening the main window. Useful wh
 msgstr "启动到系统托盘而不是打开主窗口。当 Lune Voice 在登录时自动启动时很有用。"
 
 #: src/features/history/components/history-table.tsx:177
-#: src/features/overview/overview-page.tsx:223
+#: src/features/overview/overview-page.tsx:224
 msgid "Length"
 msgstr "长度"
 
@@ -1149,7 +1149,7 @@ msgstr "许可证"
 msgid "Light"
 msgstr "浅色"
 
-#: src/features/shell/components/app-shell.tsx:175
+#: src/features/shell/components/app-shell.tsx:171
 msgid "Listening"
 msgstr "正在聆听"
 
@@ -1161,8 +1161,8 @@ msgstr "正在聆听 — 说出该短语，然后再次点击停止。"
 msgid "Listening — say the phrase…"
 msgstr "正在聆听 — 请说出该短语…"
 
-#: src/features/overview/overview-page.tsx:158
-#: src/features/shell/components/sidebar-widgets.tsx:53
+#: src/features/overview/overview-page.tsx:159
+#: src/features/shell/components/sidebar-widgets.tsx:74
 msgid "Listening…"
 msgstr "正在听……"
 
@@ -1231,11 +1231,11 @@ msgstr "会议抬头"
 msgid "Microphone"
 msgstr "麦克风"
 
-#: src/features/overview/overview-page.tsx:155
+#: src/features/overview/overview-page.tsx:156
 msgid "Microphone input level"
 msgstr "麦克风输入电平"
 
-#: src/features/overview/overview-page.tsx:114
+#: src/features/overview/overview-page.tsx:115
 msgid "min"
 msgstr "分钟"
 
@@ -1248,7 +1248,7 @@ msgid "Model size"
 msgstr "模型大小"
 
 #: src/features/settings/sections/models-section.tsx:99
-#: src/features/settings/settings-page.tsx:78
+#: src/features/settings/settings-page.tsx:84
 msgid "Models"
 msgstr "型号"
 
@@ -1259,6 +1259,13 @@ msgstr "模型存储在本地。没有遥测，没有账户。"
 #: src/features/settings/sections/pill-section.tsx:155
 msgid "Monitor"
 msgstr "显示器"
+
+#: src/features/shell/components/sidebar-quick-actions.tsx:108
+#: src/features/shell/components/sidebar-quick-actions.tsx:109
+#: src/features/shell/components/sidebar-quick-actions.tsx:117
+#: src/features/shell/components/sidebar-quick-actions.tsx:129
+msgid "More"
+msgstr "更多"
 
 #: src/features/welcome/components/engine-step.tsx:56
 msgid "Multilingual · runs on-device"
@@ -1319,7 +1326,7 @@ msgstr "未找到会话。"
 msgid "No sessions match \"{0}\"."
 msgstr "没有会话匹配“{0}”。"
 
-#: src/features/overview/overview-page.tsx:208
+#: src/features/overview/overview-page.tsx:209
 msgid "No sessions yet"
 msgstr "还没有会议"
 
@@ -1374,8 +1381,8 @@ msgstr "关闭"
 msgid "Off delivers raw transcripts. Which style is applied is chosen on the Styles tab."
 msgstr "关闭时传递原始转录文本。应用哪种风格在“风格”标签页中选择。"
 
-#: src/features/overview/overview-page.tsx:158
-#: src/features/shell/components/app-shell.tsx:178
+#: src/features/overview/overview-page.tsx:159
+#: src/features/shell/components/app-shell.tsx:174
 msgid "Offline"
 msgstr "离线"
 
@@ -1391,7 +1398,7 @@ msgstr "打开菜单"
 msgid "Open releases page"
 msgstr "打开发布页面"
 
-#: src/features/overview/overview-page.tsx:180
+#: src/features/overview/overview-page.tsx:181
 msgid "Open session from {time}"
 msgstr "{time} 开始的会议"
 
@@ -1416,7 +1423,7 @@ msgstr "或直接发送"
 msgid "Orientation"
 msgstr "方向"
 
-#: src/features/settings/settings-page.tsx:77
+#: src/features/settings/settings-page.tsx:83
 msgid "Output"
 msgstr "输出"
 
@@ -1458,7 +1465,7 @@ msgstr "性能或速度"
 msgid "Phrase"
 msgstr "短语"
 
-#: src/features/settings/settings-page.tsx:74
+#: src/features/settings/settings-page.tsx:80
 msgid "Pill"
 msgstr "指示器"
 
@@ -1502,7 +1509,7 @@ msgstr "位置"
 msgid "Preset corner or edge the pill starts at."
 msgstr "指示器起始的预设边角或边缘。"
 
-#: src/features/overview/overview-page.tsx:210
+#: src/features/overview/overview-page.tsx:211
 msgid "Press"
 msgstr "按"
 
@@ -1517,10 +1524,6 @@ msgstr "请按键…"
 #: src/features/settings/data/settings-data.ts:85
 msgid "Press the hotkey to start, press again to stop. Easiest for longer dictations."
 msgstr "按快捷键开始，再按一次停止。长篇听写最省事。"
-
-#: src/features/shell/components/sidebar-widgets.tsx:56
-msgid "Press to talk"
-msgstr "按下说话"
 
 #: src/features/settings/components/key-capture-input.tsx:159
 msgid "Press your combo — hold Esc or click away to cancel"
@@ -1554,11 +1557,11 @@ msgstr "优先事项"
 
 #: src/features/dictation/dictation-pill.tsx:63
 #: src/features/dictation/dictation-pill.tsx:69
-#: src/features/shell/components/app-shell.tsx:173
+#: src/features/shell/components/app-shell.tsx:169
 msgid "Processing"
 msgstr "处理中"
 
-#: src/features/shell/components/sidebar-widgets.tsx:53
+#: src/features/shell/components/sidebar-widgets.tsx:74
 msgid "Processing…"
 msgstr "加工…"
 
@@ -1566,23 +1569,16 @@ msgstr "加工…"
 msgid "Question or help"
 msgstr "提问或求助"
 
-#: src/features/shell/components/sidebar-quick-actions.tsx:113
-#: src/features/shell/components/sidebar-quick-actions.tsx:114
-#: src/features/shell/components/sidebar-quick-actions.tsx:122
-#: src/features/shell/components/sidebar-quick-actions.tsx:138
-msgid "Quick actions"
-msgstr "快捷操作"
-
-#: src/features/shell/components/sidebar-quick-actions.tsx:94
+#: src/features/shell/components/sidebar-quick-actions.tsx:88
 msgid "Quit Lune Voice"
 msgstr "退出 Lune Voice"
 
-#: src/features/overview/overview-page.tsx:288
-#: src/features/shell/components/app-shell.tsx:177
+#: src/features/overview/overview-page.tsx:287
+#: src/features/shell/components/app-shell.tsx:173
 msgid "Ready"
 msgstr "准备好"
 
-#: src/features/overview/overview-page.tsx:339
+#: src/features/overview/overview-page.tsx:338
 msgid "Recent sessions"
 msgstr "最近会话"
 
@@ -1651,7 +1647,7 @@ msgstr "重启 Lune Voice 即可开始使用 GPU。"
 msgid "Restart needed"
 msgstr "需要重启"
 
-#: src/features/overview/overview-page.tsx:330
+#: src/features/overview/overview-page.tsx:329
 msgid "Retry"
 msgstr "重试"
 
@@ -1709,7 +1705,7 @@ msgstr "将 <0>“{spokenTrigger}”</0> 作为整句说出 — 或说 <1>“ins
 msgid "Say a trigger as your whole utterance to expand it"
 msgstr "将触发词作为整句说出即可展开"
 
-#: src/features/overview/overview-page.tsx:375
+#: src/features/overview/overview-page.tsx:374
 msgid "Search sessions"
 msgstr "搜索会话"
 
@@ -1754,7 +1750,7 @@ msgstr "把音频发送到你配置的 OpenAI 兼容接口——可以是你自�
 msgid "Sends transcripts to an OpenAI-compatible endpoint you configure — Ollama, llama-server or LM Studio locally, or a hosted API."
 msgstr "把转写结果发送到你配置的 OpenAI 兼容接口——本地的 Ollama、llama-server 或 LM Studio，也可以是托管 API。"
 
-#: src/features/overview/overview-page.tsx:146
+#: src/features/overview/overview-page.tsx:147
 msgid "session"
 msgstr "会议"
 
@@ -1766,11 +1762,11 @@ msgstr "会议���情"
 msgid "Session timed out — backend may be unresponsive"
 msgstr "会话超时——后端可能无响应"
 
-#: src/features/overview/overview-page.tsx:146
+#: src/features/overview/overview-page.tsx:147
 msgid "sessions"
 msgstr "会议"
 
-#: src/features/shell/components/sidebar-widgets.tsx:61
+#: src/features/shell/components/sidebar-widgets.tsx:90
 msgid "Set hotkey"
 msgstr "设置热键"
 
@@ -1786,7 +1782,7 @@ msgstr "设置 GPU 加速"
 msgid "Setting up your GPU"
 msgstr "正在设置你的 GPU"
 
-#: src/features/settings/settings-page.tsx:98
+#: src/features/settings/settings-page.tsx:104
 msgid "Settings sections"
 msgstr "设置部分"
 
@@ -1801,7 +1797,7 @@ msgid "Show on all workspaces"
 msgstr "在所有工作区显示"
 
 #. placeholder {0}: recentSessions.length
-#: src/features/overview/overview-page.tsx:356
+#: src/features/overview/overview-page.tsx:355
 msgid "Showing {0} of {totalSessions} sessions"
 msgstr "显示 {totalSessions} 条中的 {0} 条"
 
@@ -1857,7 +1853,7 @@ msgstr "声音"
 msgid "Sound cues"
 msgstr "提示音"
 
-#: src/features/overview/overview-page.tsx:108
+#: src/features/overview/overview-page.tsx:109
 msgid "Speaking time"
 msgstr "说话时长"
 
@@ -1881,9 +1877,9 @@ msgstr "直角"
 msgid "Standard"
 msgstr "标准"
 
-#: src/features/shell/components/sidebar-widgets.tsx:29
-#: src/features/shell/components/sidebar-widgets.tsx:30
-#: src/features/shell/components/sidebar-widgets.tsx:46
+#: src/features/shell/components/sidebar-widgets.tsx:50
+#: src/features/shell/components/sidebar-widgets.tsx:51
+#: src/features/shell/components/sidebar-widgets.tsx:67
 msgid "Start dictating"
 msgstr "开始听写"
 
@@ -1913,9 +1909,9 @@ msgstr "停止并转写"
 msgid "Stop capturing"
 msgstr "停止录制"
 
-#: src/features/shell/components/sidebar-widgets.tsx:29
-#: src/features/shell/components/sidebar-widgets.tsx:30
-#: src/features/shell/components/sidebar-widgets.tsx:46
+#: src/features/shell/components/sidebar-widgets.tsx:50
+#: src/features/shell/components/sidebar-widgets.tsx:51
+#: src/features/shell/components/sidebar-widgets.tsx:67
 msgid "Stop dictating"
 msgstr "停止口授"
 
@@ -1924,7 +1920,7 @@ msgid "Stop dictation"
 msgstr "停止听写"
 
 #: src/features/history/components/history-table.tsx:227
-#: src/features/overview/overview-page.tsx:371
+#: src/features/overview/overview-page.tsx:370
 msgid "Stored on this device"
 msgstr "存储在此设备上"
 
@@ -1932,7 +1928,7 @@ msgstr "存储在此设备上"
 msgid "Style"
 msgstr "风格"
 
-#: src/features/settings/settings-page.tsx:76
+#: src/features/settings/settings-page.tsx:82
 msgid "Styling"
 msgstr "润色"
 
@@ -1951,7 +1947,7 @@ msgstr "开关款式"
 #: src/components/ui/theme-picker.tsx:153
 #: src/features/settings/sections/appearance-section.tsx:25
 #: src/features/settings/sections/appearance-section.tsx:47
-#: src/features/shell/components/sidebar-quick-actions.tsx:54
+#: src/features/shell/components/sidebar-quick-actions.tsx:48
 msgid "System"
 msgstr "系统"
 
@@ -1975,7 +1971,7 @@ msgstr "谢谢，你的反馈已发送。"
 msgid "The floating status pill you see while dictating."
 msgstr "听写时显示的浮动状态指示器。"
 
-#: src/features/overview/overview-page.tsx:323
+#: src/features/overview/overview-page.tsx:322
 msgid "The local runtime isn't responding. The figures below are the last known values."
 msgstr "本地运行时无响应。下方数据为最后已知的数值。"
 
@@ -1998,10 +1994,6 @@ msgstr "识别器最不确定的词语会与您的词典和词汇进行核对。
 #: src/features/settings/sections/appearance-section.tsx:70
 msgid "Theme"
 msgstr "主题"
-
-#: src/features/shell/components/sidebar-quick-actions.tsx:124
-msgid "Theme, shortcuts, quit"
-msgstr "主题、快捷键、退出"
 
 #: src/features/updates/update-dialog.tsx:160
 msgid "This copy can't update itself. Download the new version from {RELEASES_URL} and replace this one. Your settings, history and models are kept."
@@ -2029,7 +2021,7 @@ msgid "This will permanently remove this dictation session and its transcript."
 msgstr "这将永久删除该听写会话及其记录。"
 
 #: src/features/history/components/history-table.tsx:171
-#: src/features/overview/overview-page.tsx:220
+#: src/features/overview/overview-page.tsx:221
 msgid "Time"
 msgstr "时间"
 
@@ -2041,11 +2033,11 @@ msgstr "头衔缩写（“先生”→“先生”）"
 msgid "Titles"
 msgstr "标题"
 
-#: src/features/overview/overview-page.tsx:211
+#: src/features/overview/overview-page.tsx:212
 msgid "to start dictating"
 msgstr "开始听写"
 
-#: src/features/overview/overview-page.tsx:140
+#: src/features/overview/overview-page.tsx:141
 msgid "Today"
 msgstr "今天"
 
@@ -2073,7 +2065,7 @@ msgstr "左上"
 msgid "Top right"
 msgstr "右上"
 
-#: src/features/overview/overview-page.tsx:91
+#: src/features/overview/overview-page.tsx:92
 msgid "Total words"
 msgstr "总词数"
 
@@ -2086,12 +2078,12 @@ msgid "Transcribing…"
 msgstr "正在转写…"
 
 #: src/features/history/components/history-table.tsx:172
-#: src/features/overview/overview-page.tsx:221
+#: src/features/overview/overview-page.tsx:222
 msgid "Transcript"
 msgstr "转写结果"
 
 #: src/features/settings/sections/transcription-section.tsx:44
-#: src/features/settings/settings-page.tsx:75
+#: src/features/settings/settings-page.tsx:81
 msgid "Transcription"
 msgstr "转录"
 
@@ -2193,7 +2185,7 @@ msgstr "纵向"
 msgid "View"
 msgstr "查看"
 
-#: src/features/overview/overview-page.tsx:344
+#: src/features/overview/overview-page.tsx:343
 msgid "View all"
 msgstr "查看全部"
 
@@ -2213,7 +2205,7 @@ msgstr "显示"
 msgid "Voice model"
 msgstr "语音模型"
 
-#: src/features/overview/overview-page.tsx:134
+#: src/features/overview/overview-page.tsx:135
 msgid "vs all-time avg"
 msgstr "对比总体平均"
 
@@ -2294,11 +2286,11 @@ msgstr "字"
 
 #: src/features/history/components/history-table.tsx:174
 #: src/features/history/components/session-detail-modal.tsx:157
-#: src/features/overview/overview-page.tsx:222
+#: src/features/overview/overview-page.tsx:223
 msgid "Words"
 msgstr "字"
 
-#: src/features/overview/overview-page.tsx:122
+#: src/features/overview/overview-page.tsx:123
 msgid "WPM"
 msgstr "WPM"
 
@@ -2338,7 +2330,7 @@ msgstr "你的 GPU 已就绪 — 用它来更快地转写。"
 msgid "Your GPU qualifies. Setup downloads the NVIDIA runtime, then a restart turns it on."
 msgstr "你的 GPU 符合条件。安装程序会下载 NVIDIA 运行时，重启后即可启用。"
 
-#: src/features/overview/overview-page.tsx:210
+#: src/features/overview/overview-page.tsx:211
 msgid "your hotkey"
 msgstr "你的热键"
 

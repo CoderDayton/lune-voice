@@ -83,7 +83,7 @@ const ThemeSwatch = memo(function ThemeSwatch({
 
 /**
  * The theme grid on its own, opened by whoever owns the state. Split out from
- * `ThemePicker` so the sidebar's Quick actions menu can raise it without
+ * `ThemePicker` so the sidebar's More menu can raise it without
  * rendering a "Browse themes" button it has no room for.
  */
 export function ThemePickerDialog({ open, onClose }: { open: boolean; onClose: () => void }) {

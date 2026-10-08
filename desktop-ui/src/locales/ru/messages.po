@@ -77,7 +77,7 @@ msgstr "{page} / {totalPages}"
 msgid "{saved} (unavailable)"
 msgstr "{saved} (недоступно)"
 
-#: src/features/overview/overview-page.tsx:117
+#: src/features/overview/overview-page.tsx:118
 msgid "{todayMinutes} min today"
 msgstr "{todayMinutes} мин сегодня"
 
@@ -85,7 +85,7 @@ msgstr "{todayMinutes} мин сегодня"
 msgid "{totalCount} sessions"
 msgstr "{totalCount} сеансов"
 
-#: src/features/overview/overview-page.tsx:340
+#: src/features/overview/overview-page.tsx:339
 msgid "{totalSessions} total"
 msgstr "всего {totalSessions}"
 
@@ -194,7 +194,7 @@ msgstr "Модели AI, хранящиеся на вашем устройств
 msgid "All required models are already installed. Continue when you're ready."
 msgstr "Все необходимые модели уже установлены. Продолжайте, когда будете готовы."
 
-#: src/features/overview/overview-page.tsx:103
+#: src/features/overview/overview-page.tsx:104
 msgid "all-time · today"
 msgstr "за всё время · сегодня"
 
@@ -229,7 +229,7 @@ msgid "API key"
 msgstr "API-ключ"
 
 #: src/features/settings/sections/appearance-section.tsx:37
-#: src/features/settings/settings-page.tsx:72
+#: src/features/settings/settings-page.tsx:78
 msgid "Appearance"
 msgstr "Появление"
 
@@ -258,7 +258,7 @@ msgstr "Запрашиваем…"
 msgid "At least {MIN_MESSAGE_CHARS} characters."
 msgstr "Не менее {MIN_MESSAGE_CHARS} символов."
 
-#: src/features/overview/overview-page.tsx:151
+#: src/features/overview/overview-page.tsx:152
 msgid "Audio"
 msgstr "Аудио"
 
@@ -373,12 +373,12 @@ msgstr "Устройство захвата и то, как запись опр�
 msgid "Change engine"
 msgstr "Сменить движок"
 
-#: src/features/shell/components/sidebar-quick-actions.tsx:62
+#: src/features/shell/components/sidebar-quick-actions.tsx:56
 msgid "Change theme"
 msgstr "Сменить тему"
 
 #: src/features/settings/sections/general-section.tsx:159
-#: src/features/shell/components/sidebar-quick-actions.tsx:78
+#: src/features/shell/components/sidebar-quick-actions.tsx:72
 msgid "Check for updates"
 msgstr "Проверить обновления"
 
@@ -463,7 +463,7 @@ msgstr "Закрыть"
 msgid "Close sidebar"
 msgstr "Закрыть боковую панель"
 
-#: src/features/shell/components/sidebar.tsx:60
+#: src/features/shell/components/sidebar.tsx:62
 msgid "Collapse sidebar"
 msgstr "Свернуть боковую панель"
 
@@ -479,9 +479,9 @@ msgstr "Компактный"
 msgid "Completed"
 msgstr "Завершенный"
 
-#: src/features/overview/overview-page.tsx:288
-#: src/features/shell/components/app-shell.tsx:171
-#: src/features/shell/components/sidebar-widgets.tsx:46
+#: src/features/overview/overview-page.tsx:287
+#: src/features/shell/components/app-shell.tsx:167
+#: src/features/shell/components/sidebar-widgets.tsx:67
 msgid "Connecting"
 msgstr "Подключение"
 
@@ -664,7 +664,7 @@ msgstr "Определяет язык речи в каждом сеансе."
 msgid "Deterministic fixes applied before any AI styling."
 msgstr "Детерминированные исправления применяются перед любым стилем ИИ."
 
-#: src/features/settings/settings-page.tsx:73
+#: src/features/settings/settings-page.tsx:79
 msgid "Dictation"
 msgstr "Диктовка"
 
@@ -693,7 +693,7 @@ msgstr "Отменить диктовку"
 msgid "Discard the current draft and return to idle. Click the binding to change it."
 msgstr "Отмените текущий черновик и вернитесь в режим ожидания. Нажмите на привязку, чтобы изменить ее."
 
-#: src/features/overview/overview-page.tsx:288
+#: src/features/overview/overview-page.tsx:287
 msgid "Disconnected"
 msgstr "Отключено"
 
@@ -811,7 +811,7 @@ msgid "Editing “{spokenTrigger}”"
 msgstr "Редактирование «{spokenTrigger}»"
 
 #: src/features/history/components/history-table.tsx:451
-#: src/features/overview/overview-page.tsx:184
+#: src/features/overview/overview-page.tsx:185
 msgid "Empty session"
 msgstr "Пустая сессия"
 
@@ -837,7 +837,7 @@ msgstr "Примеры устарели после того, как вы изм�
 msgid "Examples teach the styling engine your style. Regenerate them after editing the prompt."
 msgstr "Примеры обучают движок стилизации вашему стилю. Сгенерируйте их заново после изменения промпта."
 
-#: src/features/shell/components/sidebar.tsx:31
+#: src/features/shell/components/sidebar.tsx:33
 msgid "Expand sidebar"
 msgstr "Развернуть боковую панель"
 
@@ -916,7 +916,7 @@ msgid "Gap between the pill and the screen edge, so it clears a taskbar or dock.
 msgstr "Зазор между индикатором и краем экрана, чтобы он не перекрывал панель задач или док."
 
 #: src/features/settings/sections/general-section.tsx:62
-#: src/features/settings/settings-page.tsx:71
+#: src/features/settings/settings-page.tsx:77
 msgid "General"
 msgstr "Общие"
 
@@ -941,15 +941,15 @@ msgstr "GitHub"
 msgid "Give the memory back after a quiet spell. The next dictation reloads the model, which adds up to a second before it starts listening — your speech is recorded during the wait, so nothing is lost."
 msgstr "Освобождает память после паузы в работе. Следующая диктовка заново загрузит модель, из-за чего до начала прослушивания пройдёт до секунды — речь записывается и во время ожидания, так что ничего не теряется."
 
-#: src/features/overview/overview-page.tsx:286
+#: src/features/overview/overview-page.tsx:285
 msgid "Good afternoon."
 msgstr "Добрый день."
 
-#: src/features/overview/overview-page.tsx:286
+#: src/features/overview/overview-page.tsx:285
 msgid "Good evening."
 msgstr "Добрый вечер."
 
-#: src/features/overview/overview-page.tsx:286
+#: src/features/overview/overview-page.tsx:285
 msgid "Good morning."
 msgstr "Доброе утро."
 
@@ -964,22 +964,22 @@ msgid "GPU support is installed but not working."
 msgstr "Поддержка GPU установлена, но не работает."
 
 #: src/components/feedback/help-feedback-dialog.tsx:240
-#: src/features/shell/components/sidebar-quick-actions.tsx:88
+#: src/features/shell/components/sidebar-quick-actions.tsx:82
 msgid "Help & feedback"
 msgstr "Помощь и отзывы"
 
 #: src/features/history/components/history-table.tsx:216
-#: src/features/overview/overview-page.tsx:363
+#: src/features/overview/overview-page.tsx:362
 msgid "History isn't saved"
 msgstr "История не сохраняется"
 
 #: src/features/history/components/history-table.tsx:219
-#: src/features/overview/overview-page.tsx:366
+#: src/features/overview/overview-page.tsx:365
 msgid "History kept {historyDays} days"
 msgstr "История хранится {historyDays} дн."
 
 #: src/features/history/components/history-table.tsx:218
-#: src/features/overview/overview-page.tsx:365
+#: src/features/overview/overview-page.tsx:364
 msgid "History kept forever"
 msgstr "История хранится всегда"
 
@@ -992,7 +992,7 @@ msgstr "Хранение истории"
 msgid "Hold is unavailable right now, so the shortcut toggles recording instead. Grant keyboard access to use Hold."
 msgstr "Удержание сейчас недоступно, поэтому сочетание клавиш включает и выключает запись. Разрешите доступ к клавиатуре, чтобы использовать удержание."
 
-#: src/features/overview/overview-page.tsx:299
+#: src/features/overview/overview-page.tsx:298
 msgid "Hold the hotkey and speak, and your words land wherever your cursor is."
 msgstr "Удерживайте горячую клавишу и говорите — слова появятся там, где стоит курсор."
 
@@ -1028,7 +1028,7 @@ msgstr "Как выглядит панель индикатора. Измене�
 msgid "How to dictate"
 msgstr "Как диктовать"
 
-#: src/features/overview/overview-page.tsx:158
+#: src/features/overview/overview-page.tsx:159
 msgid "Idle · mic ready"
 msgstr "Ожидание · микрофон готов"
 
@@ -1101,7 +1101,7 @@ msgstr "Держать индикатор при себе при переклю�
 msgid "Keyboard access"
 msgstr "Доступ к клавиатуре"
 
-#: src/features/shell/components/sidebar-quick-actions.tsx:69
+#: src/features/shell/components/sidebar-quick-actions.tsx:63
 msgid "Keyboard shortcuts"
 msgstr "Сочетания клавиш"
 
@@ -1132,7 +1132,7 @@ msgid "Launch into the system tray instead of opening the main window. Useful wh
 msgstr "Запустите в системном трее вместо открытия главного окна. Полезно, когда Lune Voice автоматически запускается при входе в систему."
 
 #: src/features/history/components/history-table.tsx:177
-#: src/features/overview/overview-page.tsx:223
+#: src/features/overview/overview-page.tsx:224
 msgid "Length"
 msgstr "Длина"
 
@@ -1149,7 +1149,7 @@ msgstr "Лицензия"
 msgid "Light"
 msgstr "Светлая"
 
-#: src/features/shell/components/app-shell.tsx:175
+#: src/features/shell/components/app-shell.tsx:171
 msgid "Listening"
 msgstr "Прослушивание"
 
@@ -1161,8 +1161,8 @@ msgstr "Слушаю — произнесите фразу, затем нажм�
 msgid "Listening — say the phrase…"
 msgstr "Слушаю — произнесите фразу…"
 
-#: src/features/overview/overview-page.tsx:158
-#: src/features/shell/components/sidebar-widgets.tsx:53
+#: src/features/overview/overview-page.tsx:159
+#: src/features/shell/components/sidebar-widgets.tsx:74
 msgid "Listening…"
 msgstr "Слушаю…"
 
@@ -1231,11 +1231,11 @@ msgstr "шапка встречи"
 msgid "Microphone"
 msgstr "Микрофон"
 
-#: src/features/overview/overview-page.tsx:155
+#: src/features/overview/overview-page.tsx:156
 msgid "Microphone input level"
 msgstr "Входной уровень микрофона"
 
-#: src/features/overview/overview-page.tsx:114
+#: src/features/overview/overview-page.tsx:115
 msgid "min"
 msgstr "мин"
 
@@ -1248,7 +1248,7 @@ msgid "Model size"
 msgstr "Размер модели"
 
 #: src/features/settings/sections/models-section.tsx:99
-#: src/features/settings/settings-page.tsx:78
+#: src/features/settings/settings-page.tsx:84
 msgid "Models"
 msgstr "Модели"
 
@@ -1259,6 +1259,13 @@ msgstr "Модели хранятся локально. Никакой теле�
 #: src/features/settings/sections/pill-section.tsx:155
 msgid "Monitor"
 msgstr "Экран"
+
+#: src/features/shell/components/sidebar-quick-actions.tsx:108
+#: src/features/shell/components/sidebar-quick-actions.tsx:109
+#: src/features/shell/components/sidebar-quick-actions.tsx:117
+#: src/features/shell/components/sidebar-quick-actions.tsx:129
+msgid "More"
+msgstr "Ещё"
 
 #: src/features/welcome/components/engine-step.tsx:56
 msgid "Multilingual · runs on-device"
@@ -1319,7 +1326,7 @@ msgstr "Сеансы не найдены."
 msgid "No sessions match \"{0}\"."
 msgstr "Нет сеансов, соответствующих \"{0}\"."
 
-#: src/features/overview/overview-page.tsx:208
+#: src/features/overview/overview-page.tsx:209
 msgid "No sessions yet"
 msgstr "Сеансов пока нет"
 
@@ -1374,8 +1381,8 @@ msgstr "Выключено"
 msgid "Off delivers raw transcripts. Which style is applied is chosen on the Styles tab."
 msgstr "В положении «Выкл.» доставляются необработанные расшифровки. Применяемый стиль выбирается на вкладке «Стили»."
 
-#: src/features/overview/overview-page.tsx:158
-#: src/features/shell/components/app-shell.tsx:178
+#: src/features/overview/overview-page.tsx:159
+#: src/features/shell/components/app-shell.tsx:174
 msgid "Offline"
 msgstr "Офлайн"
 
@@ -1391,7 +1398,7 @@ msgstr "Открыть меню"
 msgid "Open releases page"
 msgstr "Открыть страницу релизов"
 
-#: src/features/overview/overview-page.tsx:180
+#: src/features/overview/overview-page.tsx:181
 msgid "Open session from {time}"
 msgstr "Открытая сессия от {time}"
 
@@ -1416,7 +1423,7 @@ msgstr "или отправьте напрямую"
 msgid "Orientation"
 msgstr "Ориентация"
 
-#: src/features/settings/settings-page.tsx:77
+#: src/features/settings/settings-page.tsx:83
 msgid "Output"
 msgstr "Выход"
 
@@ -1458,7 +1465,7 @@ msgstr "Производительность или скорость"
 msgid "Phrase"
 msgstr "Фраза"
 
-#: src/features/settings/settings-page.tsx:74
+#: src/features/settings/settings-page.tsx:80
 msgid "Pill"
 msgstr "Индикатор"
 
@@ -1502,7 +1509,7 @@ msgstr "Положение"
 msgid "Preset corner or edge the pill starts at."
 msgstr "Заданный угол или край, откуда начинается индикатор."
 
-#: src/features/overview/overview-page.tsx:210
+#: src/features/overview/overview-page.tsx:211
 msgid "Press"
 msgstr "Нажмите"
 
@@ -1517,10 +1524,6 @@ msgstr "Нажмите клавиши…"
 #: src/features/settings/data/settings-data.ts:85
 msgid "Press the hotkey to start, press again to stop. Easiest for longer dictations."
 msgstr "Нажмите сочетание, чтобы начать, и ещё раз — чтобы остановить. Удобнее всего для длинных диктовок."
-
-#: src/features/shell/components/sidebar-widgets.tsx:56
-msgid "Press to talk"
-msgstr "Нажмите, чтобы говорить"
 
 #: src/features/settings/components/key-capture-input.tsx:159
 msgid "Press your combo — hold Esc or click away to cancel"
@@ -1554,11 +1557,11 @@ msgstr "Приоритет"
 
 #: src/features/dictation/dictation-pill.tsx:63
 #: src/features/dictation/dictation-pill.tsx:69
-#: src/features/shell/components/app-shell.tsx:173
+#: src/features/shell/components/app-shell.tsx:169
 msgid "Processing"
 msgstr "Обработка"
 
-#: src/features/shell/components/sidebar-widgets.tsx:53
+#: src/features/shell/components/sidebar-widgets.tsx:74
 msgid "Processing…"
 msgstr "Обработка…"
 
@@ -1566,23 +1569,16 @@ msgstr "Обработка…"
 msgid "Question or help"
 msgstr "Вопрос или помощь"
 
-#: src/features/shell/components/sidebar-quick-actions.tsx:113
-#: src/features/shell/components/sidebar-quick-actions.tsx:114
-#: src/features/shell/components/sidebar-quick-actions.tsx:122
-#: src/features/shell/components/sidebar-quick-actions.tsx:138
-msgid "Quick actions"
-msgstr "Быстрые действия"
-
-#: src/features/shell/components/sidebar-quick-actions.tsx:94
+#: src/features/shell/components/sidebar-quick-actions.tsx:88
 msgid "Quit Lune Voice"
 msgstr "Выйти из Lune Voice"
 
-#: src/features/overview/overview-page.tsx:288
-#: src/features/shell/components/app-shell.tsx:177
+#: src/features/overview/overview-page.tsx:287
+#: src/features/shell/components/app-shell.tsx:173
 msgid "Ready"
 msgstr "Готово"
 
-#: src/features/overview/overview-page.tsx:339
+#: src/features/overview/overview-page.tsx:338
 msgid "Recent sessions"
 msgstr "Недавние сессии"
 
@@ -1651,7 +1647,7 @@ msgstr "Перезапустите Lune Voice, чтобы начать испо�
 msgid "Restart needed"
 msgstr "Нужен перезапуск"
 
-#: src/features/overview/overview-page.tsx:330
+#: src/features/overview/overview-page.tsx:329
 msgid "Retry"
 msgstr "Повторить"
 
@@ -1709,7 +1705,7 @@ msgstr "Скажите <0>«{spokenTrigger}»</0> как целое высказ
 msgid "Say a trigger as your whole utterance to expand it"
 msgstr "Произнесите триггер целой фразой, чтобы вставить фрагмент"
 
-#: src/features/overview/overview-page.tsx:375
+#: src/features/overview/overview-page.tsx:374
 msgid "Search sessions"
 msgstr "Поиск по сессиям"
 
@@ -1754,7 +1750,7 @@ msgstr "Отправляет звук на указанную вами коне�
 msgid "Sends transcripts to an OpenAI-compatible endpoint you configure — Ollama, llama-server or LM Studio locally, or a hosted API."
 msgstr "Отправляет расшифровки на указанную вами конечную точку, совместимую с OpenAI, — локальные Ollama, llama-server или LM Studio либо размещённый API."
 
-#: src/features/overview/overview-page.tsx:146
+#: src/features/overview/overview-page.tsx:147
 msgid "session"
 msgstr "сессия"
 
@@ -1766,11 +1762,11 @@ msgstr "Детали сеанса"
 msgid "Session timed out — backend may be unresponsive"
 msgstr "Время сеанса истекло — возможно, серверная часть не отвечает"
 
-#: src/features/overview/overview-page.tsx:146
+#: src/features/overview/overview-page.tsx:147
 msgid "sessions"
 msgstr "сессии"
 
-#: src/features/shell/components/sidebar-widgets.tsx:61
+#: src/features/shell/components/sidebar-widgets.tsx:90
 msgid "Set hotkey"
 msgstr "Установить горячую клавишу"
 
@@ -1786,7 +1782,7 @@ msgstr "Настроить ускорение GPU"
 msgid "Setting up your GPU"
 msgstr "Настраиваем вашу видеокарту"
 
-#: src/features/settings/settings-page.tsx:98
+#: src/features/settings/settings-page.tsx:104
 msgid "Settings sections"
 msgstr "Разделы настроек"
 
@@ -1801,7 +1797,7 @@ msgid "Show on all workspaces"
 msgstr "Показывать на всех рабочих местах"
 
 #. placeholder {0}: recentSessions.length
-#: src/features/overview/overview-page.tsx:356
+#: src/features/overview/overview-page.tsx:355
 msgid "Showing {0} of {totalSessions} sessions"
 msgstr "Показано {0} из {totalSessions} сессий"
 
@@ -1857,7 +1853,7 @@ msgstr "Звук"
 msgid "Sound cues"
 msgstr "Звуковые сигналы"
 
-#: src/features/overview/overview-page.tsx:108
+#: src/features/overview/overview-page.tsx:109
 msgid "Speaking time"
 msgstr "Время речи"
 
@@ -1881,9 +1877,9 @@ msgstr "Прямоугольные"
 msgid "Standard"
 msgstr "Стандартный"
 
-#: src/features/shell/components/sidebar-widgets.tsx:29
-#: src/features/shell/components/sidebar-widgets.tsx:30
-#: src/features/shell/components/sidebar-widgets.tsx:46
+#: src/features/shell/components/sidebar-widgets.tsx:50
+#: src/features/shell/components/sidebar-widgets.tsx:51
+#: src/features/shell/components/sidebar-widgets.tsx:67
 msgid "Start dictating"
 msgstr "Начать диктовать"
 
@@ -1913,9 +1909,9 @@ msgstr "Остановить и расшифровать"
 msgid "Stop capturing"
 msgstr "Остановить запись"
 
-#: src/features/shell/components/sidebar-widgets.tsx:29
-#: src/features/shell/components/sidebar-widgets.tsx:30
-#: src/features/shell/components/sidebar-widgets.tsx:46
+#: src/features/shell/components/sidebar-widgets.tsx:50
+#: src/features/shell/components/sidebar-widgets.tsx:51
+#: src/features/shell/components/sidebar-widgets.tsx:67
 msgid "Stop dictating"
 msgstr "Хватит диктовать"
 
@@ -1924,7 +1920,7 @@ msgid "Stop dictation"
 msgstr "Остановить диктовку"
 
 #: src/features/history/components/history-table.tsx:227
-#: src/features/overview/overview-page.tsx:371
+#: src/features/overview/overview-page.tsx:370
 msgid "Stored on this device"
 msgstr "Хранится на этом устройстве"
 
@@ -1932,7 +1928,7 @@ msgstr "Хранится на этом устройстве"
 msgid "Style"
 msgstr "Стиль"
 
-#: src/features/settings/settings-page.tsx:76
+#: src/features/settings/settings-page.tsx:82
 msgid "Styling"
 msgstr "Стилизация"
 
@@ -1951,7 +1947,7 @@ msgstr "Переключить стиль"
 #: src/components/ui/theme-picker.tsx:153
 #: src/features/settings/sections/appearance-section.tsx:25
 #: src/features/settings/sections/appearance-section.tsx:47
-#: src/features/shell/components/sidebar-quick-actions.tsx:54
+#: src/features/shell/components/sidebar-quick-actions.tsx:48
 msgid "System"
 msgstr "Система"
 
@@ -1975,7 +1971,7 @@ msgstr "Спасибо — ваш отзыв отправлен."
 msgid "The floating status pill you see while dictating."
 msgstr "Плавающий индикатор состояния, который виден во время диктовки."
 
-#: src/features/overview/overview-page.tsx:323
+#: src/features/overview/overview-page.tsx:322
 msgid "The local runtime isn't responding. The figures below are the last known values."
 msgstr "Локальная среда не отвечает. Ниже показаны последние известные значения."
 
@@ -1998,10 +1994,6 @@ msgstr "Слова, в которых распознаватель менее в
 #: src/features/settings/sections/appearance-section.tsx:70
 msgid "Theme"
 msgstr "Тема"
-
-#: src/features/shell/components/sidebar-quick-actions.tsx:124
-msgid "Theme, shortcuts, quit"
-msgstr "Тема, сочетания клавиш, выход"
 
 #: src/features/updates/update-dialog.tsx:160
 msgid "This copy can't update itself. Download the new version from {RELEASES_URL} and replace this one. Your settings, history and models are kept."
@@ -2029,7 +2021,7 @@ msgid "This will permanently remove this dictation session and its transcript."
 msgstr "Этот сеанс диктовки и его стенограмма будут удалены без возможности восстановления."
 
 #: src/features/history/components/history-table.tsx:171
-#: src/features/overview/overview-page.tsx:220
+#: src/features/overview/overview-page.tsx:221
 msgid "Time"
 msgstr "Время"
 
@@ -2041,11 +2033,11 @@ msgstr "Сокращения названий («Мистер» → «Мисте
 msgid "Titles"
 msgstr "Титулы"
 
-#: src/features/overview/overview-page.tsx:211
+#: src/features/overview/overview-page.tsx:212
 msgid "to start dictating"
 msgstr "начать диктовать"
 
-#: src/features/overview/overview-page.tsx:140
+#: src/features/overview/overview-page.tsx:141
 msgid "Today"
 msgstr "Сегодня"
 
@@ -2073,7 +2065,7 @@ msgstr "Сверху слева"
 msgid "Top right"
 msgstr "Сверху справа"
 
-#: src/features/overview/overview-page.tsx:91
+#: src/features/overview/overview-page.tsx:92
 msgid "Total words"
 msgstr "Всего слов"
 
@@ -2086,12 +2078,12 @@ msgid "Transcribing…"
 msgstr "Расшифровка…"
 
 #: src/features/history/components/history-table.tsx:172
-#: src/features/overview/overview-page.tsx:221
+#: src/features/overview/overview-page.tsx:222
 msgid "Transcript"
 msgstr "Стенограмма"
 
 #: src/features/settings/sections/transcription-section.tsx:44
-#: src/features/settings/settings-page.tsx:75
+#: src/features/settings/settings-page.tsx:81
 msgid "Transcription"
 msgstr "Транскрипция"
 
@@ -2193,7 +2185,7 @@ msgstr "Вертикально"
 msgid "View"
 msgstr "Просмотр"
 
-#: src/features/overview/overview-page.tsx:344
+#: src/features/overview/overview-page.tsx:343
 msgid "View all"
 msgstr "Посмотреть все"
 
@@ -2213,7 +2205,7 @@ msgstr "Видимость"
 msgid "Voice model"
 msgstr "Модель голоса"
 
-#: src/features/overview/overview-page.tsx:134
+#: src/features/overview/overview-page.tsx:135
 msgid "vs all-time avg"
 msgstr "от среднего за всё время"
 
@@ -2294,11 +2286,11 @@ msgstr "слова"
 
 #: src/features/history/components/history-table.tsx:174
 #: src/features/history/components/session-detail-modal.tsx:157
-#: src/features/overview/overview-page.tsx:222
+#: src/features/overview/overview-page.tsx:223
 msgid "Words"
 msgstr "Слова"
 
-#: src/features/overview/overview-page.tsx:122
+#: src/features/overview/overview-page.tsx:123
 msgid "WPM"
 msgstr "WPM"
 
@@ -2338,7 +2330,7 @@ msgstr "Ваша видеокарта готова — используйте е
 msgid "Your GPU qualifies. Setup downloads the NVIDIA runtime, then a restart turns it on."
 msgstr "Ваша видеокарта подходит. Установка загрузит среду выполнения NVIDIA, а перезапуск включит её."
 
-#: src/features/overview/overview-page.tsx:210
+#: src/features/overview/overview-page.tsx:211
 msgid "your hotkey"
 msgstr "твоя горячая клавиша"
 

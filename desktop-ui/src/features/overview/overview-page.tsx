@@ -26,6 +26,7 @@ import {
   workspaceStore,
 } from '../../store/workspace-store';
 import { SessionDetailModal } from '../history/components/session-detail-modal';
+import { useServiceStatus } from '../shell/hooks/use-service-status';
 import { useCountUp } from './use-count-up';
 
 const AUDIO_BARS = 7;
@@ -267,7 +268,7 @@ function OverviewSkeleton() {
 
 export function OverviewPage() {
   const { t, i18n } = useLingui();
-  const serviceStatus = useStore(workspaceStore, (s) => s.runtime.serviceStatus);
+  const { isActive, isConnected, isConnecting } = useServiceStatus();
   const loading = useStore(workspaceStore, (s) => s.runtime.loading);
   const asrBackend = useStore(workspaceStore, (s) => s.settings.asrBackend);
   const dictationMode = useStore(workspaceStore, (s) => s.settings.dictationMode);
@@ -276,9 +277,7 @@ export function OverviewPage() {
   const historySessions = useStore(workspaceStore, (s) => s.historySessions);
   const recentSessions = historySessions.slice(0, RECENT_LIMIT);
 
-  const isActive = serviceStatus === 'listening' || serviceStatus === 'processing';
-  const isConnected = serviceStatus === 'ready' || isActive;
-  const isLoading = serviceStatus === 'Connecting' || loading;
+  const isLoading = isConnecting || loading;
 
   if (loading && totalSessions === 0) return <OverviewSkeleton />;
 

@@ -26,7 +26,7 @@ export const navigationShortcuts = {
   '/settings': 'Mod+,',
 } as const satisfies Record<NavigationRoute, RegisterableHotkey>;
 
-/** Hotkeys for the sidebar's Quick actions menu. Same single-source rule as the
+/** Hotkeys for the sidebar's More menu. Same single-source rule as the
  *  nav ones: the menu renders these hints and `useAppShortcuts` binds them, so
  *  a hint can never advertise a key that does nothing. */
 export const quickActionShortcuts = {

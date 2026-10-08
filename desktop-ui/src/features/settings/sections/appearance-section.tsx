@@ -15,7 +15,7 @@ import { SettingsBlock, SettingsSection } from '../components/section';
 
 export function AppearanceSection() {
   const { t } = useLingui();
-  // Shared subscription, not local state: the sidebar's Quick actions can
+  // Shared subscription, not local state: the sidebar's More menu can
   // change the theme while this section is mounted, and a private copy would
   // keep showing the old one.
   const theme = useThemePreference();

@@ -80,7 +80,7 @@ export function setThemePreference(pref: ThemePreference) {
 
 /* The preference lives in localStorage, which fires no event for same-document
    writes. Several surfaces now set it (Settings' Appearance, the picker dialog,
-   the sidebar's Quick actions), so they need one shared notification or their
+   the sidebar's More menu), so they need one shared notification or their
    local copies drift apart from each other and from the applied theme. */
 const listeners = new Set<() => void>();
 

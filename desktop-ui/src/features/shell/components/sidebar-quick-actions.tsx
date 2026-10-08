@@ -6,10 +6,10 @@ import { useRouter } from '@tanstack/react-router';
 import {
   ChevronUp,
   CircleQuestionMark,
+  Ellipsis,
   Keyboard,
   Power,
   RefreshCw,
-  SlidersHorizontal,
   Sun,
 } from 'lucide-react';
 import { useRef, useState } from 'react';
@@ -19,19 +19,13 @@ import { ThemePickerDialog } from '../../../components/ui/theme-picker';
 import { backendClient } from '../../../lib/backend/client';
 import { getThemePreference, themeLabel } from '../../../lib/theme';
 import { workspaceActions } from '../../../store/workspace-store';
-import { DRAWER_ID } from '../config/drawer';
+import { isSidebarExpanded } from '../config/drawer';
 import { quickActionShortcuts } from '../config/navigation';
 
 /** Surface a fire-and-forget command failure instead of leaving it as an
  *  invisible unhandled rejection in the webview console. */
 function reportFailure(error: unknown) {
   workspaceActions.setError(error instanceof Error ? error.message : String(error));
-}
-
-/** The drawer checkbox is checked while the sidebar is expanded. */
-function isSidebarExpanded(): boolean {
-  const toggle = document.getElementById(DRAWER_ID);
-  return toggle instanceof HTMLInputElement ? toggle.checked : true;
 }
 
 export function SidebarQuickActions() {
@@ -103,27 +97,24 @@ export function SidebarQuickActions() {
   ];
 
   return (
-    <div className="border-t border-surface-border">
+    <>
+      {/* A plain row, so the mic panel above stays the sidebar's one accent. */}
       <button
         ref={triggerRef}
         type="button"
         onClick={toggleMenu}
         aria-haspopup="menu"
         aria-expanded={open}
-        title={t`Quick actions`}
-        aria-label={t`Quick actions`}
-        className="group flex w-full cursor-pointer items-center gap-3 px-5 py-3 text-left transition-colors hover:bg-surface-hover focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-primary is-drawer-close:justify-center is-drawer-close:px-0"
+        title={t`More`}
+        aria-label={t`More`}
+        className="group flex h-10 w-full cursor-pointer items-center gap-3 rounded-field px-3 text-left text-sm text-content-muted transition-colors hover:bg-surface-hover hover:text-content focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-primary is-drawer-close:justify-center is-drawer-close:px-0"
       >
-        {/* Plain row, no tile: the mic block above is the sidebar's one accent. */}
-        <span className="flex size-9 shrink-0 items-center justify-center rounded-field text-content-subtle transition-colors group-hover:text-content-muted">
-          <SlidersHorizontal size={18} strokeWidth={1.8} />
-        </span>
-        <span className="min-w-0 flex-1 is-drawer-close:hidden">
-          <span className="block text-sm font-medium text-content">{t`Quick actions`}</span>
-          <span className="mt-0.5 block text-xs text-content-subtle">
-            {t`Theme, shortcuts, quit`}
-          </span>
-        </span>
+        <Ellipsis
+          size={18}
+          strokeWidth={1.8}
+          className="shrink-0 text-content-subtle transition-colors group-hover:text-content-muted"
+        />
+        <span className="min-w-0 flex-1 truncate is-drawer-close:hidden">{t`More`}</span>
         {/* Stays pointing up in both states: it marks which way the menu
             opens, rather than flipping to mean "close". */}
         <ChevronUp
@@ -135,7 +126,7 @@ export function SidebarQuickActions() {
 
       <ActionMenu
         items={items}
-        ariaLabel={t`Quick actions`}
+        ariaLabel={t`More`}
         open={open}
         onOpenChange={setOpen}
         anchorRef={triggerRef}
@@ -144,6 +135,6 @@ export function SidebarQuickActions() {
 
       <ThemePickerDialog open={themeOpen} onClose={() => setThemeOpen(false)} />
       <HelpFeedbackDialog open={helpOpen} onClose={() => setHelpOpen(false)} />
-    </div>
+    </>
   );
 }

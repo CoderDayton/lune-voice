@@ -2,12 +2,11 @@
 
 import { useLingui } from '@lingui/react/macro';
 import { Outlet, useRouterState } from '@tanstack/react-router';
-import { useStore } from '@tanstack/react-store';
 import { Menu } from 'lucide-react';
 import { useEffect, useEffectEvent, useRef } from 'react';
 import { ErrorToast } from '../../../components/feedback';
 import type { SessionStreamEvent } from '../../../lib/backend/types';
-import { workspaceActions, workspaceStore } from '../../../store/workspace-store';
+import { workspaceActions } from '../../../store/workspace-store';
 import { UpdateDialog } from '../../updates/update-dialog';
 import { useFirstRunGate } from '../../welcome/use-model-setup';
 import { WelcomeLayout } from '../../welcome/welcome-layout';
@@ -15,6 +14,7 @@ import { WelcomePage } from '../../welcome/welcome-page';
 import { DRAWER_ID } from '../config/drawer';
 import { findNavigationItem } from '../config/navigation';
 import { useAppShortcuts } from '../hooks/use-app-shortcuts';
+import { useServiceStatus } from '../hooks/use-service-status';
 import { startWorkspaceBridge } from '../workspace-bridge';
 import { SidebarContent } from './sidebar';
 
@@ -161,17 +161,13 @@ export function AppShell() {
  *  runtime status only, so it re-renders independently of route changes. */
 export function ShellStatusChip() {
   const { t } = useLingui();
-  const serviceStatus = useStore(workspaceStore, (s) => s.runtime.serviceStatus);
+  const { status, isActive, isConnected, isConnecting, dotClass } = useServiceStatus();
 
-  const isActive = serviceStatus === 'listening' || serviceStatus === 'processing';
-  const isConnected = serviceStatus === 'ready' || isActive;
-  const isConnecting = serviceStatus === 'Connecting';
-  const dotClass = isConnecting ? 'bg-warning' : isConnected ? 'bg-success' : 'bg-error';
   const label = isConnecting
     ? t`Connecting`
-    : serviceStatus === 'processing'
+    : status === 'processing'
       ? t`Processing`
-      : serviceStatus === 'listening'
+      : status === 'listening'
         ? t`Listening`
         : isConnected
           ? t`Ready`

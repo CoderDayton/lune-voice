@@ -1,44 +1,65 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 import { useLingui } from '@lingui/react/macro';
+import { Link } from '@tanstack/react-router';
 import { useStore } from '@tanstack/react-store';
 import { Mic, Square } from 'lucide-react';
+import { useRef } from 'react';
 import { toggleDictation, workspaceStore } from '../../../store/workspace-store';
+import { SIDEBAR_NAV_ID } from '../config/drawer';
+import { useServiceStatus } from '../hooks/use-service-status';
 
 export function SidebarQuickStart() {
   const { t } = useLingui();
-  const serviceStatus = useStore(workspaceStore, (s) => s.runtime.serviceStatus);
+  const { status, isActive, isConnecting } = useServiceStatus();
   const hotkeyToggle = useStore(workspaceStore, (s) => s.settings.hotkeyToggle);
-  const isActive = serviceStatus === 'listening' || serviceStatus === 'processing';
-  const isConnecting = serviceStatus === 'Connecting';
+  const hotkey = hotkeyToggle.trim();
+  // Set by Enter/Space on the button and read by the click that follows, so
+  // only a keyboard activation moves focus. A mouse press, a script's .click()
+  // and assistive-tech activation leave it false.
+  const keyboardActivation = useRef(false);
 
-  // No fill: the sidebar is the shell's ground, so a slab here read as a
-  // leftover panel once the sidebar itself stopped being one. The rule alone
-  // separates it.
+  // The one accent in the sidebar: a panel like the content's own, tinted red
+  // while a session is live.
   return (
-    <div className="border-t border-surface-border">
+    <div
+      className={`flex items-center rounded-box border transition-colors ${
+        isActive ? 'border-error/30 bg-error/10' : 'border-surface-border bg-surface-panel'
+      }`}
+    >
       <button
         type="button"
+        onPointerDown={() => {
+          keyboardActivation.current = false;
+        }}
+        onKeyDown={(e) => {
+          keyboardActivation.current = e.key === 'Enter' || e.key === ' ';
+        }}
         onClick={(e) => {
-          // Drop focus: dictated text typed into this window must not
-          // re-activate the button via Space/Enter and re-toggle sessions.
+          // Dictated text typed into this window must not re-activate the
+          // button via Space/Enter and re-toggle sessions, so focus leaves it.
+          // A keyboard user is parked on the sidebar's nav, which activates
+          // nothing, instead of being dropped to the top of the page.
+          const fromKeyboard = keyboardActivation.current;
+          keyboardActivation.current = false;
           e.currentTarget.blur();
+          if (fromKeyboard) document.getElementById(SIDEBAR_NAV_ID)?.focus();
           void toggleDictation();
         }}
         disabled={isConnecting}
         title={isActive ? t`Stop dictating` : t`Start dictating`}
         aria-label={isActive ? t`Stop dictating` : t`Start dictating`}
-        className="flex w-full cursor-pointer items-center gap-3.5 px-4 py-5 text-left transition-colors hover:bg-surface-hover focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-primary disabled:cursor-not-allowed disabled:opacity-60 is-drawer-close:justify-center is-drawer-close:px-0"
+        className="flex min-w-0 flex-1 cursor-pointer items-center gap-3 rounded-box px-3 py-2.5 text-left transition-colors hover:bg-surface-hover focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-primary disabled:cursor-not-allowed disabled:opacity-60 is-drawer-close:flex-none is-drawer-close:justify-center is-drawer-close:px-2"
       >
         <span
-          className={`flex size-11 shrink-0 items-center justify-center rounded-field is-drawer-close:size-11 ${
+          className={`flex size-9 shrink-0 items-center justify-center rounded-field ${
             isActive ? 'bg-error/15' : 'bg-primary/15'
           }`}
         >
           {isActive ? (
-            <Square size={18} strokeWidth={2.5} className="text-error" />
+            <Square size={16} strokeWidth={2.5} className="text-error" />
           ) : (
-            <Mic size={20} strokeWidth={2} className="text-primary" />
+            <Mic size={18} strokeWidth={2} className="text-primary" />
           )}
         </span>
         <span className="min-w-0 flex-1 is-drawer-close:hidden">
@@ -50,18 +71,25 @@ export function SidebarQuickStart() {
             // a status line so there's exactly one voice meter on screen.
             <span className="mt-0.5 flex items-center gap-1.5 text-xs text-content-subtle">
               <span className="status status-error animate-pulse" />
-              {serviceStatus === 'processing' ? t`Processing…` : t`Listening…`}
+              {status === 'processing' ? t`Processing…` : t`Listening…`}
             </span>
-          ) : (
-            <span className="mt-0.5 block text-xs text-content-subtle">{t`Press to talk`}</span>
-          )}
+          ) : null}
         </span>
-        {isActive ? null : (
+        {isActive || !hotkey ? null : (
           <kbd className="kbd kbd-sm ml-auto shrink-0 font-mono text-xs is-drawer-close:hidden">
-            {hotkeyToggle || t`Set hotkey`}
+            {hotkey}
           </kbd>
         )}
       </button>
+      {isActive || hotkey ? null : (
+        <Link
+          to="/settings"
+          search={{ tab: 'dictation' }}
+          className="mr-2 shrink-0 rounded-field px-2 py-1 text-xs text-primary transition-colors hover:bg-surface-hover is-drawer-close:hidden"
+        >
+          {t`Set hotkey`}
+        </Link>
+      )}
     </div>
   );
 }

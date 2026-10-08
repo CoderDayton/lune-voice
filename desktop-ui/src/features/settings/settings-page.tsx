@@ -15,6 +15,12 @@ import {
   Wand2,
 } from 'lucide-react';
 import type { ReactNode } from 'react';
+import {
+  NAV_ITEM_BASE,
+  NavActiveBar,
+  navIconClass,
+  navItemState,
+} from '../../components/ui/nav-item';
 import { workspaceStore } from '../../store/workspace-store';
 import type { SettingsSectionId } from './sections';
 import { AppearanceSection } from './sections/appearance-section';
@@ -37,7 +43,7 @@ export function SettingsPage() {
 
   // `?tab=` is the single source of truth. Mirroring it into local state would
   // desync the moment the user clicks a tab: a repeat deep-link (the sidebar's
-  // Quick actions while Settings is already open) then navigates to a search
+  // More menu while Settings is already open) then navigates to a search
   // value the URL already holds, and nothing re-renders.
   const active: SectionId = tab ?? 'general';
   const setActive = (id: SectionId) => {
@@ -106,33 +112,24 @@ export function SettingsPage() {
               type="button"
               onClick={() => setActive(id)}
               aria-current={isActive ? 'page' : undefined}
-              className={`relative flex shrink-0 items-center gap-3 rounded-field py-2.5 pl-2.5 pr-3.5 text-left text-sm transition-colors focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-primary md:w-full ${
-                isActive
-                  ? 'bg-surface-nav-active font-medium text-content-strong'
-                  : 'text-content-muted hover:bg-surface-hover hover:text-content'
-              }`}
+              className={`${NAV_ITEM_BASE} shrink-0 py-2.5 pr-3.5 pl-3 text-left md:w-full ${navItemState(isActive)}`}
             >
               {isActive && (
                 <>
                   {/* Active accent: a left bar on the vertical desktop rail, a
                       bottom bar on the horizontal mobile row. */}
-                  <span
-                    aria-hidden="true"
-                    className="absolute inset-y-2 left-0 hidden w-[3px] rounded-full bg-primary md:block"
-                  />
+                  <NavActiveBar className="hidden md:block" />
                   <span
                     aria-hidden="true"
                     className="absolute inset-x-3 bottom-0 h-[3px] rounded-full bg-primary md:hidden"
                   />
                 </>
               )}
-              <span
-                className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-field transition-colors ${
-                  isActive ? 'bg-primary/12 text-primary' : 'text-content-subtle'
-                }`}
-              >
-                <Icon size={18} strokeWidth={isActive ? 2.1 : 1.7} />
-              </span>
+              <Icon
+                size={18}
+                strokeWidth={isActive ? 2.1 : 1.7}
+                className={navIconClass(isActive)}
+              />
               {label}
             </button>
           );

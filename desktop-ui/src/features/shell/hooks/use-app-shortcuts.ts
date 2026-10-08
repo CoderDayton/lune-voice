@@ -32,7 +32,7 @@ export function useAppShortcuts() {
     void router.navigate({ to: '/settings' });
   });
 
-  // Quick actions. Settings' Dictation tab is where the hotkeys live, so the
+  // More menu. Settings' Dictation tab is where the hotkeys live, so the
   // "Keyboard shortcuts" action deep-links straight to it.
   useHotkey(quickActionShortcuts.shortcuts, () => {
     void router.navigate({ to: '/settings', search: { tab: 'dictation' } });
