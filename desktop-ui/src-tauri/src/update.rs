@@ -26,13 +26,11 @@ use crate::dto::{UpdatePhaseDto, UpdateStateDto};
 
 /// Whether this build checks for updates at all.
 ///
-/// Off while the release assets are unreachable: the configured endpoint is a
-/// release asset on a private repo, and GitHub answers the plugin's
-/// unauthenticated GET with a 404. Every check would therefore end in
-/// [`UpdatePhaseDto::CheckFailed`], which reads to the user as a broken app
-/// rather than as an absent feature. Turn this back on together with the GPU
-/// plugin pin in `lune_persist::gpu_plugin` — both wait on the same thing.
-const UPDATES_ENABLED: bool = false;
+/// On, although the release assets are not yet anonymously reachable. The
+/// configured endpoint is a release asset on a private repo, so GitHub answers
+/// the plugin's unauthenticated GET with a 404, and every requested check ends
+/// in [`UpdatePhaseDto::CheckFailed`]. That error is shown in the update modal.
+const UPDATES_ENABLED: bool = true;
 
 /// Shown when the user asks for a check while [`UPDATES_ENABLED`] is off.
 const DISABLED_MESSAGE: &str =
@@ -571,21 +569,6 @@ pub async fn dismiss_update(
 #[cfg(test)]
 mod gate_tests {
     use super::*;
-
-    /// The configured endpoint is a release asset on a private repo, which
-    /// GitHub serves as a 404 to the unauthenticated request the plugin makes.
-    /// Until that changes, every check would end in `CheckFailed`, so the flow
-    /// is off rather than reliably broken.
-    // Pinning a constant is the whole point here: this test is the thing that
-    // fails, with the reason attached, when someone flips the flag back on.
-    #[allow(clippy::assertions_on_constants)]
-    #[test]
-    fn update_checks_are_disabled() {
-        assert!(
-            !UPDATES_ENABLED,
-            "re-enable only once the release assets are anonymously reachable"
-        );
-    }
 
     /// The disabled notice lands verbatim in the update modal, so it must read
     /// as a sentence to a user and name no endpoint, repo or HTTP status.
