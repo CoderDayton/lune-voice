@@ -56,6 +56,8 @@ export interface WorkspaceSettings {
   startMinimized: boolean;
   /** Contact the release endpoint for a newer version at startup. */
   checkUpdatesOnLaunch: boolean;
+  /** Capitalize known names ("github" → "GitHub"). A style can override it. */
+  brandCasing: boolean;
   sessionHistoryDays: number | null;
   terminalMode: TerminalModeValue;
   privacyMode: PrivacyModeValue;
@@ -176,6 +178,7 @@ export const DEFAULT_SETTINGS: WorkspaceSettings = {
   vadPcen: true,
   startMinimized: false,
   checkUpdatesOnLaunch: false,
+  brandCasing: true,
   sessionHistoryDays: 30,
   terminalMode: 'Auto',
   privacyMode: 'LocalOnly',

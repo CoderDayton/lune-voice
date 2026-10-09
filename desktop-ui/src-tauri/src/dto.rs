@@ -220,7 +220,9 @@ pub struct FormatTogglesDto {
     pub keybinds: bool,
     pub title_abbreviations: bool,
     pub auto_capitalization: bool,
-    pub brand_casing: bool,
+    /// Null follows the global `brandCasing` setting.
+    #[serde(default)]
+    pub brand_casing: Option<bool>,
 }
 
 impl Default for FormatTogglesDto {
@@ -372,6 +374,9 @@ pub struct SettingsCoreDto {
     /// Check the release endpoint for a newer version at startup.
     #[serde(default)]
     pub check_updates_on_launch: bool,
+    /// Capitalize known names ("github" -> "GitHub"). A style can override it.
+    #[serde(default = "default_true_dto")]
+    pub brand_casing: bool,
     /// How long to keep dictation history, in days. `None` disables history.
     pub session_history_days: Option<u32>,
     /// Paste-shortcut selection strategy for the output stage.

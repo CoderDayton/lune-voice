@@ -831,6 +831,7 @@ fn settings_to_dto(settings: &UserSettings) -> WorkspaceSettingsDto {
             vad_pcen: settings.vad_pcen,
             start_minimized: settings.start_minimized,
             check_updates_on_launch: settings.check_updates_on_launch,
+            brand_casing: settings.brand_casing,
             session_history_days: settings.session_history_days,
             terminal_mode: terminal_mode_to_dto(settings.terminal_mode),
             privacy_mode: privacy_mode_to_dto(settings.privacy_mode),
@@ -961,6 +962,7 @@ fn apply_settings_dto(
     settings.vad_pcen = input.vad_pcen;
     settings.start_minimized = input.start_minimized;
     settings.check_updates_on_launch = input.check_updates_on_launch;
+    settings.brand_casing = input.brand_casing;
     settings.terminal_mode = terminal_mode_from_dto(input.terminal_mode);
     settings.privacy_mode = privacy_mode_from_dto(input.privacy_mode);
     validate_history_days(input.session_history_days)?;
@@ -1466,6 +1468,19 @@ mod tests {
         input.core.dictation_language = "zh".into();
         apply_settings_dto(&mut settings, input, &mut db).unwrap();
         assert_eq!(settings.dictation_language, "zh");
+    }
+
+    #[test]
+    fn brand_casing_round_trips_through_the_settings_dto() {
+        let mut settings = UserSettings::default();
+        let mut db = Database::open_in_memory().expect("db");
+        assert!(settings_to_dto(&settings).core.brand_casing);
+
+        let mut input = default_save_input();
+        input.core.brand_casing = false;
+        apply_settings_dto(&mut settings, input, &mut db).unwrap();
+        assert!(!settings.brand_casing);
+        assert!(!settings_to_dto(&settings).core.brand_casing);
     }
 
     #[test]

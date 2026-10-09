@@ -53,7 +53,8 @@ Output: Hey, just checking in on the deploy. Did the migration finish? If not, w
 
 /// Per-style toggles for the deterministic formatting transforms that run in
 /// the correction path, before and independently of the LLM styling pass. All
-/// default on; a style can switch any of them off.
+/// default on; a style can switch any of them off. `brand_casing` is the
+/// exception: unset, it follows the global `UserSettings::brand_casing`.
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(default)]
 pub struct FormatToggles {
@@ -64,7 +65,15 @@ pub struct FormatToggles {
     /// Capitalize the first word of each sentence.
     pub auto_capitalization: bool,
     /// Apply canonical brand casing: "github" -> "GitHub", "iphone" -> "iPhone".
-    pub brand_casing: bool,
+    /// `None` follows the global setting; `Some` overrides it for this style.
+    pub brand_casing: Option<bool>,
+}
+
+impl FormatToggles {
+    /// Whether brand casing applies, given the global setting.
+    pub fn resolve_brand_casing(&self, global: bool) -> bool {
+        self.brand_casing.unwrap_or(global)
+    }
 }
 
 impl Default for FormatToggles {
@@ -73,7 +82,7 @@ impl Default for FormatToggles {
             keybinds: true,
             title_abbreviations: true,
             auto_capitalization: true,
-            brand_casing: true,
+            brand_casing: None,
         }
     }
 }
@@ -288,6 +297,49 @@ impl StylePreset {
                 ),
             ],
             formatting: FormatToggles::default(),
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn brand_casing_follows_the_global_setting_unless_the_style_sets_it() {
+        let inherit = FormatToggles::default();
+        assert_eq!(inherit.brand_casing, None);
+        assert!(inherit.resolve_brand_casing(true));
+        assert!(!inherit.resolve_brand_casing(false));
+
+        let on = FormatToggles {
+            brand_casing: Some(true),
+            ..FormatToggles::default()
+        };
+        let off = FormatToggles {
+            brand_casing: Some(false),
+            ..FormatToggles::default()
+        };
+        assert!(on.resolve_brand_casing(false));
+        assert!(!off.resolve_brand_casing(true));
+    }
+
+    #[test]
+    fn saved_brand_casing_booleans_still_load() {
+        let on: FormatToggles = serde_json::from_str(r#"{"brand_casing":true}"#).unwrap();
+        assert_eq!(on.brand_casing, Some(true));
+        let off: FormatToggles = serde_json::from_str(r#"{"brand_casing":false}"#).unwrap();
+        assert_eq!(off.brand_casing, Some(false));
+        let unset: FormatToggles = serde_json::from_str(r#"{"keybinds":false}"#).unwrap();
+        assert_eq!(unset.brand_casing, None);
+        let null: FormatToggles = serde_json::from_str(r#"{"brand_casing":null}"#).unwrap();
+        assert_eq!(null.brand_casing, None);
+    }
+
+    #[test]
+    fn builtin_styles_follow_the_global_brand_casing() {
+        for preset in StylePreset::all_builtin() {
+            assert_eq!(preset.formatting.brand_casing, None, "{}", preset.id);
         }
     }
 }

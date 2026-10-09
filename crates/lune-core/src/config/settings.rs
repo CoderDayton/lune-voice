@@ -263,6 +263,10 @@ pub struct UserSettings {
     /// network unless the user asks it to.
     #[serde(default)]
     pub check_updates_on_launch: bool,
+    /// Apply canonical brand casing to dictated names ("github" -> "GitHub").
+    /// A style's own `formatting.brand_casing` overrides this when set.
+    #[serde(default = "default_true")]
+    pub brand_casing: bool,
 }
 
 fn default_true() -> bool {
@@ -370,6 +374,7 @@ impl Default for UserSettings {
             vad_pcen: true,
             start_minimized: false,
             check_updates_on_launch: false,
+            brand_casing: true,
         }
     }
 }
@@ -779,6 +784,15 @@ model = "LargeV4"
                 model: WhisperModel::Medium
             }
         ));
+    }
+
+    #[test]
+    fn brand_casing_is_on_by_default_and_when_absent_from_the_file() {
+        assert!(UserSettings::default().brand_casing);
+        let settings: UserSettings = toml::from_str("language = \"en-GB\"\n").unwrap();
+        assert!(settings.brand_casing);
+        let off: UserSettings = toml::from_str("brand_casing = false\n").unwrap();
+        assert!(!off.brand_casing);
     }
 
     #[test]

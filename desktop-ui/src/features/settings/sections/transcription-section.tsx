@@ -117,12 +117,25 @@ export function TranscriptionSection({
           against your dictionary and known vocabulary and re-cases known terms;
           per-word confidence decides which uncertain words to check. No AI
           model and no rewriting — it never invents text, only fixes it. */}
-      {hasWordConfidence && (
-        <SettingsSection
-          title={t`Correction`}
-          description={t`Fix recognizer errors with your dictionary and known vocabulary, on your device. It uses per-word confidence and statistical patterns — no AI model, and it never rewrites what you said.`}
-          icon={SpellCheck}
-        >
+      <SettingsSection
+        title={t`Correction`}
+        description={t`Fix recognizer errors with your dictionary and known vocabulary, on your device. It uses per-word confidence and statistical patterns — no AI model, and it never rewrites what you said.`}
+        icon={SpellCheck}
+      >
+        <SettingsRow
+          label={t`Capitalize known names`}
+          description={t`Write names like GitHub and iPhone the way their owners do. Turn this off to keep the recognizer's own capitals. A style can override this.`}
+          control={
+            <input
+              type="checkbox"
+              className="toggle toggle-primary"
+              checked={settings.brandCasing}
+              onChange={() => void saveWorkspaceSetting('brandCasing', !settings.brandCasing)}
+              aria-label={t`Capitalize known names`}
+            />
+          }
+        />
+        {hasWordConfidence && (
           <SettingsRow
             label={t`Correction sensitivity`}
             description={t`The words the recognizer is least sure about are checked against your dictionary and vocabulary. Higher checks more words; lower trusts the raw transcription.`}
@@ -147,8 +160,8 @@ export function TranscriptionSection({
               </div>
             }
           />
-        </SettingsSection>
-      )}
+        )}
+      </SettingsSection>
     </div>
   );
 }

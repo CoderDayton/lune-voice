@@ -54,6 +54,7 @@ function createMockSnapshot(): WorkspaceSnapshot {
       vadPcen: true,
       startMinimized: false,
       checkUpdatesOnLaunch: false,
+      brandCasing: true,
       sessionHistoryDays: 30,
       terminalMode: 'Auto',
       privacyMode: 'LocalOnly',
@@ -139,7 +140,7 @@ function createMockSnapshot(): WorkspaceSnapshot {
           keybinds: true,
           titleAbbreviations: true,
           autoCapitalization: true,
-          brandCasing: true,
+          brandCasing: null,
         },
       },
       {
@@ -153,7 +154,7 @@ function createMockSnapshot(): WorkspaceSnapshot {
           keybinds: true,
           titleAbbreviations: true,
           autoCapitalization: true,
-          brandCasing: true,
+          brandCasing: null,
         },
       },
       {
@@ -167,7 +168,7 @@ function createMockSnapshot(): WorkspaceSnapshot {
           keybinds: true,
           titleAbbreviations: true,
           autoCapitalization: true,
-          brandCasing: true,
+          brandCasing: null,
         },
       },
       {
@@ -181,7 +182,7 @@ function createMockSnapshot(): WorkspaceSnapshot {
           keybinds: true,
           titleAbbreviations: true,
           autoCapitalization: true,
-          brandCasing: true,
+          brandCasing: null,
         },
       },
       {
@@ -195,7 +196,7 @@ function createMockSnapshot(): WorkspaceSnapshot {
           keybinds: true,
           titleAbbreviations: true,
           autoCapitalization: true,
-          brandCasing: true,
+          brandCasing: null,
         },
       },
     ],

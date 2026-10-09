@@ -194,7 +194,24 @@ describe("workspace mappers", () => {
     expect(result.confidenceThreshold).toBe("0.55");
   });
 
+  test("brand casing is on unless the backend says otherwise", () => {
+    const missing = { settings: makeBackendSettings() } as WorkspaceSnapshot;
+    expect(mapWorkspaceSettings(missing).brandCasing).toBe(true);
+
+    const off = {
+      settings: { ...makeBackendSettings(), brandCasing: false },
+    } as WorkspaceSnapshot;
+    expect(mapWorkspaceSettings(off).brandCasing).toBe(false);
+  });
+
   // ── settingsToSaveInput ─────────────────────────────────────────────
+
+  test("brand casing is sent back to the backend", () => {
+    expect(settingsToSaveInput({ ...DEFAULT_SETTINGS }).brandCasing).toBe(true);
+    expect(settingsToSaveInput({ ...DEFAULT_SETTINGS, brandCasing: false }).brandCasing).toBe(
+      false,
+    );
+  });
 
   test("converts workspace settings to save input", () => {
     const settings = { ...DEFAULT_SETTINGS };

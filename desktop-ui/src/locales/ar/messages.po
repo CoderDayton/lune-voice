@@ -141,7 +141,7 @@ msgstr "إجراء"
 msgid "Active"
 msgstr "نشط"
 
-#: src/features/styles/components/style-hero.tsx:32
+#: src/features/styles/components/style-hero.tsx:35
 msgid "Active style"
 msgstr "أسلوب نشط"
 
@@ -270,7 +270,7 @@ msgstr "النشاط الصوتي"
 msgid "Audio feedback played as dictation starts, finishes, or errors."
 msgstr "تعليقات صوتية تُشغَّل عند بدء الإملاء أو انتهائه أو حدوث خطأ."
 
-#: src/features/styles/components/style-editor-modal.tsx:62
+#: src/features/styles/components/style-editor-modal.tsx:79
 msgid "Auto-capitalize sentences"
 msgstr "بدء الجمل بحرف كبير تلقائيًا"
 
@@ -315,11 +315,15 @@ msgstr "أسفل اليسار"
 msgid "Bottom right"
 msgstr "أسفل اليمين"
 
-#: src/features/styles/components/style-editor-modal.tsx:63
+#: src/features/styles/components/style-editor-modal.tsx:184
+msgid "Brand casing"
+msgstr ""
+
+#: src/features/styles/components/style-editor-modal.tsx:177
 msgid "Brand casing (\"github\" → \"GitHub\")"
 msgstr "حالة أحرف العلامات التجارية (\"github\" → \"GitHub\")"
 
-#: src/features/styles/components/style-hero.tsx:23
+#: src/features/styles/components/style-hero.tsx:26
 msgid "Brands"
 msgstr "العلامات التجارية"
 
@@ -335,7 +339,7 @@ msgstr "تصفح السمات"
 msgid "Bug report"
 msgstr "بلاغ عن خلل"
 
-#: src/features/styles/components/style-hero.tsx:35
+#: src/features/styles/components/style-hero.tsx:38
 #: src/features/styles/components/style-preset-card.tsx:65
 msgid "Built-in"
 msgstr "مدمج"
@@ -344,7 +348,7 @@ msgstr "مدمج"
 #: src/features/dictionary/components/dictionary-table.tsx:112
 #: src/features/settings/sections/models-section.tsx:312
 #: src/features/snippets/snippets-page.tsx:248
-#: src/features/styles/components/style-editor-modal.tsx:211
+#: src/features/styles/components/style-editor-modal.tsx:243
 msgid "Cancel"
 msgstr "إلغاء"
 
@@ -356,7 +360,12 @@ msgstr "إلغاء التسجيل الحالي"
 msgid "Cancel download"
 msgstr "إلغاء التنزيل"
 
-#: src/features/styles/components/style-hero.tsx:21
+#: src/features/settings/sections/transcription-section.tsx:126
+#: src/features/settings/sections/transcription-section.tsx:134
+msgid "Capitalize known names"
+msgstr ""
+
+#: src/features/styles/components/style-hero.tsx:24
 msgid "Capitals"
 msgstr "الأحرف الكبيرة"
 
@@ -446,14 +455,14 @@ msgstr "مسح {label}"
 msgid "Clear selection"
 msgstr "مسح التحديد"
 
-#: src/features/styles/components/style-editor-modal.tsx:228
+#: src/features/styles/components/style-editor-modal.tsx:260
 msgid "close"
 msgstr "إغلاق"
 
 #: src/components/feedback/help-feedback-dialog.tsx:281
 #: src/features/history/components/session-detail-modal.tsx:206
 #: src/features/settings/sections/models-section.tsx:324
-#: src/features/styles/components/style-editor-modal.tsx:202
+#: src/features/styles/components/style-editor-modal.tsx:234
 #: src/features/updates/update-dialog.tsx:298
 #: src/features/updates/update-dialog.tsx:310
 msgid "Close"
@@ -523,12 +532,12 @@ msgstr "استدارة زوايا شريط المؤشر."
 msgid "Corners"
 msgstr "الزوايا"
 
-#: src/features/settings/sections/transcription-section.tsx:122
+#: src/features/settings/sections/transcription-section.tsx:121
 msgid "Correction"
 msgstr "التصحيح"
 
-#: src/features/settings/sections/transcription-section.tsx:127
-#: src/features/settings/sections/transcription-section.tsx:142
+#: src/features/settings/sections/transcription-section.tsx:140
+#: src/features/settings/sections/transcription-section.tsx:155
 msgid "Correction sensitivity"
 msgstr "حساسية التصحيح"
 
@@ -568,7 +577,7 @@ msgstr "إنشاء مقتطف"
 msgid "Create new style"
 msgstr "إنشاء نمط جديد"
 
-#: src/features/styles/components/style-editor-modal.tsx:84
+#: src/features/styles/components/style-editor-modal.tsx:100
 msgid "Create style"
 msgstr "إنشاء النمط"
 
@@ -640,15 +649,15 @@ msgstr "هل تريد حذف تصحيح هذه الكلمة؟"
 msgid "Delete?"
 msgstr "حذف؟"
 
-#: src/features/styles/components/style-editor-modal.tsx:134
+#: src/features/styles/components/style-editor-modal.tsx:150
 msgid "Describe how text should be formatted. E.g., \"Use bullet points. Keep sentences short. Avoid jargon.\""
 msgstr "وصف كيفية تنسيق النص. على سبيل المثال، \"استخدم النقاط النقطية. اجعل الجمل قصيرة. تجنب المصطلحات.\""
 
-#: src/features/styles/components/style-editor-modal.tsx:102
+#: src/features/styles/components/style-editor-modal.tsx:118
 msgid "Description"
 msgstr "وصف"
 
-#: src/features/styles/components/style-editor-modal.tsx:112
+#: src/features/styles/components/style-editor-modal.tsx:128
 msgid "Description is too long."
 msgstr "الوصف طويل جدًا."
 
@@ -660,7 +669,7 @@ msgstr "يكتشف الطرفيات ويختار اختصار اللصق الم�
 msgid "Detects the spoken language each session."
 msgstr "يكتشف اللغة المنطوقة في كل جلسة."
 
-#: src/features/styles/components/style-editor-modal.tsx:143
+#: src/features/styles/components/style-editor-modal.tsx:159
 msgid "Deterministic fixes applied before any AI styling."
 msgstr "تم تطبيق الإصلاحات الحتمية قبل أي تصميم للذكاء الاصطناعي."
 
@@ -766,7 +775,7 @@ msgstr "جارٍ تنزيل التحديث"
 msgid "Downloading…"
 msgstr "جارٍ التنزيل…"
 
-#: src/features/styles/components/style-editor-modal.tsx:205
+#: src/features/styles/components/style-editor-modal.tsx:237
 msgid "Duplicate"
 msgstr "تكرار"
 
@@ -774,7 +783,7 @@ msgstr "تكرار"
 msgid "Duration"
 msgstr "مدة"
 
-#: src/features/styles/components/style-editor-modal.tsx:92
+#: src/features/styles/components/style-editor-modal.tsx:108
 msgid "e.g. Meeting notes"
 msgstr "على سبيل المثال ملاحظات الاجتماع"
 
@@ -786,7 +795,7 @@ msgstr "المسافة عن الحافة"
 msgid "Edge distance in pixels"
 msgstr "المسافة عن الحافة بالبكسل"
 
-#: src/features/styles/components/style-hero.tsx:49
+#: src/features/styles/components/style-hero.tsx:52
 #: src/features/styles/components/style-preset-card.tsx:103
 msgid "Edit"
 msgstr "تحرير"
@@ -802,7 +811,7 @@ msgstr "تحرير {0}"
 msgid "Edit snippet"
 msgstr "تعديل المقتطف"
 
-#: src/features/styles/components/style-editor-modal.tsx:84
+#: src/features/styles/components/style-editor-modal.tsx:100
 msgid "Edit style"
 msgstr "تحرير النمط"
 
@@ -829,11 +838,11 @@ msgstr "محرك"
 msgid "Enter Lune Voice"
 msgstr "الدخول إلى Lune Voice"
 
-#: src/features/styles/components/style-editor-modal.tsx:189
+#: src/features/styles/components/style-editor-modal.tsx:221
 msgid "Examples are out of date since you edited the prompt."
 msgstr "الأمثلة قديمة منذ أن عدّلت المُوجّه."
 
-#: src/features/styles/components/style-editor-modal.tsx:166
+#: src/features/styles/components/style-editor-modal.tsx:198
 msgid "Examples teach the styling engine your style. Regenerate them after editing the prompt."
 msgstr "تُعلّم الأمثلة محرك التنسيق أسلوبك. أعد توليدها بعد تعديل المُوجّه."
 
@@ -861,7 +870,7 @@ msgstr "جارٍ تنزيل Lune Voice {version}. أبقِ التطبيق مفت
 msgid "Fetching the NVIDIA runtime. This is the last step, and it only happens once."
 msgstr "جارٍ جلب بيئة تشغيل NVIDIA. هذه هي الخطوة الأخيرة وتحدث مرة واحدة فقط."
 
-#: src/features/styles/components/style-editor-modal.tsx:163
+#: src/features/styles/components/style-editor-modal.tsx:195
 msgid "Few-shot examples"
 msgstr "أمثلة إرشادية"
 
@@ -881,9 +890,13 @@ msgstr "تصفية المقتطفات"
 msgid "Filter snippets…"
 msgstr "تصفية المقتطفات…"
 
-#: src/features/settings/sections/transcription-section.tsx:123
+#: src/features/settings/sections/transcription-section.tsx:122
 msgid "Fix recognizer errors with your dictionary and known vocabulary, on your device. It uses per-word confidence and statistical patterns — no AI model, and it never rewrites what you said."
 msgstr "صحّح أخطاء التعرّف باستخدام قاموسك والمفردات المعروفة، على جهازك. يعتمد على درجة الثقة لكل كلمة وأنماط إحصائية — بلا نموذج ذكاء اصطناعي، ولا يعيد صياغة ما قلته أبدًا."
+
+#: src/features/styles/components/style-editor-modal.tsx:186
+msgid "Follow Settings"
+msgstr ""
 
 #: src/features/settings/data/settings-data.ts:271
 msgid "Force the standard paste shortcut for every app."
@@ -897,8 +910,8 @@ msgstr "فرض اختصار اللصق الخاص بالطرفية. استخدم
 msgid "Forget where you dragged the pill and return it to its preset spot."
 msgstr "نسيان الموضع الذي سحبت إليه المؤشر وإعادته إلى موضعه المحدّد مسبقًا."
 
-#: src/features/styles/components/style-editor-modal.tsx:141
-#: src/features/styles/components/style-hero.tsx:56
+#: src/features/styles/components/style-editor-modal.tsx:157
+#: src/features/styles/components/style-hero.tsx:59
 msgid "Formatting"
 msgstr "التنسيق"
 
@@ -924,8 +937,8 @@ msgstr "عام"
 msgid "General feedback"
 msgstr "ملاحظات عامة"
 
-#: src/features/styles/components/style-editor-modal.tsx:184
-#: src/features/styles/components/style-editor-modal.tsx:220
+#: src/features/styles/components/style-editor-modal.tsx:216
+#: src/features/styles/components/style-editor-modal.tsx:252
 msgid "Generating examples…"
 msgstr "توليد الأمثلة..."
 
@@ -1068,7 +1081,7 @@ msgstr "التثبيت يستبدل التطبيق ويعيد تشغيله. تب
 msgid "Installing update"
 msgstr "جارٍ تثبيت التحديث"
 
-#: src/features/styles/components/style-editor-modal.tsx:117
+#: src/features/styles/components/style-editor-modal.tsx:133
 msgid "Instructions"
 msgstr "تعليمات"
 
@@ -1105,7 +1118,7 @@ msgstr "وصول لوحة المفاتيح"
 msgid "Keyboard shortcuts"
 msgstr "اختصارات لوحة المفاتيح"
 
-#: src/features/styles/components/style-editor-modal.tsx:60
+#: src/features/styles/components/style-editor-modal.tsx:77
 msgid "Keyboard shortcuts (\"Super H\" → \"Super+H\")"
 msgstr "اختصارات لوحة المفاتيح (\"Super H\" → \"Super+H\")"
 
@@ -1271,11 +1284,11 @@ msgstr "المزيد"
 msgid "Multilingual · runs on-device"
 msgstr "متعدد اللغات · يعمل على الجهاز"
 
-#: src/features/styles/components/style-editor-modal.tsx:88
+#: src/features/styles/components/style-editor-modal.tsx:104
 msgid "Name"
 msgstr "اسم"
 
-#: src/features/styles/components/style-editor-modal.tsx:98
+#: src/features/styles/components/style-editor-modal.tsx:114
 msgid "Name is too long."
 msgstr "الاسم طويل جدًا."
 
@@ -1374,6 +1387,7 @@ msgid "Nothing installed"
 msgstr "لا شيء مثبَّت"
 
 #: src/features/settings/data/settings-data.ts:154
+#: src/features/styles/components/style-editor-modal.tsx:188
 msgid "Off"
 msgstr "إيقاف"
 
@@ -1386,7 +1400,11 @@ msgstr "يُسلّم وضع الإيقاف النصوص الخام. يُختار
 msgid "Offline"
 msgstr "غير متصل"
 
-#: src/features/styles/components/style-editor-modal.tsx:106
+#: src/features/styles/components/style-editor-modal.tsx:187
+msgid "On"
+msgstr ""
+
+#: src/features/styles/components/style-editor-modal.tsx:122
 msgid "One-line summary shown on the card"
 msgstr "ملخص من سطر واحد يظهر على البطاقة"
 
@@ -1587,7 +1605,7 @@ msgstr "الجلسات الأخيرة"
 msgid "Recording mode"
 msgstr "وضع التسجيل"
 
-#: src/features/styles/components/style-editor-modal.tsx:184
+#: src/features/styles/components/style-editor-modal.tsx:216
 msgid "Refresh few-shot examples"
 msgstr "تحديث الأمثلة الإرشادية"
 
@@ -1672,7 +1690,7 @@ msgid "Runs whisper.cpp on-device. Choose a model size below."
 msgstr "يشغّل whisper.cpp على الجهاز. اختر حجم النموذج بالأسفل."
 
 #: src/features/dictionary/components/dictionary-table.tsx:121
-#: src/features/styles/components/style-editor-modal.tsx:220
+#: src/features/styles/components/style-editor-modal.tsx:252
 msgid "Save"
 msgstr "حفظ"
 
@@ -1787,7 +1805,7 @@ msgid "Settings sections"
 msgstr "أقسام الإعدادات"
 
 #: src/features/settings/sections/dictation-section.tsx:71
-#: src/features/styles/components/style-hero.tsx:20
+#: src/features/styles/components/style-hero.tsx:23
 msgid "Shortcuts"
 msgstr "الاختصارات"
 
@@ -1987,7 +2005,7 @@ msgstr "الميكروفون قيد الاستخدام"
 msgid "The model stays in memory. Every dictation starts instantly."
 msgstr "يبقى النموذج في الذاكرة. كل إملاء يبدأ فورًا."
 
-#: src/features/settings/sections/transcription-section.tsx:128
+#: src/features/settings/sections/transcription-section.tsx:141
 msgid "The words the recognizer is least sure about are checked against your dictionary and vocabulary. Higher checks more words; lower trusts the raw transcription."
 msgstr "تُقارَن الكلمات التي يقل تأكّد أداة التعرّف منها بقاموسك ومفرداتك. القيمة الأعلى تفحص كلمات أكثر؛ والأقل تثق بالنسخ الخام."
 
@@ -2025,11 +2043,11 @@ msgstr "سيؤدي هذا إلى إزالة جلسة الإملاء هذه ون�
 msgid "Time"
 msgstr "وقت"
 
-#: src/features/styles/components/style-editor-modal.tsx:61
+#: src/features/styles/components/style-editor-modal.tsx:78
 msgid "Title abbreviations (\"Mister\" → \"Mr.\")"
 msgstr "اختصارات الألقاب (\"Mister\" → \"Mr.\")"
 
-#: src/features/styles/components/style-hero.tsx:22
+#: src/features/styles/components/style-hero.tsx:25
 msgid "Titles"
 msgstr "العناوين"
 
@@ -2180,7 +2198,7 @@ msgstr "قيد الاستخدام: {activeDevice}. يمكنك تغييره من 
 msgid "Vertical"
 msgstr "عمودي"
 
-#: src/features/styles/components/style-hero.tsx:45
+#: src/features/styles/components/style-hero.tsx:48
 #: src/features/styles/components/style-preset-card.tsx:98
 msgid "View"
 msgstr "عرض"
@@ -2193,7 +2211,7 @@ msgstr "عرض الكل"
 msgid "View source"
 msgstr "عرض الشيفرة المصدرية"
 
-#: src/features/styles/components/style-editor-modal.tsx:84
+#: src/features/styles/components/style-editor-modal.tsx:100
 msgid "View style"
 msgstr "عرض النمط"
 
@@ -2293,6 +2311,10 @@ msgstr "كلمات"
 #: src/features/overview/overview-page.tsx:123
 msgid "WPM"
 msgstr "WPM"
+
+#: src/features/settings/sections/transcription-section.tsx:127
+msgid "Write names like GitHub and iPhone the way their owners do. Turn this off to keep the recognizer's own capitals. A style can override this."
+msgstr ""
 
 #: src/features/styles/components/style-preset-card.tsx:86
 msgid "Yes"

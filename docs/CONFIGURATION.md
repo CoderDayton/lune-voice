@@ -44,7 +44,7 @@ Settings mutability tiers:
 | Tier | When Applied | Fields |
 |------|-------------|--------|
 | **Hot** | On save | `hotkey`, `activation_mode`, `model_idle_unload_minutes`, `input_device`, `sound_cues_enabled`, `sound_cue_volume`, every `pill_*` field |
-| **Warm** | Next session start, when the pipeline rebuilds | `asr_backend`, `llm_backend`, `device`, `privacy_mode`, `default_style`, `language`, `dictation_language`, `vad_pcen`, `dictation_mode`, `copy_to_clipboard`, `session_history_days` (it decides whether a dictation is recorded at all) |
+| **Warm** | Next session start, when the pipeline rebuilds | `asr_backend`, `llm_backend`, `device`, `privacy_mode`, `default_style`, `language`, `dictation_language`, `vad_pcen`, `brand_casing`, `dictation_mode`, `copy_to_clipboard`, `session_history_days` (it decides whether a dictation is recorded at all) |
 | **Cold** | Next app start | `terminal_mode`, `start_minimized`, `check_updates_on_launch` |
 
 All changes are persisted to disk immediately. The desktop app reloads a workspace snapshot after save, so the UI reflects the stored settings rather than a local guess.
@@ -92,6 +92,7 @@ session_history_days = 30
 vad_pcen = true
 start_minimized = false
 check_updates_on_launch = false
+brand_casing = true
 
 [asr_backend]
 type = "WhisperCpp"
@@ -383,6 +384,12 @@ Set the default style (omit the key entirely for no styling):
 ```toml
 default_style = "casual"
 ```
+
+### Brand Casing
+
+`brand_casing` (default `true`) controls whether known names are re-cased: `github` becomes `GitHub`, `home depot` becomes `Home Depot`. Turn it off to keep Whisper's own capitals. Your dictionary entries always apply, and so does the short built-in always-replace list.
+
+A style can override the global value. Each style's `formatting.brand_casing` is `true`, `false`, or unset; unset follows `brand_casing`. Built-in presets are unset. In the app, the global switch is Settings → Transcription → Correction, and the per-style choice is in the style editor.
 
 ### Prompt Structure
 

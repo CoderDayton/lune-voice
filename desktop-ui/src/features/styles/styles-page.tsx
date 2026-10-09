@@ -42,7 +42,7 @@ const DEFAULT_FORMATTING: FormatTogglesDto = {
   keybinds: true,
   titleAbbreviations: true,
   autoCapitalization: true,
-  brandCasing: true,
+  brandCasing: null,
 };
 
 const CLOSED_MODAL: ModalState = {
@@ -324,6 +324,9 @@ export function StylesPage() {
         onDescriptionChange={(v) => setModal((m) => ({ ...m, description: v }))}
         onInstructionsChange={(v) => setModal((m) => ({ ...m, instructions: v }))}
         formatting={modal.formatting}
+        onBrandCasingChange={(value) =>
+          setModal((m) => ({ ...m, formatting: { ...m.formatting, brandCasing: value } }))
+        }
         onFormattingChange={(key, value) =>
           setModal((m) => ({ ...m, formatting: { ...m.formatting, [key]: value } }))
         }

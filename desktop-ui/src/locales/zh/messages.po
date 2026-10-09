@@ -141,7 +141,7 @@ msgstr "操作"
 msgid "Active"
 msgstr "积极的"
 
-#: src/features/styles/components/style-hero.tsx:32
+#: src/features/styles/components/style-hero.tsx:35
 msgid "Active style"
 msgstr "活跃风格"
 
@@ -270,7 +270,7 @@ msgstr "音频活动"
 msgid "Audio feedback played as dictation starts, finishes, or errors."
 msgstr "听写开始、完成或出错时播放的音频反馈。"
 
-#: src/features/styles/components/style-editor-modal.tsx:62
+#: src/features/styles/components/style-editor-modal.tsx:79
 msgid "Auto-capitalize sentences"
 msgstr "自动大写句子"
 
@@ -315,11 +315,15 @@ msgstr "左下"
 msgid "Bottom right"
 msgstr "右下"
 
-#: src/features/styles/components/style-editor-modal.tsx:63
+#: src/features/styles/components/style-editor-modal.tsx:184
+msgid "Brand casing"
+msgstr ""
+
+#: src/features/styles/components/style-editor-modal.tsx:177
 msgid "Brand casing (\"github\" → \"GitHub\")"
 msgstr "品牌外壳（“github”→“GitHub”）"
 
-#: src/features/styles/components/style-hero.tsx:23
+#: src/features/styles/components/style-hero.tsx:26
 msgid "Brands"
 msgstr "品牌"
 
@@ -335,7 +339,7 @@ msgstr "浏览主题"
 msgid "Bug report"
 msgstr "错误报告"
 
-#: src/features/styles/components/style-hero.tsx:35
+#: src/features/styles/components/style-hero.tsx:38
 #: src/features/styles/components/style-preset-card.tsx:65
 msgid "Built-in"
 msgstr "内置"
@@ -344,7 +348,7 @@ msgstr "内置"
 #: src/features/dictionary/components/dictionary-table.tsx:112
 #: src/features/settings/sections/models-section.tsx:312
 #: src/features/snippets/snippets-page.tsx:248
-#: src/features/styles/components/style-editor-modal.tsx:211
+#: src/features/styles/components/style-editor-modal.tsx:243
 msgid "Cancel"
 msgstr "取消"
 
@@ -356,7 +360,12 @@ msgstr "取消当前录音"
 msgid "Cancel download"
 msgstr "取消下载"
 
-#: src/features/styles/components/style-hero.tsx:21
+#: src/features/settings/sections/transcription-section.tsx:126
+#: src/features/settings/sections/transcription-section.tsx:134
+msgid "Capitalize known names"
+msgstr ""
+
+#: src/features/styles/components/style-hero.tsx:24
 msgid "Capitals"
 msgstr "首都"
 
@@ -446,14 +455,14 @@ msgstr "清除{label}"
 msgid "Clear selection"
 msgstr "清除选择"
 
-#: src/features/styles/components/style-editor-modal.tsx:228
+#: src/features/styles/components/style-editor-modal.tsx:260
 msgid "close"
 msgstr "关闭"
 
 #: src/components/feedback/help-feedback-dialog.tsx:281
 #: src/features/history/components/session-detail-modal.tsx:206
 #: src/features/settings/sections/models-section.tsx:324
-#: src/features/styles/components/style-editor-modal.tsx:202
+#: src/features/styles/components/style-editor-modal.tsx:234
 #: src/features/updates/update-dialog.tsx:298
 #: src/features/updates/update-dialog.tsx:310
 msgid "Close"
@@ -523,12 +532,12 @@ msgstr "指示器条的圆角程度。"
 msgid "Corners"
 msgstr "圆角"
 
-#: src/features/settings/sections/transcription-section.tsx:122
+#: src/features/settings/sections/transcription-section.tsx:121
 msgid "Correction"
 msgstr "校正"
 
-#: src/features/settings/sections/transcription-section.tsx:127
-#: src/features/settings/sections/transcription-section.tsx:142
+#: src/features/settings/sections/transcription-section.tsx:140
+#: src/features/settings/sections/transcription-section.tsx:155
 msgid "Correction sensitivity"
 msgstr "校正灵敏度"
 
@@ -568,7 +577,7 @@ msgstr "新建片段"
 msgid "Create new style"
 msgstr "创造新风格"
 
-#: src/features/styles/components/style-editor-modal.tsx:84
+#: src/features/styles/components/style-editor-modal.tsx:100
 msgid "Create style"
 msgstr "创造风格"
 
@@ -640,15 +649,15 @@ msgstr "删除此修正？"
 msgid "Delete?"
 msgstr "删除？"
 
-#: src/features/styles/components/style-editor-modal.tsx:134
+#: src/features/styles/components/style-editor-modal.tsx:150
 msgid "Describe how text should be formatted. E.g., \"Use bullet points. Keep sentences short. Avoid jargon.\""
 msgstr "描述文本应如何格式化。例如，“使用要点。保持句子简短。避免行话。”"
 
-#: src/features/styles/components/style-editor-modal.tsx:102
+#: src/features/styles/components/style-editor-modal.tsx:118
 msgid "Description"
 msgstr "描述"
 
-#: src/features/styles/components/style-editor-modal.tsx:112
+#: src/features/styles/components/style-editor-modal.tsx:128
 msgid "Description is too long."
 msgstr "描述过长。"
 
@@ -660,7 +669,7 @@ msgstr "检测终端并选用对应的粘贴快捷键。适用于大多数合成
 msgid "Detects the spoken language each session."
 msgstr "每次会话自动检测所说的语言。"
 
-#: src/features/styles/components/style-editor-modal.tsx:143
+#: src/features/styles/components/style-editor-modal.tsx:159
 msgid "Deterministic fixes applied before any AI styling."
 msgstr "在任何 AI 样式之前应用确定性修复。"
 
@@ -766,7 +775,7 @@ msgstr "正在下载更新"
 msgid "Downloading…"
 msgstr "正在下载..."
 
-#: src/features/styles/components/style-editor-modal.tsx:205
+#: src/features/styles/components/style-editor-modal.tsx:237
 msgid "Duplicate"
 msgstr "复制"
 
@@ -774,7 +783,7 @@ msgstr "复制"
 msgid "Duration"
 msgstr "时长"
 
-#: src/features/styles/components/style-editor-modal.tsx:92
+#: src/features/styles/components/style-editor-modal.tsx:108
 msgid "e.g. Meeting notes"
 msgstr "例如会议记录"
 
@@ -786,7 +795,7 @@ msgstr "边缘距离"
 msgid "Edge distance in pixels"
 msgstr "边缘距离（像素）"
 
-#: src/features/styles/components/style-hero.tsx:49
+#: src/features/styles/components/style-hero.tsx:52
 #: src/features/styles/components/style-preset-card.tsx:103
 msgid "Edit"
 msgstr "编辑"
@@ -802,7 +811,7 @@ msgstr "编辑 {0}"
 msgid "Edit snippet"
 msgstr "编辑片段"
 
-#: src/features/styles/components/style-editor-modal.tsx:84
+#: src/features/styles/components/style-editor-modal.tsx:100
 msgid "Edit style"
 msgstr "编辑样式"
 
@@ -829,11 +838,11 @@ msgstr "引擎"
 msgid "Enter Lune Voice"
 msgstr "输入 Lune 语音"
 
-#: src/features/styles/components/style-editor-modal.tsx:189
+#: src/features/styles/components/style-editor-modal.tsx:221
 msgid "Examples are out of date since you edited the prompt."
 msgstr "自您编辑提示词后，示例已过时。"
 
-#: src/features/styles/components/style-editor-modal.tsx:166
+#: src/features/styles/components/style-editor-modal.tsx:198
 msgid "Examples teach the styling engine your style. Regenerate them after editing the prompt."
 msgstr "示例向润色引擎传授您的风格。编辑提示词后请重新生成它们。"
 
@@ -861,7 +870,7 @@ msgstr "正在下载 Lune Voice {version}。请在完成前保持应用打开。
 msgid "Fetching the NVIDIA runtime. This is the last step, and it only happens once."
 msgstr "正在获取 NVIDIA 运行时。这是最后一步，且只会进行一次。"
 
-#: src/features/styles/components/style-editor-modal.tsx:163
+#: src/features/styles/components/style-editor-modal.tsx:195
 msgid "Few-shot examples"
 msgstr "少样本示例"
 
@@ -881,9 +890,13 @@ msgstr "筛选片段"
 msgid "Filter snippets…"
 msgstr "筛选片段…"
 
-#: src/features/settings/sections/transcription-section.tsx:123
+#: src/features/settings/sections/transcription-section.tsx:122
 msgid "Fix recognizer errors with your dictionary and known vocabulary, on your device. It uses per-word confidence and statistical patterns — no AI model, and it never rewrites what you said."
 msgstr "在您的设备上，用您的词典和已知词汇修正识别错误。它使用逐词置信度和统计模式——无 AI 模型，也绝不会改写您所说的内容。"
+
+#: src/features/styles/components/style-editor-modal.tsx:186
+msgid "Follow Settings"
+msgstr ""
 
 #: src/features/settings/data/settings-data.ts:271
 msgid "Force the standard paste shortcut for every app."
@@ -897,8 +910,8 @@ msgstr "强制使用终端粘贴快捷键。若主要在终端里听写，可在
 msgid "Forget where you dragged the pill and return it to its preset spot."
 msgstr "忘记你拖动指示器的位置，并将其恢复到预设位置。"
 
-#: src/features/styles/components/style-editor-modal.tsx:141
-#: src/features/styles/components/style-hero.tsx:56
+#: src/features/styles/components/style-editor-modal.tsx:157
+#: src/features/styles/components/style-hero.tsx:59
 msgid "Formatting"
 msgstr "格式化"
 
@@ -924,8 +937,8 @@ msgstr "通用"
 msgid "General feedback"
 msgstr "一般反馈"
 
-#: src/features/styles/components/style-editor-modal.tsx:184
-#: src/features/styles/components/style-editor-modal.tsx:220
+#: src/features/styles/components/style-editor-modal.tsx:216
+#: src/features/styles/components/style-editor-modal.tsx:252
 msgid "Generating examples…"
 msgstr "生成示例..."
 
@@ -1068,7 +1081,7 @@ msgstr "安装会替换应用并重启。你的设置、历史记录和模型不
 msgid "Installing update"
 msgstr "正在安装更新"
 
-#: src/features/styles/components/style-editor-modal.tsx:117
+#: src/features/styles/components/style-editor-modal.tsx:133
 msgid "Instructions"
 msgstr "指示"
 
@@ -1105,7 +1118,7 @@ msgstr "键盘访问"
 msgid "Keyboard shortcuts"
 msgstr "键盘快捷键"
 
-#: src/features/styles/components/style-editor-modal.tsx:60
+#: src/features/styles/components/style-editor-modal.tsx:77
 msgid "Keyboard shortcuts (\"Super H\" → \"Super+H\")"
 msgstr "键盘快捷键（“Super H”→“Super+H”）"
 
@@ -1271,11 +1284,11 @@ msgstr "更多"
 msgid "Multilingual · runs on-device"
 msgstr "多语言 · 在本机运行"
 
-#: src/features/styles/components/style-editor-modal.tsx:88
+#: src/features/styles/components/style-editor-modal.tsx:104
 msgid "Name"
 msgstr "姓名"
 
-#: src/features/styles/components/style-editor-modal.tsx:98
+#: src/features/styles/components/style-editor-modal.tsx:114
 msgid "Name is too long."
 msgstr "名称过长。"
 
@@ -1374,6 +1387,7 @@ msgid "Nothing installed"
 msgstr "未安装任���内容"
 
 #: src/features/settings/data/settings-data.ts:154
+#: src/features/styles/components/style-editor-modal.tsx:188
 msgid "Off"
 msgstr "关闭"
 
@@ -1386,7 +1400,11 @@ msgstr "关闭时传递原始转录文本。应用哪种风格在“风格”标
 msgid "Offline"
 msgstr "离线"
 
-#: src/features/styles/components/style-editor-modal.tsx:106
+#: src/features/styles/components/style-editor-modal.tsx:187
+msgid "On"
+msgstr ""
+
+#: src/features/styles/components/style-editor-modal.tsx:122
 msgid "One-line summary shown on the card"
 msgstr "卡片上显示一行摘要"
 
@@ -1587,7 +1605,7 @@ msgstr "最近会话"
 msgid "Recording mode"
 msgstr "录音模式"
 
-#: src/features/styles/components/style-editor-modal.tsx:184
+#: src/features/styles/components/style-editor-modal.tsx:216
 msgid "Refresh few-shot examples"
 msgstr "刷新少样本示例"
 
@@ -1672,7 +1690,7 @@ msgid "Runs whisper.cpp on-device. Choose a model size below."
 msgstr "在本机运行 whisper.cpp。请在下方选择模型大小。"
 
 #: src/features/dictionary/components/dictionary-table.tsx:121
-#: src/features/styles/components/style-editor-modal.tsx:220
+#: src/features/styles/components/style-editor-modal.tsx:252
 msgid "Save"
 msgstr "保存"
 
@@ -1787,7 +1805,7 @@ msgid "Settings sections"
 msgstr "设置部分"
 
 #: src/features/settings/sections/dictation-section.tsx:71
-#: src/features/styles/components/style-hero.tsx:20
+#: src/features/styles/components/style-hero.tsx:23
 msgid "Shortcuts"
 msgstr "快捷方式"
 
@@ -1987,7 +2005,7 @@ msgstr "麦克风正在使用中"
 msgid "The model stays in memory. Every dictation starts instantly."
 msgstr "模型常驻内存。每次听写都能立即开始。"
 
-#: src/features/settings/sections/transcription-section.tsx:128
+#: src/features/settings/sections/transcription-section.tsx:141
 msgid "The words the recognizer is least sure about are checked against your dictionary and vocabulary. Higher checks more words; lower trusts the raw transcription."
 msgstr "识别器最不确定的词语会与您的词典和词汇进行核对。数值越高核对的词越多；越低则越信任原始转录��"
 
@@ -2025,11 +2043,11 @@ msgstr "这将永久删除该听写会话及其记录。"
 msgid "Time"
 msgstr "时间"
 
-#: src/features/styles/components/style-editor-modal.tsx:61
+#: src/features/styles/components/style-editor-modal.tsx:78
 msgid "Title abbreviations (\"Mister\" → \"Mr.\")"
 msgstr "头衔缩写（“先生”→“先生”）"
 
-#: src/features/styles/components/style-hero.tsx:22
+#: src/features/styles/components/style-hero.tsx:25
 msgid "Titles"
 msgstr "标题"
 
@@ -2180,7 +2198,7 @@ msgstr "正在使用 {activeDevice}。可在“设置 › 听写”中更改。"
 msgid "Vertical"
 msgstr "纵向"
 
-#: src/features/styles/components/style-hero.tsx:45
+#: src/features/styles/components/style-hero.tsx:48
 #: src/features/styles/components/style-preset-card.tsx:98
 msgid "View"
 msgstr "查看"
@@ -2193,7 +2211,7 @@ msgstr "查看全部"
 msgid "View source"
 msgstr "查看源代码"
 
-#: src/features/styles/components/style-editor-modal.tsx:84
+#: src/features/styles/components/style-editor-modal.tsx:100
 msgid "View style"
 msgstr "查看样式"
 
@@ -2293,6 +2311,10 @@ msgstr "字"
 #: src/features/overview/overview-page.tsx:123
 msgid "WPM"
 msgstr "WPM"
+
+#: src/features/settings/sections/transcription-section.tsx:127
+msgid "Write names like GitHub and iPhone the way their owners do. Turn this off to keep the recognizer's own capitals. A style can override this."
+msgstr ""
 
 #: src/features/styles/components/style-preset-card.tsx:86
 msgid "Yes"

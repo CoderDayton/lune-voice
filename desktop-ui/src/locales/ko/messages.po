@@ -141,7 +141,7 @@ msgstr "작업"
 msgid "Active"
 msgstr "활성"
 
-#: src/features/styles/components/style-hero.tsx:32
+#: src/features/styles/components/style-hero.tsx:35
 msgid "Active style"
 msgstr "활성 스타일"
 
@@ -270,7 +270,7 @@ msgstr "오디오 활동"
 msgid "Audio feedback played as dictation starts, finishes, or errors."
 msgstr "받아쓰기가 시작, 완료 또는 오류가 발생할 때 재생되는 오디오 피드백입니다."
 
-#: src/features/styles/components/style-editor-modal.tsx:62
+#: src/features/styles/components/style-editor-modal.tsx:79
 msgid "Auto-capitalize sentences"
 msgstr "문장 자동 대문자화"
 
@@ -315,11 +315,15 @@ msgstr "왼쪽 아래"
 msgid "Bottom right"
 msgstr "오른쪽 아래"
 
-#: src/features/styles/components/style-editor-modal.tsx:63
+#: src/features/styles/components/style-editor-modal.tsx:184
+msgid "Brand casing"
+msgstr ""
+
+#: src/features/styles/components/style-editor-modal.tsx:177
 msgid "Brand casing (\"github\" → \"GitHub\")"
 msgstr "브랜드 표기(\"github\" → \"GitHub\")"
 
-#: src/features/styles/components/style-hero.tsx:23
+#: src/features/styles/components/style-hero.tsx:26
 msgid "Brands"
 msgstr "브랜드"
 
@@ -335,7 +339,7 @@ msgstr "테마 찾아보기"
 msgid "Bug report"
 msgstr "버그 신고"
 
-#: src/features/styles/components/style-hero.tsx:35
+#: src/features/styles/components/style-hero.tsx:38
 #: src/features/styles/components/style-preset-card.tsx:65
 msgid "Built-in"
 msgstr "내장"
@@ -344,7 +348,7 @@ msgstr "내장"
 #: src/features/dictionary/components/dictionary-table.tsx:112
 #: src/features/settings/sections/models-section.tsx:312
 #: src/features/snippets/snippets-page.tsx:248
-#: src/features/styles/components/style-editor-modal.tsx:211
+#: src/features/styles/components/style-editor-modal.tsx:243
 msgid "Cancel"
 msgstr "취소"
 
@@ -356,7 +360,12 @@ msgstr "현재 녹음 취소"
 msgid "Cancel download"
 msgstr "다운로드 취소"
 
-#: src/features/styles/components/style-hero.tsx:21
+#: src/features/settings/sections/transcription-section.tsx:126
+#: src/features/settings/sections/transcription-section.tsx:134
+msgid "Capitalize known names"
+msgstr ""
+
+#: src/features/styles/components/style-hero.tsx:24
 msgid "Capitals"
 msgstr "대문자"
 
@@ -446,14 +455,14 @@ msgstr "{label} 지우기"
 msgid "Clear selection"
 msgstr "선택 해제"
 
-#: src/features/styles/components/style-editor-modal.tsx:228
+#: src/features/styles/components/style-editor-modal.tsx:260
 msgid "close"
 msgstr "닫기"
 
 #: src/components/feedback/help-feedback-dialog.tsx:281
 #: src/features/history/components/session-detail-modal.tsx:206
 #: src/features/settings/sections/models-section.tsx:324
-#: src/features/styles/components/style-editor-modal.tsx:202
+#: src/features/styles/components/style-editor-modal.tsx:234
 #: src/features/updates/update-dialog.tsx:298
 #: src/features/updates/update-dialog.tsx:310
 msgid "Close"
@@ -523,12 +532,12 @@ msgstr "표시기 막대의 모서리 둥글기입니다."
 msgid "Corners"
 msgstr "모서리"
 
-#: src/features/settings/sections/transcription-section.tsx:122
+#: src/features/settings/sections/transcription-section.tsx:121
 msgid "Correction"
 msgstr "교정"
 
-#: src/features/settings/sections/transcription-section.tsx:127
-#: src/features/settings/sections/transcription-section.tsx:142
+#: src/features/settings/sections/transcription-section.tsx:140
+#: src/features/settings/sections/transcription-section.tsx:155
 msgid "Correction sensitivity"
 msgstr "교정 민감도"
 
@@ -568,7 +577,7 @@ msgstr "스니펫 만들기"
 msgid "Create new style"
 msgstr "새로운 스타일 만들기"
 
-#: src/features/styles/components/style-editor-modal.tsx:84
+#: src/features/styles/components/style-editor-modal.tsx:100
 msgid "Create style"
 msgstr "스타일 만들기"
 
@@ -640,15 +649,15 @@ msgstr "이 단어 수정을 삭제하시겠습니까?"
 msgid "Delete?"
 msgstr "삭제?"
 
-#: src/features/styles/components/style-editor-modal.tsx:134
+#: src/features/styles/components/style-editor-modal.tsx:150
 msgid "Describe how text should be formatted. E.g., \"Use bullet points. Keep sentences short. Avoid jargon.\""
 msgstr "텍스트 형식을 지정하는 방법을 설명합니다. 예: \"글머리 기호를 사용하세요. 문장은 짧게 유지하세요. 전문 용어는 피하세요.\""
 
-#: src/features/styles/components/style-editor-modal.tsx:102
+#: src/features/styles/components/style-editor-modal.tsx:118
 msgid "Description"
 msgstr "설명"
 
-#: src/features/styles/components/style-editor-modal.tsx:112
+#: src/features/styles/components/style-editor-modal.tsx:128
 msgid "Description is too long."
 msgstr "설명이 너무 깁니다."
 
@@ -660,7 +669,7 @@ msgstr "터미널을 감지해 알맞은 붙여넣기 단축키를 고릅니다.
 msgid "Detects the spoken language each session."
 msgstr "세션마다 말한 언어를 감지합니다."
 
-#: src/features/styles/components/style-editor-modal.tsx:143
+#: src/features/styles/components/style-editor-modal.tsx:159
 msgid "Deterministic fixes applied before any AI styling."
 msgstr "AI 스타일 지정 이전에 결정적 수정 사항이 적용되었습니다."
 
@@ -766,7 +775,7 @@ msgstr "업데이트 다운로드 중"
 msgid "Downloading…"
 msgstr "다운로드 중…"
 
-#: src/features/styles/components/style-editor-modal.tsx:205
+#: src/features/styles/components/style-editor-modal.tsx:237
 msgid "Duplicate"
 msgstr "복제"
 
@@ -774,7 +783,7 @@ msgstr "복제"
 msgid "Duration"
 msgstr "기간"
 
-#: src/features/styles/components/style-editor-modal.tsx:92
+#: src/features/styles/components/style-editor-modal.tsx:108
 msgid "e.g. Meeting notes"
 msgstr "예: 회의록"
 
@@ -786,7 +795,7 @@ msgstr "가장자리 거리"
 msgid "Edge distance in pixels"
 msgstr "가장자리 거리(픽셀)"
 
-#: src/features/styles/components/style-hero.tsx:49
+#: src/features/styles/components/style-hero.tsx:52
 #: src/features/styles/components/style-preset-card.tsx:103
 msgid "Edit"
 msgstr "편집"
@@ -802,7 +811,7 @@ msgstr "{0} 편집"
 msgid "Edit snippet"
 msgstr "스니펫 편집"
 
-#: src/features/styles/components/style-editor-modal.tsx:84
+#: src/features/styles/components/style-editor-modal.tsx:100
 msgid "Edit style"
 msgstr "스타일 편집"
 
@@ -829,11 +838,11 @@ msgstr "엔진"
 msgid "Enter Lune Voice"
 msgstr "Lune Voice 열기"
 
-#: src/features/styles/components/style-editor-modal.tsx:189
+#: src/features/styles/components/style-editor-modal.tsx:221
 msgid "Examples are out of date since you edited the prompt."
 msgstr "프롬프트를 편집했으므로 예시가 최신 상태가 아닙니다."
 
-#: src/features/styles/components/style-editor-modal.tsx:166
+#: src/features/styles/components/style-editor-modal.tsx:198
 msgid "Examples teach the styling engine your style. Regenerate them after editing the prompt."
 msgstr "예시는 스타일 지정 엔진에 사용자의 스타일을 학습시킵니다. 프롬프트를 편집한 후 다시 생성하세요."
 
@@ -861,7 +870,7 @@ msgstr "Lune Voice {version}을(를) 내려받는 중입니다. 완료될 때까
 msgid "Fetching the NVIDIA runtime. This is the last step, and it only happens once."
 msgstr "NVIDIA 런타임을 가져오는 중입니다. 마지막 단계이며 한 번만 진행됩니다."
 
-#: src/features/styles/components/style-editor-modal.tsx:163
+#: src/features/styles/components/style-editor-modal.tsx:195
 msgid "Few-shot examples"
 msgstr "퓨샷 예시"
 
@@ -881,9 +890,13 @@ msgstr "스니펫 필터"
 msgid "Filter snippets…"
 msgstr "스니펫 필터…"
 
-#: src/features/settings/sections/transcription-section.tsx:123
+#: src/features/settings/sections/transcription-section.tsx:122
 msgid "Fix recognizer errors with your dictionary and known vocabulary, on your device. It uses per-word confidence and statistical patterns — no AI model, and it never rewrites what you said."
 msgstr "사전과 알려진 어휘를 사용하여 인식기 오류를 기기에서 수정합니다. 단어별 신뢰도와 통계 패턴을 사용하며 — AI 모델이 없고, 사용자가 말한 내용을 절대 다시 쓰지 않습니다."
+
+#: src/features/styles/components/style-editor-modal.tsx:186
+msgid "Follow Settings"
+msgstr ""
 
 #: src/features/settings/data/settings-data.ts:271
 msgid "Force the standard paste shortcut for every app."
@@ -897,8 +910,8 @@ msgstr "터미널용 붙여넣기 단축키를 강제합니다. 주로 터미널
 msgid "Forget where you dragged the pill and return it to its preset spot."
 msgstr "표시기를 끌어다 놓은 위치를 잊고 기본 위치로 되돌립니다."
 
-#: src/features/styles/components/style-editor-modal.tsx:141
-#: src/features/styles/components/style-hero.tsx:56
+#: src/features/styles/components/style-editor-modal.tsx:157
+#: src/features/styles/components/style-hero.tsx:59
 msgid "Formatting"
 msgstr "서식 지정"
 
@@ -924,8 +937,8 @@ msgstr "일반"
 msgid "General feedback"
 msgstr "일반 의견"
 
-#: src/features/styles/components/style-editor-modal.tsx:184
-#: src/features/styles/components/style-editor-modal.tsx:220
+#: src/features/styles/components/style-editor-modal.tsx:216
+#: src/features/styles/components/style-editor-modal.tsx:252
 msgid "Generating examples…"
 msgstr "예시 생성 중…"
 
@@ -1068,7 +1081,7 @@ msgstr "설치하면 앱이 교체되고 다시 시작됩니다. 설정, 기록,
 msgid "Installing update"
 msgstr "업데이트 설치 중"
 
-#: src/features/styles/components/style-editor-modal.tsx:117
+#: src/features/styles/components/style-editor-modal.tsx:133
 msgid "Instructions"
 msgstr "지침"
 
@@ -1105,7 +1118,7 @@ msgstr "키보드 액세스"
 msgid "Keyboard shortcuts"
 msgstr "키보드 단축키"
 
-#: src/features/styles/components/style-editor-modal.tsx:60
+#: src/features/styles/components/style-editor-modal.tsx:77
 msgid "Keyboard shortcuts (\"Super H\" → \"Super+H\")"
 msgstr "키보드 단축키(\"Super H\" → \"Super+H\")"
 
@@ -1271,11 +1284,11 @@ msgstr "더 보기"
 msgid "Multilingual · runs on-device"
 msgstr "다국어 · 기기에서 실행"
 
-#: src/features/styles/components/style-editor-modal.tsx:88
+#: src/features/styles/components/style-editor-modal.tsx:104
 msgid "Name"
 msgstr "이름"
 
-#: src/features/styles/components/style-editor-modal.tsx:98
+#: src/features/styles/components/style-editor-modal.tsx:114
 msgid "Name is too long."
 msgstr "이름이 너무 깁니다."
 
@@ -1374,6 +1387,7 @@ msgid "Nothing installed"
 msgstr "설치된 항목 없음"
 
 #: src/features/settings/data/settings-data.ts:154
+#: src/features/styles/components/style-editor-modal.tsx:188
 msgid "Off"
 msgstr "끄기"
 
@@ -1386,7 +1400,11 @@ msgstr "끄면 원본 텍스트가 전달됩니다. 적용할 스타일은 스�
 msgid "Offline"
 msgstr "오프라인"
 
-#: src/features/styles/components/style-editor-modal.tsx:106
+#: src/features/styles/components/style-editor-modal.tsx:187
+msgid "On"
+msgstr ""
+
+#: src/features/styles/components/style-editor-modal.tsx:122
 msgid "One-line summary shown on the card"
 msgstr "카드에 한 줄 요약 표시"
 
@@ -1587,7 +1605,7 @@ msgstr "최근 세션"
 msgid "Recording mode"
 msgstr "녹음 모드"
 
-#: src/features/styles/components/style-editor-modal.tsx:184
+#: src/features/styles/components/style-editor-modal.tsx:216
 msgid "Refresh few-shot examples"
 msgstr "퓨샷 예시 새로고침"
 
@@ -1672,7 +1690,7 @@ msgid "Runs whisper.cpp on-device. Choose a model size below."
 msgstr "whisper.cpp를 기기에서 실행합니다. 아래에서 모델 크기를 고르세요."
 
 #: src/features/dictionary/components/dictionary-table.tsx:121
-#: src/features/styles/components/style-editor-modal.tsx:220
+#: src/features/styles/components/style-editor-modal.tsx:252
 msgid "Save"
 msgstr "저장"
 
@@ -1787,7 +1805,7 @@ msgid "Settings sections"
 msgstr "설정 섹션"
 
 #: src/features/settings/sections/dictation-section.tsx:71
-#: src/features/styles/components/style-hero.tsx:20
+#: src/features/styles/components/style-hero.tsx:23
 msgid "Shortcuts"
 msgstr "단축키"
 
@@ -1987,7 +2005,7 @@ msgstr "마이크가 사용 중입니다"
 msgid "The model stays in memory. Every dictation starts instantly."
 msgstr "모델이 메모리에 남습니다. 매번 바로 받아쓰기가 시작됩니다."
 
-#: src/features/settings/sections/transcription-section.tsx:128
+#: src/features/settings/sections/transcription-section.tsx:141
 msgid "The words the recognizer is least sure about are checked against your dictionary and vocabulary. Higher checks more words; lower trusts the raw transcription."
 msgstr "인식기가 가장 확신하지 못하는 단어를 사전과 어휘에 대조하여 확인합니다. 높을수록 더 많은 단어를 확인하고, 낮을수록 원본 전사를 신뢰합니다."
 
@@ -2025,11 +2043,11 @@ msgstr "이 받아쓰기 세션과 텍스트가 영구적으로 삭제됩니다.
 msgid "Time"
 msgstr "시간"
 
-#: src/features/styles/components/style-editor-modal.tsx:61
+#: src/features/styles/components/style-editor-modal.tsx:78
 msgid "Title abbreviations (\"Mister\" → \"Mr.\")"
 msgstr "호칭 약어(\"Mister\" → \"Mr.\")"
 
-#: src/features/styles/components/style-hero.tsx:22
+#: src/features/styles/components/style-hero.tsx:25
 msgid "Titles"
 msgstr "호칭"
 
@@ -2180,7 +2198,7 @@ msgstr "{activeDevice}을(를) 사용 중입니다. 설정 › 받아쓰기 에�
 msgid "Vertical"
 msgstr "세로"
 
-#: src/features/styles/components/style-hero.tsx:45
+#: src/features/styles/components/style-hero.tsx:48
 #: src/features/styles/components/style-preset-card.tsx:98
 msgid "View"
 msgstr "보기"
@@ -2193,7 +2211,7 @@ msgstr "모두 보기"
 msgid "View source"
 msgstr "소스 코드 보기"
 
-#: src/features/styles/components/style-editor-modal.tsx:84
+#: src/features/styles/components/style-editor-modal.tsx:100
 msgid "View style"
 msgstr "스타일 보기"
 
@@ -2293,6 +2311,10 @@ msgstr "단어"
 #: src/features/overview/overview-page.tsx:123
 msgid "WPM"
 msgstr "WPM"
+
+#: src/features/settings/sections/transcription-section.tsx:127
+msgid "Write names like GitHub and iPhone the way their owners do. Turn this off to keep the recognizer's own capitals. A style can override this."
+msgstr ""
 
 #: src/features/styles/components/style-preset-card.tsx:86
 msgid "Yes"

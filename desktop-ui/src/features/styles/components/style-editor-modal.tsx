@@ -10,6 +10,21 @@ import type { FormatTogglesDto } from '../../../lib/backend/types';
 /** Fraction of the instructions budget at which the counter turns amber. */
 const INSTRUCTIONS_WARN_FRACTION = 0.93;
 
+type ToggleKey = 'keybinds' | 'titleAbbreviations' | 'autoCapitalization';
+
+/** A style's brand casing is on, off, or unset (follows the Settings switch). */
+function brandCasingChoice(value: boolean | null): 'inherit' | 'on' | 'off' {
+  if (value === true) return 'on';
+  if (value === false) return 'off';
+  return 'inherit';
+}
+
+function brandCasingFromChoice(choice: string): boolean | null {
+  if (choice === 'on') return true;
+  if (choice === 'off') return false;
+  return null;
+}
+
 interface StyleEditorModalProps {
   dialogRef: RefObject<HTMLDialogElement | null>;
   mode: 'create' | 'edit' | 'view';
@@ -26,7 +41,8 @@ interface StyleEditorModalProps {
   onDescriptionChange: (v: string) => void;
   onInstructionsChange: (v: string) => void;
   formatting: FormatTogglesDto;
-  onFormattingChange: (key: keyof FormatTogglesDto, value: boolean) => void;
+  onFormattingChange: (key: ToggleKey, value: boolean) => void;
+  onBrandCasingChange: (value: boolean | null) => void;
   onClose: () => void;
   onSave: () => void;
   onRefreshExamples: () => void;
@@ -50,17 +66,17 @@ export function StyleEditorModal({
   onInstructionsChange,
   formatting,
   onFormattingChange,
+  onBrandCasingChange,
   onClose,
   onSave,
   onRefreshExamples,
   onDuplicate,
 }: StyleEditorModalProps) {
   const { t, i18n } = useLingui();
-  const formatToggleRows: { key: keyof FormatTogglesDto; label: string }[] = [
+  const formatToggleRows: { key: ToggleKey; label: string }[] = [
     { key: 'keybinds', label: t`Keyboard shortcuts ("Super H" → "Super+H")` },
     { key: 'titleAbbreviations', label: t`Title abbreviations ("Mister" → "Mr.")` },
     { key: 'autoCapitalization', label: t`Auto-capitalize sentences` },
-    { key: 'brandCasing', label: t`Brand casing ("github" → "GitHub")` },
   ];
   const isViewOnly = mode === 'view';
   const isEdit = mode === 'edit';
@@ -156,6 +172,22 @@ export function StyleEditorModal({
                   />
                 </label>
               ))}
+              <label className="flex items-center justify-between gap-3 px-3 py-2">
+                <span className="text-sm text-content-default">
+                  {t`Brand casing ("github" → "GitHub")`}
+                </span>
+                <select
+                  className="select select-sm w-auto"
+                  value={brandCasingChoice(formatting.brandCasing)}
+                  disabled={isViewOnly}
+                  onChange={(e) => onBrandCasingChange(brandCasingFromChoice(e.target.value))}
+                  aria-label={t`Brand casing`}
+                >
+                  <option value="inherit">{t`Follow Settings`}</option>
+                  <option value="on">{t`On`}</option>
+                  <option value="off">{t`Off`}</option>
+                </select>
+              </label>
             </div>
           </div>
           {!isViewOnly && (isEdit || !llmReady) && (

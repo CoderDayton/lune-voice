@@ -60,6 +60,10 @@ inputDevice: string | null, vadPcen: boolean, startMinimized: boolean,
  */
 checkUpdatesOnLaunch: boolean, 
 /**
+ * Capitalize known names ("github" -> "GitHub"). A style can override it.
+ */
+brandCasing: boolean, 
+/**
  * How long to keep dictation history, in days. `None` disables history.
  */
 sessionHistoryDays: number | null, 

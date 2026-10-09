@@ -1,8 +1,10 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 import { useLingui } from '@lingui/react/macro';
+import { useStore } from '@tanstack/react-store';
 import { Lock, Pencil } from 'lucide-react';
 import { PanelHeader } from '../../../components/ui/panel-header';
+import { workspaceStore } from '../../../store/workspace-store';
 import type { StylePreset } from '../../../store/workspace-types';
 import { styleIcon } from '../style-icons';
 
@@ -16,11 +18,12 @@ export function StyleHero({ preset, onEdit, onView }: StyleHeroProps) {
   const { t } = useLingui();
   const Icon = styleIcon(preset);
   const fmt = preset.formatting;
+  const globalBrandCasing = useStore(workspaceStore, (s) => s.settings.brandCasing);
   const chips = [
     { on: fmt.keybinds, label: t`Shortcuts` },
     { on: fmt.autoCapitalization, label: t`Capitals` },
     { on: fmt.titleAbbreviations, label: t`Titles` },
-    { on: fmt.brandCasing, label: t`Brands` },
+    { on: fmt.brandCasing ?? globalBrandCasing, label: t`Brands` },
   ];
 
   return (

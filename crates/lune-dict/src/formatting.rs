@@ -115,14 +115,16 @@ pub fn normalize_with(text: &str, fmt: &FormatToggles) -> PunctuationOutcome {
     } else {
         abbreviated
     };
+    let hotkeyed = drop_dangling_separator(&hotkeyed);
     let trimmed = hotkeyed.as_str();
 
     let words: Vec<&str> = trimmed.split_whitespace().collect();
     let ends_terminal = ends_with_terminal(trimmed);
-    // A colon ending the segment (ignoring trailing closing quotes/brackets) is
-    // the ASR's own mark; keep it verbatim and never force a period on top of it
-    // — see the terminal block below.
-    let ends_colon = trimmed.trim_end_matches(CLOSING).ends_with(':');
+    // A colon, or a comma or semicolon left after the drop above, ends a short
+    // opener (ignoring trailing closing quotes/brackets). It is the ASR's own
+    // mark; keep it verbatim and never force a period on top of it — see the
+    // terminal block below.
+    let ends_open = trimmed.trim_end_matches(CLOSING).ends_with([':', ',', ';']);
     let interrogative = is_interrogative_lead(&words);
 
     // Run-on: long stretch with no internal separator or sentence break. Such a
@@ -136,7 +138,7 @@ pub fn normalize_with(text: &str, fmt: &FormatToggles) -> PunctuationOutcome {
     // on it for punctuation. A bare wh-lead ("what a mess" vs "what time is it")
     // stays ambiguous and is still deferred.
     let confident_question =
-        interrogative && !ends_terminal && !ends_colon && is_aux_inversion_question(&words);
+        interrogative && !ends_terminal && !ends_open && is_aux_inversion_question(&words);
 
     // A remaining interrogative lead without an end mark is ambiguous
     // (`?` vs `.` vs `!`), so let the LLM decide rather than guessing.
@@ -157,10 +159,11 @@ pub fn normalize_with(text: &str, fmt: &FormatToggles) -> PunctuationOutcome {
     // internal commas when it runs). Two guards: a one-word dictation (a bare
     // word, command, or fragment) gets no period, and an interrogative lead with
     // no end mark is deferred to the LLM (`?` vs `.` can't be guessed safely).
-    // A trailing colon (`ends_colon`) is left exactly as the ASR produced it: no
-    // period is appended, so we never emit the double mark ":." and never force
-    // a period where the true terminator might be a question mark.
-    if words.len() > 1 && !ends_terminal && !ends_colon {
+    // A trailing colon, comma or semicolon (`ends_open`) is left exactly as the
+    // ASR produced it: no period is appended, so we never emit a double mark
+    // such as ":." or ",." and never force a period where the true terminator
+    // might be a question mark.
+    if words.len() > 1 && !ends_terminal && !ends_open {
         if confident_question {
             out.push('?');
         } else if !interrogative {
@@ -426,6 +429,24 @@ const TERMINATORS: &[char] = &['.', '!', '?', '…'];
 /// closing quotes/brackets (e.g. `he said "go".` or `(done!)`).
 fn ends_with_terminal(text: &str) -> bool {
     text.trim_end_matches(CLOSING).ends_with(TERMINATORS)
+}
+
+/// Drop a comma or semicolon that dangles at the end of a segment of three or
+/// more words (`we shipped it,`), keeping any closing quote or bracket after
+/// it. The ASR emits one when a segment is cut off mid-clause, and a filler
+/// stripped from the end (`…today, um`) leaves one behind. Removing it lets the
+/// terminal-mark logic choose `.` or `?` instead of stacking a period on the
+/// comma. A shorter segment (`hi team,`, `yes,`) is an opener or a vocative, so
+/// it is left as spoken; see `ends_open` in [`normalize_with`].
+fn drop_dangling_separator(text: &str) -> String {
+    let body = text.trim_end_matches(CLOSING);
+    let tail = &text[body.len()..];
+    match body.strip_suffix([',', ';']) {
+        Some(stem) if stem.split_whitespace().count() >= 3 => {
+            format!("{}{}", stem.trim_end(), tail)
+        }
+        _ => text.to_owned(),
+    }
 }
 
 /// Whether the body carries any internal separator or sentence break (a comma,
@@ -1007,6 +1028,38 @@ mod tests {
     }
 
     #[test]
+    fn shape_never_puts_a_period_after_a_trailing_comma() {
+        let fmt = FormatToggles::default();
+        for (raw, want) in [
+            ("we shipped it today,", "We shipped it today."),
+            ("we shipped it today;", "We shipped it today."),
+            ("we shipped it today , ", "We shipped it today."),
+            ("did we ship it today,", "Did we ship it today?"),
+            ("he said \"we shipped it,\"", "He said \"we shipped it\"."),
+            ("we shipped it today, um", "We shipped it today."),
+            (
+                "we shipped it today, and then",
+                "We shipped it today, and then.",
+            ),
+        ] {
+            assert_eq!(shape(raw, "English", &fmt), want, "{raw}");
+        }
+    }
+
+    #[test]
+    fn shape_keeps_a_short_opener_as_spoken() {
+        let fmt = FormatToggles::default();
+        for (raw, want) in [
+            ("yes,", "Yes,"),
+            ("hi team,", "Hi team,"),
+            ("thanks everyone,", "Thanks everyone,"),
+            ("he left;", "He left;"),
+        ] {
+            assert_eq!(shape(raw, "English", &fmt), want, "{raw}");
+        }
+    }
+
+    #[test]
     fn shape_strips_english_fillers() {
         let fmt = FormatToggles::default();
         assert_eq!(
@@ -1499,7 +1552,7 @@ mod tests {
             keybinds: false,
             title_abbreviations: false,
             auto_capitalization: false,
-            brand_casing: false,
+            brand_casing: Some(false),
         };
         assert_eq!(
             normalize_with("set the hotkey to Super H", &off).text,

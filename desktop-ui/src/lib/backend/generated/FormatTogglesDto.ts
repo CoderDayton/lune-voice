@@ -3,4 +3,8 @@
 /**
  * Per-style deterministic formatting toggles, surfaced to the styles page.
  */
-export type FormatTogglesDto = { keybinds: boolean, titleAbbreviations: boolean, autoCapitalization: boolean, brandCasing: boolean, };
+export type FormatTogglesDto = { keybinds: boolean, titleAbbreviations: boolean, autoCapitalization: boolean, 
+/**
+ * Null follows the global `brandCasing` setting.
+ */
+brandCasing: boolean | null, };

@@ -642,7 +642,7 @@ fn correct_and_format(
         dict_replacements,
         detected_lang,
         heuristic_flag_risk,
-        fmt.brand_casing,
+        fmt.resolve_brand_casing(true),
     );
     let text_after_heuristic =
         lune_dict::formatting::shape(&heuristic_result.corrected_text, detected_lang, fmt);
@@ -703,9 +703,7 @@ async fn process_and_deliver(
         event_tx,
         active_arc: _,
         idle_notify: _,
-        // Style presets always resolve from `persist`, so `settings` is unused
-        // on this path.
-        settings: _,
+        settings,
     } = deps;
     debug!(%session_id, "[ASR] output ready, len={}", raw_text.len());
 
@@ -790,10 +788,12 @@ async fn process_and_deliver(
         let replacements = dict.scan(&text_after_commands);
         (entries, replacements)
     };
-    let fmt = style_preset
+    // A style's own brand-casing choice wins; otherwise the global setting.
+    let mut fmt = style_preset
         .as_ref()
         .map(|p| p.formatting)
         .unwrap_or_default();
+    fmt.brand_casing = Some(fmt.resolve_brand_casing(settings.read().await.brand_casing));
     let wants_styling = style_preset.is_some();
     // Deterministic correction + formatting + bypass-gate, as one span so a
     // single dictation request shows its shaping cost end-to-end.
@@ -2077,6 +2077,34 @@ mod tests {
         assert_eq!(shaped.text_after_heuristic, "Hello world.");
         assert_eq!(shaped.detected_lang, "English");
         assert!(shaped.unresolved_words.is_empty());
+    }
+
+    #[test]
+    fn correct_and_format_applies_brand_casing_only_when_asked() {
+        lune_dict::lexicon::warm();
+        let heuristic = LexicalGate::new();
+        let pipeline = PipelineConfig::default();
+        let text = "we drove to home depot";
+        let segments = vec![make_segment(text, false)];
+        let run = |brand_casing| {
+            let fmt = lune_core::config::FormatToggles {
+                brand_casing: Some(brand_casing),
+                ..Default::default()
+            };
+            correct_and_format(
+                text,
+                &segments,
+                &[] as &[lune_dict::DictMatch],
+                &heuristic,
+                &pipeline,
+                &fmt,
+                false,
+            )
+            .text_after_heuristic
+        };
+
+        assert_eq!(run(true), "We drove to Home Depot.");
+        assert_eq!(run(false), "We drove to home depot.");
     }
 
     #[tokio::test]
