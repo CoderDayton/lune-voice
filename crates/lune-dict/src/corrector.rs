@@ -92,13 +92,13 @@ fn process_single_word(
     dict_lookup: &HashMap<String, (&str, bool, bool)>,
     brand_casing: bool,
 ) -> ProcessedWord {
-    // Empty or digit-containing words pass through unchanged
-    if stripped.is_empty() || stripped.chars().any(|c| c.is_ascii_digit()) {
+    if stripped.is_empty() {
         return ProcessedWord {
             corrected_word: word.to_owned(),
             unresolved: None,
         };
     }
+    let has_digit = stripped.chars().any(|c| c.is_ascii_digit());
 
     let is_unknown = !lexicon_info.as_ref().is_some_and(|info| {
         info.freq >= Lexicon::CONFIDENT_FREQ || info.source == WordSource::Vocab
@@ -116,7 +116,14 @@ fn process_single_word(
         // coincidental rather than the dictionary term. Exact and multi-word
         // matches (fuzzy == false) always apply; confident mishears stay above
         // the gate and are still corrected.
-        if !(fuzzy && risk_score >= FUZZY_DICT_RISK_GATE) {
+        //
+        // A fuzzy match also never rewrites a word the lexicon knows or one
+        // that carries a digit: "must" is not a mishear of "rust", and "int9"
+        // is not a mishear of "int8". Rewriting a real word takes an exact
+        // entry.
+        let fuzzy_blocked =
+            fuzzy && (risk_score >= FUZZY_DICT_RISK_GATE || has_digit || lexicon_info.is_some());
+        if !fuzzy_blocked {
             // Title-case-only replacements of ordinary words ("Dev", "Server")
             // must not force a mid-sentence capital: apply the spelling in
             // lowercase and let the sentence-initial capitalizer own position
@@ -135,8 +142,9 @@ fn process_single_word(
         }
     }
 
-    // Known, unflagged words pass through
-    if !is_unknown && !flagged {
+    // Digit-bearing words are never judged by the lexicon; known, unflagged
+    // words pass through.
+    if has_digit || (!is_unknown && !flagged) {
         return ProcessedWord {
             corrected_word: word.to_owned(),
             unresolved: None,
@@ -363,11 +371,17 @@ impl LexicalGate {
         // collision so the user dictionary wins. The bundled vocab contributes
         // recognition/casing only; all FUZZY correction now comes solely from
         // the user dictionary via `dict_replacements`.
-        let mut phrase_matches: HashMap<usize, PhraseMatch> = lexicon
-            .vocab_phrase_matches(&words)
-            .into_iter()
-            .map(|m| (m.start, m))
-            .collect();
+        // Vocab phrases are brand casing, so the toggle governs them as it
+        // does single-word canonicals.
+        let mut phrase_matches: HashMap<usize, PhraseMatch> = if brand_casing {
+            lexicon
+                .vocab_phrase_matches(&words)
+                .into_iter()
+                .map(|m| (m.start, m))
+                .collect()
+        } else {
+            HashMap::new()
+        };
         // Built-in always-on multi-word corrections (see ALWAYS_REPLACE), exact
         // and never gated; user-dictionary entries below still overwrite them.
         let builtin_phrases: Vec<crate::DictMatch> = ALWAYS_REPLACE
@@ -379,10 +393,10 @@ impl LexicalGate {
                 fuzzy: false,
             })
             .collect();
-        for m in locate_multi_word_dict_matches(&words, &builtin_phrases) {
+        for m in locate_phrase_dict_matches(&words, &builtin_phrases) {
             phrase_matches.insert(m.start, m);
         }
-        for m in locate_multi_word_dict_matches(&words, dict_replacements) {
+        for m in locate_phrase_dict_matches(&words, dict_replacements) {
             phrase_matches.insert(m.start, m);
         }
         // Matches at *different* start indices can still overlap ("new york" at
@@ -418,12 +432,9 @@ impl LexicalGate {
                     let replacement = softened.as_deref().unwrap_or(&pm.replacement);
                     let first = words[i];
                     let last = words[i + pm.len - 1];
-                    let prefix =
-                        &first[..first.len() - first.trim_start_matches(is_edge_punct).len()];
-                    let suffix = &last[last.trim_end_matches(is_edge_punct).len()..];
-                    corrected_text.push_str(prefix);
+                    corrected_text.push_str(&first[..pm.prefix_len]);
                     corrected_text.push_str(replacement);
-                    corrected_text.push_str(suffix);
+                    corrected_text.push_str(&last[last.len() - pm.suffix_len..]);
                     i += pm.len;
                     continue;
                 }
@@ -585,6 +596,100 @@ pub(crate) fn strip_punctuation(word: &str) -> &str {
     s.trim_end_matches(is_edge_punct)
 }
 
+/// Whether any punctuation sits between the words of `window`: trailing on a
+/// word that is not the last, or leading on a word that is not the first.
+/// Such a window straddles a clause or sentence break, and replacing it as one
+/// phrase would delete that punctuation.
+pub(crate) fn has_inner_punctuation(window: &[&str]) -> bool {
+    let last = window.len().saturating_sub(1);
+    window.iter().enumerate().any(|(k, w)| {
+        (k > 0 && w.starts_with(is_edge_punct)) || (k < last && w.ends_with(is_edge_punct))
+    })
+}
+
+/// Byte lengths of the edge punctuation before `first` and after `last`.
+pub(crate) fn edge_lens(first: &str, last: &str) -> (usize, usize) {
+    (
+        first.len() - first.trim_start_matches(is_edge_punct).len(),
+        last.len() - last.trim_end_matches(is_edge_punct).len(),
+    )
+}
+
+/// Whether `phrase` is one word the span tokenizer keeps whole ("github",
+/// "gpt-4", "don't"). Every other phrase — several words, or punctuation the
+/// tokenizer splits on ("node.js", "c++", ".net") — is matched against whole
+/// transcript words by [`phrase_window_matches`].
+pub(crate) fn is_plain_word(phrase: &str) -> bool {
+    let (leading, spans) = split_internal_punctuation(phrase);
+    leading.is_empty() && matches!(spans[..], [(_, "")])
+}
+
+/// Byte lengths of the edge punctuation around `phrase_word` inside `token`,
+/// or `None` when the token is some other word. Case-insensitive. The phrase
+/// word is taken as written, punctuation included: `york` matches `"york."`,
+/// and `c++` matches `c++,` but not `c`.
+fn literal_edges(token: &str, phrase_word: &str) -> Option<(usize, usize)> {
+    if strip_punctuation(phrase_word).is_empty() {
+        return None;
+    }
+    // Lowercasing leaves punctuation bytes alone, so offsets into the folded
+    // token's edges are offsets into the original.
+    let folded;
+    let (token, word) = if token.is_ascii() && phrase_word.is_ascii() {
+        (token, phrase_word)
+    } else {
+        folded = (token.to_lowercase(), phrase_word.to_lowercase());
+        (folded.0.as_str(), folded.1.as_str())
+    };
+    let mut prefix = 0;
+    loop {
+        let rest = &token[prefix..];
+        if rest.len() >= word.len()
+            && rest.is_char_boundary(word.len())
+            && rest[..word.len()].eq_ignore_ascii_case(word)
+            && rest[word.len()..].chars().all(is_edge_punct)
+        {
+            return Some((prefix, rest.len() - word.len()));
+        }
+        prefix += rest
+            .chars()
+            .next()
+            .filter(|c| is_edge_punct(*c))?
+            .len_utf8();
+    }
+}
+
+/// The one rule for whether a run of transcript words is a dictionary phrase:
+/// word for word, case-insensitive, each phrase word as written, with no
+/// punctuation between the words beyond what the phrase itself carries.
+/// Returns the byte lengths of the punctuation before the first word and after
+/// the last. `UserDictionary::scan`, `top_relevant` and the corrector all match
+/// through this, so a phrase the scan reports is always one the corrector can
+/// place.
+pub(crate) fn phrase_window_matches(
+    window: &[&str],
+    phrase_words: &[&str],
+) -> Option<(usize, usize)> {
+    if window.is_empty() || window.len() != phrase_words.len() {
+        return None;
+    }
+    let last = window.len() - 1;
+    let mut edges = (0, 0);
+    for (k, (token, phrase_word)) in window.iter().zip(phrase_words).enumerate() {
+        let (prefix, suffix) = literal_edges(token, phrase_word)?;
+        if (k > 0 && prefix > 0) || (k < last && suffix > 0) {
+            return None;
+        }
+        if k == 0 {
+            edges.0 = prefix;
+        }
+        if k == last {
+            edges.1 = suffix;
+        }
+    }
+    Some(edges)
+}
+
 /// Non-ASCII characters that wrap or terminate a word in transcript text —
 /// typographic quotes, guillemets, dashes and ellipsis. Whisper emits these
 /// routinely for quoted or read-aloud speech.
@@ -623,17 +728,14 @@ struct AlignedRisks {
     dropped: usize,
 }
 
-/// Re-locates each multi-word `DictMatch` (from `UserDictionary::scan`'s
-/// exact multi-word matching) to its start position in `words`, so the
-/// corrector's loop can treat it exactly like a vocab phrase match. Needed
-/// because `scan()` validates and returns the matched phrase as plain text —
-/// without this, multi-word user-dictionary entries were structurally
-/// unreachable: `process_single_word`'s `dict_lookup` is keyed by a single
-/// stripped word, so a `matched` value containing whitespace could never be
-/// found there. Mirrors `scan()`'s own window-matching rule (case-insensitive,
-/// per-word, edge punctuation stripped) so the re-derived position is
-/// guaranteed consistent with how the match was originally found upstream.
-fn locate_multi_word_dict_matches(
+/// Locates each phrase `DictMatch` — several words, or one word that is not
+/// plain (see [`is_plain_word`]) — at its start positions in `words`, so the
+/// corrector's loop can treat it exactly like a vocab phrase match. `scan()`
+/// returns the matched phrase as text, and `process_single_word`'s
+/// `dict_lookup` is keyed by a single stripped span, which such a phrase never
+/// equals. Uses `scan()`'s own rule, [`phrase_window_matches`], so the position
+/// always agrees with how the match was found.
+fn locate_phrase_dict_matches(
     words: &[&str],
     dict_replacements: &[crate::DictMatch],
 ) -> Vec<PhraseMatch> {
@@ -641,7 +743,7 @@ fn locate_multi_word_dict_matches(
     for m in dict_replacements {
         let phrase_words: Vec<&str> = m.matched.split_whitespace().collect();
         let n = phrase_words.len();
-        if n < 2 || words.len() < n {
+        if n == 0 || (n == 1 && is_plain_word(phrase_words[0])) || words.len() < n {
             continue;
         }
         // Every non-overlapping occurrence, not just the first: a phrase
@@ -649,14 +751,14 @@ fn locate_multi_word_dict_matches(
         // corrected at each position, matching `vocab_phrase_matches`.
         let mut start = 0;
         while start + n <= words.len() {
-            let hit = words[start..start + n]
-                .iter()
-                .zip(&phrase_words)
-                .all(|(w, pw)| crate::eq_ci(strip_punctuation(w), pw));
-            if hit {
+            if let Some((prefix_len, suffix_len)) =
+                phrase_window_matches(&words[start..start + n], &phrase_words)
+            {
                 out.push(PhraseMatch {
                     start,
                     len: n,
+                    prefix_len,
+                    suffix_len,
                     replacement: m.replacement.clone(),
                     fuzzy: m.fuzzy,
                 });
@@ -809,6 +911,24 @@ mod tests {
             "check the system prompt first",
             "we ran a vector search over the notes",
             "greedy decoding was noticeably faster",
+            // Company and product names that are also everyday phrases.
+            "that was the best buy of the year",
+            "which capital one do you mean",
+            "it was five below this morning",
+            "five guys showed up late",
+            "they sell it in big lots",
+            "put it on the pile",
+            "press command a to select all",
+            "we stay in constant contact",
+            "it sits in public storage",
+            "a course on applied materials",
+            "we take global payments now",
+            "the city handles waste management",
+            "your new balance is zero",
+            "print the first match group",
+            "the recursion caused a stack overflow",
+            "we benchmark text generation inference speed",
+            "the goal is seamless communication",
         ] {
             let result = c.correct(text, NO_RISKS, &[], "en");
             assert_eq!(result.corrected_text, text, "must not re-case: {text}");
@@ -1364,5 +1484,80 @@ mod tests {
             "unexpected unresolved: {:?}",
             result.unresolved_words
         );
+    }
+
+    #[test]
+    fn exact_dict_entry_with_digits_applies() {
+        let c = LexicalGate::new();
+        let dict = vec![crate::DictMatch {
+            matched: "k8s".into(),
+            replacement: "Kubernetes".into(),
+            fuzzy: false,
+        }];
+        let result = c.correct("deploy to k8s now", NO_RISKS, &dict, "en");
+        assert_eq!(result.corrected_text, "deploy to Kubernetes now");
+
+        // A near-match on a digit-bearing word is a different identifier
+        // ("int9" is not a mishear of "int8"), so fuzzy never rewrites it.
+        let fuzzy = vec![crate::DictMatch {
+            matched: "int9".into(),
+            replacement: "INT8".into(),
+            fuzzy: true,
+        }];
+        let result = c.correct("cast to int9 here", NO_RISKS, &fuzzy, "en");
+        assert_eq!(result.corrected_text, "cast to int9 here");
+    }
+
+    #[test]
+    fn fuzzy_dict_match_never_rewrites_a_known_word() {
+        let c = LexicalGate::new();
+        // "must" is one edit from a "rust" entry, but it is a real word spoken
+        // with confidence — not a mishear of the dictionary term.
+        let risks = vec![("must", 0.1, 0.9)];
+        let dict = vec![crate::DictMatch {
+            matched: "must".into(),
+            replacement: "Rust".into(),
+            fuzzy: true,
+        }];
+        let result = c.correct("you must go", &risks, &dict, "en");
+        assert_eq!(result.corrected_text, "you must go");
+    }
+
+    #[test]
+    fn phrase_match_does_not_span_punctuation() {
+        let c = LexicalGate::new();
+        let dict = vec![crate::DictMatch {
+            matched: "new york".into(),
+            replacement: "New York".into(),
+            fuzzy: false,
+        }];
+        // Punctuation between the words is a clause or sentence break; a match
+        // across it would also delete that punctuation.
+        let split = c.correct("it is new. York is far", NO_RISKS, &dict, "en");
+        assert_eq!(split.corrected_text, "it is new. York is far");
+        // Same rule for the bundled vocab ("Visual Studio").
+        let vocab = c.correct("keep it visual, studio work", NO_RISKS, &[], "en");
+        assert_eq!(vocab.corrected_text, "keep it visual, studio work");
+        // Punctuation around the phrase is kept and does not block the match.
+        let edge = c.correct("i love \"new york.\"", NO_RISKS, &dict, "en");
+        assert_eq!(edge.corrected_text, "i love \"New York.\"");
+    }
+
+    #[test]
+    fn brand_casing_toggle_controls_vocab_phrases() {
+        let c = LexicalGate::new();
+        let run = |brand_casing| {
+            c.correct_with_risk_threshold(
+                "we went to home depot today",
+                NO_RISKS,
+                &[],
+                "en",
+                HWCE_FLAG_THRESHOLD,
+                brand_casing,
+            )
+            .corrected_text
+        };
+        assert_eq!(run(true), "we went to Home Depot today");
+        assert_eq!(run(false), "we went to home depot today");
     }
 }

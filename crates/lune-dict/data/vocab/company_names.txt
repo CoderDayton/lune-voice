@@ -86,7 +86,6 @@ aon
 Apache
 Apollo Global Management
 Apple
-Applied Materials
 AppLovin
 aramark
 ArcelorMittal
@@ -139,11 +138,9 @@ benchling
 Bending Spoons
 Berkshire Hathaway
 Bertelsmann
-Best Buy
 Bethesda Softworks
 Beyond Meat
 BHP
-Big Lots
 Bio-Rad Laboratories
 Biogen
 BioMarin
@@ -206,7 +203,6 @@ Canada Goose
 Capcom
 capgemini
 Capital Group
-Capital One
 Cardinal Health
 Carlisle Companies
 Carlsberg
@@ -368,8 +364,6 @@ First Citizens BancShares
 First Republic Bank
 First Solar
 fiserv
-Five Below
-Five Guys
 Fiverr
 FleetCor
 Floor & Decor
@@ -408,7 +402,6 @@ Genuine Parts Company
 Genworth Financial
 Gilead Sciences
 GlaxoSmithKline
-Global Payments
 globant
 glovo
 GoDaddy
@@ -586,7 +579,6 @@ Martin Marietta
 Marvell Technology
 masimo
 Mastercard
-Match Group
 Mattel
 Mazda
 McAfee
@@ -634,7 +626,6 @@ NatWest
 navient
 NEC
 NetApp
-New Balance
 New York Life
 Newell Brands
 Newmont
@@ -709,7 +700,6 @@ Procore Technologies
 Procter & Gamble
 prologis
 Prudential Financial
-Public Storage
 Publicis Groupe
 PulteGroup
 PVH
@@ -927,7 +917,6 @@ Walmart
 Walt Disney Company
 Warner Bros.
 Warner Bros. Discovery
-Waste Management
 Waters Corporation
 Wayfair
 Waymo

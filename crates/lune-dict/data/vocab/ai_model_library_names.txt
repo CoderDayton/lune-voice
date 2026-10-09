@@ -67,7 +67,6 @@ ColBERT
 ColBERTv2
 Colossal-AI
 Comet ML
-Command A
 Command R
 Command R Plus
 Common Crawl
@@ -410,7 +409,6 @@ ScaNN
 SciPy
 SDXL
 seaborn
-Seamless Communication
 SeamlessM4T
 SeaORM
 Semantic Kernel
@@ -460,11 +458,9 @@ Switch Transformer
 tabnine
 TensorRT
 TensorRT-LLM
-Text Generation Inference
 Textual Inversion
 TFLite
 TGI
-The Pile
 Three.js
 tiktoken
 Together AI

@@ -150,7 +150,6 @@ CodePen
 CodeSandbox
 Coinbase Wallet
 conda
-Constant Contact
 copilot
 Corel Painter
 CorelDRAW
@@ -468,7 +467,6 @@ Spring Boot
 SQLite
 Square Payments
 Squarespace
-Stack Overflow
 Strapi
 Stripe Atlas
 Stripe Checkout

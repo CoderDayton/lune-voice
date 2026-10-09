@@ -140,14 +140,20 @@ impl Lexicon {
                 continue;
             }
             for start in 0..=(stripped.len() - len) {
-                if stripped[start..start + len].iter().any(|w| w.is_empty()) {
+                if stripped[start..start + len].iter().any(|w| w.is_empty())
+                    || crate::corrector::has_inner_punctuation(&words[start..start + len])
+                {
                     continue;
                 }
                 let window_lower = crate::fold_ci(&stripped[start..start + len].join(" "));
                 if let Some(canonical) = VOCAB_INDEX.canonical_by_lower.get(window_lower.as_str()) {
+                    let (prefix_len, suffix_len) =
+                        crate::corrector::edge_lens(words[start], words[start + len - 1]);
                     let m = PhraseMatch {
                         start,
                         len,
+                        prefix_len,
+                        suffix_len,
                         replacement: canonical.to_string(),
                         fuzzy: false,
                     };
@@ -222,6 +228,10 @@ static VOCAB_INDEX: LazyLock<VocabIndex> = LazyLock::new(VocabIndex::build);
 pub(crate) struct PhraseMatch {
     pub start: usize,
     pub len: usize,
+    /// Bytes of edge punctuation before the first word, kept in the output.
+    pub prefix_len: usize,
+    /// Bytes of edge punctuation after the last word, kept in the output.
+    pub suffix_len: usize,
     pub replacement: String,
     pub fuzzy: bool,
 }

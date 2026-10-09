@@ -13,8 +13,10 @@ use lune_core::dict::DictionaryEntry;
 
 /// The user dictionary as the correction pipeline reads it.
 ///
-/// Finds matches in ASR text (multi-word exact match, single-word fuzzy with
-/// Levenshtein distance ≤ 1) and selects relevant entries for LLM prompts.
+/// Finds matches in ASR text (phrases — several words, or a word carrying
+/// punctuation such as `node.js` — exactly as written; plain single words
+/// exactly, else Levenshtein distance ≤ 1 for words of [`MIN_FUZZY_CHARS`] or
+/// more) and selects relevant entries for LLM prompts.
 /// Holds no database handle: the caller loads the entries and builds a new
 /// value when they change.
 #[derive(Debug, Clone, Default)]
@@ -30,35 +32,36 @@ impl UserDictionary {
     }
 
     pub fn scan(&self, text: &str) -> Vec<DictMatch> {
-        let (multi, single): (Vec<&DictionaryEntry>, Vec<&DictionaryEntry>) = self
+        let (single, phrases): (Vec<&DictionaryEntry>, Vec<&DictionaryEntry>) = self
             .entries
             .iter()
-            .partition(|e| e.phrase.contains(char::is_whitespace));
+            .partition(|e| corrector::is_plain_word(&e.phrase));
 
         let mut replacements = Vec::new();
         // `text` is not mutated across the loop, so split it once instead of
         // re-splitting per multi-word entry (was O(entries × text length)).
         let text_words: Vec<&str> = text.split_whitespace().collect();
 
-        for entry in &multi {
+        for entry in &phrases {
             let phrase_words: Vec<&str> = entry.phrase.split_whitespace().collect();
             let n = phrase_words.len();
-            // A phrase that is whitespace but not empty lands in `multi` (it
-            // contains whitespace) yet tokenizes to nothing. A zero-width
-            // window matches vacuously and `i += n` advances by zero, so the
-            // loop below would never terminate.
+            // An empty or whitespace-only phrase is not a plain word, so it
+            // lands here and tokenizes to nothing. A zero-width window would
+            // advance `i` by zero and the loop below would never terminate.
             if n == 0 {
                 continue;
             }
             let mut i = 0;
             while i + n <= text_words.len() {
-                let window_match = text_words[i..i + n]
-                    .iter()
-                    .zip(&phrase_words)
-                    .all(|(tw, pw)| eq_ci(strip_trailing_punct(tw), pw));
-                if window_match {
-                    let matched: String = text_words[i..i + n].join(" ");
-                    // Multi-word phrase matches are word-boundary-exact, never fuzzy.
+                let window = &text_words[i..i + n];
+                if let Some((prefix, suffix)) =
+                    corrector::phrase_window_matches(window, &phrase_words)
+                {
+                    // Without the surrounding punctuation, so the corrector
+                    // can place the phrase again wherever it sits.
+                    let joined = window.join(" ");
+                    let matched = joined[prefix..joined.len() - suffix].to_owned();
+                    // Phrase matches are word-boundary-exact, never fuzzy.
                     replacements.push(DictMatch {
                         matched,
                         replacement: entry.replacement.clone(),
@@ -78,16 +81,14 @@ impl UserDictionary {
         // uses, so the user dictionary and the bundled vocab agree on what
         // counts as a word.
         for word in text.split_whitespace() {
-            let (_, spans) = crate::corrector::split_internal_punctuation(word);
+            let (_, spans) = corrector::split_internal_punctuation(word);
             for (span, _) in &spans {
                 if span.is_empty() {
                     continue;
                 }
-                if let Some(entry) = single.iter().find(|e| lev_le1_ci(span, &e.phrase)) {
-                    // Exact (case-insensitive) match is trusted; an off-by-one
-                    // match is fuzzy and will be gated on low confidence by
-                    // the corrector.
-                    let fuzzy = !eq_ci(span, entry.phrase.as_str());
+                // Exact (case-insensitive) match is trusted; an off-by-one
+                // match is fuzzy and will be gated by the corrector.
+                if let Some((entry, fuzzy)) = match_single_word(&single, span) {
                     replacements.push(DictMatch {
                         matched: (*span).to_owned(),
                         replacement: entry.replacement.clone(),
@@ -102,15 +103,17 @@ impl UserDictionary {
 
     /// Return up to `limit` entries most relevant to `text` for LLM injection.
     ///
-    /// Relevance: entries whose phrase matches (exact or fuzzy Levenshtein ≤ 1)
-    /// a word in `text`. Sorted by priority DESC; truncated to `limit`.
+    /// Relevance: entries [`Self::scan`] could match — a phrase on whole
+    /// words, a plain single word exactly or as a near-match. Sorted by
+    /// priority DESC; truncated to `limit`.
     pub fn top_relevant<'a>(&'a self, text: &str, limit: usize) -> Vec<&'a DictionaryEntry> {
         // Pre-split once into spans (not just whitespace tokens), same
         // tokenization as `scan`, so a glued-without-whitespace word is still
-        // considered. Keep original case; lev_le1_ci handles CI below.
+        // considered.
+        let text_words: Vec<&str> = text.split_whitespace().collect();
         let spans: Vec<&str> = text
             .split_whitespace()
-            .flat_map(|w| crate::corrector::split_internal_punctuation(w).1)
+            .flat_map(|w| corrector::split_internal_punctuation(w).1)
             .map(|(span, _)| span)
             .collect();
 
@@ -118,15 +121,16 @@ impl UserDictionary {
             .entries
             .iter()
             .filter(|e| {
-                // No-alloc ASCII CI substring match.
-                if contains_ascii_ci(text, &e.phrase) {
-                    return true;
+                if corrector::is_plain_word(&e.phrase) {
+                    return spans
+                        .iter()
+                        .any(|span| match_single_word(&[*e], span).is_some());
                 }
-                // Fuzzy single-word match (no to_lowercase allocation).
-                if !e.phrase.contains(char::is_whitespace) {
-                    return spans.iter().any(|w| lev_le1_ci(w, &e.phrase));
-                }
-                false
+                let phrase_words: Vec<&str> = e.phrase.split_whitespace().collect();
+                !phrase_words.is_empty()
+                    && text_words.windows(phrase_words.len()).any(|window| {
+                        corrector::phrase_window_matches(window, &phrase_words).is_some()
+                    })
             })
             .collect();
 
@@ -152,24 +156,29 @@ pub struct DictMatch {
     pub fuzzy: bool,
 }
 
-/// Strip trailing ASCII punctuation for comparison purposes.
-#[inline]
-fn strip_trailing_punct(s: &str) -> &str {
-    s.trim_end_matches(['.', ',', '!', '?', ';', ':'])
-}
+/// Shortest word, in characters, on either side of a fuzzy match. One edit is
+/// a third of a three-letter word: below this, "at" and "is" are both near
+/// matches of an "ai" entry.
+const MIN_FUZZY_CHARS: usize = 4;
 
-/// ASCII case-insensitive substring search with no heap allocation.
-#[inline]
-fn contains_ascii_ci(haystack: &str, needle: &str) -> bool {
-    let h = haystack.as_bytes();
-    let n = needle.as_bytes();
-    if n.len() > h.len() {
-        return false;
+/// The entry a single transcript word matches, and whether the match is fuzzy.
+/// An exact (case-insensitive) entry always wins over a near-match, whatever
+/// the priorities; among near-matches the first — highest-priority — wins.
+fn match_single_word<'a>(
+    entries: &[&'a DictionaryEntry],
+    span: &str,
+) -> Option<(&'a DictionaryEntry, bool)> {
+    if let Some(entry) = entries.iter().find(|e| eq_ci(span, &e.phrase)) {
+        return Some((entry, false));
     }
-    if n.is_empty() {
-        return true;
+    let long_enough = |s: &str| s.chars().count() >= MIN_FUZZY_CHARS;
+    if !long_enough(span) {
+        return None;
     }
-    h.windows(n.len()).any(|w| w.eq_ignore_ascii_case(n))
+    entries
+        .iter()
+        .find(|e| long_enough(&e.phrase) && lev_le1_ci(span, &e.phrase))
+        .map(|entry| (*entry, true))
 }
 
 /// Case-fold a word for use as a lookup key.
@@ -384,7 +393,93 @@ mod tests {
         assert!(relevant.iter().any(|e| e.phrase == "dayton"));
     }
 
+    // ── scan: match selection ─────────────────────────────────────────────
+
+    #[test]
+    fn scan_prefers_an_exact_entry_over_a_higher_priority_near_match() {
+        let mgr = UserDictionary::new(vec![entry("card", "Card9", 9), entry("cars", "CARS", 1)]);
+        let matches = mgr.scan("cars");
+        assert_eq!(
+            matches,
+            [DictMatch {
+                matched: "cars".into(),
+                replacement: "CARS".into(),
+                fuzzy: false,
+            }]
+        );
+    }
+
+    #[test]
+    fn scan_does_not_fuzzy_match_short_words() {
+        let mgr = UserDictionary::new(vec![entry("ai", "AI", 5), entry("", "boom", 5)]);
+        // "a", "at" and "is" are each one edit from "ai".
+        assert!(mgr.scan("a cat is at home").is_empty());
+        // The exact word still matches.
+        let matches = mgr.scan("the ai works");
+        assert_eq!(matches.len(), 1);
+        assert!(!matches[0].fuzzy);
+    }
+
+    /// The scan and the corrector must agree on where a phrase sits, or a
+    /// match the scan reports is never applied.
+    #[test]
+    fn multi_word_entry_applies_next_to_punctuation() {
+        let mgr = UserDictionary::new(vec![entry("new york", "New York", 5)]);
+        let gate = crate::corrector::LexicalGate::new();
+        for (text, expected) in [
+            ("i love new york.", "i love New York."),
+            ("i love \"new york\" pizza", "i love \"New York\" pizza"),
+        ] {
+            let matches = mgr.scan(text);
+            let none: &[(&str, f32, f32)] = &[];
+            let result = gate.correct(text, none, &matches, "en");
+            assert_eq!(result.corrected_text, expected);
+        }
+    }
+
+    /// A phrase that carries punctuation is matched as written, against whole
+    /// transcript words, and never against the bare word inside it.
+    #[test]
+    fn entries_with_punctuation_inside_apply() {
+        let mgr = UserDictionary::new(vec![
+            entry("node.js", "Node.js", 5),
+            entry("c++", "C++", 5),
+            entry(".net", ".NET", 5),
+            entry("dr. smith", "Dr. Smith", 5),
+        ]);
+        let gate = crate::corrector::LexicalGate::new();
+        let none: &[(&str, f32, f32)] = &[];
+        for (text, expected) in [
+            (
+                "we write node.js, c++ and .net.",
+                "we write Node.js, C++ and .NET.",
+            ),
+            ("go ask (dr. smith) first", "go ask (Dr. Smith) first"),
+            // The bare words are different words.
+            ("plan c of the net node", "plan c of the net node"),
+        ] {
+            let result = gate.correct(text, none, &mgr.scan(text), "en");
+            assert_eq!(result.corrected_text, expected);
+        }
+
+        let relevant = mgr.top_relevant("we write node.js, c++ and .net.", 10);
+        assert_eq!(relevant.len(), 3);
+        assert!(mgr.top_relevant("plan c of the net node", 10).is_empty());
+    }
+
     // ── top_relevant ──────────────────────────────────────────────────────
+
+    #[test]
+    fn top_relevant_matches_whole_words_only() {
+        let mgr = UserDictionary::new(vec![entry("ai", "AI", 5), entry("new york", "New York", 5)]);
+        // "ai" is inside "said" and "plain"; "new york" is inside "renew yorker".
+        assert!(
+            mgr.top_relevant("she said plain things to renew yorker", 10)
+                .is_empty()
+        );
+        let relevant = mgr.top_relevant("the AI moved to New York.", 10);
+        assert_eq!(relevant.len(), 2);
+    }
 
     #[test]
     fn top_relevant_finds_match() {
