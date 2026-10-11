@@ -29,7 +29,7 @@ export function PanelHeader({
     <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
       <div className="flex min-w-0 items-start gap-4">
         {Icon && (
-          <div className="flex size-10 shrink-0 items-center justify-center rounded-field bg-primary/15 text-primary">
+          <div className="flex size-10 shrink-0 items-center justify-center rounded-full bg-primary/15 text-primary ring-1 ring-primary/30">
             <Icon size={19} strokeWidth={1.75} />
           </div>
         )}

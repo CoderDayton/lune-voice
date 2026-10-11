@@ -39,7 +39,7 @@ msgid "{0} / {1}"
 msgstr "{0} / {1}"
 
 #. placeholder {0}: presets.length
-#: src/features/styles/styles-page.tsx:269
+#: src/features/styles/styles-page.tsx:274
 msgid "{0} presets"
 msgstr "Préréglages {0}"
 
@@ -228,8 +228,8 @@ msgstr "Point d'accès API"
 msgid "API key"
 msgstr "Clé API"
 
-#: src/features/settings/sections/appearance-section.tsx:37
-#: src/features/settings/settings-page.tsx:78
+#: src/features/settings/sections/appearance-section.tsx:16
+#: src/features/settings/settings-page.tsx:73
 msgid "Appearance"
 msgstr "Apparence"
 
@@ -315,13 +315,13 @@ msgstr "En bas à gauche"
 msgid "Bottom right"
 msgstr "En bas à droite"
 
-#: src/features/styles/components/style-editor-modal.tsx:184
+#: src/features/styles/components/style-editor-modal.tsx:188
 msgid "Brand casing"
-msgstr ""
+msgstr "Casse des marques"
 
-#: src/features/styles/components/style-editor-modal.tsx:177
+#: src/features/styles/components/style-editor-modal.tsx:181
 msgid "Brand casing (\"github\" → \"GitHub\")"
-msgstr "Boîtier de marque (\"github\" → \"GitHub\")"
+msgstr "Casse des marques (\"github\" → \"GitHub\")"
 
 #: src/features/styles/components/style-hero.tsx:26
 msgid "Brands"
@@ -330,10 +330,6 @@ msgstr "Marques"
 #: src/components/feedback/help-feedback-dialog.tsx:248
 msgid "Browse open issues"
 msgstr "Parcourir les tickets ouverts"
-
-#: src/components/ui/theme-picker.tsx:220
-msgid "Browse themes"
-msgstr "Parcourir les thèmes"
 
 #: src/components/feedback/help-feedback-dialog.tsx:58
 msgid "Bug report"
@@ -348,7 +344,7 @@ msgstr "Intégré"
 #: src/features/dictionary/components/dictionary-table.tsx:112
 #: src/features/settings/sections/models-section.tsx:312
 #: src/features/snippets/snippets-page.tsx:248
-#: src/features/styles/components/style-editor-modal.tsx:243
+#: src/features/styles/components/style-editor-modal.tsx:247
 msgid "Cancel"
 msgstr "Annuler"
 
@@ -363,14 +359,14 @@ msgstr "Annuler le téléchargement"
 #: src/features/settings/sections/transcription-section.tsx:126
 #: src/features/settings/sections/transcription-section.tsx:134
 msgid "Capitalize known names"
-msgstr ""
+msgstr "Mettre en majuscules les noms connus"
 
 #: src/features/styles/components/style-hero.tsx:24
 msgid "Capitals"
 msgstr "Capitales"
 
-#: src/components/ui/voice-capture-field.tsx:157
-#: src/components/ui/voice-capture-field.tsx:163
+#: src/components/ui/voice-capture-field.tsx:155
+#: src/components/ui/voice-capture-field.tsx:161
 msgid "Capture by voice"
 msgstr "Capturer à la voix"
 
@@ -382,12 +378,8 @@ msgstr "Périphérique de capture et façon dont l'enregistrement détecte votre
 msgid "Change engine"
 msgstr "Changer de moteur"
 
-#: src/features/shell/components/sidebar-quick-actions.tsx:56
-msgid "Change theme"
-msgstr "Changer de thème"
-
 #: src/features/settings/sections/general-section.tsx:159
-#: src/features/shell/components/sidebar-quick-actions.tsx:72
+#: src/features/shell/components/sidebar-quick-actions.tsx:73
 msgid "Check for updates"
 msgstr "Rechercher des mises à jour"
 
@@ -418,15 +410,11 @@ msgstr "Vérification des modèles installés…"
 msgid "Checking…"
 msgstr "Vérification…"
 
-#: src/components/ui/theme-picker.tsx:119
-msgid "Choose a theme"
-msgstr "Choisissez un thème"
-
 #: src/features/settings/sections/output-section.tsx:22
 msgid "Choose how finished text is inserted into the app you are currently using."
 msgstr "Choisissez la manière dont le texte final est inséré dans l'application que vous utilisez actuellement."
 
-#: src/features/settings/sections/appearance-section.tsx:38
+#: src/features/settings/sections/appearance-section.tsx:17
 msgid "Choose how Lune Voice looks."
 msgstr "Choisissez à quoi ressemble Lune Voice."
 
@@ -447,7 +435,7 @@ msgstr "Choisissez le moteur qui transforme votre voix en texte. Les moteurs loc
 msgid "Choose your speech engine. Everything runs offline — no cloud, no accounts."
 msgstr "Choisissez votre moteur vocal. Tout fonctionne hors ligne — pas de cloud, pas de compte."
 
-#: src/components/ui/list-card.tsx:88
+#: src/components/ui/list-card.tsx:89
 msgid "Clear {label}"
 msgstr "Effacer {label}"
 
@@ -455,20 +443,20 @@ msgstr "Effacer {label}"
 msgid "Clear selection"
 msgstr "Effacer la sélection"
 
-#: src/features/styles/components/style-editor-modal.tsx:260
+#: src/features/styles/components/style-editor-modal.tsx:264
 msgid "close"
 msgstr "fermer"
 
 #: src/components/feedback/help-feedback-dialog.tsx:281
 #: src/features/history/components/session-detail-modal.tsx:206
 #: src/features/settings/sections/models-section.tsx:324
-#: src/features/styles/components/style-editor-modal.tsx:234
-#: src/features/updates/update-dialog.tsx:298
-#: src/features/updates/update-dialog.tsx:310
+#: src/features/styles/components/style-editor-modal.tsx:238
+#: src/features/updates/update-dialog.tsx:326
+#: src/features/updates/update-dialog.tsx:338
 msgid "Close"
 msgstr "Fermer"
 
-#: src/features/shell/components/app-shell.tsx:151
+#: src/features/shell/components/app-shell.tsx:155
 msgid "Close sidebar"
 msgstr "Fermer la barre latérale"
 
@@ -489,8 +477,8 @@ msgid "Completed"
 msgstr "Complété"
 
 #: src/features/overview/overview-page.tsx:287
-#: src/features/shell/components/app-shell.tsx:167
-#: src/features/shell/components/sidebar-widgets.tsx:67
+#: src/features/shell/components/app-shell.tsx:171
+#: src/features/shell/components/sidebar-widgets.tsx:75
 msgid "Connecting"
 msgstr "De liaison"
 
@@ -573,7 +561,7 @@ msgstr "Plantage ou blocage"
 msgid "Create a snippet"
 msgstr "Créer un extrait"
 
-#: src/features/styles/styles-page.tsx:303
+#: src/features/styles/styles-page.tsx:308
 msgid "Create new style"
 msgstr "Créer un nouveau style"
 
@@ -594,8 +582,7 @@ msgstr "Volume des signaux"
 msgid "Current binding: {value}. Click to change."
 msgstr "Raccourci actuel : {value}. Cliquez pour le modifier."
 
-#: src/components/ui/theme-picker.tsx:183
-#: src/features/settings/sections/appearance-section.tsx:45
+#: src/features/settings/sections/appearance-section.tsx:24
 msgid "Dark"
 msgstr "Sombre"
 
@@ -649,15 +636,15 @@ msgstr "Supprimer cette correction ?"
 msgid "Delete?"
 msgstr "Supprimer?"
 
-#: src/features/styles/components/style-editor-modal.tsx:150
+#: src/features/styles/components/style-editor-modal.tsx:154
 msgid "Describe how text should be formatted. E.g., \"Use bullet points. Keep sentences short. Avoid jargon.\""
 msgstr "Décrivez comment le texte doit être formaté. Par exemple : « Utilisez des puces. Gardez les phrases courtes. Évitez le jargon. »"
 
-#: src/features/styles/components/style-editor-modal.tsx:118
+#: src/features/styles/components/style-editor-modal.tsx:122
 msgid "Description"
 msgstr "Description"
 
-#: src/features/styles/components/style-editor-modal.tsx:128
+#: src/features/styles/components/style-editor-modal.tsx:132
 msgid "Description is too long."
 msgstr "La description est trop longue."
 
@@ -669,11 +656,11 @@ msgstr "Détecte les terminaux et choisit le raccourci de collage adapté. Fonct
 msgid "Detects the spoken language each session."
 msgstr "Détecte la langue parlée à chaque session."
 
-#: src/features/styles/components/style-editor-modal.tsx:159
+#: src/features/styles/components/style-editor-modal.tsx:163
 msgid "Deterministic fixes applied before any AI styling."
 msgstr "Correctifs déterministes appliqués avant tout style d'IA."
 
-#: src/features/settings/settings-page.tsx:79
+#: src/features/settings/settings-page.tsx:74
 msgid "Dictation"
 msgstr "Dictée"
 
@@ -690,7 +677,7 @@ msgstr "Indicateur de dictée"
 msgid "Dictation pill visibility"
 msgstr "Visibilité de l'indicateur de dictée"
 
-#: src/components/ui/voice-capture-field.tsx:200
+#: src/components/ui/voice-capture-field.tsx:198
 msgid "Didn't catch anything — try again, a little closer to the mic."
 msgstr "Rien n'a été capté — réessayez, un peu plus près du micro."
 
@@ -775,7 +762,7 @@ msgstr "Téléchargement de la mise à jour"
 msgid "Downloading…"
 msgstr "Téléchargement…"
 
-#: src/features/styles/components/style-editor-modal.tsx:237
+#: src/features/styles/components/style-editor-modal.tsx:241
 msgid "Duplicate"
 msgstr "Double"
 
@@ -783,7 +770,7 @@ msgstr "Double"
 msgid "Duration"
 msgstr "Durée"
 
-#: src/features/styles/components/style-editor-modal.tsx:108
+#: src/features/styles/components/style-editor-modal.tsx:112
 msgid "e.g. Meeting notes"
 msgstr "par ex. Notes de réunion"
 
@@ -824,7 +811,7 @@ msgstr "Modification de « {spokenTrigger} »"
 msgid "Empty session"
 msgstr "Session vide"
 
-#: src/features/styles/styles-page.tsx:239
+#: src/features/styles/styles-page.tsx:244
 msgid "Enable styling"
 msgstr "Activer la stylisation"
 
@@ -838,11 +825,11 @@ msgstr "Moteur"
 msgid "Enter Lune Voice"
 msgstr "Entrez la voix de Lune"
 
-#: src/features/styles/components/style-editor-modal.tsx:221
+#: src/features/styles/components/style-editor-modal.tsx:225
 msgid "Examples are out of date since you edited the prompt."
 msgstr "Les exemples sont obsolètes depuis que vous avez modifié l'invite."
 
-#: src/features/styles/components/style-editor-modal.tsx:198
+#: src/features/styles/components/style-editor-modal.tsx:202
 msgid "Examples teach the styling engine your style. Regenerate them after editing the prompt."
 msgstr "Les exemples apprennent votre style au moteur de stylisation. Régénérez-les après avoir modifié l'invite."
 
@@ -870,7 +857,7 @@ msgstr "Téléchargement de Lune Voice {version}. Laissez l'application ouverte 
 msgid "Fetching the NVIDIA runtime. This is the last step, and it only happens once."
 msgstr "Récupération de l'environnement d'exécution NVIDIA. C'est la dernière étape, et elle n'a lieu qu'une fois."
 
-#: src/features/styles/components/style-editor-modal.tsx:195
+#: src/features/styles/components/style-editor-modal.tsx:199
 msgid "Few-shot examples"
 msgstr "Exemples few-shot"
 
@@ -894,9 +881,9 @@ msgstr "Filtrer les extraits…"
 msgid "Fix recognizer errors with your dictionary and known vocabulary, on your device. It uses per-word confidence and statistical patterns — no AI model, and it never rewrites what you said."
 msgstr "Corrigez les erreurs de reconnaissance avec votre dictionnaire et votre vocabulaire connu, sur votre appareil. Il utilise la confiance par mot et des modèles statistiques — aucun modèle d'IA, et il ne réécrit jamais ce que vous avez dit."
 
-#: src/features/styles/components/style-editor-modal.tsx:186
+#: src/features/styles/components/style-editor-modal.tsx:190
 msgid "Follow Settings"
-msgstr ""
+msgstr "Suivre les réglages"
 
 #: src/features/settings/data/settings-data.ts:271
 msgid "Force the standard paste shortcut for every app."
@@ -910,7 +897,7 @@ msgstr "Impose le raccourci de collage des terminaux. Utile sous COSMIC si vous 
 msgid "Forget where you dragged the pill and return it to its preset spot."
 msgstr "Oublier la position où vous avez fait glisser l'indicateur et le ramener à son emplacement prédéfini."
 
-#: src/features/styles/components/style-editor-modal.tsx:157
+#: src/features/styles/components/style-editor-modal.tsx:161
 #: src/features/styles/components/style-hero.tsx:59
 msgid "Formatting"
 msgstr "Formatage"
@@ -929,7 +916,7 @@ msgid "Gap between the pill and the screen edge, so it clears a taskbar or dock.
 msgstr "Espace entre l'indicateur et le bord de l'écran, pour éviter une barre des tâches ou un dock."
 
 #: src/features/settings/sections/general-section.tsx:62
-#: src/features/settings/settings-page.tsx:77
+#: src/features/settings/settings-page.tsx:72
 msgid "General"
 msgstr "Général"
 
@@ -937,8 +924,8 @@ msgstr "Général"
 msgid "General feedback"
 msgstr "Retour général"
 
-#: src/features/styles/components/style-editor-modal.tsx:216
-#: src/features/styles/components/style-editor-modal.tsx:252
+#: src/features/styles/components/style-editor-modal.tsx:220
+#: src/features/styles/components/style-editor-modal.tsx:256
 msgid "Generating examples…"
 msgstr "Générer des exemples…"
 
@@ -977,7 +964,7 @@ msgid "GPU support is installed but not working."
 msgstr "La prise en charge GPU est installée mais ne fonctionne pas."
 
 #: src/components/feedback/help-feedback-dialog.tsx:240
-#: src/features/shell/components/sidebar-quick-actions.tsx:82
+#: src/features/shell/components/sidebar-quick-actions.tsx:83
 msgid "Help & feedback"
 msgstr "Aide et retours"
 
@@ -1057,7 +1044,7 @@ msgstr "Insérer au curseur"
 msgid "Insert placeholder"
 msgstr "Insérer un espace réservé"
 
-#: src/features/updates/update-dialog.tsx:265
+#: src/features/updates/update-dialog.tsx:293
 msgid "Install and restart"
 msgstr "Installer et redémarrer"
 
@@ -1081,7 +1068,7 @@ msgstr "L'installation remplace l'application et la redémarre. Vos paramètres,
 msgid "Installing update"
 msgstr "Installation de la mise à jour"
 
-#: src/features/styles/components/style-editor-modal.tsx:133
+#: src/features/styles/components/style-editor-modal.tsx:137
 msgid "Instructions"
 msgstr "Instructions"
 
@@ -1114,7 +1101,7 @@ msgstr "Gardez l'indicateur avec vous lorsque vous changez d'espace de travail o
 msgid "Keyboard access"
 msgstr "Accès au clavier"
 
-#: src/features/shell/components/sidebar-quick-actions.tsx:63
+#: src/features/shell/components/sidebar-quick-actions.tsx:64
 msgid "Keyboard shortcuts"
 msgstr "Raccourcis clavier"
 
@@ -1135,8 +1122,8 @@ msgstr "Grand"
 msgid "Large v3 Turbo"
 msgstr "Large v3 Turbo"
 
-#: src/features/updates/update-dialog.tsx:261
-#: src/features/updates/update-dialog.tsx:275
+#: src/features/updates/update-dialog.tsx:289
+#: src/features/updates/update-dialog.tsx:303
 msgid "Later"
 msgstr "Plus tard"
 
@@ -1157,25 +1144,24 @@ msgstr "Permet à la transcription et à la stylisation d'utiliser un point de t
 msgid "License"
 msgstr "Licence"
 
-#: src/components/ui/theme-picker.tsx:168
-#: src/features/settings/sections/appearance-section.tsx:46
+#: src/features/settings/sections/appearance-section.tsx:25
 msgid "Light"
 msgstr "Clair"
 
-#: src/features/shell/components/app-shell.tsx:171
+#: src/features/shell/components/app-shell.tsx:175
 msgid "Listening"
 msgstr "Écoute"
 
-#: src/components/ui/voice-capture-field.tsx:196
+#: src/components/ui/voice-capture-field.tsx:194
 msgid "Listening — say the phrase, then click again to stop."
 msgstr "Écoute — prononcez la phrase, puis cliquez à nouveau pour arrêter."
 
-#: src/components/ui/voice-capture-field.tsx:138
+#: src/components/ui/voice-capture-field.tsx:136
 msgid "Listening — say the phrase…"
 msgstr "Écoute — prononcez la phrase…"
 
 #: src/features/overview/overview-page.tsx:159
-#: src/features/shell/components/sidebar-widgets.tsx:74
+#: src/features/shell/components/sidebar-widgets.tsx:82
 msgid "Listening…"
 msgstr "Écoute…"
 
@@ -1187,10 +1173,6 @@ msgstr "Verrouiller la position"
 #: src/features/welcome/components/ready-checks.tsx:95
 msgid "Looking for input devices…"
 msgstr "Recherche de périphériques d'entrée…"
-
-#: src/components/ui/theme-picker.tsx:132
-msgid "Lune"
-msgstr "Lune"
 
 #: src/features/updates/update-dialog.tsx:136
 msgid "Lune Voice {currentVersion} is the latest version."
@@ -1252,7 +1234,7 @@ msgstr "Niveau d'entrée du microphone"
 msgid "min"
 msgstr "min"
 
-#: src/features/settings/sections/appearance-section.tsx:41
+#: src/features/settings/sections/appearance-section.tsx:20
 msgid "Mode"
 msgstr "Mode"
 
@@ -1261,7 +1243,7 @@ msgid "Model size"
 msgstr "Taille du modèle"
 
 #: src/features/settings/sections/models-section.tsx:99
-#: src/features/settings/settings-page.tsx:84
+#: src/features/settings/settings-page.tsx:79
 msgid "Models"
 msgstr "Modèles"
 
@@ -1273,10 +1255,10 @@ msgstr "Les modèles sont stockés localement. Pas de télémétrie, pas de comp
 msgid "Monitor"
 msgstr "Écran"
 
-#: src/features/shell/components/sidebar-quick-actions.tsx:108
 #: src/features/shell/components/sidebar-quick-actions.tsx:109
-#: src/features/shell/components/sidebar-quick-actions.tsx:117
-#: src/features/shell/components/sidebar-quick-actions.tsx:129
+#: src/features/shell/components/sidebar-quick-actions.tsx:110
+#: src/features/shell/components/sidebar-quick-actions.tsx:120
+#: src/features/shell/components/sidebar-quick-actions.tsx:132
 msgid "More"
 msgstr "Plus"
 
@@ -1284,11 +1266,11 @@ msgstr "Plus"
 msgid "Multilingual · runs on-device"
 msgstr "Multilingue · s'exécute sur l'appareil"
 
-#: src/features/styles/components/style-editor-modal.tsx:104
+#: src/features/styles/components/style-editor-modal.tsx:107
 msgid "Name"
 msgstr "Nom"
 
-#: src/features/styles/components/style-editor-modal.tsx:114
+#: src/features/styles/components/style-editor-modal.tsx:118
 msgid "Name is too long."
 msgstr "Le nom est trop long."
 
@@ -1387,7 +1369,7 @@ msgid "Nothing installed"
 msgstr "Rien d'installé"
 
 #: src/features/settings/data/settings-data.ts:154
-#: src/features/styles/components/style-editor-modal.tsx:188
+#: src/features/styles/components/style-editor-modal.tsx:192
 msgid "Off"
 msgstr "Désactivé"
 
@@ -1396,23 +1378,23 @@ msgid "Off delivers raw transcripts. Which style is applied is chosen on the Sty
 msgstr "« Désactivé » fournit les transcriptions brutes. Le style appliqué se choisit dans l'onglet Styles."
 
 #: src/features/overview/overview-page.tsx:159
-#: src/features/shell/components/app-shell.tsx:174
+#: src/features/shell/components/app-shell.tsx:178
 msgid "Offline"
 msgstr "Hors ligne"
 
-#: src/features/styles/components/style-editor-modal.tsx:187
+#: src/features/styles/components/style-editor-modal.tsx:191
 msgid "On"
-msgstr ""
+msgstr "Activé"
 
-#: src/features/styles/components/style-editor-modal.tsx:122
+#: src/features/styles/components/style-editor-modal.tsx:126
 msgid "One-line summary shown on the card"
 msgstr "Résumé d'une ligne affiché sur la carte"
 
-#: src/features/shell/components/app-shell.tsx:111
+#: src/features/shell/components/app-shell.tsx:114
 msgid "Open menu"
 msgstr "Ouvrir le menu"
 
-#: src/features/updates/update-dialog.tsx:285
+#: src/features/updates/update-dialog.tsx:313
 msgid "Open releases page"
 msgstr "Ouvrir la page des versions"
 
@@ -1441,7 +1423,7 @@ msgstr "ou envoyer directement"
 msgid "Orientation"
 msgstr "Orientation"
 
-#: src/features/settings/settings-page.tsx:83
+#: src/features/settings/settings-page.tsx:78
 msgid "Output"
 msgstr "Sortir"
 
@@ -1483,7 +1465,7 @@ msgstr "Performances ou rapidité"
 msgid "Phrase"
 msgstr "Expression"
 
-#: src/features/settings/settings-page.tsx:80
+#: src/features/settings/settings-page.tsx:75
 msgid "Pill"
 msgstr "Indicateur"
 
@@ -1575,11 +1557,11 @@ msgstr "Priorité"
 
 #: src/features/dictation/dictation-pill.tsx:63
 #: src/features/dictation/dictation-pill.tsx:69
-#: src/features/shell/components/app-shell.tsx:169
+#: src/features/shell/components/app-shell.tsx:173
 msgid "Processing"
 msgstr "Traitement"
 
-#: src/features/shell/components/sidebar-widgets.tsx:74
+#: src/features/shell/components/sidebar-widgets.tsx:82
 msgid "Processing…"
 msgstr "Traitement…"
 
@@ -1587,12 +1569,12 @@ msgstr "Traitement…"
 msgid "Question or help"
 msgstr "Question ou aide"
 
-#: src/features/shell/components/sidebar-quick-actions.tsx:88
+#: src/features/shell/components/sidebar-quick-actions.tsx:89
 msgid "Quit Lune Voice"
 msgstr "Quitter Lune Voice"
 
 #: src/features/overview/overview-page.tsx:287
-#: src/features/shell/components/app-shell.tsx:173
+#: src/features/shell/components/app-shell.tsx:177
 msgid "Ready"
 msgstr "Prêt"
 
@@ -1605,7 +1587,7 @@ msgstr "Sessions récentes"
 msgid "Recording mode"
 msgstr "Mode d'enregistrement"
 
-#: src/features/styles/components/style-editor-modal.tsx:216
+#: src/features/styles/components/style-editor-modal.tsx:220
 msgid "Refresh few-shot examples"
 msgstr "Actualiser les exemples few-shot"
 
@@ -1673,7 +1655,7 @@ msgstr "Réessayer"
 msgid "Retry download"
 msgstr "Réessayez le téléchargement"
 
-#: src/features/styles/styles-page.tsx:241
+#: src/features/styles/styles-page.tsx:246
 msgid "Rewrite each transcript in a chosen style. When off, the raw transcript is delivered as-is."
 msgstr "Réécrivez chaque transcription dans un style choisi. Lorsque cette option est désactivée, la transcription brute est fournie telle quelle."
 
@@ -1690,7 +1672,7 @@ msgid "Runs whisper.cpp on-device. Choose a model size below."
 msgstr "Exécute whisper.cpp sur l'appareil. Choisissez une taille de modèle ci-dessous."
 
 #: src/features/dictionary/components/dictionary-table.tsx:121
-#: src/features/styles/components/style-editor-modal.tsx:252
+#: src/features/styles/components/style-editor-modal.tsx:256
 msgid "Save"
 msgstr "Sauvegarder"
 
@@ -1784,7 +1766,7 @@ msgstr "Session expirée — le backend ne répond peut-être pas"
 msgid "sessions"
 msgstr "séances"
 
-#: src/features/shell/components/sidebar-widgets.tsx:90
+#: src/features/shell/components/sidebar-widgets.tsx:98
 msgid "Set hotkey"
 msgstr "Définir le raccourci clavier"
 
@@ -1800,7 +1782,7 @@ msgstr "Configurer l'accélération GPU"
 msgid "Setting up your GPU"
 msgstr "Configuration de votre GPU"
 
-#: src/features/settings/settings-page.tsx:104
+#: src/features/settings/settings-page.tsx:99
 msgid "Settings sections"
 msgstr "Sections de paramètres"
 
@@ -1897,7 +1879,7 @@ msgstr "Standard"
 
 #: src/features/shell/components/sidebar-widgets.tsx:50
 #: src/features/shell/components/sidebar-widgets.tsx:51
-#: src/features/shell/components/sidebar-widgets.tsx:67
+#: src/features/shell/components/sidebar-widgets.tsx:75
 msgid "Start dictating"
 msgstr "Commencez à dicter"
 
@@ -1922,14 +1904,14 @@ msgstr "Démarrez, arrêtez et annulez la dictée sans quitter votre travail."
 msgid "Stop and transcribe"
 msgstr "Arrêter et transcrire"
 
-#: src/components/ui/voice-capture-field.tsx:157
-#: src/components/ui/voice-capture-field.tsx:162
+#: src/components/ui/voice-capture-field.tsx:155
+#: src/components/ui/voice-capture-field.tsx:160
 msgid "Stop capturing"
 msgstr "Arrêter la capture"
 
 #: src/features/shell/components/sidebar-widgets.tsx:50
 #: src/features/shell/components/sidebar-widgets.tsx:51
-#: src/features/shell/components/sidebar-widgets.tsx:67
+#: src/features/shell/components/sidebar-widgets.tsx:75
 msgid "Stop dictating"
 msgstr "Arrêtez de dicter"
 
@@ -1946,7 +1928,7 @@ msgstr "Stocké sur cet appareil"
 msgid "Style"
 msgstr "Style"
 
-#: src/features/settings/settings-page.tsx:82
+#: src/features/settings/settings-page.tsx:77
 msgid "Styling"
 msgstr "Stylisation"
 
@@ -1958,14 +1940,19 @@ msgstr "Moteur de stylisation"
 msgid "Styling is turned off. Enable a styling engine in Settings before generating examples."
 msgstr "Le style est désactivé. Activez un moteur de style dans les Réglages avant de générer des exemples."
 
-#: src/features/styles/styles-page.tsx:268
+#: src/features/styles/styles-page.tsx:273
 msgid "Switch style"
 msgstr "Changer de style"
 
-#: src/components/ui/theme-picker.tsx:153
-#: src/features/settings/sections/appearance-section.tsx:25
-#: src/features/settings/sections/appearance-section.tsx:47
-#: src/features/shell/components/sidebar-quick-actions.tsx:48
+#: src/features/shell/components/sidebar-quick-actions.tsx:58
+msgid "Switch to dark theme"
+msgstr "Passer au thème sombre"
+
+#: src/features/shell/components/sidebar-quick-actions.tsx:58
+msgid "Switch to light theme"
+msgstr "Passer au thème clair"
+
+#: src/features/settings/sections/appearance-section.tsx:26
 msgid "System"
 msgstr "Système"
 
@@ -1997,7 +1984,7 @@ msgstr "Le moteur local ne répond pas. Les chiffres ci-dessous sont les derniè
 msgid "The main shortcut used for voice typing. Click the binding to change it."
 msgstr "Le raccourci principal utilisé pour la saisie vocale. Cliquez sur la liaison pour la modifier."
 
-#: src/components/ui/voice-capture-field.tsx:160
+#: src/components/ui/voice-capture-field.tsx:158
 msgid "The microphone is in use"
 msgstr "Le microphone est en cours d'utilisation"
 
@@ -2008,10 +1995,6 @@ msgstr "Le modèle reste en mémoire. Chaque dictée démarre instantanément."
 #: src/features/settings/sections/transcription-section.tsx:141
 msgid "The words the recognizer is least sure about are checked against your dictionary and vocabulary. Higher checks more words; lower trusts the raw transcription."
 msgstr "Les mots dont le système de reconnaissance est le moins sûr sont vérifiés par rapport à votre dictionnaire et votre vocabulaire. Plus la valeur est élevée, plus de mots sont vérifiés ; plus elle est basse, plus la transcription brute est privilégiée."
-
-#: src/features/settings/sections/appearance-section.tsx:70
-msgid "Theme"
-msgstr "Thème"
 
 #: src/features/updates/update-dialog.tsx:160
 msgid "This copy can't update itself. Download the new version from {RELEASES_URL} and replace this one. Your settings, history and models are kept."
@@ -2025,7 +2008,7 @@ msgstr "Ce modèle est utilisé par votre configuration actuelle. La dictée pou
 msgid "This only happens once. You can keep using your computer in the meantime."
 msgstr "Cela n'arrive qu'une seule fois. En attendant, vous pouvez continuer à utiliser votre ordinateur."
 
-#: src/features/updates/update-dialog.tsx:254
+#: src/features/updates/update-dialog.tsx:282
 msgid "This only takes a moment."
 msgstr "Cela ne prend qu'un instant."
 
@@ -2087,11 +2070,11 @@ msgstr "En haut à droite"
 msgid "Total words"
 msgstr "Nombre total de mots"
 
-#: src/components/ui/voice-capture-field.tsx:198
+#: src/components/ui/voice-capture-field.tsx:196
 msgid "Transcribing what you said…"
 msgstr "Transcription de ce que vous avez dit…"
 
-#: src/components/ui/voice-capture-field.tsx:140
+#: src/components/ui/voice-capture-field.tsx:138
 msgid "Transcribing…"
 msgstr "Transcription…"
 
@@ -2101,7 +2084,7 @@ msgid "Transcript"
 msgstr "Transcription"
 
 #: src/features/settings/sections/transcription-section.tsx:44
-#: src/features/settings/settings-page.tsx:81
+#: src/features/settings/settings-page.tsx:76
 msgid "Transcription"
 msgstr "Transcription"
 
@@ -2135,7 +2118,7 @@ msgid "Trigger phrase"
 msgstr "Phrase de déclenchement"
 
 #: src/components/feedback/error-boundary.tsx:44
-#: src/features/updates/update-dialog.tsx:302
+#: src/features/updates/update-dialog.tsx:330
 msgid "Try again"
 msgstr "Réessayer"
 
@@ -2249,7 +2232,7 @@ msgstr "Que s'est-il passé, ou qu'aimeriez-vous voir ?"
 msgid "What is this about?"
 msgstr "De quoi s'agit-il ?"
 
-#: src/features/updates/update-dialog.tsx:235
+#: src/features/updates/update-dialog.tsx:263
 msgid "What's new"
 msgstr "Nouveautés"
 
@@ -2314,7 +2297,7 @@ msgstr "WPM"
 
 #: src/features/settings/sections/transcription-section.tsx:127
 msgid "Write names like GitHub and iPhone the way their owners do. Turn this off to keep the recognizer's own capitals. A style can override this."
-msgstr ""
+msgstr "Écrit les noms comme GitHub et iPhone comme le font leurs propriétaires. Désactivez cette option pour conserver les majuscules du moteur de reconnaissance. Un style peut la remplacer."
 
 #: src/features/styles/components/style-preset-card.tsx:86
 msgid "Yes"
@@ -2360,7 +2343,7 @@ msgstr "votre raccourci clavier"
 msgid "Your models are ready. Everything stays on this machine."
 msgstr "Vos modèles sont prêts. Tout reste sur cette machine."
 
-#: src/features/styles/styles-page.tsx:305
+#: src/features/styles/styles-page.tsx:310
 msgid "Your own formatting preset"
 msgstr "Votre propre préréglage de formatage"
 

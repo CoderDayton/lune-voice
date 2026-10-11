@@ -65,7 +65,7 @@ export function PriorityPicker({
             key={level.value}
             type="button"
             aria-pressed={active}
-            className={`h-full grow rounded-selector px-3 text-xs font-medium transition-colors sm:grow-0 ${
+            className={`h-full grow rounded-md px-3.5 text-xs font-medium transition-colors sm:grow-0 ${
               active
                 ? 'bg-primary/20 text-primary'
                 : 'text-content-subtle hover:bg-surface-hover hover:text-content'

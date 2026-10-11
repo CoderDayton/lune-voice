@@ -8,6 +8,7 @@ import {
   CircleQuestionMark,
   Ellipsis,
   Keyboard,
+  Moon,
   Power,
   RefreshCw,
   Sun,
@@ -15,9 +16,9 @@ import {
 import { useRef, useState } from 'react';
 import { HelpFeedbackDialog } from '../../../components/feedback/help-feedback-dialog';
 import { ActionMenu, type ActionMenuItem } from '../../../components/ui/action-menu';
-import { ThemePickerDialog } from '../../../components/ui/theme-picker';
+import { NavBead } from '../../../components/ui/nav-item';
 import { backendClient } from '../../../lib/backend/client';
-import { getThemePreference, themeLabel } from '../../../lib/theme';
+import { setThemeMode, toggledThemeMode, useThemeMode } from '../../../lib/theme';
 import { workspaceActions } from '../../../store/workspace-store';
 import { isSidebarExpanded } from '../config/drawer';
 import { quickActionShortcuts } from '../config/navigation';
@@ -35,28 +36,28 @@ export function SidebarQuickActions() {
 
   const [open, setOpen] = useState(false);
   const [placement, setPlacement] = useState<'top' | 'right'>('top');
-  const [themeName, setThemeName] = useState('');
-  const [themeOpen, setThemeOpen] = useState(false);
+  const themeMode = useThemeMode();
   const [helpOpen, setHelpOpen] = useState(false);
 
-  // Both are read at open time rather than tracked continuously: neither the
-  // collapsed state nor the theme can change while the menu is up.
+  // Read at open time rather than tracked: the collapsed state cannot change
+  // while the menu is up.
   function toggleMenu() {
-    if (!open) {
-      setPlacement(isSidebarExpanded() ? 'top' : 'right');
-      const pref = getThemePreference();
-      setThemeName(pref === 'system' ? t`System` : themeLabel(pref));
-    }
+    if (!open) setPlacement(isSidebarExpanded() ? 'top' : 'right');
     setOpen((prev) => !prev);
   }
+
+  // One click always changes the look; "System" is chosen in Settings.
+  const targetMode = toggledThemeMode(
+    themeMode,
+    window.matchMedia('(prefers-color-scheme: light)').matches,
+  );
 
   const items: ActionMenuItem[] = [
     {
       id: 'theme',
-      label: t`Change theme`,
-      icon: Sun,
-      trailing: themeName,
-      onSelect: () => setThemeOpen(true),
+      label: targetMode === 'light' ? t`Switch to light theme` : t`Switch to dark theme`,
+      icon: targetMode === 'light' ? Sun : Moon,
+      onSelect: () => setThemeMode(targetMode),
     },
     {
       id: 'shortcuts',
@@ -107,13 +108,15 @@ export function SidebarQuickActions() {
         aria-expanded={open}
         title={t`More`}
         aria-label={t`More`}
-        className="group flex h-10 w-full cursor-pointer items-center gap-3 rounded-field px-3 text-left text-sm text-content-muted transition-colors hover:bg-surface-hover hover:text-content focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-primary is-drawer-close:justify-center is-drawer-close:px-0"
+        className="group flex h-12 w-full cursor-pointer items-center gap-3 rounded-full pr-4 pl-2 text-left text-sm text-content-muted transition-colors hover:bg-surface-hover hover:text-content focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-primary is-drawer-close:justify-center is-drawer-close:px-0"
       >
-        <Ellipsis
-          size={18}
-          strokeWidth={1.8}
-          className="shrink-0 text-content-subtle transition-colors group-hover:text-content-muted"
-        />
+        <NavBead active={false}>
+          <Ellipsis
+            size={17}
+            strokeWidth={1.8}
+            className="text-content-subtle transition-colors group-hover:text-content-muted"
+          />
+        </NavBead>
         <span className="min-w-0 flex-1 truncate is-drawer-close:hidden">{t`More`}</span>
         {/* Stays pointing up in both states: it marks which way the menu
             opens, rather than flipping to mean "close". */}
@@ -133,7 +136,6 @@ export function SidebarQuickActions() {
         placement={placement}
       />
 
-      <ThemePickerDialog open={themeOpen} onClose={() => setThemeOpen(false)} />
       <HelpFeedbackDialog open={helpOpen} onClose={() => setHelpOpen(false)} />
     </>
   );

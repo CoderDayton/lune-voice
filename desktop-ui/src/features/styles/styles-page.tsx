@@ -95,7 +95,12 @@ export function StylesPage() {
       formatting: preset?.formatting ?? DEFAULT_FORMATTING,
       fewShotDirty: preset?.fewShotDirty ?? false,
     });
-    requestAnimationFrame(() => dialogRef.current?.showModal());
+    requestAnimationFrame(() => {
+      dialogRef.current?.showModal();
+      if (mode !== 'view') {
+        dialogRef.current?.querySelector<HTMLElement>('[data-autofocus]')?.focus();
+      }
+    });
     // Resolve styling-engine readiness in the background so the editor can gate
     // example generation (disable refresh + explain what to set up).
     if (mode !== 'view') {

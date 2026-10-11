@@ -103,11 +103,11 @@
   --surface-panel: oklch(1 0 0);
   --surface-field: oklch(0.97 0 0);
   --surface-wash: oklch(0 0 0 / 0.06);
-  --surface-nav-active: oklch(0 0 0 / 0.08);
+  --surface-nav-active: oklch(0 0 0 / 0.05);
   --surface-hover: oklch(0 0 0 / 0.05);
   --surface-border: oklch(0 0 0 / 0.10);
   --surface-border-strong: oklch(0 0 0 / 0.20);
-  --surface-inset: oklch(0.94 0 0);
+  --surface-inset: oklch(0.97 0 0);
   --surface-recessed: oklch(0.965 0 0);
   --ring-focus: oklch(0.50 0.18 295 / 0.40);
   --surface-success-tint: oklch(0.55 0.16 165 / 0.10);

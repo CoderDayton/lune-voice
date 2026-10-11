@@ -200,7 +200,7 @@ export function DescriptiveDropdown<Value extends string>({
     <div ref={containerRef} className={`relative inline-block ${className}`}>
       <button
         type="button"
-        className={`btn justify-between gap-3 w-full sm:w-72 normal-case font-normal border border-surface-border bg-surface-elevated hover:bg-surface-hover ${buttonClassName}`}
+        className={`field-trigger w-full sm:w-72 ${buttonClassName}`}
         aria-haspopup="listbox"
         aria-expanded={open}
         aria-controls={listboxId}
@@ -209,7 +209,7 @@ export function DescriptiveDropdown<Value extends string>({
       >
         <span className="flex min-w-0 items-center gap-2.5 text-left">
           {TriggerIcon && (
-            <span className="flex size-8 shrink-0 items-center justify-center rounded-selector bg-primary/15 text-primary">
+            <span className="field-chip flex size-8 shrink-0 items-center justify-center rounded-md bg-primary/15 text-primary">
               <TriggerIcon size={16} strokeWidth={1.8} />
             </span>
           )}

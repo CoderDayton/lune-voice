@@ -99,11 +99,15 @@ export function StyleEditorModal({
         <h3 className="mb-4 shrink-0 font-semibold text-lg">
           {isViewOnly ? t`View style` : isEdit ? t`Edit style` : t`Create style`}
         </h3>
-        <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto pr-1">
+        <div
+          tabIndex={-1}
+          className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto pr-1 focus:outline-none"
+        >
           <label className="flex flex-col gap-1.5">
             <span className="text-sm font-medium text-content-default">{t`Name`}</span>
             <input
               type="text"
+              data-autofocus
               className="input w-full"
               placeholder={t`e.g. Meeting notes`}
               value={name}

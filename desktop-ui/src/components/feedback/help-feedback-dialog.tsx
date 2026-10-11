@@ -74,7 +74,7 @@ function FeedbackComposer({
           id={selectId}
           value={category}
           onChange={(e) => onCategoryChange(e.target.value as Category)}
-          className="select select-bordered w-full bg-surface-elevated"
+          className="select w-full"
         >
           {CATEGORIES.map((id) => (
             <option key={id} value={id}>
@@ -91,7 +91,7 @@ function FeedbackComposer({
         rows={5}
         aria-label={t`Your feedback`}
         placeholder={t`What happened, or what would you like to see?`}
-        className="textarea textarea-bordered mt-3 w-full resize-none bg-surface-elevated"
+        className="textarea mt-3 w-full resize-none"
       />
 
       <div className="mt-1 flex items-center justify-between text-xs text-content-subtle">

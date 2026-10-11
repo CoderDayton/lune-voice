@@ -1,0 +1,81 @@
+/* SPDX-License-Identifier: GPL-3.0-or-later */
+
+/* ── Fields ────────────────────────────────────────────────────────────
+   Every text-entry control shares one shape: 2.5rem tall (2rem for `-sm`),
+   one corner radius, on the field surface, with the standard hairline that
+   firms up on hover.
+   Unlayered on purpose: DaisyUI's own rules sit in a layer and would
+   otherwise win. Only properties no component overrides are set here —
+   padding-right stays free for the controls that sit inside a field.
+   Focus rings live in base.css, which owns the focus model. */
+
+.input,
+.select,
+.textarea,
+.field-trigger {
+  appearance: none;
+  background-color: var(--surface-field);
+  border: 1px solid var(--surface-border);
+  color: var(--content-default);
+  transition:
+    border-color var(--duration-fast) var(--ease-standard),
+    box-shadow var(--duration-fast) var(--ease-standard);
+}
+
+.input:hover,
+.select:hover,
+.textarea:hover,
+.field-trigger:hover {
+  border-color: var(--surface-border-strong);
+}
+
+.input,
+.select,
+.field-trigger {
+  height: 2.5rem;
+  border-radius: var(--radius-field);
+  padding-left: 1rem;
+  font-size: 0.875rem;
+}
+
+.input-sm,
+.select-sm {
+  height: 2rem;
+  padding-left: 0.75rem;
+  font-size: 0.8125rem;
+}
+
+/* Search fields bring their own clear button. */
+.input input[type="search"]::-webkit-search-cancel-button {
+  display: none;
+}
+
+.textarea {
+  border-radius: var(--radius-field);
+  padding: 0.625rem 1rem;
+}
+
+/* The trigger of a `DescriptiveDropdown`: a field that opens a list. */
+.field-trigger {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding-right: 0.75rem;
+  text-align: left;
+  cursor: pointer;
+}
+
+/* A leading icon chip sits close to the edge instead of the usual inset. */
+.field-trigger:has(> :first-child > :first-child.field-chip) {
+  padding-left: 0.25rem;
+}
+
+.input:has(input:disabled),
+.input:disabled,
+.select:disabled,
+.textarea:disabled,
+.field-trigger:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}

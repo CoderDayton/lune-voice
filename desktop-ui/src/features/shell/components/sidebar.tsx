@@ -7,7 +7,7 @@ import { PanelLeftClose, PanelLeftOpen } from 'lucide-react';
 import luneLogo from '../../../assets/lune-voice-logo.png';
 import {
   NAV_ITEM_BASE,
-  NavActiveBar,
+  NavBead,
   navIconClass,
   navItemState,
 } from '../../../components/ui/nav-item';
@@ -58,7 +58,7 @@ export function SidebarContent() {
         </span>
         <label
           htmlFor={DRAWER_ID}
-          className="cursor-pointer rounded-field p-2 text-content-subtle transition-colors hover:bg-surface-hover hover:text-content is-drawer-close:hidden"
+          className="cursor-pointer rounded-full p-2 text-content-subtle transition-colors hover:bg-surface-hover hover:text-content is-drawer-close:hidden"
           aria-label={t`Collapse sidebar`}
         >
           <PanelLeftClose size={20} strokeWidth={1.8} />
@@ -114,14 +114,11 @@ function NavRow({ item, pathname }: { item: NavigationItem; pathname: string }) 
           aria-current={active ? 'page' : undefined}
           // The label is hidden when collapsed; this keeps the link named.
           aria-label={label}
-          className={`${NAV_ITEM_BASE} mx-3 h-11 px-3 ${navItemState(active)} is-drawer-close:justify-center is-drawer-close:gap-0 is-drawer-close:px-0`}
+          className={`${NAV_ITEM_BASE} mx-3 h-12 pr-4 pl-2 ${navItemState(active)} is-drawer-close:justify-center is-drawer-close:gap-0 is-drawer-close:px-0`}
         >
-          {active ? <NavActiveBar /> : null}
-          <Icon
-            size={18}
-            strokeWidth={active ? 2 : 1.7}
-            className={`${navIconClass(active)} is-drawer-close:size-[1.1875rem]`}
-          />
+          <NavBead active={active}>
+            <Icon size={17} strokeWidth={active ? 2 : 1.7} className={navIconClass(active)} />
+          </NavBead>
           <span className="truncate is-drawer-close:hidden">{label}</span>
           {/* Shortcut hint: out of the way until the row is hovered or focused. */}
           <span

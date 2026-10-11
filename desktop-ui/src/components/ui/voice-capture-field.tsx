@@ -130,9 +130,7 @@ export function VoiceCaptureField({
             }
           }}
           readOnly={capturing}
-          className={
-            compact ? 'input w-full pr-10 text-sm' : 'input input-lg w-full pr-14 text-base'
-          }
+          className={`input w-full text-sm ${compact ? 'pr-10' : 'pr-14'}`}
           placeholder={
             capturePhase === 'listening'
               ? t`Listening — say the phrase…`

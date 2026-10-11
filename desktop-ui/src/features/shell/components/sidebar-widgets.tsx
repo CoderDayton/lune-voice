@@ -23,7 +23,7 @@ export function SidebarQuickStart() {
   // while a session is live.
   return (
     <div
-      className={`flex items-center rounded-box border transition-colors ${
+      className={`flex items-center rounded-full border transition-colors ${
         isActive ? 'border-error/30 bg-error/10' : 'border-surface-border bg-surface-panel'
       }`}
     >
@@ -49,21 +49,29 @@ export function SidebarQuickStart() {
         disabled={isConnecting}
         title={isActive ? t`Stop dictating` : t`Start dictating`}
         aria-label={isActive ? t`Stop dictating` : t`Start dictating`}
-        className="flex min-w-0 flex-1 cursor-pointer items-center gap-3 rounded-box px-3 py-2.5 text-left transition-colors hover:bg-surface-hover focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-primary disabled:cursor-not-allowed disabled:opacity-60 is-drawer-close:flex-none is-drawer-close:justify-center is-drawer-close:px-2"
+        className="flex min-w-0 flex-1 cursor-pointer items-center gap-3 rounded-full py-2 pr-3 pl-2 text-left transition-colors hover:bg-surface-hover focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-primary disabled:cursor-not-allowed disabled:opacity-60 is-drawer-close:flex-none is-drawer-close:justify-center is-drawer-close:px-2"
       >
         <span
-          className={`flex size-9 shrink-0 items-center justify-center rounded-field ${
-            isActive ? 'bg-error/15' : 'bg-primary/15'
+          className={`relative flex size-10 shrink-0 items-center justify-center rounded-full ${
+            isActive ? 'bg-error' : 'bg-(image:--surface-brand)'
           }`}
         >
           {isActive ? (
-            <Square size={16} strokeWidth={2.5} className="text-error" />
+            <span
+              aria-hidden="true"
+              className="animate-pulse-ring absolute -inset-1 rounded-full border border-error/60"
+            />
+          ) : null}
+          {isActive ? (
+            <Square size={15} strokeWidth={2.5} className="text-error-content" />
           ) : (
-            <Mic size={18} strokeWidth={2} className="text-primary" />
+            <Mic size={18} strokeWidth={2} className="text-primary-content" />
           )}
         </span>
         <span className="min-w-0 flex-1 is-drawer-close:hidden">
-          <span className={`block text-sm font-medium ${isActive ? 'text-error' : 'text-content'}`}>
+          <span
+            className={`block text-sm font-medium ${isActive ? 'text-content-strong' : 'text-content'}`}
+          >
             {isActive ? t`Stop dictating` : isConnecting ? t`Connecting` : t`Start dictating`}
           </span>
           {isActive ? (
@@ -85,7 +93,7 @@ export function SidebarQuickStart() {
         <Link
           to="/settings"
           search={{ tab: 'dictation' }}
-          className="mr-2 shrink-0 rounded-field px-2 py-1 text-xs text-primary transition-colors hover:bg-surface-hover is-drawer-close:hidden"
+          className="mr-2 shrink-0 rounded-full px-2.5 py-1 text-xs text-primary transition-colors hover:bg-surface-hover is-drawer-close:hidden"
         >
           {t`Set hotkey`}
         </Link>

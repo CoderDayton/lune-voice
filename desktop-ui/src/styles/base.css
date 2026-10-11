@@ -141,6 +141,7 @@
   .input:focus-visible,
   .textarea:focus-visible,
   .select:focus-visible,
+  .field-trigger:focus-visible,
   .toggle:focus-visible {
     outline: none !important;
   }
@@ -151,18 +152,20 @@
     box-shadow: 0 0 0 3px var(--ring-focus) !important;
   }
 
-  /* Select keeps its locked neutral border (below); toggle keeps its track
-     state. Both get just the halo so keyboard focus stays visible. */
-  .select:focus-visible,
-  .toggle:focus-visible {
+  /* A `label.input` wraps its real <input>, so the label itself is never
+     :focus-visible; mirror the halo when the inner input is. */
+  .input:has(input:focus-visible) {
+    outline: none !important;
+    border-color: var(--color-primary) !important;
     box-shadow: 0 0 0 3px var(--ring-focus) !important;
   }
 
-  .input,
-  .select,
-  .textarea {
-    background: var(--surface-field);
-    border-color: var(--surface-border);
+  /* Select keeps its locked neutral border (below); toggle keeps its track
+     state. Both get just the halo so keyboard focus stays visible. */
+  .select:focus-visible,
+  .field-trigger:focus-visible,
+  .toggle:focus-visible {
+    box-shadow: 0 0 0 3px var(--ring-focus) !important;
   }
 
   /* Lock the select's border on focus/open — DaisyUI brightens it,
@@ -170,8 +173,7 @@
      for affordance, no need to highlight the border. */
   .select:focus,
   .select:focus-visible,
-  .select:focus-within,
-  .select:hover {
+  .select:focus-within {
     border-color: var(--surface-border) !important;
   }
 

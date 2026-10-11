@@ -1,87 +1,88 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-/** Theme management — supports custom Lune themes + all 35 DaisyUI built-in themes. */
+/** Colour mode: Lune Dark, Lune Light, or whichever the OS prefers. */
 
 import { useSyncExternalStore } from 'react';
 
-export type ThemePreference = 'system' | string; // "system" or any theme name
+export type ThemeMode = 'system' | 'dark' | 'light';
+export type ThemeScheme = 'dark' | 'light';
 
 const STORAGE_KEY = 'lune-theme';
 
-/** All available themes grouped by tone. */
-export const THEME_GROUPS = {
-  custom: ['lune', 'lune-light'],
-  light: [
-    'light',
-    'cupcake',
-    'bumblebee',
-    'emerald',
-    'corporate',
-    'retro',
-    'valentine',
-    'garden',
-    'lofi',
-    'pastel',
-    'fantasy',
-    'wireframe',
-    'cmyk',
-    'autumn',
-    'acid',
-    'lemonade',
-    'winter',
-    'nord',
-    'caramellatte',
-    'silk',
-  ],
-  dark: [
-    'dark',
-    'synthwave',
-    'cyberpunk',
-    'halloween',
-    'forest',
-    'aqua',
-    'black',
-    'luxury',
-    'dracula',
-    'business',
-    'night',
-    'coffee',
-    'dim',
-    'sunset',
-    'abyss',
-  ],
-} as const;
+/** Stock themes an older build could have saved. They map to their light side;
+ *  anything else unrecognised maps to dark. */
+const LEGACY_LIGHT_THEMES: ReadonlySet<string> = new Set([
+  'lune-light',
+  'light',
+  'cupcake',
+  'bumblebee',
+  'emerald',
+  'corporate',
+  'retro',
+  'valentine',
+  'garden',
+  'lofi',
+  'pastel',
+  'fantasy',
+  'wireframe',
+  'cmyk',
+  'autumn',
+  'acid',
+  'lemonade',
+  'winter',
+  'nord',
+  'caramellatte',
+  'silk',
+]);
 
-export const ALL_THEMES = [...THEME_GROUPS.custom, ...THEME_GROUPS.light, ...THEME_GROUPS.dark];
-
-/** Human-readable display name. */
-export function themeLabel(id: string): string {
-  if (id === 'lune') return 'Lune Dark';
-  if (id === 'lune-light') return 'Lune Light';
-  return id.charAt(0).toUpperCase() + id.slice(1).replace(/([a-z])([A-Z])/g, '$1 $2');
+/** Reads a saved value, including the theme names older builds stored. */
+export function normalizeThemeMode(stored: string | null): ThemeMode {
+  if (stored === 'system' || stored === 'dark' || stored === 'light') return stored;
+  if (stored && LEGACY_LIGHT_THEMES.has(stored)) return 'light';
+  return 'dark';
 }
 
-/** Whether a theme is dark-scheme. */
-export function isDarkTheme(id: string): boolean {
-  if (id === 'lune') return true;
-  if (id === 'lune-light') return false;
-  return (THEME_GROUPS.dark as readonly string[]).includes(id);
+export function themeSchemeFor(mode: ThemeMode, systemPrefersLight: boolean): ThemeScheme {
+  if (mode === 'system') return systemPrefersLight ? 'light' : 'dark';
+  return mode;
 }
 
-export function getThemePreference(): ThemePreference {
-  return localStorage.getItem(STORAGE_KEY) ?? 'lune';
+/** The explicit mode that changes what the user sees: the opposite of the
+ *  look `mode` shows now, so a toggle always has a visible effect. */
+export function toggledThemeMode(mode: ThemeMode, systemPrefersLight: boolean): ThemeScheme {
+  return themeSchemeFor(mode, systemPrefersLight) === 'light' ? 'dark' : 'light';
 }
 
-export function setThemePreference(pref: ThemePreference) {
-  localStorage.setItem(STORAGE_KEY, pref);
-  applyTheme(pref);
+/* Storage can throw (blocked site data, quota); the theme must still apply,
+   so the last mode saved this session backs the read. */
+let sessionMode: ThemeMode | null = null;
+
+export function getThemeMode(): ThemeMode {
+  try {
+    return normalizeThemeMode(localStorage.getItem(STORAGE_KEY));
+  } catch {
+    return sessionMode ?? 'dark';
+  }
+}
+
+function saveThemeMode(mode: ThemeMode) {
+  sessionMode = mode;
+  try {
+    localStorage.setItem(STORAGE_KEY, mode);
+  } catch {
+    // Applied for this session only.
+  }
+}
+
+export function setThemeMode(mode: ThemeMode) {
+  saveThemeMode(mode);
+  applyTheme(mode);
   for (const listener of listeners) listener();
 }
 
-/* The preference lives in localStorage, which fires no event for same-document
-   writes. Several surfaces now set it (Settings' Appearance, the picker dialog,
-   the sidebar's More menu), so they need one shared notification or their
-   local copies drift apart from each other and from the applied theme. */
+/* The mode lives in localStorage, which fires no event for same-document
+   writes. Settings' Appearance and the sidebar's More menu both set it, so
+   they need one shared notification or their copies drift apart. */
 const listeners = new Set<() => void>();
 
 function subscribeTheme(listener: () => void): () => void {
@@ -91,30 +92,29 @@ function subscribeTheme(listener: () => void): () => void {
   };
 }
 
-/** The current preference, re-read whenever any surface changes it. */
-export function useThemePreference(): ThemePreference {
-  return useSyncExternalStore(subscribeTheme, getThemePreference);
+/** The current mode, re-read whenever any surface changes it. */
+export function useThemeMode(): ThemeMode {
+  return useSyncExternalStore(subscribeTheme, getThemeMode);
 }
 
-export function applyTheme(pref: ThemePreference) {
-  const resolved = pref === 'system' ? getSystemTheme() : pref;
-  document.documentElement.setAttribute('data-theme', resolved);
-  // Propagate light/dark scheme so CSS design tokens auto-switch for all themes
-  document.documentElement.setAttribute(
-    'data-color-scheme',
-    isDarkTheme(resolved) ? 'dark' : 'light',
-  );
+/** Saves the normalised mode and applies it. Runs before first paint. */
+export function initTheme() {
+  const mode = getThemeMode();
+  saveThemeMode(mode);
+  applyTheme(mode);
 }
 
-function getSystemTheme(): string {
-  if (window.matchMedia('(prefers-color-scheme: light)').matches) return 'lune-light';
-  return 'lune';
+export function applyTheme(mode: ThemeMode) {
+  const scheme = themeSchemeFor(mode, window.matchMedia('(prefers-color-scheme: light)').matches);
+  const root = document.documentElement;
+  root.setAttribute('data-theme', scheme === 'light' ? 'lune-light' : 'lune');
+  root.setAttribute('data-color-scheme', scheme);
 }
 
 export function watchSystemTheme(onUpdate?: () => void): () => void {
   const mq = window.matchMedia('(prefers-color-scheme: dark)');
   const handler = () => {
-    if (getThemePreference() === 'system') {
+    if (getThemeMode() === 'system') {
       applyTheme('system');
       for (const listener of listeners) listener();
       onUpdate?.();

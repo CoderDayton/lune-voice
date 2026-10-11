@@ -70,28 +70,30 @@ export function ListSearchRail({
 
   return (
     <div className="flex shrink-0 items-center gap-3 border-b border-surface-border px-3 py-2.5 sm:px-4">
-      <Search size={17} strokeWidth={2} className="shrink-0 text-content-subtle" />
-      <input
-        ref={inputRef}
-        type="search"
-        value={value}
-        onChange={(e) => onValueChange(e.target.value)}
-        placeholder={placeholder}
-        aria-label={label}
-        className="h-9 min-w-0 grow bg-transparent text-sm text-content outline-none placeholder:text-content-subtle"
-      />
-      {value.trim() ? (
-        <button
-          type="button"
-          onClick={() => onValueChange('')}
-          className="btn btn-soft btn-circle btn-xs"
-          aria-label={t`Clear ${label}`}
-        >
-          <X size={14} />
-        </button>
-      ) : (
-        <kbd className="kbd kbd-sm hidden text-content-subtle sm:inline-flex">/</kbd>
-      )}
+      <label className="input min-w-0 grow gap-2.5 pr-2">
+        <Search size={16} strokeWidth={2} className="shrink-0 text-content-subtle" />
+        <input
+          ref={inputRef}
+          type="search"
+          value={value}
+          onChange={(e) => onValueChange(e.target.value)}
+          placeholder={placeholder}
+          aria-label={label}
+          className="min-w-0 grow bg-transparent text-sm text-content outline-none placeholder:text-content-subtle"
+        />
+        {value.trim() ? (
+          <button
+            type="button"
+            onClick={() => onValueChange('')}
+            className="btn btn-soft btn-circle btn-xs"
+            aria-label={t`Clear ${label}`}
+          >
+            <X size={14} />
+          </button>
+        ) : (
+          <kbd className="kbd kbd-sm hidden text-content-subtle sm:inline-flex">/</kbd>
+        )}
+      </label>
       <span className="hidden shrink-0 text-sm tabular-nums text-content-subtle sm:inline">
         {count}
       </span>

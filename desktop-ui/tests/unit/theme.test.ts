@@ -1,54 +1,81 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-import { describe, expect, test } from "bun:test";
-import { ALL_THEMES, isDarkTheme, themeLabel, THEME_GROUPS } from "../../src/lib/theme";
+import { describe, expect, test } from 'bun:test';
+import {
+  getThemeMode,
+  normalizeThemeMode,
+  setThemeMode,
+  themeSchemeFor,
+  toggledThemeMode,
+} from '../../src/lib/theme';
 
-describe("theme utilities", () => {
-  test("ALL_THEMES includes all groups", () => {
-    const expected =
-      THEME_GROUPS.custom.length + THEME_GROUPS.light.length + THEME_GROUPS.dark.length;
-    expect(ALL_THEMES.length).toBe(expected);
+describe('blocked storage', () => {
+  test('a mode set this session is still the current mode', () => {
+    const g = globalThis as Record<string, unknown>;
+    const saved = { localStorage: g.localStorage, window: g.window, document: g.document };
+    const boom = () => {
+      throw new Error('blocked');
+    };
+    g.localStorage = { getItem: boom, setItem: boom };
+    g.window = { matchMedia: () => ({ matches: false }) };
+    g.document = { documentElement: { setAttribute: () => {} } };
+    try {
+      setThemeMode('light');
+      expect(getThemeMode()).toBe('light');
+    } finally {
+      Object.assign(g, saved);
+    }
+  });
+});
+
+describe('normalizeThemeMode', () => {
+  test('a fresh install is dark', () => {
+    expect(normalizeThemeMode(null)).toBe('dark');
   });
 
-  test("ALL_THEMES has no duplicates", () => {
-    const unique = new Set(ALL_THEMES);
-    expect(unique.size).toBe(ALL_THEMES.length);
+  test('current values pass through', () => {
+    expect(normalizeThemeMode('dark')).toBe('dark');
+    expect(normalizeThemeMode('light')).toBe('light');
+    expect(normalizeThemeMode('system')).toBe('system');
   });
 
-  test("themeLabel capitalizes custom themes", () => {
-    expect(themeLabel("lune")).toBe("Lune Dark");
-    expect(themeLabel("lune-light")).toBe("Lune Light");
+  test('the old Lune theme names map to their side', () => {
+    expect(normalizeThemeMode('lune')).toBe('dark');
+    expect(normalizeThemeMode('lune-light')).toBe('light');
   });
 
-  test("themeLabel capitalizes standard themes", () => {
-    expect(themeLabel("dark")).toBe("Dark");
-    expect(themeLabel("cupcake")).toBe("Cupcake");
-    expect(themeLabel("synthwave")).toBe("Synthwave");
+  test('a retired stock theme maps to its light or dark side', () => {
+    expect(normalizeThemeMode('cupcake')).toBe('light');
+    expect(normalizeThemeMode('nord')).toBe('light');
+    expect(normalizeThemeMode('dracula')).toBe('dark');
+    expect(normalizeThemeMode('forest')).toBe('dark');
   });
 
-  test("isDarkTheme identifies dark themes correctly", () => {
-    expect(isDarkTheme("lune")).toBe(true);
-    expect(isDarkTheme("dark")).toBe(true);
-    expect(isDarkTheme("dracula")).toBe(true);
-    expect(isDarkTheme("forest")).toBe(true);
-    expect(isDarkTheme("night")).toBe(true);
+  test('an unknown value falls back to dark', () => {
+    expect(normalizeThemeMode('nonsense')).toBe('dark');
+  });
+});
+
+describe('themeSchemeFor', () => {
+  test('system follows the OS', () => {
+    expect(themeSchemeFor('system', true)).toBe('light');
+    expect(themeSchemeFor('system', false)).toBe('dark');
   });
 
-  test("isDarkTheme identifies light themes correctly", () => {
-    expect(isDarkTheme("lune-light")).toBe(false);
-    expect(isDarkTheme("light")).toBe(false);
-    expect(isDarkTheme("cupcake")).toBe(false);
-    expect(isDarkTheme("nord")).toBe(false);
-    expect(isDarkTheme("winter")).toBe(false);
+  test('an explicit mode ignores the OS', () => {
+    expect(themeSchemeFor('dark', true)).toBe('dark');
+    expect(themeSchemeFor('light', false)).toBe('light');
+  });
+});
+
+describe('toggledThemeMode', () => {
+  test('flips an explicit mode', () => {
+    expect(toggledThemeMode('dark', false)).toBe('light');
+    expect(toggledThemeMode('light', true)).toBe('dark');
   });
 
-  test("custom themes are at the start of ALL_THEMES", () => {
-    expect(ALL_THEMES[0]).toBe("lune");
-    expect(ALL_THEMES[1]).toBe("lune-light");
-  });
-
-  test("lune is in custom group", () => {
-    expect(THEME_GROUPS.custom).toContain("lune");
-    expect(THEME_GROUPS.custom).toContain("lune-light");
+  test('flips the look system currently shows', () => {
+    expect(toggledThemeMode('system', true)).toBe('dark');
+    expect(toggledThemeMode('system', false)).toBe('light');
   });
 });

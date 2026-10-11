@@ -94,7 +94,7 @@ export function RailTooltip({
                 top: anchor.top + anchor.height / 2,
                 transform: 'translateY(-50%)',
               }}
-              className="pointer-events-none z-tooltip flex items-center gap-2.5 rounded-field border border-surface-border bg-surface-elevated px-2.5 py-1.5 text-sm text-content shadow-card"
+              className="pointer-events-none z-tooltip flex items-center gap-2.5 rounded-full border border-surface-border bg-surface-elevated px-3 py-1.5 text-sm text-content shadow-card"
             >
               <span className="whitespace-nowrap">{label}</span>
               {hint ? (

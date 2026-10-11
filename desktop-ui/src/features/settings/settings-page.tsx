@@ -15,12 +15,7 @@ import {
   Wand2,
 } from 'lucide-react';
 import type { ReactNode } from 'react';
-import {
-  NAV_ITEM_BASE,
-  NavActiveBar,
-  navIconClass,
-  navItemState,
-} from '../../components/ui/nav-item';
+import { NAV_ITEM_BASE, NavBead, navIconClass, navItemState } from '../../components/ui/nav-item';
 import { workspaceStore } from '../../store/workspace-store';
 import type { SettingsSectionId } from './sections';
 import { AppearanceSection } from './sections/appearance-section';
@@ -98,7 +93,7 @@ export function SettingsPage() {
   };
 
   return (
-    <div className="bento-board">
+    <div className="bento-board auto-rows-auto">
       {/* Section rail — horizontal scroll on mobile, vertical on desktop */}
       <nav
         aria-label={t`Settings sections`}
@@ -112,24 +107,15 @@ export function SettingsPage() {
               type="button"
               onClick={() => setActive(id)}
               aria-current={isActive ? 'page' : undefined}
-              className={`${NAV_ITEM_BASE} shrink-0 py-2.5 pr-3.5 pl-3 text-left md:w-full ${navItemState(isActive)}`}
+              className={`${NAV_ITEM_BASE} h-12 shrink-0 pr-4 pl-2 text-left md:w-full ${navItemState(isActive)}`}
             >
-              {isActive && (
-                <>
-                  {/* Active accent: a left bar on the vertical desktop rail, a
-                      bottom bar on the horizontal mobile row. */}
-                  <NavActiveBar className="hidden md:block" />
-                  <span
-                    aria-hidden="true"
-                    className="absolute inset-x-3 bottom-0 h-[3px] rounded-full bg-primary md:hidden"
-                  />
-                </>
-              )}
-              <Icon
-                size={18}
-                strokeWidth={isActive ? 2.1 : 1.7}
-                className={navIconClass(isActive)}
-              />
+              <NavBead active={isActive}>
+                <Icon
+                  size={17}
+                  strokeWidth={isActive ? 2 : 1.7}
+                  className={navIconClass(isActive)}
+                />
+              </NavBead>
               {label}
             </button>
           );

@@ -108,8 +108,12 @@ export function AppShell() {
 
         {/* Mobile topbar */}
         <div className="flex items-center gap-2 px-3 py-2 lg:hidden border-b border-surface-border bg-surface-glass backdrop-blur-sm">
-          <label htmlFor={DRAWER_ID} className="btn btn-soft btn-sm" aria-label={t`Open menu`}>
-            <Menu size={20} strokeWidth={1.5} />
+          <label
+            htmlFor={DRAWER_ID}
+            className="flex size-9 cursor-pointer items-center justify-center rounded-full bg-surface-wash text-content-muted transition-colors hover:bg-surface-hover hover:text-content focus-visible:outline-2 focus-visible:outline-primary"
+            aria-label={t`Open menu`}
+          >
+            <Menu size={18} strokeWidth={1.8} />
           </label>
           <span className="font-display tracking-heading text-base font-medium text-content-default select-none">
             {page.label}
@@ -174,7 +178,7 @@ export function ShellStatusChip() {
           : t`Offline`;
 
   return (
-    <div className="flex shrink-0 items-center gap-2 rounded-selector border border-surface-border bg-surface-elevated px-3 py-1.5 text-sm text-content-muted select-none">
+    <div className="flex shrink-0 items-center gap-2 rounded-full border border-surface-border bg-surface-elevated px-3 py-1.5 text-sm text-content-muted select-none">
       <span className="relative inline-flex size-2 items-center justify-center">
         {isActive && <span className={`status-pulse absolute inset-0 rounded-full ${dotClass}`} />}
         <span className={`relative size-2 rounded-full ${dotClass}`} />

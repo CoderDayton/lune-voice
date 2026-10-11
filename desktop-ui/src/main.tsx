@@ -8,13 +8,14 @@ import ReactDOM from 'react-dom/client';
 import { ErrorBoundary } from './components/feedback';
 import { activateLocale, defaultLocale, locales } from './i18n';
 import { backendClient } from './lib/backend/client';
-import { applyTheme, getThemePreference } from './lib/theme';
+import { initTheme, watchSystemTheme } from './lib/theme';
 import { routeTree } from './routeTree.gen';
 import { workspaceActions } from './store/workspace-store';
 import './app.css';
 
 // Apply saved theme before first paint to avoid flash
-applyTheme(getThemePreference());
+initTheme();
+watchSystemTheme();
 
 const router = createRouter({
   routeTree,

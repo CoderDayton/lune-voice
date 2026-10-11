@@ -48,7 +48,7 @@ interface ActionMenuProps {
 
 const GUTTER = 8;
 /** Matches the mock: the expanded menu insets from the sidebar's own edges. */
-const ANCHOR_INSET = 12;
+const ANCHOR_INSET = 4;
 /** Floor for the anchor-matched width, so a narrow sidebar stays readable. */
 const MIN_WIDTH = 180;
 
@@ -131,28 +131,34 @@ function ActionMenuRow({
         type="button"
         role="menuitem"
         onClick={onActivate}
-        className={`flex h-8 w-full shrink-0 items-center gap-3 rounded-field px-3 text-left text-sm transition-colors duration-fast focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-primary ${
+        className={`group flex h-10 w-full shrink-0 items-center gap-3 rounded-full pr-3 pl-1.5 text-left text-sm transition-colors duration-fast focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-primary ${
           item.danger
             ? 'text-error hover:bg-error/10 focus-visible:bg-error/10'
             : 'text-content hover:bg-surface-hover focus-visible:bg-surface-hover'
         }`}
       >
         {Icon && (
-          <Icon
-            size={16}
-            strokeWidth={1.8}
-            className={`shrink-0 ${item.danger ? '' : 'text-content-subtle'}`}
-          />
+          <span
+            className={`flex size-7 shrink-0 items-center justify-center rounded-full ${
+              item.danger ? 'bg-error/10' : 'bg-surface-wash'
+            }`}
+          >
+            <Icon
+              size={15}
+              strokeWidth={1.8}
+              className={item.danger ? '' : 'text-content-muted group-hover:text-content'}
+            />
+          </span>
         )}
         <span className="min-w-0 flex-1 truncate">{item.label}</span>
         {item.trailing && (
-          <span
+          <kbd
             className={`shrink-0 font-mono text-xs ${
               item.danger ? 'text-error/70' : 'text-content-subtle'
             }`}
           >
             {item.trailing}
-          </span>
+          </kbd>
         )}
       </button>
     </>
@@ -269,7 +275,7 @@ export function ActionMenu({
       aria-label={ariaLabel}
       style={menuStyle}
       onKeyDown={onKeyDown}
-      className="z-popover flex flex-col overflow-y-auto rounded-box border border-surface-border bg-surface-elevated p-1 shadow-card backdrop-blur-xl"
+      className="animate-page-in z-popover flex flex-col overflow-y-auto rounded-3xl border border-surface-border-strong bg-surface-elevated p-1.5 shadow-overlay"
     >
       {items.map((item, i) => (
         <ActionMenuRow

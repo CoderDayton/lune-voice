@@ -467,7 +467,7 @@ function SessionRows({ session, expanded, selected, onSelect, onToggle }: Sessio
           <td colSpan={8} className="p-0">
             <div ref={foldRef} className="overflow-hidden">
               <div className="px-4 py-4 sm:px-6">
-                <div className="rounded-field border border-surface-border bg-surface-inset p-4">
+                <div className="rounded-2xl border border-surface-border bg-surface-inset p-4">
                   <p className="max-h-60 overflow-y-auto whitespace-pre-wrap break-words text-[0.95rem] leading-7 text-content">
                     {session.transcript || t`No transcript`}
                   </p>

@@ -1,7 +1,7 @@
 /* SPDX-License-Identifier: GPL-3.0-or-later */
 
 @plugin "daisyui" {
-  themes: light, dark, cupcake, bumblebee, emerald, corporate, synthwave, retro, cyberpunk, valentine, halloween, garden, forest, aqua, lofi, pastel, fantasy, wireframe, black, luxury, dracula, cmyk, autumn, business, acid, lemonade, night, coffee, winter, dim, nord, sunset, caramellatte, abyss, silk;
+  themes: false;
 }
 
 /* ── Lune theme: local audio console dark ──────────────────────────── */
@@ -35,7 +35,7 @@
   --color-error: oklch(0.66 0.18 22);
   --color-error-content: oklch(0.98 0.005 22);
   --radius-selector: 0.5rem;
-  --radius-field: 0.25rem;
+  --radius-field: 0.5rem;
   --radius-box: 0.5rem;
   --size-selector: 0.3rem;
   --size-field: 0.3rem;
@@ -72,7 +72,7 @@
   --color-error: oklch(0.56 0.22 22);
   --color-error-content: oklch(0.99 0.005 22);
   --radius-selector: 0.5rem;
-  --radius-field: 0.25rem;
+  --radius-field: 0.5rem;
   --radius-box: 0.5rem;
   --size-selector: 0.3rem;
   --size-field: 0.3rem;

@@ -326,7 +326,7 @@ function SnippetComposer({ composer: c, onClose }: { composer: Composer; onClose
         {c.body.trim() && (
           <div
             aria-live="polite"
-            className="rounded-field border border-surface-border bg-surface-inset/60 px-3 py-2 text-sm"
+            className="rounded-2xl border border-surface-border bg-surface-inset/60 px-3 py-2 text-sm"
           >
             <span className="text-xs uppercase tracking-wider text-content-subtle">
               <Trans>Types as</Trans>
