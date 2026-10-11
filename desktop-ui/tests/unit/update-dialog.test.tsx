@@ -65,4 +65,49 @@ describe('UpdateDialog', () => {
     expect(getByText('Update check failed')).toBeDefined();
     expect(getByText(/network unreachable/)).toBeDefined();
   });
+
+  test('puts the headline in plain text and only the error detail in the tinted block', () => {
+    withState({
+      phase: 'check-failed',
+      currentVersion: '0.1.0',
+      availableVersion: null,
+      notes: null,
+      message: 'Could not check for updates.\n\nCould not fetch a valid release JSON',
+      downloadedBytes: 0,
+      totalBytes: 0,
+    });
+
+    const { getByText, container } = render(
+      <I18nProvider i18n={i18n}>
+        <UpdateDialog />
+      </I18nProvider>,
+    );
+
+    const block = container.querySelector('.alert') as HTMLElement;
+    expect(block.classList.contains('alert-soft')).toBe(true);
+    expect(block.textContent).toBe('Could not fetch a valid release JSON');
+    expect(block.contains(getByText('Could not check for updates.'))).toBe(false);
+  });
+
+  test('keeps a one-paragraph failure whole inside the tinted block', () => {
+    withState({
+      phase: 'install-failed',
+      currentVersion: '0.1.0',
+      availableVersion: '0.2.0',
+      notes: null,
+      message: 'No package to replace.',
+      downloadedBytes: 0,
+      totalBytes: 0,
+    });
+
+    const { container } = render(
+      <I18nProvider i18n={i18n}>
+        <UpdateDialog />
+      </I18nProvider>,
+    );
+
+    const block = container.querySelector('.alert') as HTMLElement;
+    expect(block.classList.contains('alert-soft')).toBe(true);
+    expect(block.textContent).toBe('No package to replace.');
+  });
 });

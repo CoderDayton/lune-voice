@@ -187,12 +187,7 @@ function UpdateBody({ state, titleId, onInstall, onDismiss, onRetryCheck }: Upda
       )}
 
       {(phase === 'check-failed' || phase === 'install-failed') && message && (
-        <div role="alert" className="alert alert-error mt-3 py-2 text-sm">
-          {/* The backend messages are already user-facing; showing them verbatim
-              keeps real detail ("connection refused", "no package to replace")
-              instead of a generic failure nobody can act on. */}
-          <span className="min-w-0 flex-1 break-words whitespace-pre-line">{message}</span>
-        </div>
+        <FailureMessage message={message} />
       )}
 
       <div className="modal-action">
@@ -224,6 +219,39 @@ function PhaseIcon({ phase }: { phase: UpdatePhaseDto }) {
 }
 
 /**
+ * The backend's failure text, shown verbatim so real detail ("connection
+ * refused", "no package to replace") survives instead of a generic failure
+ * nobody can act on.
+ *
+ * It is written as `headline`, a blank line, then `detail`. The headline reads
+ * as a sentence under the title; the detail — the underlying error — goes in a
+ * tinted block where it can be selected and copied. A message with no detail
+ * is shown whole in that block.
+ */
+function FailureMessage({ message }: { message: string }) {
+  const [headline, ...rest] = message.split(/\n\s*\n/);
+  const detail = rest.join('\n\n').trim();
+  return (
+    <div role="alert" className="mt-3">
+      {detail && <p className="text-sm text-content-muted">{headline}</p>}
+      <div
+        className={`alert alert-error alert-soft items-start border border-error/20 py-2.5 ${
+          detail ? 'mt-3' : ''
+        }`}
+      >
+        <span
+          className={`min-w-0 flex-1 select-text break-words whitespace-pre-line ${
+            detail ? 'font-mono text-xs leading-relaxed' : 'text-sm'
+          }`}
+        >
+          {detail || headline}
+        </span>
+      </div>
+    </div>
+  );
+}
+
+/**
  * Release notes come from the update manifest — a remote document. Rendered as
  * plain text in a bounded scroller: never as markup, and never tall enough to
  * push the buttons off a small screen.
@@ -233,7 +261,7 @@ function ReleaseNotes({ notes }: { notes: string }) {
   return (
     <details className="mt-3">
       <summary className="cursor-pointer text-sm text-content-subtle">{t`What's new`}</summary>
-      <div className="mt-2 max-h-48 overflow-y-auto rounded-field border border-surface-border bg-surface-inset p-3">
+      <div className="mt-2 max-h-48 overflow-y-auto rounded-2xl border border-surface-border bg-surface-inset p-3">
         <p className="text-xs whitespace-pre-line break-words text-content-muted">{notes}</p>
       </div>
     </details>
