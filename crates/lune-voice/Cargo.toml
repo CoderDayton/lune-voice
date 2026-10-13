@@ -142,6 +142,11 @@ path = "../../benchmarks/tuning/punctuation_ab.rs"
 required-features = ["whisper-cpp"]
 
 [[example]]
+name = "lead_in_ab"
+path = "../../benchmarks/tuning/lead_in_ab.rs"
+required-features = ["whisper-cpp"]
+
+[[example]]
 name = "dict_carrier_ab"
 path = "../../benchmarks/tuning/dict_carrier_ab.rs"
 

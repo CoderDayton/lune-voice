@@ -63,6 +63,7 @@ After-speech wait = poll_final (Silero endpoint trim + whisper.cpp decode) + opt
 | `transcribe` | Whole capture → AGC → VAD → whisper (+ styling) pipeline on a WAV/f32/dir (`--env WAV=`) |
 | `pipeline` / `stages` / `latency` | Real pipeline, per-stage timings, session latency |
 | `domain` / `punctuation` / `dict` / `snippets` | Output-quality A/Bs |
+| `leadin` | Opening-word errors on short utterances per lead-in policy (`--env LUNE_BENCH_DIR=` for your own `.wav` + `.txt` clips) |
 | `styling` / `rulecmp` | Remote styling capability and rule comparison (endpoint via `LUNE_BENCH_LLM_*`, see `benchmarks/bench_utils.rs`) |
 | `vram` | GPU memory use per model (`--env DEVICE=`, `CYCLES=`) |
 | `modelload` | Cold and warm model load + unload timings (`--env REPEATS=`, `WHISPER_MODEL=`) — the source of the idle-unload figures above |

@@ -54,6 +54,7 @@ fn backend(use_vad: bool) -> Option<WhisperCppBackend> {
         model_path,
         use_gpu: false,
         vad_model_path,
+        lead_in: lune_asr::LeadIn::default(),
     })
     .ok()
 }

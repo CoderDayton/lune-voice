@@ -157,6 +157,7 @@ impl AsrRegistry {
                             .join(lune_core::models::DIR_WHISPER_VAD)
                             .join(lune_core::models::WHISPER_VAD_GGML),
                     ),
+                    lead_in: crate::LeadIn::default(),
                 })?;
                 Ok(Self::WhisperCpp(backend))
             }

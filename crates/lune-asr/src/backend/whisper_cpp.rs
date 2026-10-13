@@ -36,6 +36,73 @@ pub struct WhisperCppConfig {
     /// buffer (drop leading/trailing silence) before decode. `None`/missing =>
     /// the full buffer is decoded.
     pub vad_model_path: Option<PathBuf>,
+    /// What is put in front of the first word before a decode.
+    pub lead_in: LeadIn,
+}
+
+/// What a decode gets in front of the first word.
+///
+/// whisper anchors the opening phrase on the audio before it. The endpoint
+/// trim keeps what was recorded there, which is nothing when speech starts
+/// with the hotkey press.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum LeadIn {
+    /// Only what was recorded before the onset.
+    #[default]
+    Recorded,
+    /// Top a recorded lead-in shorter than `ms` up to `ms`, with noise at the
+    /// level of the quietest part of the clip.
+    AtLeast { ms: u32 },
+    /// `ms` of digital silence ahead of the recorded lead-in.
+    Silence { ms: u32 },
+}
+
+/// Loudest noise a top-up may use, about -54 dBFS. Keeps a clip with no quiet
+/// stretch from being fronted with audible hiss.
+const LEAD_NOISE_MAX_RMS: f32 = 0.002;
+
+/// Frame the clip's noise floor is measured over: 20 ms at 16 kHz.
+const LEAD_FLOOR_FRAME: usize = 320;
+
+/// RMS of the quietest whole frame of `clip`, capped at [`LEAD_NOISE_MAX_RMS`].
+fn noise_floor_rms(clip: &[f32]) -> f32 {
+    clip.chunks_exact(LEAD_FLOOR_FRAME)
+        .map(|f| (f.iter().map(|s| s * s).sum::<f32>() / f.len() as f32).sqrt())
+        .fold(LEAD_NOISE_MAX_RMS, f32::min)
+}
+
+/// Samples to put in front of `clip` under `policy`; empty when it needs none.
+///
+/// `recorded_lead` is how many samples of `clip` come before the speech onset,
+/// or `None` when the onset is unknown (no VAD), which leaves a top-up with
+/// nothing to measure. The noise is seeded from a constant, so one clip always
+/// decodes from the same samples.
+#[cfg_attr(not(feature = "whisper-cpp"), allow(dead_code))]
+pub(crate) fn lead_in_prefix(
+    policy: LeadIn,
+    clip: &[f32],
+    recorded_lead: Option<usize>,
+) -> Vec<f32> {
+    const SAMPLES_PER_MS: usize = 16;
+    match policy {
+        LeadIn::Recorded => Vec::new(),
+        LeadIn::Silence { ms } => vec![0.0; ms as usize * SAMPLES_PER_MS],
+        LeadIn::AtLeast { ms } => {
+            let Some(recorded) = recorded_lead else {
+                return Vec::new();
+            };
+            let missing = (ms as usize * SAMPLES_PER_MS).saturating_sub(recorded);
+            let amplitude = noise_floor_rms(clip) * 3f32.sqrt();
+            let mut state: u32 = 0x9E37_79B9;
+            (0..missing)
+                .map(|_| {
+                    state = state.wrapping_mul(1_664_525).wrapping_add(1_013_904_223);
+                    let unit = (state >> 8) as f32 / (1u32 << 24) as f32;
+                    (unit * 2.0 - 1.0) * amplitude
+                })
+                .collect()
+        }
+    }
 }
 
 /// On-disk magic of a ggml model file: `0x67676d6c` ("ggml") stored
@@ -145,6 +212,65 @@ pub(crate) fn fitted_audio_ctx(samples: usize) -> i32 {
     (frames as i32).max(AUDIO_CTX_MIN)
 }
 
+/// Longest stretch handed to whisper in one decode: 28 s. Past its 30 s window
+/// whisper decodes the leftover on its own, and a leftover of a second or less
+/// comes back as invented text ("Thank you.").
+#[cfg_attr(not(feature = "whisper-cpp"), allow(dead_code))]
+const CHUNK_MAX_SAMPLES: usize = 28 * 16_000;
+
+/// Shortest piece a cut may leave on either side: 3 s.
+#[cfg_attr(not(feature = "whisper-cpp"), allow(dead_code))]
+const CHUNK_MIN_SAMPLES: usize = 3 * 16_000;
+
+/// Ranges of a `total`-sample clip to decode one by one, in order and with no
+/// gap between them.
+///
+/// `speech` holds the VAD speech spans in clip samples. A clip longer than
+/// [`CHUNK_MAX_SAMPLES`] is cut in the middle of a pause between two spans, so
+/// each piece keeps its own pauses whole. Two spans that touch count: the VAD
+/// pads each span, which closes a short pause. Among the pauses that leave both
+/// sides at least [`CHUNK_MIN_SAMPLES`], one in the back half of the window
+/// wins, then the longest, then the latest. A stretch with no usable pause
+/// stays in one piece.
+///
+/// `lead` samples are decoded in front of the first piece and count against
+/// its window.
+#[cfg_attr(not(feature = "whisper-cpp"), allow(dead_code))]
+pub(crate) fn plan_chunks(
+    speech: &[(usize, usize)],
+    total: usize,
+    lead: usize,
+) -> Vec<(usize, usize)> {
+    let mut chunks = Vec::new();
+    let mut start = 0;
+    loop {
+        let room = CHUNK_MAX_SAMPLES.saturating_sub(if start == 0 { lead } else { 0 });
+        if total - start <= room {
+            break;
+        }
+        let cut = speech
+            .windows(2)
+            .filter(|pair| pair[1].0 >= pair[0].1)
+            .map(|pair| {
+                let width = pair[1].0 - pair[0].1;
+                (pair[0].1 + width / 2, width)
+            })
+            .filter(|&(mid, _)| {
+                mid >= start + CHUNK_MIN_SAMPLES
+                    && mid <= start + room
+                    && mid + CHUNK_MIN_SAMPLES <= total
+            })
+            .max_by_key(|&(mid, width)| (mid - start >= room / 2, width, mid));
+        let Some((mid, _)) = cut else {
+            break;
+        };
+        chunks.push((start, mid));
+        start = mid;
+    }
+    chunks.push((start, total));
+    chunks
+}
+
 /// Route whisper.cpp + ggml native logs into `tracing` instead of raw stderr,
 /// so they obey the global log filter.
 ///
@@ -165,8 +291,8 @@ pub fn install_logging_hooks() {}
 #[cfg(feature = "whisper-cpp")]
 mod imp {
     use super::{
-        AsrSessionConfig, DecodeProfile, Result, WhisperCppConfig, check_ggml_file,
-        fitted_audio_ctx,
+        AsrSessionConfig, DecodeProfile, LeadIn, Result, WhisperCppConfig, check_ggml_file,
+        fitted_audio_ctx, lead_in_prefix, plan_chunks,
     };
 
     use std::sync::Mutex;
@@ -299,6 +425,7 @@ mod imp {
         ctx: WhisperContext,
         n_threads: i32,
         profile: DecodeProfile,
+        lead_in: LeadIn,
         /// Standalone silero VAD for endpoint trimming (loaded once, reused).
         /// `None` => decode the full buffer (model absent or failed to load).
         vad: Option<Mutex<WhisperVadContext>>,
@@ -378,6 +505,7 @@ mod imp {
                 ctx,
                 n_threads,
                 profile,
+                lead_in: config.lead_in,
                 vad,
             })
         }
@@ -435,30 +563,31 @@ mod imp {
                 // Worth the extra CPU here: decoding is one-shot per utterance, and
                 // greedy decoding loses words beam search gets right ("ESLint" →
                 // "ES and Lint"). A slow machine is better served by a smaller model.
-                let mut params = FullParams::new(SamplingStrategy::BeamSearch {
-                    beam_size: 5,
-                    patience: -1.0,
-                });
-                params.set_n_threads(self.n_threads);
-                // "auto" detects; explicit short codes (en, de, …) match the app's
-                // dictation-language values one-to-one.
-                params.set_language(Some(language.as_deref().unwrap_or("auto")));
-                params.set_print_special(false);
-                params.set_print_progress(false);
-                params.set_print_realtime(false);
-                params.set_print_timestamps(false);
-                // Suppress non-speech tokens ("[music]", "(wind)") — pure hallucination
-                // residue on quiet/short clips. (`suppress_blank` is already default-true.)
-                params.set_suppress_nst(true);
-                // Bound the temperature-fallback ladder. whisper.cpp's default
-                // increment of 0.2 re-decodes the whole window at 0.0, 0.2 …
-                // 1.0 whenever the average log-prob or entropy check fails —
-                // up to six full decodes, on exactly the mumbled or noisy
-                // utterances that are already the slowest. Dictation is
-                // interactive and hotkey-bounded, so a bounded wait beats a
-                // marginally better transcript arriving six times later. One
-                // retry is kept: it recovers the common single-bad-decode case.
-                params.set_temperature_inc(TEMPERATURE_FALLBACK_STEP);
+                fn decode_params<'a>(n_threads: i32, lang: &'a str) -> FullParams<'a, 'a> {
+                    let mut params = FullParams::new(SamplingStrategy::BeamSearch {
+                        beam_size: 5,
+                        patience: -1.0,
+                    });
+                    params.set_n_threads(n_threads);
+                    params.set_language(Some(lang));
+                    params.set_print_special(false);
+                    params.set_print_progress(false);
+                    params.set_print_realtime(false);
+                    params.set_print_timestamps(false);
+                    // Suppress non-speech tokens ("[music]", "(wind)") — pure hallucination
+                    // residue on quiet/short clips. (`suppress_blank` is already default-true.)
+                    params.set_suppress_nst(true);
+                    // Bound the temperature-fallback ladder. whisper.cpp's default
+                    // increment of 0.2 re-decodes the whole window at 0.0, 0.2 …
+                    // 1.0 whenever the average log-prob or entropy check fails —
+                    // up to six full decodes, on exactly the mumbled or noisy
+                    // utterances that are already the slowest. Dictation is
+                    // interactive and hotkey-bounded, so a bounded wait beats a
+                    // marginally better transcript arriving six times later. One
+                    // retry is kept: it recovers the common single-bad-decode case.
+                    params.set_temperature_inc(TEMPERATURE_FALLBACK_STEP);
+                    params
+                }
 
                 // Endpoint-trim with whisper's own (standalone) silero VAD: decode
                 // only [first speech onset .. last offset] + padding as ONE
@@ -468,7 +597,13 @@ mod imp {
                 // punctuation. We deliberately avoid the in-decode `enable_vad`,
                 // which concatenates speech spans and strips those pauses → run-ons.
                 enum VadTrim {
-                    Speech(usize, usize),
+                    Speech {
+                        start: usize,
+                        end: usize,
+                        onset: usize,
+                        /// Every VAD speech span, in buffer samples.
+                        spans: Vec<(usize, usize)>,
+                    },
                     Silence,
                     Full,
                 }
@@ -495,10 +630,23 @@ mod imp {
                             let to_sample = |cs: f32| (cs * SAMPLE_RATE as f32 / 100.0) as isize;
                             let pad_lead = (VAD_PAD_LEAD_MS * SAMPLE_RATE / 1000) as isize;
                             let pad_tail = (VAD_PAD_TAIL_MS * SAMPLE_RATE / 1000) as isize;
+                            let onset = to_sample(start_cs).max(0) as usize;
                             let start = (to_sample(start_cs) - pad_lead).max(0) as usize;
                             let end =
                                 ((to_sample(end_cs) + pad_tail).max(0) as usize).min(audio.len());
-                            VadTrim::Speech(start, end)
+                            let spans = (0..=last)
+                                .map(|i| {
+                                    let from = segs.get_segment_start_timestamp(i).unwrap_or(0.0);
+                                    let to = segs.get_segment_end_timestamp(i).unwrap_or(0.0);
+                                    (to_sample(from).max(0) as usize, to_sample(to).max(0) as usize)
+                                })
+                                .collect();
+                            VadTrim::Speech {
+                                start,
+                                end,
+                                onset,
+                                spans,
+                            }
                         }
                         Ok(_) => VadTrim::Silence,
                         Err(e) => {
@@ -509,131 +657,173 @@ mod imp {
                 })
                 .unwrap_or(VadTrim::Full);
 
-                let decode_slice: &[f32] = match trim {
-                    VadTrim::Speech(start, end) if start < end => &audio[start..end],
+                let (slice_start, slice_end, onset, spans) = match trim {
+                    VadTrim::Speech {
+                        start,
+                        end,
+                        onset,
+                        spans,
+                    } if start < end => (start, end, Some(onset), spans),
                     VadTrim::Silence => {
                         audio.clear();
                         return Ok(Vec::new());
                     }
-                    _ => audio.as_slice(),
+                    _ => (0, audio.len(), None, Vec::new()),
                 };
+                let decode_slice = &audio[slice_start..slice_end];
 
-                // whisper's segment timestamps are relative to `decode_slice`.
-                // Endpoint trimming drops a lead-in (commonly hundreds of ms),
-                // so add it back to keep `start_ms`/`end_ms` relative to the
-                // original buffer the caller pushed.
-                let trim_offset_ms = match trim {
-                    VadTrim::Speech(start, end) if start < end => {
-                        (start as u64 * 1000) / SAMPLE_RATE as u64
+                // Endpoint trimming drops a lead-in; segment times add it back so
+                // `start_ms`/`end_ms` stay relative to the buffer the caller pushed.
+                let trim_offset_ms = (slice_start as u64 * 1000) / SAMPLE_RATE as u64;
+
+                let recorded_lead = onset.map(|onset| onset.saturating_sub(slice_start));
+                let prefix = lead_in_prefix(self.lead_in, decode_slice, recorded_lead);
+                let recorded_len = decode_slice.len();
+                let prefix_ms = (prefix.len() as u64 * 1000) / SAMPLE_RATE as u64;
+
+                let spans: Vec<(usize, usize)> = spans
+                    .iter()
+                    .map(|&(from, to)| {
+                        (
+                            from.saturating_sub(slice_start).min(recorded_len),
+                            to.saturating_sub(slice_start).min(recorded_len),
+                        )
+                    })
+                    .collect();
+                let chunks = plan_chunks(&spans, recorded_len, prefix.len());
+
+                // "auto" detects on the first chunk only; later chunks reuse its answer.
+                let wanted = language.as_deref().unwrap_or("auto");
+                let mut detected: Option<String> = None;
+                let mut out = Vec::new();
+                for (index, &(from, to)) in chunks.iter().enumerate() {
+                    let lang = match detected.as_deref() {
+                        Some(found) if wanted == "auto" => found,
+                        _ => wanted,
+                    };
+                    let mut params = decode_params(self.n_threads, lang);
+
+                    // Prime punctuation/casing style only for longer dictation, where
+                    // whisper otherwise runs sentences together; on a short clip the
+                    // prompt biases the decode toward a spurious continuation, so skip it.
+                    if recorded_len >= PROMPT_MIN_SAMPLES {
+                        params.set_initial_prompt(PUNCTUATION_PROMPT);
                     }
-                    _ => 0,
-                };
+                    let padded: Vec<f32>;
+                    let piece: &[f32] = if index == 0 && !prefix.is_empty() {
+                        padded = [prefix.as_slice(), &decode_slice[from..to]].concat();
+                        &padded
+                    } else {
+                        &decode_slice[from..to]
+                    };
+                    if self.profile.fit_audio_ctx {
+                        params.set_audio_ctx(fitted_audio_ctx(piece.len()));
+                    }
 
-                // Prime punctuation/casing style only for longer dictation, where
-                // whisper otherwise runs sentences together; on a short clip the
-                // prompt biases the decode toward a spurious continuation, so skip it.
-                if decode_slice.len() >= PROMPT_MIN_SAMPLES {
-                    params.set_initial_prompt(PUNCTUATION_PROMPT);
-                }
-                if self.profile.fit_audio_ctx {
-                    params.set_audio_ctx(fitted_audio_ctx(decode_slice.len()));
-                }
+                    state
+                        .full(params, piece)
+                        .map_err(|e| Error::asr(format!("whisper inference: {e}")))?;
+                    if detected.is_none() {
+                        detected = whisper_rs::get_lang_str(state.full_lang_id_from_state())
+                            .map(str::to_string);
+                    }
 
-                state
-                    .full(params, decode_slice)
-                    .map_err(|e| Error::asr(format!("whisper inference: {e}")))?;
+                    let piece_ms = trim_offset_ms + (from as u64 * 1000) / SAMPLE_RATE as u64;
+                    let lead_ms = if index == 0 { prefix_ms } else { 0 };
+                    let n = state.full_n_segments();
+                    for i in 0..n {
+                        let Some(seg) = state.get_segment(i) else {
+                            continue;
+                        };
+                        let text = seg.to_str_lossy().unwrap_or_default().trim().to_string();
+                        if text.is_empty() {
+                            continue;
+                        }
+
+                        // Fold per-token probabilities into the segment confidence AND
+                        // group tokens into per-word confidences — whisper marks a new
+                        // word with a leading-space token. Per-word values feed the
+                        // corrector's risk gating (which protects uncertain words and
+                        // drives `unresolved_words`); leaving them empty made that gating
+                        // inert. Special tokens ("[_...]", p≈1.0) are skipped so they
+                        // don't inflate the mean.
+                        let mut sum = 0.0f32;
+                        let mut count = 0u32;
+                        let mut min_p = 1.0f32;
+                        let mut word_confidences: Vec<WordConfidence> = Vec::new();
+                        let mut cur_word = String::new();
+                        let mut cur_min = 1.0f32;
+                        let mut cur_sum = 0.0f32;
+                        let mut cur_count = 0u32;
+                        for j in 0..seg.n_tokens() {
+                            let Some(tok) = seg.get_token(j) else {
+                                continue;
+                            };
+                            let Ok(piece) = tok.to_str_lossy() else {
+                                continue;
+                            };
+                            if piece.starts_with("[_") {
+                                continue;
+                            }
+                            let p = tok.token_probability();
+                            sum += p;
+                            min_p = min_p.min(p);
+                            count += 1;
+                            // A leading space begins a new word — flush the previous one.
+                            if piece.starts_with(' ') {
+                                flush_word(
+                                    &mut word_confidences,
+                                    &mut cur_word,
+                                    &mut cur_min,
+                                    &mut cur_sum,
+                                    &mut cur_count,
+                                );
+                            }
+                            cur_word.push_str(&piece);
+                            cur_min = cur_min.min(p);
+                            cur_sum += p;
+                            cur_count += 1;
+                        }
+                        flush_word(
+                            &mut word_confidences,
+                            &mut cur_word,
+                            &mut cur_min,
+                            &mut cur_sum,
+                            &mut cur_count,
+                        );
+                        let (confidence, min_token_confidence) = if count == 0 {
+                            (None, None)
+                        } else {
+                            (Some(sum / count as f32), Some(min_p))
+                        };
+
+                        let id = *next_id;
+                        *next_id += 1;
+                        out.push(AsrSegment {
+                            id,
+                            confidence,
+                            min_token_confidence,
+                            word_confidences,
+                            is_final: true,
+                            // whisper timestamps are in centiseconds (10 ms units),
+                            // relative to the piece it decoded — add back that piece's
+                            // place in the buffer so callers see original-buffer time.
+                            start_ms: Some(
+                                (piece_ms + (seg.start_timestamp().max(0) as u64) * 10)
+                                    .saturating_sub(lead_ms),
+                            ),
+                            end_ms: Some(
+                                (piece_ms + (seg.end_timestamp().max(0) as u64) * 10)
+                                    .saturating_sub(lead_ms),
+                            ),
+                            text,
+                            detected_language: detected.clone(),
+                        });
+                    }
+                }
                 // Drain the decoded audio so a repeat poll can't re-emit it (matches
                 // Qwen3's take-on-poll contract); capacity is retained for reuse.
                 audio.clear();
-
-                let detected =
-                    whisper_rs::get_lang_str(state.full_lang_id_from_state()).map(str::to_string);
-
-                let n = state.full_n_segments();
-                let mut out = Vec::with_capacity(n.max(0) as usize);
-                for i in 0..n {
-                    let Some(seg) = state.get_segment(i) else {
-                        continue;
-                    };
-                    let text = seg.to_str_lossy().unwrap_or_default().trim().to_string();
-                    if text.is_empty() {
-                        continue;
-                    }
-
-                    // Fold per-token probabilities into the segment confidence AND
-                    // group tokens into per-word confidences — whisper marks a new
-                    // word with a leading-space token. Per-word values feed the
-                    // corrector's risk gating (which protects uncertain words and
-                    // drives `unresolved_words`); leaving them empty made that gating
-                    // inert. Special tokens ("[_...]", p≈1.0) are skipped so they
-                    // don't inflate the mean.
-                    let mut sum = 0.0f32;
-                    let mut count = 0u32;
-                    let mut min_p = 1.0f32;
-                    let mut word_confidences: Vec<WordConfidence> = Vec::new();
-                    let mut cur_word = String::new();
-                    let mut cur_min = 1.0f32;
-                    let mut cur_sum = 0.0f32;
-                    let mut cur_count = 0u32;
-                    for j in 0..seg.n_tokens() {
-                        let Some(tok) = seg.get_token(j) else {
-                            continue;
-                        };
-                        let Ok(piece) = tok.to_str_lossy() else {
-                            continue;
-                        };
-                        if piece.starts_with("[_") {
-                            continue;
-                        }
-                        let p = tok.token_probability();
-                        sum += p;
-                        min_p = min_p.min(p);
-                        count += 1;
-                        // A leading space begins a new word — flush the previous one.
-                        if piece.starts_with(' ') {
-                            flush_word(
-                                &mut word_confidences,
-                                &mut cur_word,
-                                &mut cur_min,
-                                &mut cur_sum,
-                                &mut cur_count,
-                            );
-                        }
-                        cur_word.push_str(&piece);
-                        cur_min = cur_min.min(p);
-                        cur_sum += p;
-                        cur_count += 1;
-                    }
-                    flush_word(
-                        &mut word_confidences,
-                        &mut cur_word,
-                        &mut cur_min,
-                        &mut cur_sum,
-                        &mut cur_count,
-                    );
-                    let (confidence, min_token_confidence) = if count == 0 {
-                        (None, None)
-                    } else {
-                        (Some(sum / count as f32), Some(min_p))
-                    };
-
-                    let id = *next_id;
-                    *next_id += 1;
-                    out.push(AsrSegment {
-                        id,
-                        confidence,
-                        min_token_confidence,
-                        word_confidences,
-                        is_final: true,
-                        // whisper timestamps are in centiseconds (10 ms units),
-                        // relative to `decode_slice` — add back the VAD-trim
-                        // offset so callers see original-buffer time.
-                        start_ms: Some(trim_offset_ms + (seg.start_timestamp().max(0) as u64) * 10),
-                        end_ms: Some(trim_offset_ms + (seg.end_timestamp().max(0) as u64) * 10),
-                        text,
-                        detected_language: detected.clone(),
-                    });
-                }
                 Ok(out)
             })
         }
@@ -696,11 +886,99 @@ pub use imp::WhisperCppBackend;
 #[cfg(test)]
 mod tests {
     use super::{
-        AUDIO_CTX_MIN, DecodeProfile, GGML_MAGIC, MIN_GGML_BYTES, check_ggml_file, fitted_audio_ctx,
+        AUDIO_CTX_MIN, CHUNK_MAX_SAMPLES, CHUNK_MIN_SAMPLES, DecodeProfile, GGML_MAGIC,
+        LEAD_NOISE_MAX_RMS, LeadIn, MIN_GGML_BYTES, check_ggml_file, fitted_audio_ctx,
+        lead_in_prefix, plan_chunks,
     };
     use std::io::Write;
 
     const SECOND: usize = 16_000;
+    const MS: usize = SECOND / 1000;
+
+    fn rms(samples: &[f32]) -> f32 {
+        (samples.iter().map(|s| s * s).sum::<f32>() / samples.len() as f32).sqrt()
+    }
+
+    /// A clip with a quiet room-tone stretch followed by a loud one.
+    fn clip_with_floor(floor: f32) -> Vec<f32> {
+        let mut clip: Vec<f32> = (0..SECOND / 2)
+            .map(|i| if i % 2 == 0 { floor } else { -floor })
+            .collect();
+        clip.extend((0..SECOND).map(|i| if i % 2 == 0 { 0.3 } else { -0.3 }));
+        clip
+    }
+
+    #[test]
+    fn the_recorded_lead_in_is_decoded_as_is_by_default() {
+        assert_eq!(LeadIn::default(), LeadIn::Recorded);
+        let clip = clip_with_floor(0.001);
+        assert!(lead_in_prefix(LeadIn::Recorded, &clip, Some(0)).is_empty());
+    }
+
+    #[test]
+    fn a_long_enough_recorded_lead_in_gets_no_top_up() {
+        let clip = clip_with_floor(0.001);
+        let policy = LeadIn::AtLeast { ms: 400 };
+        assert!(lead_in_prefix(policy, &clip, Some(400 * MS)).is_empty());
+        assert!(lead_in_prefix(policy, &clip, Some(900 * MS)).is_empty());
+    }
+
+    #[test]
+    fn a_short_recorded_lead_in_is_topped_up_to_the_minimum() {
+        let clip = clip_with_floor(0.001);
+        let policy = LeadIn::AtLeast { ms: 400 };
+        assert_eq!(lead_in_prefix(policy, &clip, Some(0)).len(), 400 * MS);
+        assert_eq!(
+            lead_in_prefix(policy, &clip, Some(150 * MS)).len(),
+            250 * MS
+        );
+    }
+
+    #[test]
+    fn a_top_up_without_a_known_onset_adds_nothing() {
+        // No VAD means no onset, so there is no lead-in to measure.
+        let clip = clip_with_floor(0.001);
+        assert!(lead_in_prefix(LeadIn::AtLeast { ms: 400 }, &clip, None).is_empty());
+    }
+
+    #[test]
+    fn the_top_up_is_noise_at_the_level_of_the_quietest_part_of_the_clip() {
+        let clip = clip_with_floor(0.001);
+        let prefix = lead_in_prefix(LeadIn::AtLeast { ms: 400 }, &clip, Some(0));
+        let level = rms(&prefix);
+        assert!((0.0007..0.0013).contains(&level), "level {level}");
+        // Digital silence would put a step at the join.
+        assert!(prefix.iter().any(|s| *s != 0.0));
+    }
+
+    #[test]
+    fn the_top_up_never_gets_louder_than_the_noise_cap() {
+        // A clip with no quiet stretch must not be fronted with loud noise.
+        let clip = clip_with_floor(0.2);
+        let prefix = lead_in_prefix(LeadIn::AtLeast { ms: 400 }, &clip, Some(0));
+        assert!(rms(&prefix) <= LEAD_NOISE_MAX_RMS * 1.05);
+    }
+
+    #[test]
+    fn the_top_up_is_the_same_on_every_decode() {
+        let clip = clip_with_floor(0.001);
+        let policy = LeadIn::AtLeast { ms: 400 };
+        assert_eq!(
+            lead_in_prefix(policy, &clip, Some(0)),
+            lead_in_prefix(policy, &clip, Some(0))
+        );
+    }
+
+    #[test]
+    fn fixed_silence_is_added_whatever_the_recorded_lead_in() {
+        let clip = clip_with_floor(0.001);
+        let policy = LeadIn::Silence { ms: 3000 };
+        for lead in [None, Some(0), Some(900 * MS)] {
+            let prefix = lead_in_prefix(policy, &clip, lead);
+            assert_eq!(prefix.len(), 3 * SECOND);
+            assert!(prefix.iter().all(|s| *s == 0.0));
+        }
+    }
 
     #[test]
     fn a_gpu_decode_keeps_the_full_window_and_uses_flash_attention() {
@@ -747,6 +1025,113 @@ mod tests {
         // 0 means whisper's own 30 s window.
         assert_eq!(fitted_audio_ctx(29 * SECOND), 0);
         assert_eq!(fitted_audio_ctx(90 * SECOND), 0);
+    }
+
+    /// Speech spans of `len` seconds each, separated by the given pauses (ms).
+    fn speech_with_pauses(len: usize, pauses_ms: &[usize]) -> (Vec<(usize, usize)>, usize) {
+        let mut spans = Vec::new();
+        let mut at = 0;
+        for pause in pauses_ms {
+            spans.push((at, at + len * SECOND));
+            at += len * SECOND + pause * MS;
+        }
+        spans.push((at, at + len * SECOND));
+        (spans, at + len * SECOND)
+    }
+
+    fn assert_covers(chunks: &[(usize, usize)], total: usize) {
+        assert_eq!(chunks.first().map(|c| c.0), Some(0));
+        assert_eq!(chunks.last().map(|c| c.1), Some(total));
+        for pair in chunks.windows(2) {
+            assert_eq!(pair[0].1, pair[1].0, "chunks must not overlap or skip");
+        }
+    }
+
+    #[test]
+    fn a_clip_that_fits_one_window_is_decoded_whole() {
+        let (speech, total) = speech_with_pauses(5, &[300, 300, 300]);
+        assert!(total <= CHUNK_MAX_SAMPLES);
+        assert_eq!(plan_chunks(&speech, total, 0), vec![(0, total)]);
+    }
+
+    #[test]
+    fn a_clip_just_past_the_window_is_cut_at_a_pause_with_no_sliver() {
+        // 30.2 s: whisper alone would decode 30 s and invent text for the rest.
+        let mut speech = vec![(0, 10 * SECOND), (10 * SECOND + 400 * MS, 20 * SECOND)];
+        speech.push((20 * SECOND + 400 * MS, 30 * SECOND + 200 * MS));
+        let total = 30 * SECOND + 200 * MS;
+        let chunks = plan_chunks(&speech, total, 0);
+        assert_eq!(chunks.len(), 2);
+        assert_covers(&chunks, total);
+        for (start, end) in &chunks {
+            assert!(end - start <= CHUNK_MAX_SAMPLES);
+            assert!(end - start >= CHUNK_MIN_SAMPLES);
+        }
+        // The cut sits in the middle of the pause, clear of both words.
+        assert_eq!(chunks[0].1, 20 * SECOND + 200 * MS);
+    }
+
+    #[test]
+    fn the_longest_pause_in_the_back_half_is_preferred() {
+        // Pauses end at 6.1, 12.4, 19.3 and 25.4 s; the 900 ms one is a
+        // sentence break, the later 100 ms one is a gap between words.
+        let (speech, total) = speech_with_pauses(6, &[100, 300, 900, 100, 100]);
+        let chunks = plan_chunks(&speech, total, 0);
+        assert_covers(&chunks, total);
+        let long_pause_mid = 18 * SECOND + 400 * MS + 450 * MS;
+        assert_eq!(chunks[0].1, long_pause_mid);
+    }
+
+    #[test]
+    fn a_long_dictation_is_cut_into_windows_that_all_fit() {
+        let (speech, total) = speech_with_pauses(4, &[300; 20]);
+        assert!(total > 80 * SECOND);
+        let chunks = plan_chunks(&speech, total, 0);
+        assert!(chunks.len() >= 3);
+        assert_covers(&chunks, total);
+        for (start, end) in &chunks {
+            assert!(end - start <= CHUNK_MAX_SAMPLES);
+            assert!(end - start >= CHUNK_MIN_SAMPLES);
+        }
+    }
+
+    #[test]
+    fn spans_that_touch_still_mark_a_pause_to_cut_at() {
+        // The VAD pads each span, so a pause shorter than both pads leaves
+        // two spans that meet with no gap between them.
+        let total = 30 * SECOND + 400 * MS;
+        let speech = [
+            (0, 4 * SECOND),
+            (4 * SECOND, 14 * SECOND),
+            (14 * SECOND, total),
+        ];
+        assert_eq!(
+            plan_chunks(&speech, total, 0),
+            vec![(0, 14 * SECOND), (14 * SECOND, total)]
+        );
+    }
+
+    #[test]
+    fn a_lead_in_in_front_of_the_first_piece_counts_against_its_window() {
+        let speech = [
+            (0, 10 * SECOND),
+            (10 * SECOND + 400 * MS, 27 * SECOND + 500 * MS),
+            (27 * SECOND + 900 * MS, 40 * SECOND),
+        ];
+        let total = 40 * SECOND;
+        let lead = 3 * SECOND;
+        let chunks = plan_chunks(&speech, total, lead);
+        assert_covers(&chunks, total);
+        assert!(chunks[0].1 - chunks[0].0 + lead <= CHUNK_MAX_SAMPLES);
+        for (start, end) in &chunks[1..] {
+            assert!(end - start <= CHUNK_MAX_SAMPLES);
+        }
+    }
+
+    #[test]
+    fn speech_with_no_pause_is_left_to_whisper_in_one_piece() {
+        let total = 40 * SECOND;
+        assert_eq!(plan_chunks(&[(0, total)], total, 0), vec![(0, total)]);
     }
 
     fn write_temp(name: &str, bytes: &[u8]) -> std::path::PathBuf {
