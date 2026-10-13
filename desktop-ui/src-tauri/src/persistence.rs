@@ -614,7 +614,7 @@ fn build_snapshot(
     database: &mut Database,
 ) -> Result<WorkspaceSnapshot, String> {
     let history = database
-        .list_sessions(SNAPSHOT_HISTORY_LIMIT)
+        .list_sessions_page(SNAPSHOT_HISTORY_LIMIT, 0, None)
         .map_err(|e| format!("list sessions: {e}"))?
         .into_iter()
         .map(|session| HistoryItemDto {
@@ -1390,6 +1390,48 @@ mod tests {
 
         enforce_retention(&mut db, &defaults, SettingsTrust::AsWritten);
         assert!(db.list_sessions(10).unwrap().is_empty());
+    }
+
+    /// A run of failed starts writes rows with no transcript. The recent list
+    /// only shows rows with text, so those must not use up its slots.
+    #[test]
+    fn failed_sessions_do_not_push_real_ones_out_of_the_snapshot() {
+        use lune_core::asr::AsrBackendKind;
+        use lune_core::session::DictationSession;
+
+        let mut db = Database::open_in_memory().unwrap();
+        let now = chrono::Utc::now();
+        let session = |age_secs: i64, status, transcript: Option<&str>| DictationSession {
+            id: uuid::Uuid::new_v4(),
+            started_at: now - chrono::Duration::seconds(age_secs),
+            ended_at: None,
+            style: None,
+            backend: AsrBackendKind::WhisperCpp,
+            status,
+            transcript: transcript.map(str::to_owned),
+        };
+        db.insert_session(&session(
+            3600,
+            SessionStatus::Completed,
+            Some("the real one"),
+        ))
+        .unwrap();
+        for age in 0..i64::from(SNAPSHOT_HISTORY_LIMIT) {
+            db.insert_session(&session(
+                age,
+                SessionStatus::Failed("audio init".into()),
+                None,
+            ))
+            .unwrap();
+        }
+
+        let snapshot = build_snapshot(UserSettings::default(), &mut db).unwrap();
+        let transcripts: Vec<&str> = snapshot
+            .history
+            .iter()
+            .map(|h| h.transcript.as_str())
+            .collect();
+        assert_eq!(transcripts, ["the real one"]);
     }
 
     /// The frontend reads every settings field at the top level of the object.
