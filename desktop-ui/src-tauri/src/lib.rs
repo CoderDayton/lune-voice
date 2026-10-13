@@ -186,7 +186,35 @@ const UPDATE_CHECK_LAUNCH_DELAY: std::time::Duration = std::time::Duration::from
 /// We don't keep the window alive while minimized — closing destroys the
 /// webview to free its memory, and the next call here rebuilds it.
 fn create_or_focus_main_window(app: &tauri::AppHandle) {
+    open_main_window(app, None);
+}
+
+/// Put the newest dictation's text on the clipboard.
+fn copy_latest_dictation() {
+    match persistence::latest_transcript() {
+        Ok(Some(text)) => {
+            if let Err(e) = lune_voice::copy_text(&text) {
+                tracing::warn!(error = %e, "copy last dictation failed");
+            }
+        }
+        Ok(None) => tracing::info!("no dictation to copy yet"),
+        Err(e) => tracing::warn!(error = %e, "copy last dictation failed"),
+    }
+}
+
+/// Show the main window, building it if needed, on `route` when one is given.
+///
+/// The router follows the browser location. A window that exists is moved with
+/// a history push and a `popstate`; one that does not exist yet starts at the
+/// route because the location is set before its scripts run.
+fn open_main_window(app: &tauri::AppHandle, route: Option<&str>) {
     if let Some(w) = app.get_webview_window("main") {
+        if let Some(route) = route {
+            let _ = w.eval(format!(
+                "history.pushState(null, '', '{route}'); \
+                 dispatchEvent(new PopStateEvent('popstate'));"
+            ));
+        }
         let _ = w.unminimize();
         let _ = w.show();
         let _ = w.set_focus();
@@ -209,7 +237,13 @@ fn create_or_focus_main_window(app: &tauri::AppHandle) {
     let (width, height) = adaptive_window_size(app);
     match WebviewWindowBuilder::from_config(app, &config) {
         Ok(builder) => {
-            if let Err(e) = builder.inner_size(width, height).build() {
+            let builder = builder.inner_size(width, height);
+            let builder = match route {
+                Some(route) => builder
+                    .initialization_script(format!("history.replaceState(null, '', '{route}');")),
+                None => builder,
+            };
+            if let Err(e) = builder.build() {
                 tracing::error!(error = %e, "failed to create main window");
             }
         }
@@ -334,7 +368,16 @@ pub fn run() {
 
             // ── System tray ──────────────────────────────────────────────
             let show_i = MenuItem::with_id(app, "show", "Open Lune Voice", true, None::<&str>)?;
+            let settings_i =
+                MenuItem::with_id(app, "settings", "Open Settings", true, None::<&str>)?;
             let toggle_i = MenuItem::with_id(app, "toggle", "Start Dictation", true, None::<&str>)?;
+            let copy_i = MenuItem::with_id(
+                app,
+                "copy_latest",
+                "Copy Last Dictation",
+                true,
+                None::<&str>,
+            )?;
             let sep = PredefinedMenuItem::separator(app)?;
             let updates_i = MenuItem::with_id(
                 app,
@@ -344,7 +387,18 @@ pub fn run() {
                 None::<&str>,
             )?;
             let quit_i = MenuItem::with_id(app, "quit", "Quit", true, None::<&str>)?;
-            let menu = Menu::with_items(app, &[&show_i, &toggle_i, &sep, &updates_i, &quit_i])?;
+            let menu = Menu::with_items(
+                app,
+                &[
+                    &show_i,
+                    &settings_i,
+                    &toggle_i,
+                    &copy_i,
+                    &sep,
+                    &updates_i,
+                    &quit_i,
+                ],
+            )?;
 
             TrayIconBuilder::new()
                 .icon(
@@ -358,6 +412,12 @@ pub fn run() {
                 .on_menu_event(|app, event| match event.id().as_ref() {
                     "show" => {
                         create_or_focus_main_window(app);
+                    }
+                    "settings" => {
+                        open_main_window(app, Some("/settings"));
+                    }
+                    "copy_latest" => {
+                        tauri::async_runtime::spawn_blocking(copy_latest_dictation);
                     }
                     "toggle" => {
                         let rt = app.state::<runtime::AppRuntime>();

@@ -37,6 +37,20 @@ pub use uinput_typer::{
     grant_uinput_access, remove_uinput_rule, uinput_access_ready, uinput_rule_is_self_installed,
 };
 
+/// Put `text` on the system clipboard.
+pub fn copy_text(text: &str) -> Result<(), String> {
+    #[cfg(unix)]
+    {
+        uinput_typer::set_clipboard(text)
+    }
+    #[cfg(not(unix))]
+    {
+        arboard::Clipboard::new()
+            .and_then(|mut clipboard| clipboard.set_text(text))
+            .map_err(|e| e.to_string())
+    }
+}
+
 // Focused-window capture. Available on every platform: the type and its
 // terminal classification are shared, and only the capture behind them is
 // platform-specific.

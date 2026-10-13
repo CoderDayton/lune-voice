@@ -609,6 +609,22 @@ pub fn save_style_few_shot_pairs(
     build_snapshot(settings, &mut database)
 }
 
+/// Text of the newest dictation that has any.
+pub fn latest_transcript() -> Result<Option<String>, String> {
+    let paths = resolve_paths()?;
+    let mut database = open_database(&paths)?;
+    latest_transcript_in(&mut database)
+}
+
+fn latest_transcript_in(database: &mut Database) -> Result<Option<String>, String> {
+    Ok(database
+        .list_sessions_page(1, 0, None)
+        .map_err(|e| format!("list sessions: {e}"))?
+        .into_iter()
+        .next()
+        .and_then(|session| session.transcript))
+}
+
 fn build_snapshot(
     settings: UserSettings,
     database: &mut Database,
@@ -1432,6 +1448,56 @@ mod tests {
             .map(|h| h.transcript.as_str())
             .collect();
         assert_eq!(transcripts, ["the real one"]);
+    }
+
+    fn session_at(
+        age_secs: i64,
+        status: SessionStatus,
+        transcript: Option<&str>,
+    ) -> lune_core::session::DictationSession {
+        lune_core::session::DictationSession {
+            id: uuid::Uuid::new_v4(),
+            started_at: chrono::Utc::now() - chrono::Duration::seconds(age_secs),
+            ended_at: None,
+            style: None,
+            backend: lune_core::asr::AsrBackendKind::WhisperCpp,
+            status,
+            transcript: transcript.map(str::to_owned),
+        }
+    }
+
+    #[test]
+    fn the_latest_dictation_is_the_newest_one_with_text() {
+        let mut db = Database::open_in_memory().unwrap();
+        db.insert_session(&session_at(
+            600,
+            SessionStatus::Completed,
+            Some("older words"),
+        ))
+        .unwrap();
+        db.insert_session(&session_at(
+            60,
+            SessionStatus::Completed,
+            Some("newer words"),
+        ))
+        .unwrap();
+        db.insert_session(&session_at(
+            1,
+            SessionStatus::Failed("audio init".into()),
+            None,
+        ))
+        .unwrap();
+
+        assert_eq!(
+            latest_transcript_in(&mut db).unwrap().as_deref(),
+            Some("newer words")
+        );
+    }
+
+    #[test]
+    fn there_is_no_latest_dictation_before_the_first_one() {
+        let mut db = Database::open_in_memory().unwrap();
+        assert_eq!(latest_transcript_in(&mut db).unwrap(), None);
     }
 
     /// The frontend reads every settings field at the top level of the object.
