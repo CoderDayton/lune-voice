@@ -245,6 +245,11 @@ fn convert_i16_samples_into(data: &[i16], out: &mut Vec<f32>) {
     out.extend(data.iter().map(|&s| s as f32 / 32768.0));
 }
 
+fn convert_i32_samples_into(data: &[i32], out: &mut Vec<f32>) {
+    out.clear();
+    out.extend(data.iter().map(|&s| s as f32 / 2_147_483_648.0));
+}
+
 fn convert_u16_samples_into(data: &[u16], out: &mut Vec<f32>) {
     out.clear();
     out.extend(data.iter().map(|&s| (s as f32 - 32768.0) / 32768.0));
@@ -466,7 +471,7 @@ impl AudioStream {
 
         // Build the stream based on sample format
         // Macro to reduce boilerplate for stream building across sample formats.
-        // Each format (F32, I16, U16) differs only in the callback signature and whether
+        // Each format (F32, I16, I32, U16) differs only in the callback signature and whether
         // sample conversion is needed. This macro captures the common pattern of building
         // a stream, error handling, and calling process_audio_callback.
         macro_rules! build_stream {
@@ -501,7 +506,7 @@ impl AudioStream {
                     )
                     .map_err(|e| AudioError::StreamBuild(e.to_string()))?
             };
-            // I16/U16 variants: allocate conversion buffer and convert before processing
+            // Integer variants: allocate conversion buffer and convert before processing
             ($sample_type:ty, $convert_fn:expr) => {{
                 let mut sample_buf = Vec::<f32>::with_capacity(chunk_samples * 4);
                 device
@@ -539,6 +544,7 @@ impl AudioStream {
         let stream = match supported_config.sample_format() {
             SampleFormat::F32 => build_stream!(f32),
             SampleFormat::I16 => build_stream!(i16, convert_i16_samples_into),
+            SampleFormat::I32 => build_stream!(i32, convert_i32_samples_into),
             SampleFormat::U16 => build_stream!(u16, convert_u16_samples_into),
             format => {
                 return Err(AudioError::StreamBuild(format!(
@@ -1126,6 +1132,16 @@ mod tests {
         assert!(converted[0] <= -1.0);
         assert_eq!(converted[1], 0.0);
         assert!(converted[2] > 0.99);
+    }
+
+    #[test]
+    fn convert_i32_samples_scales_signed_range() {
+        let mut converted = Vec::new();
+        convert_i32_samples_into(&[i32::MIN, 0, i32::MAX, 1 << 30], &mut converted);
+        assert_eq!(converted[0], -1.0);
+        assert_eq!(converted[1], 0.0);
+        assert!(converted[2] > 0.99 && converted[2] <= 1.0);
+        assert_eq!(converted[3], 0.5);
     }
 
     #[test]
