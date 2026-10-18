@@ -622,8 +622,15 @@ mod tests {
         backend.push_audio(&session, &[0.0f32; 100]).await.unwrap();
         // poll_final must propagate the failure — Ok(empty) would read as
         // "no speech detected" upstream and hide the API outage.
-        let err = backend.poll_final(&session).await.unwrap_err();
-        assert!(err.to_string().contains("ASR failed"), "got: {err}");
+        let err = backend.poll_final(&session).await.unwrap_err().to_string();
+        // Linux refuses a closed loopback port at once, so the retries run
+        // out ("ASR failed"). Windows retries the SYN for ~2s before refusing,
+        // so the 100ms request deadline fires first ("did not answer"). Either
+        // way the outage reaches the caller, which is what this test pins.
+        assert!(
+            err.contains("ASR failed") || err.contains("did not answer"),
+            "got: {err}"
+        );
     }
 
     /// The server has to receive and transcribe the whole clip inside the
