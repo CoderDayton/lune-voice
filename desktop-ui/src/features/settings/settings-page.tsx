@@ -93,43 +93,55 @@ export function SettingsPage() {
   };
 
   return (
-    <div className="bento-board auto-rows-auto">
-      {/* Section rail — horizontal scroll on mobile, vertical on desktop */}
-      <nav
-        aria-label={t`Settings sections`}
-        className="bento-cell sticky top-0 z-20 col-span-12 flex-row gap-1 overflow-x-auto p-space-sm md:col-span-3 md:flex-col md:self-start"
-      >
-        {sections.map(({ id, label, icon: Icon }) => {
-          const isActive = id === active;
-          return (
-            <button
-              key={id}
-              type="button"
-              onClick={() => setActive(id)}
-              aria-current={isActive ? 'page' : undefined}
-              className={`${NAV_ITEM_BASE} h-12 shrink-0 pr-4 pl-2 text-left md:w-full ${navItemState(isActive)}`}
-            >
-              <NavBead active={isActive}>
-                <Icon
-                  size={17}
-                  strokeWidth={isActive ? 2 : 1.7}
-                  className={navIconClass(isActive)}
-                />
-              </NavBead>
-              {label}
-            </button>
-          );
-        })}
-      </nav>
+    // Laid out on the page's own width (a container query), not the window's:
+    // the app sidebar takes a share of the window, so a window breakpoint gave
+    // the rail a quarter of an already narrow page and its labels spilled out.
+    <div className="@container">
+      <div className="grid gap-space-md @3xl:grid-cols-[13.5rem_minmax(0,1fr)]">
+        {/* Section rail — a scrolling tab strip when the page is narrow, a
+          vertical rail of fixed width once there is room for one. Only the
+          rail stays pinned: a pinned strip left a band above it where the
+          page scrolled into view. */}
+        <nav
+          aria-label={t`Settings sections`}
+          className="bento-cell z-20 flex-row gap-1 overflow-x-auto p-space-sm @3xl:sticky @3xl:top-0 @3xl:flex-col @3xl:self-start @3xl:overflow-x-visible"
+        >
+          {sections.map(({ id, label, icon: Icon }) => {
+            const isActive = id === active;
+            return (
+              <button
+                key={id}
+                type="button"
+                onClick={() => setActive(id)}
+                aria-current={isActive ? 'page' : undefined}
+                title={label}
+                className={`${NAV_ITEM_BASE} h-12 shrink-0 pr-4 pl-2 text-left @3xl:w-full @3xl:min-w-0 ${navItemState(isActive)}`}
+              >
+                <NavBead active={isActive}>
+                  <Icon
+                    size={17}
+                    strokeWidth={isActive ? 2 : 1.7}
+                    className={navIconClass(isActive)}
+                  />
+                </NavBead>
+                {/* Whole in the tab strip; in the rail, a translation longer
+                  than the rail ends in an ellipsis (full text in the title)
+                  instead of running past the panel edge. */}
+                <span className="whitespace-nowrap @3xl:min-w-0 @3xl:truncate">{label}</span>
+              </button>
+            );
+          })}
+        </nav>
 
-      {/* All sections stay mounted; inactive ones are hidden so transient
+        {/* All sections stay mounted; inactive ones are hidden so transient
           state (e.g. an in-progress model download) survives tab switches. */}
-      <div className="col-span-12 min-w-0 md:col-span-9">
-        {sections.map(({ id }) => (
-          <div key={id} hidden={id !== active}>
-            {content[id]}
-          </div>
-        ))}
+        <div className="min-w-0">
+          {sections.map(({ id }) => (
+            <div key={id} hidden={id !== active}>
+              {content[id]}
+            </div>
+          ))}
+        </div>
       </div>
     </div>
   );

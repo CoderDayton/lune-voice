@@ -36,6 +36,9 @@ interface DescriptiveDropdownProps<Value extends string> {
   align?: 'start' | 'end';
 }
 
+/** Tallest the open menu grows before it scrolls, in pixels. */
+const MENU_MAX_HEIGHT = 360;
+
 /**
  * DaisyUI-styled dropdown that renders icon + label + description per option.
  * Drop-in replacement for `<select>` when option meaning isn't obvious from
@@ -102,7 +105,10 @@ export function DescriptiveDropdown<Value extends string>({
       const estRow = options.some((opt) => opt.description) ? 60 : 44;
       const estContent = options.length * estRow + 12;
       const desired = menuRef.current?.scrollHeight || estContent;
-      const cap = Math.round(window.innerHeight * 0.6);
+      // About eight plain rows (fewer with descriptions): a long list such as
+      // the dictation languages scrolls inside the menu instead of covering
+      // most of the window. Still never more than 60% of a short window.
+      const cap = Math.min(MENU_MAX_HEIGHT, Math.round(window.innerHeight * 0.6));
       const needed = Math.min(desired, cap);
       const openUp = spaceBelow < needed && spaceAbove > spaceBelow;
       const available = openUp ? spaceAbove : spaceBelow;
@@ -120,9 +126,17 @@ export function DescriptiveDropdown<Value extends string>({
     }
 
     updateMenuPosition();
+    // Bring the selected option into view once the menu has rendered, so a
+    // choice far down a scrolling list is visible on open.
+    const reveal = requestAnimationFrame(() => {
+      menuRef.current
+        ?.querySelector<HTMLElement>('[aria-selected="true"]')
+        ?.scrollIntoView({ block: 'nearest' });
+    });
     window.addEventListener('resize', updateMenuPosition);
     window.addEventListener('scroll', updateMenuPosition, true);
     return () => {
+      cancelAnimationFrame(reveal);
       window.removeEventListener('resize', updateMenuPosition);
       window.removeEventListener('scroll', updateMenuPosition, true);
     };
