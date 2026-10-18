@@ -89,6 +89,8 @@ impl Default for AsrSessionConfig {
 pub enum AsrBackendKind {
     OpenAiCompatible,
     WhisperCpp,
+    /// NVIDIA Parakeet TDT, run by whisper.cpp's `parakeet` library.
+    ParakeetCpp,
 }
 
 /// Trait for ASR backend implementations.

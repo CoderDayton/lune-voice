@@ -30,6 +30,7 @@ export type { StylePresetDto } from './StylePresetDto';
 export type { TerminalModeDto } from './TerminalModeDto';
 export type { UpdatePhaseDto } from './UpdatePhaseDto';
 export type { UpdateStateDto } from './UpdateStateDto';
+export type { ParakeetModelDto } from './ParakeetModelDto';
 export type { WhisperModelDto } from './WhisperModelDto';
 export type { WorkspaceSettingsDto } from './WorkspaceSettingsDto';
 export type { WorkspaceSnapshot } from './WorkspaceSnapshot';

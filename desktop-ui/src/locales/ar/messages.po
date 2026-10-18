@@ -13,7 +13,7 @@ msgstr ""
 "Language-Team: \n"
 "Plural-Forms: \n"
 
-#: src/features/welcome/welcome-page.tsx:513
+#: src/features/welcome/welcome-page.tsx:521
 msgid "— change it any time in Settings › Dictation."
 msgstr "— يمكنك تغييره في أي وقت من الإعدادات › الإملاء."
 
@@ -103,19 +103,19 @@ msgstr "## اجتماع — {date}\n"
 "الحاضرون:\n"
 "- "
 
-#: src/features/settings/data/settings-data.ts:289
+#: src/features/settings/data/settings-data.ts:523
 msgid "1 year"
 msgstr "سنة واحدة"
 
-#: src/features/settings/data/settings-data.ts:287
+#: src/features/settings/data/settings-data.ts:521
 msgid "30 days"
 msgstr "30 يومًا"
 
-#: src/features/settings/data/settings-data.ts:286
+#: src/features/settings/data/settings-data.ts:520
 msgid "7 days"
 msgstr "7 أيام"
 
-#: src/features/settings/data/settings-data.ts:288
+#: src/features/settings/data/settings-data.ts:522
 msgid "90 days"
 msgstr "90 يومًا"
 
@@ -166,31 +166,31 @@ msgstr "أضف تصحيحًا وسيطبقه Lune Voice في كل مرة تمل�
 msgid "Add snippet"
 msgstr "إضافة مقتطف"
 
-#: src/features/settings/data/settings-data.ts:323
+#: src/features/settings/data/settings-data.ts:557
 msgid "After 1 hour"
 msgstr "بعد ساعة"
 
-#: src/features/settings/data/settings-data.ts:321
+#: src/features/settings/data/settings-data.ts:555
 msgid "After 15 minutes"
 msgstr "بعد 15 دقيقة"
 
-#: src/features/settings/data/settings-data.ts:324
+#: src/features/settings/data/settings-data.ts:558
 msgid "After 2 hours"
 msgstr "بعد ساعتين"
 
-#: src/features/settings/data/settings-data.ts:322
+#: src/features/settings/data/settings-data.ts:556
 msgid "After 30 minutes"
 msgstr "بعد 30 دقيقة"
 
-#: src/features/settings/data/settings-data.ts:320
+#: src/features/settings/data/settings-data.ts:554
 msgid "After 5 minutes"
 msgstr "بعد 5 دقائق"
 
-#: src/features/settings/sections/models-section.tsx:100
+#: src/features/settings/sections/models-section.tsx:103
 msgid "AI models stored on your device."
 msgstr "نماذج الذكاء الاصطناعي المخزنة على جهازك."
 
-#: src/features/welcome/welcome-page.tsx:217
+#: src/features/welcome/welcome-page.tsx:225
 msgid "All required models are already installed. Continue when you're ready."
 msgstr "جميع النماذج المطلوبة مثبتة بالفعل. استمر عندما تكون جاهزًا."
 
@@ -208,15 +208,15 @@ msgstr "السماح"
 msgid "Allow remote services"
 msgstr "السماح بالخدمات البعيدة"
 
-#: src/features/settings/data/settings-data.ts:97
+#: src/features/settings/data/settings-data.ts:106
 msgid "Always"
 msgstr "دائمًا"
 
-#: src/features/settings/data/settings-data.ts:275
+#: src/features/settings/data/settings-data.ts:509
 msgid "Always Ctrl+Shift+V"
 msgstr "دائمًا Ctrl+Shift+V"
 
-#: src/features/settings/data/settings-data.ts:270
+#: src/features/settings/data/settings-data.ts:504
 msgid "Always Ctrl+V"
 msgstr "دائمًا Ctrl+V"
 
@@ -274,11 +274,11 @@ msgstr "تعليقات صوتية تُشغَّل عند بدء الإملاء أ
 msgid "Auto-capitalize sentences"
 msgstr "بدء الجمل بحرف كبير تلقائيًا"
 
-#: src/features/settings/data/settings-data.ts:245
+#: src/features/settings/data/settings-data.ts:461
 msgid "Auto-detect"
 msgstr "كشف تلقائي"
 
-#: src/features/settings/data/settings-data.ts:265
+#: src/features/settings/data/settings-data.ts:499
 #: src/features/settings/sections/pill-section.tsx:55
 msgid "Automatic"
 msgstr "تلقائي"
@@ -287,11 +287,11 @@ msgstr "تلقائي"
 msgid "Automatic updates are off"
 msgstr "التحديثات التلقائية متوقفة"
 
-#: src/features/settings/data/settings-data.ts:192
+#: src/features/settings/data/settings-data.ts:207
 msgid "Balanced accuracy and speed."
 msgstr "توازن بين الدقة والسرعة."
 
-#: src/features/settings/data/settings-data.ts:177
+#: src/features/settings/data/settings-data.ts:192
 msgid "Base"
 msgstr "أساسي"
 
@@ -299,19 +299,19 @@ msgstr "أساسي"
 msgid "Before you start"
 msgstr "قبل أن تبدأ"
 
-#: src/features/settings/data/settings-data.ts:199
+#: src/features/settings/data/settings-data.ts:214
 msgid "Best accuracy; turbo decoder keeps it fast."
 msgstr "أعلى دقة؛ ومفكك الترميز التوربيني يُبقيها سريعة."
 
-#: src/features/settings/data/settings-data.ts:107
+#: src/features/settings/data/settings-data.ts:116
 msgid "Bottom center"
 msgstr "أسفل الوسط"
 
-#: src/features/settings/data/settings-data.ts:106
+#: src/features/settings/data/settings-data.ts:115
 msgid "Bottom left"
 msgstr "أسفل اليسار"
 
-#: src/features/settings/data/settings-data.ts:108
+#: src/features/settings/data/settings-data.ts:117
 msgid "Bottom right"
 msgstr "أسفل اليمين"
 
@@ -342,7 +342,7 @@ msgstr "مدمج"
 
 #: src/components/feedback/confirm-dialog.tsx:61
 #: src/features/dictionary/components/dictionary-table.tsx:112
-#: src/features/settings/sections/models-section.tsx:312
+#: src/features/settings/sections/models-section.tsx:315
 #: src/features/snippets/snippets-page.tsx:248
 #: src/features/styles/components/style-editor-modal.tsx:247
 msgid "Cancel"
@@ -352,12 +352,12 @@ msgstr "إلغاء"
 msgid "Cancel current recording"
 msgstr "إلغاء التسجيل الحالي"
 
-#: src/features/welcome/welcome-page.tsx:410
+#: src/features/welcome/welcome-page.tsx:418
 msgid "Cancel download"
 msgstr "إلغاء التنزيل"
 
-#: src/features/settings/sections/transcription-section.tsx:126
 #: src/features/settings/sections/transcription-section.tsx:134
+#: src/features/settings/sections/transcription-section.tsx:142
 msgid "Capitalize known names"
 msgstr "كتابة الأسماء المعروفة بأحرف كبيرة"
 
@@ -374,7 +374,7 @@ msgstr "التقاط بالصوت"
 msgid "Capture device and how recording detects when you speak."
 msgstr "جهاز الالتقاط وكيفية اكتشاف التسجيل لبدء حديثك."
 
-#: src/features/welcome/welcome-page.tsx:472
+#: src/features/welcome/welcome-page.tsx:480
 msgid "Change engine"
 msgstr "تغيير المحرك"
 
@@ -392,7 +392,7 @@ msgstr "البحث عن تحديثات عند بدء التشغيل"
 msgid "Check whether a newer version has been released."
 msgstr "تحقّق مما إذا كان قد صدر إصدار أحدث."
 
-#: src/features/welcome/welcome-page.tsx:211
+#: src/features/welcome/welcome-page.tsx:219
 msgid "Check your network and we'll pick up where we left off."
 msgstr "تحقق من شبكتك وسنستأنف من حيث توقفنا."
 
@@ -400,11 +400,11 @@ msgstr "تحقق من شبكتك وسنستأنف من حيث توقفنا."
 msgid "Checking for updates"
 msgstr "جارٍ التحقق من التحديثات"
 
-#: src/features/welcome/welcome-page.tsx:78
+#: src/features/welcome/welcome-page.tsx:82
 msgid "Checking installed models…"
 msgstr "جارٍ التحقق من النماذج المثبتة…"
 
-#: src/features/settings/components/asr-engine-cards.tsx:227
+#: src/features/settings/components/asr-engine-cards.tsx:246
 #: src/features/settings/sections/general-section.tsx:159
 #: src/features/welcome/components/ready-checks.tsx:113
 msgid "Checking…"
@@ -422,16 +422,20 @@ msgstr "اختر شكل Lune Voice."
 msgid "Choose how transcripts are restyled — sent to an OpenAI-compatible endpoint you configure, local or hosted, or left off entirely."
 msgstr "اختر طريقة إعادة صياغة النصوص المنسوخة — بإرسالها إلى نقطة نهاية متوافقة مع OpenAI تضبطها بنفسك، محليةً كانت أم مستضافة، أو بإيقافها تمامًا."
 
-#: src/features/welcome/welcome-page.tsx:214
-#: src/features/welcome/welcome-page.tsx:220
+#: src/features/welcome/welcome-page.tsx:222
+#: src/features/welcome/welcome-page.tsx:228
 msgid "Choose the AI models to install. Everything runs offline — no cloud, no accounts."
 msgstr "اختر نماذج الذكاء الاصطناعي المراد تثبيتها. كل شيء يعمل دون الاتصال بالإنترنت - لا توجد سحابة ولا حسابات."
 
-#: src/features/settings/sections/transcription-section.tsx:50
-msgid "Choose the engine that turns your speech into text. Local engines run fully on-device; Whisper is multilingual with selectable model sizes."
-msgstr "اختر المحرك الذي يحوّل كلامك إلى نص. تعمل المحركات المحلية بالكامل على جهازك؛ وWhisper متعدد اللغات مع أحجام نماذج قابلة للاختيار."
+#: src/features/settings/sections/transcription-section.tsx:51
+msgid "Choose the engine that turns your speech into text. Local engines run fully on-device: Whisper covers the most languages with selectable model sizes, Parakeet is the fastest for 25 European languages."
+msgstr "اختر المحرك الذي يحوّل كلامك إلى نص. تعمل المحركات المحلية بالكامل على جهازك: يغطي Whisper أكبر عدد من اللغات مع أحجام نماذج قابلة للاختيار، وParakeet هو الأسرع لـ 25 لغة أوروبية."
 
-#: src/features/welcome/welcome-page.tsx:199
+#: src/features/settings/components/asr-engine-cards.tsx:397
+msgid "Choose your dictation language below. Parakeet cannot tell Lune which language it heard, so until one is set every dictation is formatted as English."
+msgstr "اختر لغة الإملاء أدناه. لا يستطيع Parakeet إخبار Lune باللغة التي سمعها، لذا يُنسَّق كل إملاء على أنه إنجليزي حتى تُضبط لغة."
+
+#: src/features/welcome/welcome-page.tsx:207
 msgid "Choose your speech engine. Everything runs offline — no cloud, no accounts."
 msgstr "اختر محرك الكلام الخاص بك. كل شيء يعمل دون اتصال بالإنترنت — لا سحابة ولا حسابات."
 
@@ -449,7 +453,7 @@ msgstr "إغلاق"
 
 #: src/components/feedback/help-feedback-dialog.tsx:281
 #: src/features/history/components/session-detail-modal.tsx:206
-#: src/features/settings/sections/models-section.tsx:324
+#: src/features/settings/sections/models-section.tsx:327
 #: src/features/styles/components/style-editor-modal.tsx:238
 #: src/features/updates/update-dialog.tsx:326
 #: src/features/updates/update-dialog.tsx:338
@@ -468,7 +472,8 @@ msgstr "طي الشريط الجانبي"
 msgid "Combo must include a non-modifier key."
 msgstr "يجب أن يتضمن التركيب مفتاحًا غير معدِّل."
 
-#: src/features/settings/data/settings-data.ts:112
+#: src/features/settings/data/settings-data.ts:121
+#: src/features/settings/data/settings-data.ts:237
 msgid "Compact"
 msgstr "مضغوط"
 
@@ -486,12 +491,12 @@ msgstr "الاتصال"
 msgid "Contact the release server shortly after startup and tell you only when a newer version exists. Off by default — dictation itself never needs the network."
 msgstr "الاتصال بخادم الإصدارات بُعيد بدء التشغيل وإخبارك فقط عند وجود إصدار أحدث. مُعطَّل افتراضيًا — فالإملاء نفسه لا يحتاج إلى الشبكة أبدًا."
 
-#: src/features/welcome/welcome-page.tsx:387
-#: src/features/welcome/welcome-page.tsx:466
+#: src/features/welcome/welcome-page.tsx:395
+#: src/features/welcome/welcome-page.tsx:474
 msgid "Continue"
 msgstr "متابعة"
 
-#: src/features/settings/sections/transcription-section.tsx:45
+#: src/features/settings/sections/transcription-section.tsx:46
 msgid "Control how your speech is turned into text."
 msgstr "تحكم في كيفية تحويل كلامك إلى نص."
 
@@ -520,16 +525,16 @@ msgstr "استدارة زوايا شريط المؤشر."
 msgid "Corners"
 msgstr "الزوايا"
 
-#: src/features/settings/sections/transcription-section.tsx:121
+#: src/features/settings/sections/transcription-section.tsx:129
 msgid "Correction"
 msgstr "التصحيح"
 
-#: src/features/settings/sections/transcription-section.tsx:140
-#: src/features/settings/sections/transcription-section.tsx:155
+#: src/features/settings/sections/transcription-section.tsx:148
+#: src/features/settings/sections/transcription-section.tsx:163
 msgid "Correction sensitivity"
 msgstr "حساسية التصحيح"
 
-#: src/features/welcome/welcome-page.tsx:319
+#: src/features/welcome/welcome-page.tsx:327
 msgid "Could not download GPU support — transcription will run on the CPU. You can retry under Settings › Models."
 msgstr "تعذّر تنزيل دعم GPU — سيجري النسخ على المعالج. يمكنك إعادة المحاولة من الإعدادات › نماذج."
 
@@ -553,6 +558,10 @@ msgstr "تعذّر الوصول إلى خدمة الملاحظات. استخدم
 msgid "Couldn't save that snippet. Try again."
 msgstr "تعذّر حفظ هذا المقتطف. حاول مرة أخرى."
 
+#: src/features/welcome/components/engine-step.tsx:282
+msgid "Covers {languages}. For any other language, choose Whisper."
+msgstr "يدعم: {languages}. لأي لغة أخرى، اختر Whisper."
+
 #: src/components/feedback/help-feedback-dialog.tsx:59
 msgid "Crash or freeze"
 msgstr "تعطّل أو تجمّد"
@@ -569,7 +578,7 @@ msgstr "إنشاء نمط جديد"
 msgid "Create style"
 msgstr "إنشاء النمط"
 
-#: src/features/welcome/welcome-page.tsx:512
+#: src/features/welcome/welcome-page.tsx:520
 msgid "Ctrl+Space"
 msgstr "Ctrl+Space"
 
@@ -589,7 +598,7 @@ msgstr "داكن"
 #: src/components/feedback/confirm-dialog.tsx:72
 #: src/features/history/components/history-table.tsx:500
 #: src/features/history/components/session-detail-modal.tsx:199
-#: src/features/settings/sections/models-section.tsx:260
+#: src/features/settings/sections/models-section.tsx:263
 msgid "Delete"
 msgstr "حذف"
 
@@ -603,7 +612,7 @@ msgid "Delete {0}"
 msgstr "حذف {0}"
 
 #. placeholder {0}: model.name
-#: src/features/settings/sections/models-section.tsx:297
+#: src/features/settings/sections/models-section.tsx:300
 msgid "Delete {0}?"
 msgstr "هل تريد حذف {0}؟"
 
@@ -611,7 +620,7 @@ msgstr "هل تريد حذف {0}؟"
 msgid "Delete {count, plural, one {# session} other {# sessions}}?"
 msgstr "حذف {count, plural, zero {# جلسة} one {جلسة واحدة} two {جلستين} few {# جلسات} many {# جلسة} other {# جلسة}}؟"
 
-#: src/features/settings/sections/models-section.tsx:315
+#: src/features/settings/sections/models-section.tsx:318
 msgid "Delete model"
 msgstr "حذف النموذج"
 
@@ -648,11 +657,11 @@ msgstr "وصف"
 msgid "Description is too long."
 msgstr "الوصف طويل جدًا."
 
-#: src/features/settings/data/settings-data.ts:266
+#: src/features/settings/data/settings-data.ts:500
 msgid "Detects terminals and picks the matching paste shortcut. Works on most compositors."
 msgstr "يكتشف الطرفيات ويختار اختصار اللصق المناسب. يعمل مع معظم مُركِّبات العرض."
 
-#: src/features/settings/data/settings-data.ts:246
+#: src/features/settings/data/settings-data.ts:462
 msgid "Detects the spoken language each session."
 msgstr "يكتشف اللغة المنطوقة في كل جلسة."
 
@@ -664,10 +673,16 @@ msgstr "تم تطبيق الإصلاحات الحتمية قبل أي تصميم
 msgid "Dictation"
 msgstr "الإملاء"
 
-#: src/features/settings/sections/transcription-section.tsx:71
-#: src/features/settings/sections/transcription-section.tsx:77
+#: src/features/settings/sections/transcription-section.tsx:72
+#: src/features/settings/sections/transcription-section.tsx:85
+#: src/features/welcome/components/engine-step.tsx:286
+#: src/features/welcome/components/engine-step.tsx:294
 msgid "Dictation language"
 msgstr "لغة الإملاء"
+
+#: src/features/settings/components/asr-engine-cards.tsx:386
+msgid "Dictation language set to {languageName}. Parakeet cannot tell Lune which language it heard, so it has no Auto-detect — change the language below whenever you dictate in another one."
+msgstr "ضُبطت لغة الإملاء على {languageName}. لا يستطيع Parakeet إخبار Lune باللغة التي سمعها، لذا لا يتوفر فيه «كشف تلقائي» — غيّر اللغة أدناه كلما أمليت بلغة أخرى."
 
 #: src/features/settings/sections/pill-section.tsx:73
 msgid "Dictation pill"
@@ -693,7 +708,7 @@ msgstr "تجاهل المسودة الحالية والعودة إلى وضع ا
 msgid "Disconnected"
 msgstr "غير متصل"
 
-#: src/features/settings/sections/models-section.tsx:134
+#: src/features/settings/sections/models-section.tsx:137
 msgid "Disk usage"
 msgstr "استخدام القرص"
 
@@ -701,40 +716,39 @@ msgstr "استخدام القرص"
 msgid "Dismiss error"
 msgstr "تجاهل الخطأ"
 
-#: src/features/settings/data/settings-data.ts:285
+#: src/features/settings/data/settings-data.ts:519
 msgid "Don't save history"
 msgstr "عدم حفظ السجل"
 
 #: src/features/history/components/history-table.tsx:494
 #: src/features/settings/components/gpu-backend-card.tsx:114
-#: src/features/settings/sections/models-section.tsx:274
+#: src/features/settings/sections/models-section.tsx:277
 msgid "Download"
 msgstr "تحميل"
 
-#. placeholder {0}: localizeText(i18n, selected.label)
-#: src/features/settings/components/asr-engine-cards.tsx:167
-msgid "Download {0}"
-msgstr "تنزيل {0}"
+#: src/features/settings/components/asr-engine-cards.tsx:312
+msgid "Download {label}"
+msgstr "تنزيل {label}"
 
-#: src/features/welcome/welcome-page.tsx:458
+#: src/features/welcome/welcome-page.tsx:466
 msgid "Download {pendingCount} models"
 msgstr "تنزيل نماذج {pendingCount}"
 
-#: src/features/welcome/welcome-page.tsx:457
+#: src/features/welcome/welcome-page.tsx:465
 msgid "Download 1 model"
 msgstr "تنزيل نموذج واحد"
 
-#: src/features/welcome/welcome-page.tsx:154
+#: src/features/welcome/welcome-page.tsx:162
 msgid "Download failed"
 msgstr "فشل التنزيل"
 
-#: src/features/welcome/welcome-page.tsx:210
+#: src/features/welcome/welcome-page.tsx:218
 msgid "Download interrupted"
 msgstr "تمت مقاطعة التنزيل"
 
 #: src/components/ui/byte-progress.tsx:37
-#: src/features/settings/components/asr-engine-cards.tsx:152
-#: src/features/settings/sections/models-section.tsx:233
+#: src/features/settings/components/asr-engine-cards.tsx:297
+#: src/features/settings/sections/models-section.tsx:236
 #: src/features/welcome/components/model-card.tsx:105
 msgid "Download progress"
 msgstr "تقدم التنزيل"
@@ -743,11 +757,11 @@ msgstr "تقدم التنزيل"
 msgid "Download transcript"
 msgstr "تحميل النص"
 
-#: src/features/welcome/welcome-page.tsx:204
+#: src/features/welcome/welcome-page.tsx:212
 msgid "Downloading models"
 msgstr "تنزيل النماذج"
 
-#: src/features/welcome/welcome-page.tsx:310
+#: src/features/welcome/welcome-page.tsx:318
 msgid "Downloading NVIDIA's CUDA runtime."
 msgstr "جارٍ تنزيل بيئة تشغيل CUDA من NVIDIA."
 
@@ -755,10 +769,10 @@ msgstr "جارٍ تنزيل بيئة تشغيل CUDA من NVIDIA."
 msgid "Downloading update"
 msgstr "جارٍ تنزيل التحديث"
 
-#: src/features/settings/components/asr-engine-cards.tsx:155
+#: src/features/settings/components/asr-engine-cards.tsx:300
 #: src/features/settings/components/gpu-backend-card.tsx:114
-#: src/features/settings/sections/models-section.tsx:274
-#: src/features/welcome/welcome-page.tsx:402
+#: src/features/settings/sections/models-section.tsx:277
+#: src/features/welcome/welcome-page.tsx:410
 msgid "Downloading…"
 msgstr "جارٍ التنزيل…"
 
@@ -821,7 +835,7 @@ msgstr "تفعيل التنسيق"
 msgid "Engine"
 msgstr "محرك"
 
-#: src/features/welcome/welcome-page.tsx:439
+#: src/features/welcome/welcome-page.tsx:447
 msgid "Enter Lune Voice"
 msgstr "الدخول إلى Lune Voice"
 
@@ -837,11 +851,15 @@ msgstr "تُعلّم الأمثلة محرك التنسيق أسلوبك. أعد
 msgid "Expand sidebar"
 msgstr "قم بتوسيع الشريط الجانبي"
 
-#: src/features/settings/data/settings-data.ts:185
+#: src/features/settings/data/settings-data.ts:200
 msgid "Fast; less accurate than Medium."
 msgstr "سريع؛ أقل دقة من المتوسط."
 
-#: src/features/settings/data/settings-data.ts:178
+#: src/features/welcome/components/engine-step.tsx:85
+msgid "Fastest on CPU · 25 European languages"
+msgstr "الأسرع على المعالج · 25 لغة أوروبية"
+
+#: src/features/settings/data/settings-data.ts:193
 msgid "Fastest, lowest accuracy. For older or low-power computers."
 msgstr "الأسرع، والأقل دقة. للأجهزة القديمة أو منخفضة الأداء."
 
@@ -853,7 +871,7 @@ msgstr "طلب ميزة"
 msgid "Fetching Lune Voice {version}. Keep the app open until it finishes."
 msgstr "جارٍ تنزيل Lune Voice {version}. أبقِ التطبيق مفتوحًا حتى ينتهي."
 
-#: src/features/welcome/welcome-page.tsx:208
+#: src/features/welcome/welcome-page.tsx:216
 msgid "Fetching the NVIDIA runtime. This is the last step, and it only happens once."
 msgstr "جارٍ جلب بيئة تشغيل NVIDIA. هذه هي الخطوة الأخيرة وتحدث مرة واحدة فقط."
 
@@ -877,7 +895,7 @@ msgstr "تصفية المقتطفات"
 msgid "Filter snippets…"
 msgstr "تصفية المقتطفات…"
 
-#: src/features/settings/sections/transcription-section.tsx:122
+#: src/features/settings/sections/transcription-section.tsx:130
 msgid "Fix recognizer errors with your dictionary and known vocabulary, on your device. It uses per-word confidence and statistical patterns — no AI model, and it never rewrites what you said."
 msgstr "صحّح أخطاء التعرّف باستخدام قاموسك والمفردات المعروفة، على جهازك. يعتمد على درجة الثقة لكل كلمة وأنماط إحصائية — بلا نموذج ذكاء اصطناعي، ولا يعيد صياغة ما قلته أبدًا."
 
@@ -885,11 +903,11 @@ msgstr "صحّح أخطاء التعرّف باستخدام قاموسك وال�
 msgid "Follow Settings"
 msgstr "اتباع الإعدادات"
 
-#: src/features/settings/data/settings-data.ts:271
+#: src/features/settings/data/settings-data.ts:505
 msgid "Force the standard paste shortcut for every app."
 msgstr "فرض اختصار اللصق القياسي في كل التطبيقات."
 
-#: src/features/settings/data/settings-data.ts:276
+#: src/features/settings/data/settings-data.ts:510
 msgid "Force the terminal paste shortcut. Use on COSMIC if you mostly dictate into terminals."
 msgstr "فرض اختصار اللصق الخاص بالطرفية. استخدمه في COSMIC إذا كنت تُملي في الطرفيات غالبًا."
 
@@ -902,12 +920,16 @@ msgstr "نسيان الموضع الذي سحبت إليه المؤشر وإعا
 msgid "Formatting"
 msgstr "التنسيق"
 
-#: src/features/settings/sections/transcription-section.tsx:101
-#: src/features/settings/sections/transcription-section.tsx:107
+#: src/features/settings/sections/transcription-section.tsx:109
+#: src/features/settings/sections/transcription-section.tsx:115
 msgid "Free the model when idle"
 msgstr "تحرير النموذج عند الخمول"
 
-#: src/features/settings/data/settings-data.ts:123
+#: src/features/settings/data/settings-data.ts:244
+msgid "Full"
+msgstr "كامل"
+
+#: src/features/settings/data/settings-data.ts:132
 msgid "Fully round"
 msgstr "دائري بالكامل"
 
@@ -937,7 +959,7 @@ msgstr "github"
 msgid "GitHub"
 msgstr "GitHub"
 
-#: src/features/settings/sections/transcription-section.tsx:102
+#: src/features/settings/sections/transcription-section.tsx:110
 msgid "Give the memory back after a quiet spell. The next dictation reloads the model, which adds up to a second before it starts listening — your speech is recorded during the wait, so nothing is lost."
 msgstr "يُعيد الذاكرة بعد فترة سكون. الإملاء التالي يُعيد تحميل النموذج، ما يضيف حتى ثانية قبل بدء الاستماع — ويُسجَّل كلامك أثناء الانتظار، فلا يضيع شيء."
 
@@ -954,8 +976,8 @@ msgid "Good morning."
 msgstr "صباح الخير."
 
 #: src/features/settings/components/gpu-backend-card.tsx:68
-#: src/features/welcome/components/engine-step.tsx:253
-#: src/features/welcome/welcome-page.tsx:301
+#: src/features/welcome/components/engine-step.tsx:350
+#: src/features/welcome/welcome-page.tsx:309
 msgid "GPU acceleration"
 msgstr "تسريع GPU"
 
@@ -996,19 +1018,19 @@ msgstr "وضع الاستمرار بالضغط غير متاح حاليًا، ل
 msgid "Hold the hotkey and speak, and your words land wherever your cursor is."
 msgstr "اضغط مع الاستمرار على مفتاح الاختصار وتحدّث، وستظهر كلماتك في موضع المؤشر."
 
-#: src/features/settings/data/settings-data.ts:91
+#: src/features/settings/data/settings-data.ts:100
 msgid "Hold the hotkey while speaking, release to stop. Better for quick bursts."
 msgstr "استمر في الضغط على الاختصار أثناء الكلام وأفلته للتوقف. أنسب للجُمل القصيرة."
 
-#: src/features/settings/data/settings-data.ts:90
+#: src/features/settings/data/settings-data.ts:99
 msgid "Hold while speaking"
 msgstr "الاستمرار بالضغط أثناء الكلام"
 
-#: src/features/welcome/welcome-page.tsx:508
+#: src/features/welcome/welcome-page.tsx:516
 msgid "Hold your hotkey, speak, then let go. The text is typed into whatever app you were using."
 msgstr "اضغط مع الاستمرار على اختصارك، وتحدّث، ثم اترك المفتاح. يُكتب النص في التطبيق الذي كنت تستخدمه."
 
-#: src/features/settings/data/settings-data.ts:118
+#: src/features/settings/data/settings-data.ts:127
 msgid "Horizontal"
 msgstr "أفقي"
 
@@ -1024,7 +1046,7 @@ msgstr "مدى ارتفاع صوت تنبيهات الإملاء."
 msgid "How the pill bar looks. Changes apply immediately."
 msgstr "شكل شريط المؤشر. تُطبَّق التغييرات فورًا."
 
-#: src/features/welcome/welcome-page.tsx:505
+#: src/features/welcome/welcome-page.tsx:513
 msgid "How to dictate"
 msgstr "كيفية الإملاء"
 
@@ -1032,7 +1054,7 @@ msgstr "كيفية الإملاء"
 msgid "Idle · mic ready"
 msgstr "خامل · الميكروفون جاهز"
 
-#: src/features/settings/sections/models-section.tsx:217
+#: src/features/settings/sections/models-section.tsx:220
 msgid "In use"
 msgstr "قيد الاستخدام"
 
@@ -1048,15 +1070,15 @@ msgstr "إدراج عنصر نائب"
 msgid "Install and restart"
 msgstr "التثبيت وإعادة التشغيل"
 
-#: src/features/settings/components/asr-engine-cards.tsx:231
-#: src/features/settings/sections/models-section.tsx:220
+#: src/features/settings/components/asr-engine-cards.tsx:250
+#: src/features/settings/sections/models-section.tsx:223
 #: src/features/welcome/components/model-card.tsx:88
-#: src/features/welcome/welcome-page.tsx:303
+#: src/features/welcome/welcome-page.tsx:311
 msgid "Installed"
 msgstr "تم التثبيت"
 
 #: src/features/settings/components/gpu-backend-card.tsx:154
-#: src/features/welcome/components/engine-step.tsx:243
+#: src/features/welcome/components/engine-step.tsx:340
 msgid "Installed. Restart Lune Voice to start using your GPU."
 msgstr "تم التثبيت. أعد تشغيل Lune Voice لبدء استخدام وحدة معالجة الرسوميات."
 
@@ -1080,11 +1102,11 @@ msgstr "انضم إلى النقاشات"
 msgid "Just now"
 msgstr "الآن"
 
-#: src/features/settings/data/settings-data.ts:290
+#: src/features/settings/data/settings-data.ts:524
 msgid "Keep forever"
 msgstr "الاحتفاظ دائمًا"
 
-#: src/features/settings/data/settings-data.ts:317
+#: src/features/settings/data/settings-data.ts:551
 msgid "Keep loaded"
 msgstr "إبقاؤه محمَّلًا"
 
@@ -1114,11 +1136,15 @@ msgstr "اختصارات لوحة المفاتيح (\"Super H\" → \"Super+H\")
 msgid "Language"
 msgstr "لغة"
 
-#: src/features/settings/data/settings-data.ts:114
+#: src/features/settings/components/asr-engine-cards.tsx:379
+msgid "Languages: {languages}"
+msgstr "اللغات: {languages}"
+
+#: src/features/settings/data/settings-data.ts:123
 msgid "Large"
 msgstr "كبير"
 
-#: src/features/settings/data/settings-data.ts:198
+#: src/features/settings/data/settings-data.ts:213
 msgid "Large v3 Turbo"
 msgstr "Large v3 Turbo"
 
@@ -1207,11 +1233,11 @@ msgstr "يحتاج Lune Voice إلى إذن للكتابة في التطبيقا
 msgid "Lune Voice writes"
 msgstr "سيكتب Lune Voice"
 
-#: src/features/settings/components/asr-engine-cards.tsx:175
+#: src/features/settings/components/asr-engine-cards.tsx:320
 msgid "Manage in Models"
 msgstr "الإدارة من قسم النماذج"
 
-#: src/features/settings/data/settings-data.ts:191
+#: src/features/settings/data/settings-data.ts:206
 msgid "Medium"
 msgstr "متوسط"
 
@@ -1238,16 +1264,17 @@ msgstr "دقيقة"
 msgid "Mode"
 msgstr "وضع"
 
-#: src/features/welcome/components/engine-step.tsx:130
+#: src/features/welcome/components/engine-step.tsx:167
+#: src/features/welcome/components/engine-step.tsx:267
 msgid "Model size"
 msgstr "حجم النموذج"
 
-#: src/features/settings/sections/models-section.tsx:99
+#: src/features/settings/sections/models-section.tsx:102
 #: src/features/settings/settings-page.tsx:79
 msgid "Models"
 msgstr "نماذج"
 
-#: src/features/welcome/welcome-page.tsx:526
+#: src/features/welcome/welcome-page.tsx:534
 msgid "Models are stored locally. No telemetry, no accounts."
 msgstr "تُخزن النماذج محليًا. لا قياسات عن بُعد ولا حسابات."
 
@@ -1262,7 +1289,7 @@ msgstr "الشاشة"
 msgid "More"
 msgstr "المزيد"
 
-#: src/features/welcome/components/engine-step.tsx:56
+#: src/features/welcome/components/engine-step.tsx:78
 msgid "Multilingual · runs on-device"
 msgstr "متعدد اللغات · يعمل على الجهاز"
 
@@ -1274,7 +1301,7 @@ msgstr "اسم"
 msgid "Name is too long."
 msgstr "الاسم طويل جدًا."
 
-#: src/features/settings/data/settings-data.ts:99
+#: src/features/settings/data/settings-data.ts:108
 msgid "Never"
 msgstr "أبدًا"
 
@@ -1337,7 +1364,7 @@ msgstr "لا توجد مقتطفات تطابق «{query}»."
 msgid "No snippets yet"
 msgstr "لا توجد مقتطفات بعد"
 
-#: src/features/settings/data/settings-data.ts:155
+#: src/features/settings/data/settings-data.ts:170
 msgid "No styling — transcripts are delivered exactly as transcribed."
 msgstr "بدون تنسيق — تُسلَّم النصوص كما نُسخت تمامًا."
 
@@ -1360,15 +1387,23 @@ msgid "not connected"
 msgstr "غير متصل"
 
 #: src/features/settings/components/gpu-backend-card.tsx:135
-#: src/features/settings/sections/models-section.tsx:223
+#: src/features/settings/sections/models-section.tsx:226
 msgid "Not installed"
 msgstr "غير مثبت"
 
-#: src/features/settings/sections/models-section.tsx:136
+#: src/features/settings/sections/models-section.tsx:139
 msgid "Nothing installed"
 msgstr "لا شيء مثبَّت"
 
-#: src/features/settings/data/settings-data.ts:154
+#: src/features/settings/data/settings-data.ts:147
+msgid "NVIDIA Parakeet on-device. Much faster than Whisper on a CPU, for 25 European languages."
+msgstr "NVIDIA Parakeet على الجهاز. أسرع بكثير من Whisper على المعالج، لـ 25 لغة أوروبية."
+
+#: src/features/welcome/components/engine-step.tsx:86
+msgid "NVIDIA Parakeet running on-device. Punctuates by itself and detects which of its languages you speak."
+msgstr "NVIDIA Parakeet يعمل على جهازك. يضع علامات الترقيم بنفسه ويكتشف أيّ لغة من لغاته تتحدث."
+
+#: src/features/settings/data/settings-data.ts:169
 #: src/features/styles/components/style-editor-modal.tsx:192
 msgid "Off"
 msgstr "إيقاف"
@@ -1402,12 +1437,12 @@ msgstr "فتح صفحة الإصدارات"
 msgid "Open session from {time}"
 msgstr "فتح جلسة {time}"
 
-#: src/features/settings/data/settings-data.ts:361
+#: src/features/settings/data/settings-data.ts:596
 msgid "OpenAI-compatible"
 msgstr "متوافق مع OpenAI"
 
-#: src/features/settings/data/settings-data.ts:139
-#: src/features/settings/data/settings-data.ts:160
+#: src/features/settings/data/settings-data.ts:154
+#: src/features/settings/data/settings-data.ts:175
 msgid "OpenAI-compatible API"
 msgstr "واجهة برمجية متوافقة مع OpenAI"
 
@@ -1431,7 +1466,7 @@ msgstr "الإخراج"
 msgid "Overall footprint of the pill bar."
 msgstr "الحجم الإجمالي لشريط المؤشر."
 
-#: src/features/welcome/welcome-page.tsx:345
+#: src/features/welcome/welcome-page.tsx:353
 msgid "Overall progress"
 msgstr "التقدم الشامل"
 
@@ -1439,7 +1474,32 @@ msgstr "التقدم الشامل"
 msgid "Pagination"
 msgstr "ترقيم الصفحات"
 
-#: src/features/settings/data/settings-data.ts:365
+#: src/features/settings/data/settings-data.ts:595
+#: src/features/welcome/components/engine-step.tsx:84
+msgid "Parakeet"
+msgstr "Parakeet"
+
+#: src/features/settings/data/settings-data.ts:146
+msgid "Parakeet (local)"
+msgstr "Parakeet (محلي)"
+
+#: src/features/settings/components/asr-engine-cards.tsx:387
+msgid "Parakeet cannot tell Lune which language it heard, so it has no Auto-detect. Set the dictation language below to the one you speak, and change it when you switch languages."
+msgstr "لا يستطيع Parakeet إخبار Lune باللغة التي سمعها، لذا لا يتوفر فيه «كشف تلقائي». اضبط لغة الإملاء أدناه على اللغة التي تتحدثها، وغيّرها عند تبديل اللغة."
+
+#: src/features/welcome/components/engine-step.tsx:288
+msgid "Parakeet cannot tell Lune which language it heard, so set the one you speak. You can change it later in Settings."
+msgstr "لا يستطيع Parakeet إخبار Lune باللغة التي سمعها، لذا اضبط اللغة التي تتحدثها. يمكنك تغييرها لاحقًا من الإعدادات."
+
+#: src/features/settings/components/asr-engine-cards.tsx:398
+msgid "Parakeet cannot transcribe {languageName}, so dictation will not start. Choose a language it covers below, or use Whisper."
+msgstr "لا يستطيع Parakeet تفريغ {languageName}، لذا لن يبدأ الإملاء. اختر أدناه لغة يدعمها، أو استخدم Whisper."
+
+#: src/features/settings/components/asr-engine-cards.tsx:363
+msgid "Parakeet model size"
+msgstr "حجم نموذج Parakeet"
+
+#: src/features/settings/data/settings-data.ts:600
 msgid "Paste"
 msgstr "لصق"
 
@@ -1448,7 +1508,7 @@ msgstr "لصق"
 msgid "Paste compatibility"
 msgstr "توافق اللصق"
 
-#: src/features/settings/data/settings-data.ts:217
+#: src/features/settings/data/settings-data.ts:409
 msgid "Paste into app"
 msgstr "اللصق في التطبيق"
 
@@ -1497,13 +1557,17 @@ msgstr "التموضع"
 msgid "Play a short sound when dictation starts, finishes, or runs into an error."
 msgstr "تشغيل صوت قصير عند بدء الإملاء أو انتهائه أو حدوث خطأ."
 
-#: src/features/welcome/welcome-page.tsx:414
+#: src/features/welcome/welcome-page.tsx:422
 msgid "Please keep the app open until downloads finish"
 msgstr "يرجى إبقاء التطبيق مفتوحًا حتى تنتهي التنزيلات"
 
 #: src/features/settings/sections/pill-section.tsx:116
 msgid "Position"
 msgstr "الموضع"
+
+#: src/features/settings/data/settings-data.ts:245
+msgid "Practically the accuracy of the original model. Recommended."
+msgstr "دقة النموذج الأصلي تقريبًا. موصى به."
 
 #: src/features/settings/sections/pill-section.tsx:117
 msgid "Preset corner or edge the pill starts at."
@@ -1521,7 +1585,7 @@ msgstr "اضغط المفاتيح لتعيين الاختصار. استمر با
 msgid "Press keys…"
 msgstr "اضغط المفاتيح…"
 
-#: src/features/settings/data/settings-data.ts:85
+#: src/features/settings/data/settings-data.ts:94
 msgid "Press the hotkey to start, press again to stop. Easiest for longer dictations."
 msgstr "اضغط الاختصار للبدء واضغطه ثانية للتوقف. الأسهل للإملاء الطويل."
 
@@ -1529,7 +1593,7 @@ msgstr "اضغط الاختصار للبدء واضغطه ثانية للتوق�
 msgid "Press your combo — hold Esc or click away to cancel"
 msgstr "اضغط تركيبك — استمر بالضغط على Esc أو انقر خارجًا للإلغاء"
 
-#: src/features/welcome/welcome-page.tsx:509
+#: src/features/welcome/welcome-page.tsx:517
 msgid "Press your hotkey, speak, then press it again. The text is typed into whatever app you were using."
 msgstr "اضغط اختصارك، وتحدّث، ثم اضغطه مرة أخرى. يُكتب النص في التطبيق الذي كنت تستخدمه."
 
@@ -1591,9 +1655,9 @@ msgstr "وضع التسجيل"
 msgid "Refresh few-shot examples"
 msgstr "تحديث الأمثلة الإرشادية"
 
-#: src/features/settings/sections/transcription-section.tsx:67
-msgid "Remote services are turned off, so dictation cannot start with this engine. Turn on Allow remote services in General, or switch back to Whisper."
-msgstr "الخدمات البعيدة متوقفة، لذا لا يمكن بدء الإملاء بهذا المحرك. فعّل «السماح بالخدمات البعيدة» في «عام»، أو ارجع إلى Whisper."
+#: src/features/settings/sections/transcription-section.tsx:68
+msgid "Remote services are turned off, so dictation cannot start with this engine. Turn on Allow remote services in General, or switch to an on-device engine."
+msgstr "الخدمات البعيدة متوقفة، لذا لا يمكن بدء الإملاء بهذا المحرك. فعّل «السماح بالخدمات البعيدة» في «عام»، أو انتقل إلى محرك يعمل على الجهاز."
 
 #: src/features/settings/sections/styling-engine-section.tsx:73
 msgid "Remote services are turned off, so transcripts are delivered without styling. Turn on Allow remote services in General to use this endpoint."
@@ -1639,7 +1703,7 @@ msgstr "إعادة تعيين"
 msgid "Reset position"
 msgstr "إعادة تعيين الموضع"
 
-#: src/features/welcome/welcome-page.tsx:314
+#: src/features/welcome/welcome-page.tsx:322
 msgid "Restart Lune Voice to start using your GPU."
 msgstr "أعد تشغيل Lune Voice لبدء استخدام بطاقتك الرسومية."
 
@@ -1651,7 +1715,7 @@ msgstr "يلزم إعادة التشغيل"
 msgid "Retry"
 msgstr "إعادة المحاولة"
 
-#: src/features/welcome/welcome-page.tsx:426
+#: src/features/welcome/welcome-page.tsx:434
 msgid "Retry download"
 msgstr "أعد محاولة التنزيل"
 
@@ -1659,7 +1723,7 @@ msgstr "أعد محاولة التنزيل"
 msgid "Rewrite each transcript in a chosen style. When off, the raw transcript is delivered as-is."
 msgstr "أعد صياغة كل نص بأسلوب مختار. عند الإيقاف، يُسلّم النص الخام كما هو."
 
-#: src/features/settings/data/settings-data.ts:124
+#: src/features/settings/data/settings-data.ts:133
 msgid "Rounded"
 msgstr "مستدير الزوايا"
 
@@ -1667,7 +1731,7 @@ msgstr "مستدير الزوايا"
 msgid "Running on CPU"
 msgstr "يعمل على المعالج"
 
-#: src/features/settings/data/settings-data.ts:132
+#: src/features/settings/data/settings-data.ts:141
 msgid "Runs whisper.cpp on-device. Choose a model size below."
 msgstr "يشغّل whisper.cpp على الجهاز. اختر حجم النموذج بالأسفل."
 
@@ -1721,7 +1785,7 @@ msgstr "بحث في النصوص..."
 msgid "Select all sessions on this page"
 msgstr "تحديد كل الجلسات في هذه الصفحة"
 
-#: src/features/welcome/welcome-page.tsx:462
+#: src/features/welcome/welcome-page.tsx:470
 msgid "Select required models"
 msgstr "حدد النماذج المطلوبة"
 
@@ -1738,15 +1802,15 @@ msgstr "إرسال"
 msgid "Send method"
 msgstr "طريقة الإرسال"
 
-#: src/features/settings/data/settings-data.ts:218
+#: src/features/settings/data/settings-data.ts:410
 msgid "Sends a paste shortcut into the focused app. Fastest for long dictations."
 msgstr "يُرسل اختصار لصق إلى التطبيق النشط. الأسرع للإملاء الطويل."
 
-#: src/features/settings/data/settings-data.ts:140
+#: src/features/settings/data/settings-data.ts:155
 msgid "Sends audio to an OpenAI-compatible endpoint you configure — a server on your own machine, or a hosted API."
 msgstr "يُرسل الصوت إلى نقطة نهاية متوافقة مع OpenAI تُعدّها بنفسك — خادم على جهازك أو واجهة برمجية مستضافة."
 
-#: src/features/settings/data/settings-data.ts:161
+#: src/features/settings/data/settings-data.ts:176
 msgid "Sends transcripts to an OpenAI-compatible endpoint you configure — Ollama, llama-server or LM Studio locally, or a hosted API."
 msgstr "يُرسل النصوص إلى نقطة نهاية متوافقة مع OpenAI تُعدّها بنفسك — Ollama أو llama-server أو LM Studio محليًا، أو واجهة برمجية مستضافة."
 
@@ -1770,19 +1834,19 @@ msgstr "جلسات"
 msgid "Set hotkey"
 msgstr "تعيين مفتاح التشغيل السريع"
 
-#: src/features/settings/sections/transcription-section.tsx:72
+#: src/features/settings/sections/transcription-section.tsx:76
 msgid "Set the language you speak. Auto uses detection from speech."
 msgstr "حدد اللغة التي تتحدثها. يستخدم الوضع التلقائي اكتشاف اللغة من الكلام."
 
-#: src/features/welcome/welcome-page.tsx:455
+#: src/features/welcome/welcome-page.tsx:463
 msgid "Set up GPU acceleration"
 msgstr "إعداد تسريع GPU"
 
-#: src/features/welcome/welcome-page.tsx:207
+#: src/features/welcome/welcome-page.tsx:215
 msgid "Setting up your GPU"
 msgstr "جارٍ إعداد وحدة معالجة الرسوميات"
 
-#: src/features/settings/settings-page.tsx:99
+#: src/features/settings/settings-page.tsx:106
 msgid "Settings sections"
 msgstr "أقسام الإعدادات"
 
@@ -1805,7 +1869,7 @@ msgstr "عرض {0} من {totalSessions} جلسة"
 msgid "Showing {start}–{end} of {visibleCount} sessions"
 msgstr "عرض {start}–{end} من {visibleCount} جلسة"
 
-#: src/features/settings/data/settings-data.ts:224
+#: src/features/settings/data/settings-data.ts:416
 msgid "Simulates keystrokes one character at a time. Works where paste is blocked."
 msgstr "يحاكي ضغطات المفاتيح حرفًا بحرف. يعمل حيث يكون اللصق ممنوعًا."
 
@@ -1821,9 +1885,9 @@ msgstr "الحجم"
 msgid "Size & shape"
 msgstr "الحجم والشكل"
 
-#: src/features/welcome/welcome-page.tsx:391
-#: src/features/welcome/welcome-page.tsx:429
-#: src/features/welcome/welcome-page.tsx:475
+#: src/features/welcome/welcome-page.tsx:399
+#: src/features/welcome/welcome-page.tsx:437
+#: src/features/welcome/welcome-page.tsx:483
 msgid "Skip for now"
 msgstr "تخطي الآن"
 
@@ -1831,9 +1895,13 @@ msgstr "تخطي الآن"
 msgid "Skip to main content"
 msgstr "انتقل إلى المحتوى الرئيسي"
 
-#: src/features/settings/data/settings-data.ts:184
+#: src/features/settings/data/settings-data.ts:199
 msgid "Small"
 msgstr "صغير"
+
+#: src/features/settings/data/settings-data.ts:238
+msgid "Smaller download and less memory, slightly less accurate."
+msgstr "تنزيل أصغر وذاكرة أقل، ودقة أقل قليلًا."
 
 #: src/features/snippets/snippets-page.tsx:291
 #: src/features/snippets/snippets-page.tsx:420
@@ -1857,11 +1925,11 @@ msgstr "التنبيهات الصوتية"
 msgid "Speaking time"
 msgstr "مدة التحدث"
 
-#: src/features/welcome/components/engine-step.tsx:71
+#: src/features/welcome/components/engine-step.tsx:100
 msgid "Speech engine"
 msgstr "محرك التعرف على الكلام"
 
-#: src/features/settings/sections/models-section.tsx:71
+#: src/features/settings/sections/models-section.tsx:74
 msgid "Speech-to-text"
 msgstr "تحويل الكلام إلى نص"
 
@@ -1869,11 +1937,11 @@ msgstr "تحويل الكلام إلى نص"
 msgid "Spoken phrase"
 msgstr "العبارة المنطوقة"
 
-#: src/features/settings/data/settings-data.ts:125
+#: src/features/settings/data/settings-data.ts:134
 msgid "Square"
 msgstr "مربع"
 
-#: src/features/settings/data/settings-data.ts:113
+#: src/features/settings/data/settings-data.ts:122
 msgid "Standard"
 msgstr "قياسي"
 
@@ -1976,6 +2044,10 @@ msgstr "شكرًا — تم إرسال ملاحظاتك."
 msgid "The floating status pill you see while dictating."
 msgstr "مؤشر الحالة العائم الذي يظهر أثناء الإملاء."
 
+#: src/features/settings/sections/transcription-section.tsx:75
+msgid "The language you speak. Parakeet needs it set."
+msgstr "اللغة التي تتحدثها. يحتاج Parakeet إلى ضبطها."
+
 #: src/features/overview/overview-page.tsx:322
 msgid "The local runtime isn't responding. The figures below are the last known values."
 msgstr "بيئة التشغيل المحلية لا تستجيب. الأرقام أدناه هي آخر القيم المعروفة."
@@ -1988,11 +2060,11 @@ msgstr "الاختصار الرئيسي المستخدم للكتابة الصو
 msgid "The microphone is in use"
 msgstr "الميكروفون قيد الاستخدام"
 
-#: src/features/settings/data/settings-data.ts:318
+#: src/features/settings/data/settings-data.ts:552
 msgid "The model stays in memory. Every dictation starts instantly."
 msgstr "يبقى النموذج في الذاكرة. كل إملاء يبدأ فورًا."
 
-#: src/features/settings/sections/transcription-section.tsx:141
+#: src/features/settings/sections/transcription-section.tsx:149
 msgid "The words the recognizer is least sure about are checked against your dictionary and vocabulary. Higher checks more words; lower trusts the raw transcription."
 msgstr "تُقارَن الكلمات التي يقل تأكّد أداة التعرّف منها بقاموسك ومفرداتك. القيمة الأعلى تفحص كلمات أكثر؛ والأقل تثق بالنسخ الخام."
 
@@ -2000,11 +2072,11 @@ msgstr "تُقارَن الكلمات التي يقل تأكّد أداة الت
 msgid "This copy can't update itself. Download the new version from {RELEASES_URL} and replace this one. Your settings, history and models are kept."
 msgstr "لا تستطيع هذه النسخة تحديث نفسها. نزّل الإصدار الجديد من {RELEASES_URL} واستبدل به هذه النسخة. ستبقى إعداداتك وسجلك ونماذجك كما هي."
 
-#: src/features/settings/sections/models-section.tsx:307
+#: src/features/settings/sections/models-section.tsx:310
 msgid "This model is in use by your current configuration. Dictation may not work until you reinstall it or pick another."
 msgstr "هذا النموذج قيد الاستخدام في إعدادك الحالي. قد لا يعمل الإملاء حتى تعيد تثبيته أو تختار غيره."
 
-#: src/features/welcome/welcome-page.tsx:205
+#: src/features/welcome/welcome-page.tsx:213
 msgid "This only happens once. You can keep using your computer in the meantime."
 msgstr "وهذا يحدث مرة واحدة فقط. يمكنك الاستمرار في استخدام جهاز الكمبيوتر الخاص بك في هذه الأثناء."
 
@@ -2050,19 +2122,19 @@ msgstr "التبديل والإلغاء مرتبطان بمجموعة المفا
 msgid "Toggle is easiest for longer dictation. Hold is better for quick bursts."
 msgstr "التبديل أسهل للإملاء الطويل. الضغط المستمر أفضل للدفعات السريعة."
 
-#: src/features/settings/data/settings-data.ts:84
+#: src/features/settings/data/settings-data.ts:93
 msgid "Toggle to start and stop"
 msgstr "التبديل للبدء والإيقاف"
 
-#: src/features/settings/data/settings-data.ts:104
+#: src/features/settings/data/settings-data.ts:113
 msgid "Top center"
 msgstr "أعلى الوسط"
 
-#: src/features/settings/data/settings-data.ts:103
+#: src/features/settings/data/settings-data.ts:112
 msgid "Top left"
 msgstr "أعلى اليسار"
 
-#: src/features/settings/data/settings-data.ts:105
+#: src/features/settings/data/settings-data.ts:114
 msgid "Top right"
 msgstr "أعلى اليمين"
 
@@ -2083,7 +2155,7 @@ msgstr "جارٍ النسخ…"
 msgid "Transcript"
 msgstr "نص"
 
-#: src/features/settings/sections/transcription-section.tsx:44
+#: src/features/settings/sections/transcription-section.tsx:45
 #: src/features/settings/settings-page.tsx:76
 msgid "Transcription"
 msgstr "النسخ"
@@ -2122,7 +2194,7 @@ msgstr "عبارة التشغيل"
 msgid "Try again"
 msgstr "إعادة المحاولة"
 
-#: src/features/settings/data/settings-data.ts:366
+#: src/features/settings/data/settings-data.ts:601
 msgid "Type"
 msgstr "كتابة"
 
@@ -2130,7 +2202,7 @@ msgstr "كتابة"
 msgid "Type a phrase, or tap the mic to capture it exactly as Lune Voice hears it."
 msgstr "اكتب عبارة، أو انقر على الميكروفون لالتقاطها تمامًا كما يسمعها Lune Voice."
 
-#: src/features/settings/data/settings-data.ts:223
+#: src/features/settings/data/settings-data.ts:415
 msgid "Type into app"
 msgstr "الكتابة في التطبيق"
 
@@ -2159,12 +2231,12 @@ msgstr "فشل التحديث"
 msgid "Updates"
 msgstr "التحديثات"
 
-#: src/features/welcome/components/engine-step.tsx:271
+#: src/features/welcome/components/engine-step.tsx:368
 msgid "Use GPU acceleration"
 msgstr "استخدام تسريع GPU"
 
-#: src/features/settings/sections/transcription-section.tsx:88
 #: src/features/settings/sections/transcription-section.tsx:96
+#: src/features/settings/sections/transcription-section.tsx:104
 msgid "Use hardware acceleration"
 msgstr "استخدام تسريع الأجهزة"
 
@@ -2177,7 +2249,7 @@ msgstr "استخدم النمط {0}"
 msgid "Using {activeDevice}. Change it in Settings › Dictation."
 msgstr "قيد الاستخدام: {activeDevice}. يمكنك تغييره من الإعدادات › الإملاء."
 
-#: src/features/settings/data/settings-data.ts:119
+#: src/features/settings/data/settings-data.ts:128
 msgid "Vertical"
 msgstr "عمودي"
 
@@ -2202,7 +2274,7 @@ msgstr "عرض النمط"
 msgid "Visibility"
 msgstr "الظهور"
 
-#: src/features/settings/sections/transcription-section.tsx:49
+#: src/features/settings/sections/transcription-section.tsx:50
 msgid "Voice model"
 msgstr "نموذج صوتي"
 
@@ -2214,13 +2286,13 @@ msgstr "مقارنةً بالمتوسط العام"
 msgid "Wait {cooldown}s"
 msgstr "انتظر {cooldown} ثانية"
 
-#: src/features/welcome/welcome-page.tsx:216
+#: src/features/welcome/welcome-page.tsx:224
 msgid "Welcome back"
 msgstr "مرحبًا بعودتك"
 
-#: src/features/welcome/welcome-page.tsx:198
-#: src/features/welcome/welcome-page.tsx:213
-#: src/features/welcome/welcome-page.tsx:219
+#: src/features/welcome/welcome-page.tsx:206
+#: src/features/welcome/welcome-page.tsx:221
+#: src/features/welcome/welcome-page.tsx:227
 msgid "Welcome to Lune Voice"
 msgstr "مرحبًا بك في Lune Voice"
 
@@ -2236,11 +2308,11 @@ msgstr "ما موضوع هذا؟"
 msgid "What's new"
 msgstr "ما الجديد"
 
-#: src/features/settings/sections/transcription-section.tsx:89
+#: src/features/settings/sections/transcription-section.tsx:97
 msgid "When available, this can make transcription finish faster."
 msgstr "عندما يكون ذلك متاحًا، يمكن أن يؤدي ذلك إلى إنهاء عملية النسخ بشكل أسرع."
 
-#: src/features/settings/data/settings-data.ts:98
+#: src/features/settings/data/settings-data.ts:107
 msgid "When dictating"
 msgstr "أثناء الإملاء"
 
@@ -2264,20 +2336,20 @@ msgstr "اختصار اللصق المراد إرساله. «تلقائي» يك
 msgid "Which screen the pill appears on."
 msgstr "الشاشة التي يظهر عليها المؤشر."
 
-#: src/features/settings/data/settings-data.ts:360
-#: src/features/welcome/components/engine-step.tsx:55
+#: src/features/settings/data/settings-data.ts:594
+#: src/features/welcome/components/engine-step.tsx:77
 msgid "Whisper"
 msgstr "Whisper"
 
-#: src/features/settings/data/settings-data.ts:131
+#: src/features/settings/data/settings-data.ts:140
 msgid "Whisper (local)"
 msgstr "Whisper (محلي)"
 
-#: src/features/settings/components/asr-engine-cards.tsx:125
+#: src/features/settings/components/asr-engine-cards.tsx:175
 msgid "Whisper model size"
 msgstr "حجم نموذج Whisper"
 
-#: src/features/welcome/components/engine-step.tsx:57
+#: src/features/welcome/components/engine-step.tsx:79
 msgid "whisper.cpp running on-device. Choose a size to trade speed for accuracy."
 msgstr "whisper.cpp يعمل على جهازك. اختر حجمًا للمفاضلة بين السرعة والدقة."
 
@@ -2295,7 +2367,7 @@ msgstr "كلمات"
 msgid "WPM"
 msgstr "WPM"
 
-#: src/features/settings/sections/transcription-section.tsx:127
+#: src/features/settings/sections/transcription-section.tsx:135
 msgid "Write names like GitHub and iPhone the way their owners do. Turn this off to keep the recognizer's own capitals. A style can override this."
 msgstr "اكتب أسماء مثل GitHub وiPhone كما يكتبها أصحابها. أوقف هذا للإبقاء على الأحرف الكبيرة كما يخرجها المتعرّف. يمكن لأي نمط تجاوز هذا الإعداد."
 
@@ -2311,7 +2383,7 @@ msgstr "أنت تستخدم الإصدار {version}."
 msgid "You say"
 msgstr "أنت تقول"
 
-#: src/features/welcome/welcome-page.tsx:201
+#: src/features/welcome/welcome-page.tsx:209
 msgid "You're all set"
 msgstr "أنت جاهز تمامًا"
 
@@ -2327,11 +2399,11 @@ msgstr "مفتاح واجهة برمجة التطبيقات الخاص بك. ا�
 msgid "Your feedback"
 msgstr "ملاحظاتك"
 
-#: src/features/welcome/components/engine-step.tsx:241
+#: src/features/welcome/components/engine-step.tsx:338
 msgid "Your GPU is ready — use it for faster transcription."
 msgstr "وحدة معالجة الرسوميات لديك جاهزة — استخدمها لنسخ أسرع."
 
-#: src/features/welcome/components/engine-step.tsx:244
+#: src/features/welcome/components/engine-step.tsx:341
 msgid "Your GPU qualifies. Setup downloads the NVIDIA runtime, then a restart turns it on."
 msgstr "بطاقتك مؤهَّلة. سيُنزّل الإعداد بيئة تشغيل NVIDIA، وتفعّلها إعادة التشغيل."
 
@@ -2339,7 +2411,7 @@ msgstr "بطاقتك مؤهَّلة. سيُنزّل الإعداد بيئة تش
 msgid "your hotkey"
 msgstr "مفتاح التشغيل السريع الخاص بك"
 
-#: src/features/welcome/welcome-page.tsx:202
+#: src/features/welcome/welcome-page.tsx:210
 msgid "Your models are ready. Everything stays on this machine."
 msgstr "النماذج الخاصة بك جاهزة. كل شيء يبقى على هذا الجهاز."
 

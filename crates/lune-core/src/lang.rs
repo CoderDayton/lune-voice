@@ -62,6 +62,41 @@ pub fn display_name(raw: &str) -> Option<&'static str> {
         ("indonesian", "Indonesian"),
         ("tr", "Turkish"),
         ("turkish", "Turkish"),
+        // The rest of the 25 European languages Parakeet covers (and Whisper
+        // with it), so a dictation in any of them is formatted as itself
+        // rather than falling back to English rules.
+        ("bg", "Bulgarian"),
+        ("bulgarian", "Bulgarian"),
+        ("cs", "Czech"),
+        ("czech", "Czech"),
+        ("da", "Danish"),
+        ("danish", "Danish"),
+        ("el", "Greek"),
+        ("greek", "Greek"),
+        ("et", "Estonian"),
+        ("estonian", "Estonian"),
+        ("fi", "Finnish"),
+        ("finnish", "Finnish"),
+        ("hr", "Croatian"),
+        ("croatian", "Croatian"),
+        ("hu", "Hungarian"),
+        ("hungarian", "Hungarian"),
+        ("lt", "Lithuanian"),
+        ("lithuanian", "Lithuanian"),
+        ("lv", "Latvian"),
+        ("latvian", "Latvian"),
+        ("mt", "Maltese"),
+        ("maltese", "Maltese"),
+        ("ro", "Romanian"),
+        ("romanian", "Romanian"),
+        ("sk", "Slovak"),
+        ("slovak", "Slovak"),
+        ("sl", "Slovenian"),
+        ("slovenian", "Slovenian"),
+        ("sv", "Swedish"),
+        ("swedish", "Swedish"),
+        ("uk", "Ukrainian"),
+        ("ukrainian", "Ukrainian"),
     ];
     TABLE
         .iter()
@@ -72,6 +107,17 @@ pub fn display_name(raw: &str) -> Option<&'static str> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// Every language a local engine can be set to has a name, so none of
+    /// them is formatted with English rules for want of one.
+    #[test]
+    fn every_parakeet_language_has_a_display_name() {
+        for code in crate::config::ParakeetModel::default().languages() {
+            assert!(display_name(code).is_some(), "{code} has no display name");
+        }
+        assert_eq!(display_name("cs"), Some("Czech"));
+        assert_eq!(display_name("uk-UA"), Some("Ukrainian"));
+    }
 
     #[test]
     fn maps_bcp47_codes_to_english_names() {

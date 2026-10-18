@@ -13,7 +13,10 @@ use lune_core::asr::{AsrBackend, AsrBackendKind, AsrSegment, AsrSessionConfig};
 use lune_core::config::{AsrBackendConfig, DevicePolicy, PipelineConfig};
 use lune_core::error::{Error, Result};
 
-use crate::{OpenAiAsrConfig, OpenAiCompatibleAsrBackend, WhisperCppBackend, WhisperCppConfig};
+use crate::{
+    OpenAiAsrConfig, OpenAiCompatibleAsrBackend, ParakeetCppBackend, ParakeetCppConfig,
+    WhisperCppBackend, WhisperCppConfig,
+};
 
 // ── Dispatch helpers ────────────────────────────────────────────────────────
 //
@@ -52,6 +55,10 @@ macro_rules! dispatch {
                 AsrSessionHandle::WhisperCpp(s) => b.$method(s $(, $arg)*).await,
                 _ => Err(mismatch_err()),
             },
+            AsrRegistry::ParakeetCpp(b) => match $session {
+                AsrSessionHandle::ParakeetCpp(s) => b.$method(s $(, $arg)*).await,
+                _ => Err(mismatch_err()),
+            },
         }
     };
 }
@@ -65,6 +72,9 @@ macro_rules! dispatch_new {
             AsrRegistry::WhisperCpp(b) => {
                 Ok(AsrSessionHandle::WhisperCpp(b.$method($($arg),*).await?))
             }
+            AsrRegistry::ParakeetCpp(b) => {
+                Ok(AsrSessionHandle::ParakeetCpp(b.$method($($arg),*).await?))
+            }
         }
     };
 }
@@ -76,6 +86,7 @@ macro_rules! dispatch_new {
 pub enum AsrRegistry {
     OpenAi(OpenAiCompatibleAsrBackend),
     WhisperCpp(WhisperCppBackend),
+    ParakeetCpp(ParakeetCppBackend),
 }
 
 /// Runtime-dispatched ASR session handle.
@@ -83,6 +94,7 @@ pub enum AsrRegistry {
 pub enum AsrSessionHandle {
     OpenAi(<OpenAiCompatibleAsrBackend as AsrBackend>::SessionHandle),
     WhisperCpp(<WhisperCppBackend as AsrBackend>::SessionHandle),
+    ParakeetCpp(<ParakeetCppBackend as AsrBackend>::SessionHandle),
 }
 
 // ── AsrBackend impl ─────────────────────────────────────────────────────────
@@ -161,6 +173,19 @@ impl AsrRegistry {
                 })?;
                 Ok(Self::WhisperCpp(backend))
             }
+            AsrBackendConfig::ParakeetCpp { model } => {
+                let backend = ParakeetCppBackend::new(ParakeetCppConfig {
+                    model: *model,
+                    model_path: models_dir.join(model.dir()).join(model.ggml_file()),
+                    use_gpu: device.use_gpu(cuda_available),
+                    vad_model_path: Some(
+                        models_dir
+                            .join(lune_core::models::DIR_WHISPER_VAD)
+                            .join(lune_core::models::WHISPER_VAD_GGML),
+                    ),
+                })?;
+                Ok(Self::ParakeetCpp(backend))
+            }
             #[allow(unreachable_patterns)]
             _ => Err(Error::config("unknown ASR backend type")),
         }
@@ -171,6 +196,7 @@ impl AsrRegistry {
         match self {
             Self::OpenAi(_) => AsrBackendKind::OpenAiCompatible,
             Self::WhisperCpp(_) => AsrBackendKind::WhisperCpp,
+            Self::ParakeetCpp(_) => AsrBackendKind::ParakeetCpp,
         }
     }
 
@@ -201,6 +227,17 @@ impl AsrRegistry {
                 // (no per-backend isotonic file), so route a touch more eagerly
                 // rather than trust a hard cutoff.
                 word_confidence_threshold: Some(0.50),
+                max_speech_samples: 300 * 16_000,
+                llm_timeout_secs: 30,
+            },
+            AsrBackendKind::ParakeetCpp => PipelineConfig {
+                // TDT token probabilities are sharply peaked: a clean word sits
+                // near 1.0 and a doubtful one well below. Uncalibrated like
+                // whisper's, so the same moderate gate applies.
+                word_confidence_threshold: Some(0.50),
+                // Long dictations are cut at pauses into pieces inside the
+                // model's ~50 s encoder window (`parakeet_cpp::piece_limit`),
+                // which keeps encoder memory bounded, so the cap matches whisper's.
                 max_speech_samples: 300 * 16_000,
                 llm_timeout_secs: 30,
             },

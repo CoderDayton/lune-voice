@@ -10,6 +10,7 @@ Lune Voice keeps its settings in a TOML file. The same settings are in the app's
 - [Settings File](#settings-file)
 - [ASR Backends](#asr-backends)
   - [WhisperCpp (Local, default)](#whispercpp-local-default)
+  - [ParakeetCpp (Local)](#parakeetcpp-local)
   - [OpenAI-Compatible (Remote)](#openai-compatible-remote-asr)
 - [LLM Backends](#llm-backends)
   - [Disabled](#disabled-llm)
@@ -148,6 +149,39 @@ CPU or GPU is set by the top-level `device` field. Running on the GPU needs a CU
 - Input: 16 kHz mono PCM, which is whisper's native format, so nothing is converted
 - Decoding: beam search (beam size 5), once per utterance, with no streaming
 - Confidence: per-token probabilities become each segment's `confidence` (mean) and `min_token_confidence` (minimum). Segments below 0.25 are treated as garbage and dropped
+
+### ParakeetCpp (Local)
+
+NVIDIA [Parakeet TDT 0.6B v3](https://huggingface.co/nvidia/parakeet-tdt-0.6b-v3), run on-device by whisper.cpp's own `parakeet` library — the same whisper.cpp tree and the same ggml as the Whisper backend, so the CPU backends and the downloadable GPU plugin apply to it unchanged. The model is whisper.cpp's GGML conversion from `ggml-org/parakeet-GGUF`.
+
+```toml
+[asr_backend]
+type = "ParakeetCpp"
+model = "TdtV3Q8"
+```
+
+| Field | Values | Default | Description |
+|-------|--------|---------|-------------|
+| `model` | `TdtV3Q8`, `TdtV3Q4K` | `TdtV3Q8` | Which GGML quantization to load |
+
+**Available models** (the same NVIDIA weights, two quantizations):
+
+| `model` value | File | Size | Trade-off |
+|---------------|------|------|-----------|
+| `TdtV3Q4K` | `ggml-parakeet-tdt-0.6b-v3-q4_k.bin` | ~416 MB | Smaller download and memory; slightly less accurate |
+| `TdtV3Q8` | `ggml-parakeet-tdt-0.6b-v3-q8_0.bin` | ~669 MB | Practically the original model's accuracy (recommended) |
+
+**When to pick it over Whisper:** dictation on a CPU without a GPU, in one of its languages. Its FastConformer encoder and TDT decoder skip the token-by-token beam search Whisper runs, so it finishes a dictation many times faster on the same CPU, and it writes punctuation and capitalization itself.
+
+**Languages:** Bulgarian, Croatian, Czech, Danish, Dutch, English, Estonian, Finnish, French, German, Greek, Hungarian, Italian, Latvian, Lithuanian, Maltese, Polish, Portuguese, Romanian, Russian, Slovak, Slovenian, Spanish, Swedish and Ukrainian.
+
+**`dictation_language` must be set explicitly — no `"auto"`.** Parakeet recognizes which of its languages is spoken, but never reports it back, and the correction and formatting passes need to know (with `"auto"` they would treat every dictation as English: English filler removal, English casing rules). So with Parakeet the language selector offers only these 25 languages, without Auto-detect. Switching the engine to Parakeet while the language is `"auto"` or one it does not cover (Japanese, Korean, Chinese) moves it, in the same save, to your system language if Parakeet covers it, otherwise English, and the Parakeet panel says which. Saving Parakeet with `"auto"` or an unsupported language is refused. A hand-edited `settings.toml` that still pairs them keeps dictating, formatted as English, with a warning in Settings; a language outside the list makes a dictation refuse to start with an error naming the fix.
+
+**Inference details:**
+- Input: 16 kHz mono PCM, endpoint-trimmed by the same Silero pass as Whisper (it uses the same `models/whisper-vad-silero/` model, downloaded alongside)
+- Decoding: greedy TDT. A dictation longer than the model's ~50 s encoder window is cut in the middle of a pause and decoded piece by piece. Past that window whisper.cpp's Parakeet drops speech, and a 5-minute single pass would also need 1–2 GB; each piece needs tens of MB
+- Confidence: per-token probabilities folded into segment and per-word confidences exactly as for Whisper, so correction sensitivity works the same way. The default `word_confidence_threshold` is `0.50`
+- `detected_language` on each segment is the dictation language when one is set; Parakeet does not report what it heard
 
 ### OpenAI-Compatible (Remote ASR)
 
@@ -488,7 +522,7 @@ Each session record contains:
 | `started_at` | datetime | Session start timestamp |
 | `ended_at` | datetime | Session end timestamp (null if the app crashed) |
 | `style` | string | Style preset ID used |
-| `backend` | enum | ASR backend type (`WhisperCpp` / `OpenAiCompatible`) |
+| `backend` | enum | ASR backend type (`WhisperCpp` / `ParakeetCpp` / `OpenAiCompatible`) |
 | `status` | enum | `Active`, `Completed`, `Failed(reason)`, or `Cancelled` |
 | `transcript` | string | Final styled transcript (null if empty) |
 
@@ -502,8 +536,8 @@ These go in the `[pipeline]` section of `settings.toml` (`PipelineOverrides`). E
 
 | Parameter | Default | Effect | Tradeoff |
 |-----------|---------|--------|----------|
-| `word_confidence_threshold` | 0.50 (whisper.cpp) | Words below this count as uncertain. Only uncertain single words can get a near-miss dictionary fix | Higher allows more near-miss fixes |
-| `max_speech_secs` | 300 (local Whisper), 120 (remote) | Ends the session after this many seconds of audio | Higher allows longer dictations |
+| `word_confidence_threshold` | 0.50 (whisper.cpp, Parakeet) | Words below this count as uncertain. Only uncertain single words can get a near-miss dictionary fix | Higher allows more near-miss fixes |
+| `max_speech_secs` | 300 (local Whisper and Parakeet), 120 (remote) | Ends the session after this many seconds of audio | Higher allows longer dictations |
 | `llm_timeout_secs` | 30 | Uses the unstyled text if styling takes longer than this | Lower caps the worst-case wait |
 
 There are no VAD timing settings. The hotkey decides when you start and stop, and the VAD only trims silence at the ends.
@@ -530,9 +564,11 @@ Models are downloaded automatically on first run from HuggingFace Hub.
 | Whisper Small | `ggerganov/whisper.cpp` | `whisper-small-q5_1` | `ggml-small-q5_1.bin` | ~190 MB |
 | Whisper Medium *(default)* | `ggerganov/whisper.cpp` | `whisper-medium-q5_0` | `ggml-medium-q5_0.bin` | ~539 MB |
 | Whisper Large v3 Turbo | `ggerganov/whisper.cpp` | `whisper-large-v3-turbo-q8_0` | `ggml-large-v3-turbo-q8_0.bin` | ~874 MB |
+| Parakeet TDT 0.6B v3 (q4_k) | `ggml-org/parakeet-GGUF` | `parakeet-tdt-0.6b-v3-q4_k` | `ggml-parakeet-tdt-0.6b-v3-q4_k.bin` | ~416 MB |
+| Parakeet TDT 0.6B v3 (q8_0) | `ggml-org/parakeet-GGUF` | `parakeet-tdt-0.6b-v3-q8_0` | `ggml-parakeet-tdt-0.6b-v3-q8_0.bin` | ~669 MB |
 | Whisper VAD | `ggml-org/whisper-vad` | `whisper-vad-silero` | `ggml-silero-v5.1.2.bin` | ~9 MB |
 
-Models are stored in `~/.local/share/lune-voice/models/` on Linux and `%APPDATA%\lune-voice\models\` on Windows.
+The VAD downloads with whichever speech model you get first, and both local engines share it. Models are stored in `~/.local/share/lune-voice/models/` on Linux and `%APPDATA%\lune-voice\models\` on Windows.
 
 Styling has no local model to manage. It runs against an OpenAI-compatible endpoint, set up like this:
 

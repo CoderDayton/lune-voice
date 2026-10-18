@@ -3,6 +3,8 @@
 import type { GpuBackendStateDto } from '../../lib/backend/generated/GpuBackendStateDto';
 import {
   type AsrBackendValue,
+  engineModelLocalName,
+  type ParakeetModelValue,
   type WhisperModelValue,
   whisperModels,
 } from '../settings/data/settings-data';
@@ -29,12 +31,31 @@ export function relevantSetupModels(models: ModelStatus[]): ModelStatus[] {
 }
 
 /**
- * On-disk model directory for a chosen engine + Whisper size. Pure so the
+ * On-disk model directory for a chosen engine and its model. Pure so the
  * onboarding selection logic can be unit-tested without the Tauri/store deps.
+ * Onboarding only offers on-device engines; anything else falls back to the
+ * chosen Whisper size rather than leaving setup with nothing to install.
  */
-export function asrModelLocalName(_backend: AsrBackendValue, whisper: WhisperModelValue): string {
+export function asrModelLocalName(
+  backend: AsrBackendValue,
+  whisper: WhisperModelValue,
+  parakeet: ParakeetModelValue,
+): string {
   const fallback = whisperModels[0]?.localName ?? '';
-  return whisperModels.find((m) => m.value === whisper)?.localName ?? fallback;
+  return (
+    engineModelLocalName(backend, whisper, parakeet) ??
+    engineModelLocalName('WhisperCpp', whisper, parakeet) ??
+    fallback
+  );
+}
+
+/**
+ * The engine the setup flow starts on. A saved on-device choice stands, so
+ * re-running setup never swaps a Parakeet user back to Whisper; a remote
+ * engine (configured in Settings, never in onboarding) starts on Whisper.
+ */
+export function initialSetupEngine(saved: AsrBackendValue): AsrBackendValue {
+  return saved === 'ParakeetCpp' ? 'ParakeetCpp' : 'WhisperCpp';
 }
 
 /**

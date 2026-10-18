@@ -6,6 +6,7 @@ import {
   buildInitialSelection,
   gpuAccelerationOffer,
   hasOptionalModels,
+  initialSetupEngine,
   initialWhisperModel,
   isSetupSatisfiable,
   type ModelStatus,
@@ -26,9 +27,33 @@ const model = (localName: string, opts: Partial<ModelStatus> = {}): ModelStatus 
 
 describe('asrModelLocalName', () => {
   test('maps each Whisper size to its model directory', () => {
-    expect(asrModelLocalName('WhisperCpp', 'Small')).toBe('whisper-small-q5_1');
-    expect(asrModelLocalName('WhisperCpp', 'Medium')).toBe('whisper-medium-q5_0');
-    expect(asrModelLocalName('WhisperCpp', 'LargeV3Turbo')).toBe('whisper-large-v3-turbo-q8_0');
+    expect(asrModelLocalName('WhisperCpp', 'Small', 'TdtV3Q8')).toBe('whisper-small-q5_1');
+    expect(asrModelLocalName('WhisperCpp', 'Medium', 'TdtV3Q4K')).toBe('whisper-medium-q5_0');
+    expect(asrModelLocalName('WhisperCpp', 'LargeV3Turbo', 'TdtV3Q8')).toBe(
+      'whisper-large-v3-turbo-q8_0',
+    );
+  });
+
+  test('Parakeet installs its chosen size whatever Whisper size is saved', () => {
+    expect(asrModelLocalName('ParakeetCpp', 'Small', 'TdtV3Q8')).toBe('parakeet-tdt-0.6b-v3-q8_0');
+    expect(asrModelLocalName('ParakeetCpp', 'LargeV3Turbo', 'TdtV3Q4K')).toBe(
+      'parakeet-tdt-0.6b-v3-q4_k',
+    );
+  });
+
+  test('a remote engine never leaves setup without a model to install', () => {
+    expect(asrModelLocalName('OpenAiCompatible', 'Medium', 'TdtV3Q8')).toBe('whisper-medium-q5_0');
+  });
+});
+
+describe('initialSetupEngine', () => {
+  test('a saved Parakeet choice survives re-running setup', () => {
+    expect(initialSetupEngine('ParakeetCpp')).toBe('ParakeetCpp');
+  });
+
+  test('Whisper and remote engines start setup on Whisper', () => {
+    expect(initialSetupEngine('WhisperCpp')).toBe('WhisperCpp');
+    expect(initialSetupEngine('OpenAiCompatible')).toBe('WhisperCpp');
   });
 });
 

@@ -11,7 +11,8 @@ Lune Voice has one dictation pipeline and one way to control it: the desktop app
 - [Pipeline Walkthrough](#pipeline-walkthrough)
   - [Audio Capture](#1-audio-capture)
   - [ASR](#2-asr)
-    - [Compute backend selection](#2a-i-compute-backend-selection)
+    - [ParakeetCpp (local)](#2a-i-parakeetcpp-local)
+    - [Compute backend selection](#2a-ii-compute-backend-selection)
   - [Dictionary Application](#3-dictionary-application)
   - [LLM Styling](#4-llm-styling)
   - [Text Delivery](#5-text-delivery)
@@ -33,7 +34,7 @@ The runtime pipeline uses interchangeable backends:
 
 | Component | Backends                                       | Model format             | Runtime                         |
 | --------- | ---------------------------------------------- | ------------------------ | ------------------------------- |
-| ASR       | WhisperCpp (local), OpenAI-compatible (remote) | GGML `.bin` / remote API | whisper-rs (whisper.cpp) / HTTP |
+| ASR       | WhisperCpp (local), ParakeetCpp (local), OpenAI-compatible (remote) | GGML `.bin` / remote API | whisper-rs (whisper.cpp, incl. its `parakeet` library) / HTTP |
 | LLM       | OpenAI-compatible (remote), disabled           | remote API               | HTTP                            |
 
 
@@ -48,7 +49,7 @@ Backends are chosen in one place, through registries and DTO mappers. The deskto
 ```
 lune-core (types, config, errors)
 ├─ lune-audio (mic, resample, ringbuf, vad, pcen)
-├─ lune-asr (whisper.cpp, openai remote, registry)
+├─ lune-asr (whisper.cpp, parakeet, openai remote, registry)
 ├─ lune-llm (openai remote, null passthrough, style pipeline, prompt, few-shot)
 ├─ lune-dict (corrector, vocab, voice commands)
 └─ lune-persist (settings.toml, sqlite, model hub)
@@ -112,13 +113,33 @@ Four GGML model sizes are available, all from `ggerganov/whisper.cpp`:
 | `LargeV3Turbo`       | `ggml-large-v3-turbo-q8_0.bin` | ~874 MB | `whisper-large-v3-turbo-q8_0` |
 
 
-#### 2a-i. Compute backend selection
+#### 2a-i. ParakeetCpp (local)
+
+**File:** `crates/lune-asr/src/backend/parakeet_cpp.rs`
+
+NVIDIA Parakeet TDT 0.6B v3, run by the `parakeet` library that whisper.cpp 1.9 ships beside `whisper` in the same source tree. It links the same ggml, so it needs no second native stack: the vendored `whisper-rs-sys` binds `parakeet.h` and links `libparakeet` next to `libwhisper` (marked `LUNE FORK` in its `build.rs` and `wrapper.h`), and the CPU backend plugins and the downloadable CUDA plugin serve both engines. `whisper-rs` has no Parakeet wrapper, so the backend calls the raw bindings and keeps each native handle in a small owning type that frees it.
+
+- **One decoder state, reused.** `parakeet_init_state` allocates the decoder state, so the backend builds it once at load instead of per session (the library still re-plans the encoder graph when the clip length changes). Every decode runs with `no_context`, which clears the prediction network's LSTM state and the decoded tokens first, so the same audio decodes the same way whatever came before (an integration test pins this).
+- **Chunked at pauses, inside the model's window.** v3 declares a 5000-mel-frame (50 s) encoder window. Past it whisper.cpp's Parakeet switches to a dynamic encoder graph that silently drops speech (a 55 s test clip lost its second half), and attention stays full and quadratic up to ~655 s, so a 5-minute single pass would also need 1–2 GB. A trimmed span is therefore cut in the middle of pauses by the planner whisper uses (`local::plan_chunks_within`, whisper with a 28 s window) into pieces that fit the window read from the model (`piece_limit`, ~49.7 s for v3); continuous speech with no pause is split evenly as a last resort. Each piece costs tens of MB. The real-model test pins this with an 86 s dictation. Clips under 0.5 s are padded with trailing silence so the 8× convolutional subsampling never sees an empty input.
+- **Language.** v3 detects which of its 25 European languages is spoken but takes no hint and reports nothing back, so the dictation language has to come from the user: `ParakeetModel::accepts_dictation_language` refuses `"auto"` and anything outside the 25, the settings save enforces it, and the UI offers only those languages (switching engines picks the system language when it fits, else English, in the same save). `start_session` still refuses an uncovered language with an error that names the fix, and tolerates a hand-edited `"auto"` (formatted as English) rather than block dictation. `detected_language` on each segment is the dictation language. `lune_core::lang::display_name` names all 25, so none falls back to English formatting rules.
+- **Logging.** Loading Parakeet re-points ggml's process-global log callback at Parakeet's own (`parakeet_backend_init_gpu` calls `ggml_log_set`). `install_logging_hooks` therefore registers a `tracing` sink for Parakeet too; left at its stderr default, it would silently undo the ggml hook for whisper as well.
+
+**Shared with whisper** (`crates/lune-asr/src/backend/local.rs`): the Silero endpoint trim, the ggml file sanity check, the CPU-backend guard (both native loaders *throw* out of their state setup when ggml has no CPU device, which aborts the process — a broken plugin install now gets an error instead), decode-thread count, and the per-word confidence rule. A tuning change there reaches both engines.
+
+| Variant | File | Size | Directory |
+| ------- | ---- | ---- | --------- |
+| `TdtV3Q4K` | `ggml-parakeet-tdt-0.6b-v3-q4_k.bin` (`ggml-org/parakeet-GGUF`) | ~416 MB | `parakeet-tdt-0.6b-v3-q4_k` |
+| `TdtV3Q8` *(default)* | `ggml-parakeet-tdt-0.6b-v3-q8_0.bin` (`ggml-org/parakeet-GGUF`) | ~669 MB | `parakeet-tdt-0.6b-v3-q8_0` |
+
+The two files were uploaded to the repository in separate commits, so each `PinnedFile` row in `lune-persist`'s hub carries its own commit, and a model whose files are all pinned is downloaded from those pins alone, without asking the hub for a file listing.
+
+#### 2a-ii. Compute backend selection
 
 **File:** `crates/lune-asr/src/gpu_backend.rs`
 
 ggml's compute backends are built as `dlopen`-able plugins (`GGML_BACKEND_DL`), so the executable carries no `DT_NEEDED` on the CUDA runtime and starts on a machine with no NVIDIA driver at all. Two directories are scanned at startup: `<exe dir>/backends/` for the bundled CPU backends, and `<data dir>/backends/` for the CUDA plugin the user downloads.
 
-`load_plugins` **must run before the first `WhisperContext` is created**. ggml picks a device from whatever is in the backend registry when the context is created, which is why `desktop-ui/src-tauri/src/lib.rs` calls it before the Tauri builder. A `OnceLock` makes it run only once, because the registry is global to the process and has no unload.
+`load_plugins` **must run before the first `WhisperContext` or Parakeet context is created**. ggml picks a device from whatever is in the backend registry when the context is created, which is why `desktop-ui/src-tauri/src/lib.rs` calls it before the Tauri builder. A `OnceLock` makes it run only once, because the registry is global to the process and has no unload.
 
 On Linux each plugin carries `RUNPATH=$ORIGIN`, so it finds its CUDA libraries in its own directory. Setting `LD_LIBRARY_PATH` from inside the app wouldn't work, because glibc caches the search path at startup. Windows has no `$ORIGIN`, so the app loads the CUDA DLLs by full path first.
 
@@ -366,6 +387,7 @@ Tauri async runtime (tokio multi_thread)
 
 tokio blocking pool (block_in_place / spawn_blocking)
 |-- whisper.cpp inference (WhisperContext shared; per-session WhisperState via Mutex)
+|-- Parakeet inference (one context + one reused decoder state behind a Mutex)
 |-- spellcheck / dictionary work
 `-- persistence I/O (run_persist, pill settings)
 

@@ -314,7 +314,7 @@ jobs:
           fi
           echo "ok: udev rule present in $deb"
 
-      # The executable links libwhisper/libggml dynamically and ggml has no
+      # The executable links libwhisper/libparakeet/libggml dynamically and ggml has no
       # CPU code without a backend plugin, so a bundle missing either starts
       # and cannot transcribe, or does not start at all.
       - name: Verify the ggml runtime is packaged and resolves
@@ -324,7 +324,7 @@ jobs:
           root=$(mktemp -d)
           dpkg-deb -x "$deb" "$root"
           res="$root/usr/lib/LuneVoice"
-          for f in libwhisper.so.1 libggml.so.0 libggml-base.so.0 \
+          for f in libwhisper.so.1 libparakeet.so.1 libggml.so.0 libggml-base.so.0 \
                    backends/libggml-cpu-sse42.so backends/libggml-cpu-haswell.so; do
             [ -f "$res/$f" ] || { echo "::error::$f missing from $deb"; ls -R "$res"; exit 1; }
           done

@@ -50,6 +50,11 @@ fn backend(use_vad: bool) -> Option<WhisperCppBackend> {
     } else {
         None
     };
+    // Register ggml's compute backends first, as the app does at startup: a
+    // no-op for a static build, the CPU plugins for a `GGML_BACKEND_DL` one,
+    // without which the backend refuses to load.
+    let _ =
+        lune_asr::gpu_backend::load_plugins(&std::env::temp_dir().join("lune-whisper-test-data"));
     WhisperCppBackend::new(WhisperCppConfig {
         model_path,
         use_gpu: false,

@@ -1,16 +1,32 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 import { useLingui } from '@lingui/react/macro';
-import { Check, CircleAlert, type LucideIcon, Mic, Zap } from 'lucide-react';
+import { Check, CircleAlert, Gauge, type LucideIcon, Mic, Zap } from 'lucide-react';
 import { useId } from 'react';
+import { DescriptiveDropdown } from '../../../components/ui/descriptive-dropdown';
 import { formatBytes } from '../../../lib/format-bytes';
-import type { AsrBackendValue, WhisperModelValue } from '../../settings/data/settings-data';
-import { localizeText, whisperModels } from '../../settings/data/settings-data';
+import type {
+  AsrBackendValue,
+  ParakeetModelValue,
+  WhisperModelValue,
+} from '../../settings/data/settings-data';
+import {
+  dictationLanguagesFor,
+  formatLanguageList,
+  localizeOptions,
+  localizeText,
+  parakeetLanguages,
+  parakeetModels,
+  whisperModels,
+} from '../../settings/data/settings-data';
 import type { GpuAccelerationOffer } from '../setup-logic';
 
 interface EngineStepProps {
   engineBackend: AsrBackendValue;
   engineWhisper: WhisperModelValue;
+  engineParakeet: ParakeetModelValue;
+  /** Dictation language; with Parakeet always one it covers. */
+  engineLanguage: string;
   error: string | null;
   /** What the GPU acceptance card should offer, or `null` to hide it. */
   gpuOffer: GpuAccelerationOffer | null;
@@ -20,11 +36,13 @@ interface EngineStepProps {
   gpuDownloadBytes: number;
   onSelectEngine: (backend: AsrBackendValue) => void;
   onSelectWhisper: (model: WhisperModelValue) => void;
+  onSelectParakeet: (model: ParakeetModelValue) => void;
+  onSelectLanguage: (language: string) => void;
   onToggleGpu: (next: boolean) => void;
 }
 
 interface EngineOption {
-  value: Extract<AsrBackendValue, 'WhisperCpp'>;
+  value: Extract<AsrBackendValue, 'WhisperCpp' | 'ParakeetCpp'>;
   label: string;
   tagline: string;
   detail: string;
@@ -32,19 +50,23 @@ interface EngineOption {
 }
 
 /**
- * First-run engine picker: the on-device speech engines. The cloud backend
- * is intentionally omitted here — onboarding is about getting a local model on
- * disk; the remote option lives in Settings.
+ * First-run engine picker: the on-device speech engines, Whisper and Parakeet.
+ * The cloud backend is intentionally omitted here — onboarding is about getting
+ * a local model on disk; the remote option lives in Settings.
  */
 export function EngineStep({
   engineBackend,
   engineWhisper,
+  engineParakeet,
+  engineLanguage,
   error,
   gpuOffer,
   useGpu,
   gpuDownloadBytes,
   onSelectEngine,
   onSelectWhisper,
+  onSelectParakeet,
+  onSelectLanguage,
   onToggleGpu,
 }: EngineStepProps) {
   const { t } = useLingui();
@@ -56,6 +78,13 @@ export function EngineStep({
       tagline: t`Multilingual · runs on-device`,
       detail: t`whisper.cpp running on-device. Choose a size to trade speed for accuracy.`,
       icon: Mic,
+    },
+    {
+      value: 'ParakeetCpp',
+      label: t`Parakeet`,
+      tagline: t`Fastest on CPU · 25 European languages`,
+      detail: t`NVIDIA Parakeet running on-device. Punctuates by itself and detects which of its languages you speak.`,
+      icon: Gauge,
     },
   ];
 
@@ -86,6 +115,14 @@ export function EngineStep({
 
       {engineBackend === 'WhisperCpp' && (
         <WhisperSizeStep selected={engineWhisper} onSelect={onSelectWhisper} />
+      )}
+      {engineBackend === 'ParakeetCpp' && (
+        <ParakeetSizeStep
+          selected={engineParakeet}
+          onSelect={onSelectParakeet}
+          language={engineLanguage}
+          onSelectLanguage={onSelectLanguage}
+        />
       )}
 
       {gpuOffer && (
@@ -199,6 +236,66 @@ function SizeRow({ label, description, size, groupName, active, onSelect }: Size
         <span className="mt-0.5 block text-xs leading-snug text-content-subtle">{description}</span>
       </span>
     </label>
+  );
+}
+
+interface ParakeetSizeStepProps {
+  selected: ParakeetModelValue;
+  onSelect: (model: ParakeetModelValue) => void;
+  language: string;
+  onSelectLanguage: (language: string) => void;
+}
+
+/**
+ * The Parakeet size choice, in the same rows as Whisper's, plus the language
+ * list — the limit someone weighing Parakeet against Whisper needs to see
+ * before committing to a download — and the dictation language, which
+ * Parakeet needs set because it cannot report the one it heard.
+ */
+function ParakeetSizeStep({
+  selected,
+  onSelect,
+  language,
+  onSelectLanguage,
+}: ParakeetSizeStepProps) {
+  const { t, i18n } = useLingui();
+  const groupName = useId();
+  const languages = formatLanguageList(i18n.locale, parakeetLanguages);
+
+  return (
+    <fieldset>
+      <legend className="setup-label">{t`Model size`}</legend>
+      <div className="setup-group">
+        {parakeetModels.map((m) => (
+          <SizeRow
+            key={m.value}
+            label={localizeText(i18n, m.label)}
+            description={m.description === undefined ? '' : localizeText(i18n, m.description)}
+            size={m.size}
+            groupName={groupName}
+            active={selected === m.value}
+            onSelect={() => onSelect(m.value)}
+          />
+        ))}
+      </div>
+      <p className="mt-2 text-xs leading-snug text-content-subtle">
+        {t`Covers ${languages}. For any other language, choose Whisper.`}
+      </p>
+      <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
+        <span className="min-w-0 flex-1">
+          <span className="block text-sm font-medium text-content-strong">{t`Dictation language`}</span>
+          <span className="mt-0.5 block text-xs leading-snug text-content-subtle">
+            {t`Parakeet cannot tell Lune which language it heard, so set the one you speak. You can change it later in Settings.`}
+          </span>
+        </span>
+        <DescriptiveDropdown
+          value={language}
+          options={localizeOptions(i18n, dictationLanguagesFor('ParakeetCpp'))}
+          ariaLabel={t`Dictation language`}
+          onChange={(next) => onSelectLanguage(next)}
+        />
+      </div>
+    </fieldset>
   );
 }
 

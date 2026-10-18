@@ -105,61 +105,6 @@ pub(crate) fn lead_in_prefix(
     }
 }
 
-/// On-disk magic of a ggml model file: `0x67676d6c` ("ggml") stored
-/// little-endian, so the first four bytes read `l m g g`.
-const GGML_MAGIC: [u8; 4] = *b"lmgg";
-
-/// Smallest plausible ggml model. Well under any real whisper model, and only
-/// there to reject an empty or barely-started file with a clear message.
-const MIN_GGML_BYTES: u64 = 4096;
-
-/// Reject a model file whisper.cpp would die on rather than report.
-///
-/// Its loader raises a C++ exception or trips `GGML_ASSERT` on malformed input.
-/// Neither can be caught from Rust — an exception crossing the `extern "C"`
-/// boundary is undefined behaviour and the assert calls `abort()` — so the
-/// process disappears with no dialog and no error. Validating first is the only
-/// lever available.
-///
-/// This is a cheap sanity check, not an integrity check: the download path
-/// already verifies a SHA-256 (`lune-persist`'s hub). What it catches is a file
-/// truncated after that — a full disk, a crash mid-write, a hand-placed file.
-pub fn check_ggml_file(path: &std::path::Path) -> Result<()> {
-    use lune_core::error::Error;
-    use std::io::Read;
-
-    let meta = std::fs::metadata(path).map_err(|e| {
-        Error::asr(format!(
-            "cannot read the model file {}: {e}",
-            path.display()
-        ))
-    })?;
-    if meta.len() < MIN_GGML_BYTES {
-        return Err(Error::asr(format!(
-            "the model file {} is only {} bytes and cannot be a whisper model — \
-             it is most likely a partial download; delete it and download the model again",
-            path.display(),
-            meta.len()
-        )));
-    }
-    let mut head = [0u8; 4];
-    std::fs::File::open(path)
-        .and_then(|mut f| f.read_exact(&mut head))
-        .map_err(|e| {
-            Error::asr(format!(
-                "cannot read the model file {}: {e}",
-                path.display()
-            ))
-        })?;
-    if head != GGML_MAGIC {
-        return Err(Error::asr(format!(
-            "the model file {} is not in ggml format — delete it and download the model again",
-            path.display()
-        )));
-    }
-    Ok(())
-}
-
 /// How a decode runs, chosen once from the device the model runs on.
 ///
 /// On a CPU the fixed 30 s encoder window dominates a short dictation, and
@@ -222,86 +167,42 @@ const CHUNK_MAX_SAMPLES: usize = 28 * 16_000;
 #[cfg_attr(not(feature = "whisper-cpp"), allow(dead_code))]
 const CHUNK_MIN_SAMPLES: usize = 3 * 16_000;
 
-/// Ranges of a `total`-sample clip to decode one by one, in order and with no
-/// gap between them.
-///
-/// `speech` holds the VAD speech spans in clip samples. A clip longer than
-/// [`CHUNK_MAX_SAMPLES`] is cut in the middle of a pause between two spans, so
-/// each piece keeps its own pauses whole. Two spans that touch count: the VAD
-/// pads each span, which closes a short pause. Among the pauses that leave both
-/// sides at least [`CHUNK_MIN_SAMPLES`], one in the back half of the window
-/// wins, then the longest, then the latest. A stretch with no usable pause
-/// stays in one piece.
-///
-/// `lead` samples are decoded in front of the first piece and count against
-/// its window.
+/// Ranges of a `total`-sample clip to decode one by one, cut at pauses so no
+/// piece runs past [`CHUNK_MAX_SAMPLES`] where avoidable — see
+/// [`crate::backend::local::plan_chunks_within`] for the rule. `lead` samples
+/// are decoded in front of the first piece and count against its window.
 #[cfg_attr(not(feature = "whisper-cpp"), allow(dead_code))]
 pub(crate) fn plan_chunks(
     speech: &[(usize, usize)],
     total: usize,
     lead: usize,
 ) -> Vec<(usize, usize)> {
-    let mut chunks = Vec::new();
-    let mut start = 0;
-    loop {
-        let room = CHUNK_MAX_SAMPLES.saturating_sub(if start == 0 { lead } else { 0 });
-        if total - start <= room {
-            break;
-        }
-        let cut = speech
-            .windows(2)
-            .filter(|pair| pair[1].0 >= pair[0].1)
-            .map(|pair| {
-                let width = pair[1].0 - pair[0].1;
-                (pair[0].1 + width / 2, width)
-            })
-            .filter(|&(mid, _)| {
-                mid >= start + CHUNK_MIN_SAMPLES
-                    && mid <= start + room
-                    && mid + CHUNK_MIN_SAMPLES <= total
-            })
-            .max_by_key(|&(mid, width)| (mid - start >= room / 2, width, mid));
-        let Some((mid, _)) = cut else {
-            break;
-        };
-        chunks.push((start, mid));
-        start = mid;
-    }
-    chunks.push((start, total));
-    chunks
+    crate::backend::local::plan_chunks_within(
+        speech,
+        total,
+        lead,
+        CHUNK_MAX_SAMPLES,
+        CHUNK_MIN_SAMPLES,
+    )
 }
-
-/// Route whisper.cpp + ggml native logs into `tracing` instead of raw stderr,
-/// so they obey the global log filter.
-///
-/// Idempotent, and must run before anything that can make ggml talk —
-/// `gpu_backend::load_plugins` above all, whose `dlopen` failures are the only
-/// account of why a GPU plugin did not load. On a GUI launch raw stderr goes
-/// nowhere, so a diagnostic emitted before this call is lost outright.
-#[cfg(feature = "whisper-cpp")]
-pub fn install_logging_hooks() {
-    static LOG_HOOK: std::sync::Once = std::sync::Once::new();
-    LOG_HOOK.call_once(whisper_rs::install_logging_hooks);
-}
-
-/// No-op: the stub build links no whisper.cpp, so there is nothing to route.
-#[cfg(not(feature = "whisper-cpp"))]
-pub fn install_logging_hooks() {}
 
 #[cfg(feature = "whisper-cpp")]
 mod imp {
     use super::{
-        AsrSessionConfig, DecodeProfile, LeadIn, Result, WhisperCppConfig, check_ggml_file,
-        fitted_audio_ctx, lead_in_prefix, plan_chunks,
+        AsrSessionConfig, DecodeProfile, LeadIn, Result, WhisperCppConfig, fitted_audio_ctx,
+        lead_in_prefix, plan_chunks,
+    };
+    use crate::backend::local::{
+        EndpointVad, SAMPLE_RATE, VadTrim, WordConfidences, check_ggml_file, decode_threads,
+        ensure_cpu_backend, run_blocking,
     };
 
     use std::sync::Mutex;
 
-    use lune_core::asr::{AsrBackend, AsrSegment, WordConfidence};
+    use lune_core::asr::{AsrBackend, AsrSegment};
     use lune_core::error::Error;
     use whisper_rs::{
         FullParams, SamplingStrategy, WhisperContext, WhisperContextParameters, WhisperState,
-        WhisperVadContext, WhisperVadContextParams, WhisperVadParams,
     };
 
     /// Primes the decoder's preceding-context with a short, well-punctuated
@@ -311,115 +212,16 @@ mod imp {
     const PUNCTUATION_PROMPT: &str =
         "Okay, let's begin. Here are my notes, thoughts, and questions:";
 
-    /// Cap decode threads. whisper.cpp scales sub-linearly past a handful of
-    /// threads and we don't want to starve the audio/UI threads.
-    const MAX_THREADS: usize = 8;
-
-    /// Sample rate of whisper input audio (16 kHz mono f32).
-    const SAMPLE_RATE: usize = 16_000;
-
     /// Temperature step for whisper's decode-fallback ladder. `0.5` allows one
     /// retry (0.0 then 0.5) instead of the upstream default of five (0.2 steps
     /// to 1.0), capping the worst case at two decodes rather than six.
     const TEMPERATURE_FALLBACK_STEP: f32 = 0.5;
-
-    /// Padding kept around the VAD speech span when endpoint-trimming, so soft
-    /// onsets/offsets aren't clipped. Asymmetric on purpose: the onset gets more
-    /// lead-in than the tail — a bit of silence before the first word lets
-    /// whisper anchor the opening phrase, which measurably recovers softly-spoken
-    /// opening words (A/B: recovered a dropped opening word across quiet/loud and
-    /// with pre-roll lead-in). The tail keeps the original margin; the
-    /// producer-side flush in `capture.rs` already guards the very last phonemes.
-    const VAD_PAD_LEAD_MS: usize = 400;
-    const VAD_PAD_TAIL_MS: usize = 240;
-
-    /// silero VAD probability threshold. Below whisper.cpp's 0.5 default so a
-    /// soft first-word onset (fricatives/plosives, or audio still inside the
-    /// AGC warm-up) is detected earlier and not clipped mid-word.
-    const VAD_THRESHOLD: f32 = 0.35;
-
-    /// Minimum voiced duration for a VAD segment (ms). Below whisper.cpp's 250
-    /// default so short commands ("yes", "no", "stop", "undo") aren't discarded
-    /// wholesale — that path returns zero segments and drops the whole utterance.
-    const VAD_MIN_SPEECH_MS: i32 = 100;
-
-    /// Padding whisper's own VAD keeps around each segment (ms). Raised from the
-    /// 30 default for extra onset/offset lead-in; stacks with `VAD_PAD_MS`.
-    const VAD_SPEECH_PAD_MS: i32 = 120;
 
     /// Skip the punctuation-priming prompt below this much decoded audio: the
     /// run-on problem it fixes only appears on long, multi-sentence dictation,
     /// while on a short clip the prompt is a strong bias that can inject a
     /// spurious continuation. 16 kHz mono → 6 s.
     const PROMPT_MIN_SAMPLES: usize = 6 * SAMPLE_RATE;
-
-    /// Push a finished word's confidence — both the weakest token in the word
-    /// (so a single garbled token flags the whole word) and the mean across
-    /// the same tokens (so a downstream consumer can tell a uniformly-risky
-    /// word apart from one outlier token dragging an otherwise-fine word
-    /// down, e.g. a glued punctuation token — see `WordConfidence::mean_confidence`)
-    /// — and reset the accumulators. Whitespace-only words are dropped.
-    fn flush_word(
-        words: &mut Vec<WordConfidence>,
-        word: &mut String,
-        word_min: &mut f32,
-        word_sum: &mut f32,
-        word_count: &mut u32,
-    ) {
-        let trimmed = word.trim();
-        if !trimmed.is_empty() {
-            let confidence = (*word_min).clamp(0.0, 1.0);
-            let mean_confidence = if *word_count > 0 {
-                (*word_sum / *word_count as f32).clamp(0.0, 1.0)
-            } else {
-                confidence
-            };
-            words.push(WordConfidence {
-                word: trimmed.to_string(),
-                confidence,
-                word_error_risk: 1.0 - confidence,
-                mean_confidence,
-            });
-        }
-        word.clear();
-        *word_min = 1.0;
-        *word_sum = 0.0;
-        *word_count = 0;
-    }
-
-    /// Run CPU/GPU-heavy whisper work without stalling the async runtime.
-    ///
-    /// Lune Voice runs on Tauri's multi-thread tokio runtime, so `block_in_place`
-    /// hands the worker off to the blocking pool and other tasks keep running
-    /// during the multi-second decode. There is no `spawn_blocking` here because
-    /// the whisper session is `!Send` (it wraps raw C pointers) and cannot move
-    /// to another thread. On a current-thread runtime (unit tests) or outside a
-    /// runtime the closure runs inline — a current-thread *production* runtime
-    /// would stall its single thread for the whole decode, so we warn loudly
-    /// rather than freezing silently.
-    fn run_blocking<T>(f: impl FnOnce() -> T) -> T {
-        use tokio::runtime::{Handle, RuntimeFlavor};
-        match Handle::try_current() {
-            Ok(h) if h.runtime_flavor() == RuntimeFlavor::MultiThread => {
-                tokio::task::block_in_place(f)
-            }
-            Ok(h) if h.runtime_flavor() == RuntimeFlavor::CurrentThread => {
-                // Reachable only in tests. A current-thread production runtime
-                // must not be used here — it would block its single thread for
-                // the whole decode. Warn once so this is visible, then run
-                // inline (block_in_place would panic on the current_thread flavor).
-                static WARNED: std::sync::Once = std::sync::Once::new();
-                WARNED.call_once(|| {
-                    tracing::warn!(
-                        "whisper decode running on a current-thread runtime blocks the async \
-                         runtime; Lune Voice must run on a multi-thread runtime"
-                    );
-                });
-                f()
-            }
-            _ => f(),
-        }
-    }
 
     pub struct WhisperCppBackend {
         ctx: WhisperContext,
@@ -428,7 +230,7 @@ mod imp {
         lead_in: LeadIn,
         /// Standalone silero VAD for endpoint trimming (loaded once, reused).
         /// `None` => decode the full buffer (model absent or failed to load).
-        vad: Option<Mutex<WhisperVadContext>>,
+        vad: Option<EndpointVad>,
     }
 
     /// Mutable per-session state behind the handle's `Mutex`.
@@ -448,7 +250,7 @@ mod imp {
             // Normally already done at startup, before the plugin load. Kept
             // here so a caller that builds a backend without going through
             // that path still gets whisper's logs.
-            super::install_logging_hooks();
+            crate::backend::local::install_logging_hooks();
 
             // Validate before handing the path to whisper.cpp. Its loader
             // signals a malformed file by throwing a C++ exception or tripping
@@ -457,6 +259,7 @@ mod imp {
             // mid-write is a normal failure, so it has to be caught here, where
             // it can still be reported.
             check_ggml_file(&config.model_path)?;
+            ensure_cpu_backend()?;
 
             // whisper.cpp falls back to the CPU when asked for a GPU it cannot
             // find, so the profile follows the device it will actually use.
@@ -472,34 +275,12 @@ mod imp {
                     config.model_path.display()
                 ))
             })?;
-            let n_threads = std::thread::available_parallelism()
-                .map(|n| n.get().min(MAX_THREADS) as i32)
-                .unwrap_or(4);
+            let n_threads = decode_threads();
             // Load the standalone silero VAD once for endpoint trimming. A
-            // missing/failed model degrades to full-buffer decode (warn once).
-            let vad = config.vad_model_path.and_then(|path| {
-                // Same loader, same failure mode as the main model: a truncated
-                // silero file aborts the process rather than returning an
-                // error, so validate before handing over the path. Unlike the
-                // main model this degrades instead of failing — losing the
-                // endpoint trim is survivable.
-                if let Err(e) = check_ggml_file(&path) {
-                    tracing::warn!(error = %e, "whisper VAD model unusable; decoding without endpoint trim");
-                    return None;
-                }
-                let mut vp = WhisperVadContextParams::default();
-                // Always run the VAD on CPU: silero is tiny (no GPU benefit) and
-                // standing up a second CUDA context at init is a crash source.
-                vp.set_use_gpu(false);
-                vp.set_n_threads(n_threads);
-                match WhisperVadContext::new(&path.to_string_lossy(), vp) {
-                    Ok(v) => Some(Mutex::new(v)),
-                    Err(e) => {
-                        tracing::warn!(error = %e, "failed to load whisper VAD; decoding without endpoint trim");
-                        None
-                    }
-                }
-            });
+            // missing/failed model degrades to full-buffer decode.
+            let vad = config
+                .vad_model_path
+                .and_then(|path| EndpointVad::load(&path, n_threads));
             tracing::info!(on_gpu, ?profile, "whisper decode profile");
             Ok(Self {
                 ctx,
@@ -589,107 +370,28 @@ mod imp {
                     params
                 }
 
-                // Endpoint-trim with whisper's own (standalone) silero VAD: decode
-                // only [first speech onset .. last offset] + padding as ONE
-                // contiguous slice. Drops leading/trailing silence (less
-                // hallucination; anchors the decode at the first word) while
-                // preserving every INTERNAL pause — the cue whisper uses for
-                // punctuation. We deliberately avoid the in-decode `enable_vad`,
-                // which concatenates speech spans and strips those pauses → run-ons.
-                enum VadTrim {
-                    Speech {
-                        start: usize,
-                        end: usize,
-                        onset: usize,
-                        /// Every VAD speech span, in buffer samples.
-                        spans: Vec<(usize, usize)>,
-                    },
-                    Silence,
-                    Full,
-                }
+                // Endpoint-trim with the standalone silero VAD (see
+                // `EndpointVad`): decode only the speech, keeping its pauses.
                 let trim = self
-                .vad
-                .as_ref()
-                // Recover from a poisoned lock rather than silently decoding
-                // without endpoint trimming for the rest of the process. The
-                // VAD context is reset on every use, so a panic in a previous
-                // decode leaves nothing behind worth protecting — and losing
-                // the trim quietly shows up as hallucinated leading silence,
-                // which is very hard to trace back to here.
-                .map(|m| m.lock().unwrap_or_else(|e| e.into_inner()))
-                .map(|mut vad| {
-                    let mut vad_params = WhisperVadParams::default();
-                    vad_params.set_threshold(VAD_THRESHOLD);
-                    vad_params.set_min_speech_duration(VAD_MIN_SPEECH_MS);
-                    vad_params.set_speech_pad(VAD_SPEECH_PAD_MS);
-                    match vad.segments_from_samples(vad_params, audio.as_slice()) {
-                        Ok(segs) if segs.num_segments() > 0 => {
-                            let last = segs.num_segments() - 1;
-                            let start_cs = segs.get_segment_start_timestamp(0).unwrap_or(0.0);
-                            let end_cs = segs.get_segment_end_timestamp(last).unwrap_or(0.0);
-                            let to_sample = |cs: f32| (cs * SAMPLE_RATE as f32 / 100.0) as isize;
-                            let pad_lead = (VAD_PAD_LEAD_MS * SAMPLE_RATE / 1000) as isize;
-                            let pad_tail = (VAD_PAD_TAIL_MS * SAMPLE_RATE / 1000) as isize;
-                            let onset = to_sample(start_cs).max(0) as usize;
-                            let start = (to_sample(start_cs) - pad_lead).max(0) as usize;
-                            let end =
-                                ((to_sample(end_cs) + pad_tail).max(0) as usize).min(audio.len());
-                            let spans = (0..=last)
-                                .map(|i| {
-                                    let from = segs.get_segment_start_timestamp(i).unwrap_or(0.0);
-                                    let to = segs.get_segment_end_timestamp(i).unwrap_or(0.0);
-                                    (to_sample(from).max(0) as usize, to_sample(to).max(0) as usize)
-                                })
-                                .collect();
-                            VadTrim::Speech {
-                                start,
-                                end,
-                                onset,
-                                spans,
-                            }
-                        }
-                        Ok(_) => VadTrim::Silence,
-                        Err(e) => {
-                            tracing::warn!(error = %e, "whisper VAD failed; decoding full buffer");
-                            VadTrim::Full
-                        }
-                    }
-                })
-                .unwrap_or(VadTrim::Full);
-
-                let (slice_start, slice_end, onset, spans) = match trim {
-                    VadTrim::Speech {
-                        start,
-                        end,
-                        onset,
-                        spans,
-                    } if start < end => (start, end, Some(onset), spans),
-                    VadTrim::Silence => {
-                        audio.clear();
-                        return Ok(Vec::new());
-                    }
-                    _ => (0, audio.len(), None, Vec::new()),
+                    .vad
+                    .as_ref()
+                    .map_or(VadTrim::Full, |vad| vad.trim(audio.as_slice()));
+                let Some(slice) = trim.decode_slice(audio.len()) else {
+                    audio.clear();
+                    return Ok(Vec::new());
                 };
-                let decode_slice = &audio[slice_start..slice_end];
+                let decode_slice = &audio[slice.start..slice.end];
 
                 // Endpoint trimming drops a lead-in; segment times add it back so
                 // `start_ms`/`end_ms` stay relative to the buffer the caller pushed.
-                let trim_offset_ms = (slice_start as u64 * 1000) / SAMPLE_RATE as u64;
+                let trim_offset_ms = slice.offset_ms();
 
-                let recorded_lead = onset.map(|onset| onset.saturating_sub(slice_start));
+                let recorded_lead = slice.onset.map(|onset| onset.saturating_sub(slice.start));
                 let prefix = lead_in_prefix(self.lead_in, decode_slice, recorded_lead);
                 let recorded_len = decode_slice.len();
                 let prefix_ms = (prefix.len() as u64 * 1000) / SAMPLE_RATE as u64;
 
-                let spans: Vec<(usize, usize)> = spans
-                    .iter()
-                    .map(|&(from, to)| {
-                        (
-                            from.saturating_sub(slice_start).min(recorded_len),
-                            to.saturating_sub(slice_start).min(recorded_len),
-                        )
-                    })
-                    .collect();
+                let spans = slice.relative_spans();
                 let chunks = plan_chunks(&spans, recorded_len, prefix.len());
 
                 // "auto" detects on the first chunk only; later chunks reuse its answer.
@@ -740,21 +442,11 @@ mod imp {
                             continue;
                         }
 
-                        // Fold per-token probabilities into the segment confidence AND
-                        // group tokens into per-word confidences — whisper marks a new
-                        // word with a leading-space token. Per-word values feed the
-                        // corrector's risk gating (which protects uncertain words and
-                        // drives `unresolved_words`); leaving them empty made that gating
-                        // inert. Special tokens ("[_...]", p≈1.0) are skipped so they
-                        // don't inflate the mean.
-                        let mut sum = 0.0f32;
-                        let mut count = 0u32;
-                        let mut min_p = 1.0f32;
-                        let mut word_confidences: Vec<WordConfidence> = Vec::new();
-                        let mut cur_word = String::new();
-                        let mut cur_min = 1.0f32;
-                        let mut cur_sum = 0.0f32;
-                        let mut cur_count = 0u32;
+                        // Fold per-token probabilities into the segment confidence
+                        // and per-word confidences (`WordConfidences`) — whisper marks
+                        // a new word with a leading-space token. Special tokens
+                        // ("[_...]", p≈1.0) are skipped so they don't inflate the mean.
+                        let mut acc = WordConfidences::new();
                         for j in 0..seg.n_tokens() {
                             let Some(tok) = seg.get_token(j) else {
                                 continue;
@@ -765,37 +457,9 @@ mod imp {
                             if piece.starts_with("[_") {
                                 continue;
                             }
-                            let p = tok.token_probability();
-                            sum += p;
-                            min_p = min_p.min(p);
-                            count += 1;
-                            // A leading space begins a new word — flush the previous one.
-                            if piece.starts_with(' ') {
-                                flush_word(
-                                    &mut word_confidences,
-                                    &mut cur_word,
-                                    &mut cur_min,
-                                    &mut cur_sum,
-                                    &mut cur_count,
-                                );
-                            }
-                            cur_word.push_str(&piece);
-                            cur_min = cur_min.min(p);
-                            cur_sum += p;
-                            cur_count += 1;
+                            acc.push(&piece, tok.token_probability(), piece.starts_with(' '));
                         }
-                        flush_word(
-                            &mut word_confidences,
-                            &mut cur_word,
-                            &mut cur_min,
-                            &mut cur_sum,
-                            &mut cur_count,
-                        );
-                        let (confidence, min_token_confidence) = if count == 0 {
-                            (None, None)
-                        } else {
-                            (Some(sum / count as f32), Some(min_p))
-                        };
+                        let (word_confidences, confidence, min_token_confidence) = acc.finish();
 
                         let id = *next_id;
                         *next_id += 1;
@@ -886,11 +550,9 @@ pub use imp::WhisperCppBackend;
 #[cfg(test)]
 mod tests {
     use super::{
-        AUDIO_CTX_MIN, CHUNK_MAX_SAMPLES, CHUNK_MIN_SAMPLES, DecodeProfile, GGML_MAGIC,
-        LEAD_NOISE_MAX_RMS, LeadIn, MIN_GGML_BYTES, check_ggml_file, fitted_audio_ctx,
-        lead_in_prefix, plan_chunks,
+        AUDIO_CTX_MIN, CHUNK_MAX_SAMPLES, CHUNK_MIN_SAMPLES, DecodeProfile, LEAD_NOISE_MAX_RMS,
+        LeadIn, fitted_audio_ctx, lead_in_prefix, plan_chunks,
     };
-    use std::io::Write;
 
     const SECOND: usize = 16_000;
     const MS: usize = SECOND / 1000;
@@ -1132,53 +794,5 @@ mod tests {
     fn speech_with_no_pause_is_left_to_whisper_in_one_piece() {
         let total = 40 * SECOND;
         assert_eq!(plan_chunks(&[(0, total)], total, 0), vec![(0, total)]);
-    }
-
-    fn write_temp(name: &str, bytes: &[u8]) -> std::path::PathBuf {
-        let path = std::env::temp_dir().join(format!("lune-ggml-check-{name}"));
-        let mut f = std::fs::File::create(&path).expect("create temp model");
-        f.write_all(bytes).expect("write temp model");
-        path
-    }
-
-    #[test]
-    fn a_well_formed_model_passes() {
-        let mut bytes = GGML_MAGIC.to_vec();
-        bytes.resize(MIN_GGML_BYTES as usize + 1, 0);
-        let path = write_temp("ok.bin", &bytes);
-        assert!(check_ggml_file(&path).is_ok());
-        let _ = std::fs::remove_file(path);
-    }
-
-    #[test]
-    fn a_truncated_download_is_rejected_by_size() {
-        // What a full disk or a crash mid-write leaves behind. whisper.cpp
-        // would abort the process on this, so it must never reach the loader.
-        let path = write_temp("short.bin", &GGML_MAGIC);
-        let err = check_ggml_file(&path).expect_err("a 4-byte model must be refused");
-        assert!(
-            err.to_string().contains("partial download"),
-            "the message must tell the user what to do, got: {err}"
-        );
-        let _ = std::fs::remove_file(path);
-    }
-
-    #[test]
-    fn a_file_that_is_not_ggml_is_rejected_by_magic() {
-        // Right size, wrong contents — an HTML error page saved under the
-        // model's name is the realistic version of this.
-        let mut bytes = b"<!DOCTYPE html>".to_vec();
-        bytes.resize(MIN_GGML_BYTES as usize + 1, b' ');
-        let path = write_temp("html.bin", &bytes);
-        let err = check_ggml_file(&path).expect_err("a non-ggml file must be refused");
-        assert!(err.to_string().contains("not in ggml format"), "got: {err}");
-        let _ = std::fs::remove_file(path);
-    }
-
-    #[test]
-    fn a_missing_model_is_reported_not_panicked() {
-        let path = std::env::temp_dir().join("lune-ggml-check-absent.bin");
-        let _ = std::fs::remove_file(&path);
-        assert!(check_ggml_file(&path).is_err());
     }
 }

@@ -14,8 +14,9 @@ files, models and modified sources.
 
 ## whisper.cpp (and ggml)
 
-Compiled into the application when the local Whisper speech-to-text backend is
-enabled. Source: https://github.com/ggerganov/whisper.cpp
+Compiled into the application when the local speech-to-text backends are
+enabled — whisper itself and the `parakeet` library from the same source tree,
+which runs the Parakeet engine. Source: https://github.com/ggerganov/whisper.cpp
 
 ```
 MIT License
@@ -48,10 +49,13 @@ Rust bindings to whisper.cpp. Source: https://codeberg.org/tazz4843/whisper-rs
 Released into the public domain under the Unlicense. No attribution required;
 listed here for completeness.
 
-**Modified.** `whisper-rs-sys` is vendored at `vendor/whisper-rs-sys` with two
-changed files, both marked `LUNE FORK`: `build.rs` adds `GGML_BACKEND_DL`
-support, and `src/lib.rs` adds a lint allow for the generated bindings. The
-changes are distributed under Lune Voice's GPL-3.0-or-later licence; the
+**Modified.** `whisper-rs-sys` is vendored at `vendor/whisper-rs-sys` with
+five changed files, each change marked `LUNE FORK`: `build.rs` adds
+`GGML_BACKEND_DL` support and links whisper.cpp's `parakeet` library;
+`wrapper.h` and `Cargo.toml` bind and package `parakeet.h`; `src/lib.rs` adds a
+lint allow for the generated bindings; and `whisper.cpp/src/whisper.cpp` reuses
+the language-detection encode for the first decode window. The changes are
+distributed under Lune Voice's GPL-3.0-or-later licence; the rest of the
 vendored whisper.cpp source and its MIT licence are unchanged.
 
 ## Whisper GGML models
@@ -60,6 +64,21 @@ The `ggml-*.bin` models downloaded on demand from
 https://huggingface.co/ggerganov/whisper.cpp are conversions of OpenAI's Whisper
 models, released by OpenAI under the MIT License (Copyright (c) 2022 OpenAI). The
 models are downloaded by the user at runtime and are not bundled with the binary.
+
+## Parakeet TDT model (NVIDIA)
+
+`ggml-parakeet-tdt-0.6b-v3-q8_0.bin` and `ggml-parakeet-tdt-0.6b-v3-q4_k.bin`,
+downloaded on demand from
+https://huggingface.co/ggml-org/parakeet-GGUF, is whisper.cpp's GGML
+conversion of NVIDIA's [parakeet-tdt-0.6b-v3](https://huggingface.co/nvidia/parakeet-tdt-0.6b-v3),
+quantized to q8_0 and q4_k. The model is licensed by NVIDIA under the
+[Creative Commons Attribution 4.0 International](https://creativecommons.org/licenses/by/4.0/)
+licence (CC-BY-4.0); the conversion and quantization are the only changes made
+to it. Downloaded by the user at runtime; not bundled with the binary.
+
+A 16 KB Parakeet model with random weights, `fixtures/parakeet/for-tests-ggml-parakeet-tdt.bin`,
+is copied from whisper.cpp's test suite (MIT) for the backend's tests. It is
+not part of any release artifact.
 
 ## Whisper VAD model (silero)
 

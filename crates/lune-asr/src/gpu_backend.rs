@@ -531,6 +531,27 @@ mod imp {
         }
     }
 
+    /// Whether ggml's registry holds a CPU device.
+    ///
+    /// Always true for a static ggml, which links its CPU backend in. Under
+    /// `GGML_BACKEND_DL` the CPU backend is itself a plugin, so a bundle whose
+    /// `backends/` directory went missing has none — and both whisper.cpp and
+    /// Parakeet answer that by throwing a C++ exception out of their state
+    /// setup, which aborts the process instead of reporting anything.
+    pub fn cpu_device_registered() -> bool {
+        use whisper_rs::whisper_rs_sys as sys;
+        // SAFETY: as in `device_names`: a count, then handles for indices
+        // below it.
+        unsafe {
+            (0..sys::ggml_backend_dev_count()).any(|i| {
+                let dev = sys::ggml_backend_dev_get(i);
+                !dev.is_null()
+                    && sys::ggml_backend_dev_type(dev)
+                        == sys::ggml_backend_dev_type_GGML_BACKEND_DEVICE_TYPE_CPU
+            })
+        }
+    }
+
     /// Current GPU state for the setup UI. Loading is a side effect when a
     /// plugin is installed, which is what makes "installed" and "actually
     /// working" distinguishable rather than assumed.
@@ -598,7 +619,7 @@ mod imp {
 pub use imp::{load_plugins, state};
 
 #[cfg(feature = "whisper-cpp")]
-pub(crate) use imp::gpu_device_registered;
+pub(crate) use imp::{cpu_device_registered, gpu_device_registered};
 
 /// Whether CUDA can actually be used for a decode right now.
 ///

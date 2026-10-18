@@ -22,9 +22,9 @@ set -euo pipefail
 #      Only the app crate recompiles.
 #
 # Installed layout:
-#   Linux    <prefix>/lib/LuneVoice/{libwhisper,libggml,libggml-base}.so.N
+#   Linux    <prefix>/lib/LuneVoice/{libwhisper,libparakeet,libggml,libggml-base}.so.N
 #            <prefix>/lib/LuneVoice/backends/libggml-cpu-{sse42,haswell}.so
-#   Windows  <install dir>/{whisper,ggml,ggml-base}.dll
+#   Windows  <install dir>/{whisper,parakeet,ggml,ggml-base}.dll
 #            <install dir>/backends/ggml-cpu-{sse42,haswell}.dll
 #
 # Honours CARGO_TARGET_DIR. Runs under Git Bash on Windows.
@@ -69,14 +69,14 @@ mkdir -p "$RUNTIME/backends"
 shopt -s nullglob
 backends=()
 if [[ "$windows" == 1 ]]; then
-    for lib in whisper ggml ggml-base; do
+    for lib in whisper parakeet ggml ggml-base; do
         cp "$out/bin/$lib.dll" "$RUNTIME/"
     done
     for v in "${CPU_VARIANTS[@]}"; do backends+=("$out/bin/ggml-cpu-$v.dll"); done
 else
     # The executable needs each library under its SONAME (`libggml.so.0`); the
     # other names are symlinks, which bundles do not keep.
-    for lib in libwhisper libggml libggml-base; do
+    for lib in libwhisper libparakeet libggml libggml-base; do
         sonames=()
         for f in "$out/lib/$lib".so.*; do
             [[ "$(basename "$f")" =~ ^$lib\.so\.[0-9]+$ ]] && sonames+=("$f")

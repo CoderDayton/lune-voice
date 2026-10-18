@@ -48,6 +48,8 @@ export function WelcomePage({ onFinish }: WelcomePageProps) {
     totalToDownload,
     engineBackend,
     engineWhisper,
+    engineParakeet,
+    engineLanguage,
     asrLocalName,
     gpuOffer,
     useGpu,
@@ -59,6 +61,8 @@ export function WelcomePage({ onFinish }: WelcomePageProps) {
     gpuError,
     setEngineBackend,
     setEngineWhisper,
+    setEngineParakeet,
+    setEngineLanguage,
     confirmEngine,
     backToEngine,
     toggleModel,
@@ -99,12 +103,16 @@ export function WelcomePage({ onFinish }: WelcomePageProps) {
           <EngineStep
             engineBackend={engineBackend}
             engineWhisper={engineWhisper}
+            engineParakeet={engineParakeet}
+            engineLanguage={engineLanguage}
             error={error}
             gpuOffer={gpuOffer}
             useGpu={useGpu}
             gpuDownloadBytes={gpuDownloadBytes}
             onSelectEngine={setEngineBackend}
             onSelectWhisper={setEngineWhisper}
+            onSelectParakeet={setEngineParakeet}
+            onSelectLanguage={setEngineLanguage}
             onToggleGpu={setUseGpu}
           />
         ) : (

@@ -23,6 +23,8 @@ include = [
     "whisper.cpp/cmake",
     "whisper.cpp/src/**",
     "whisper.cpp/include/whisper.h",
+    # LUNE FORK: bound by `wrapper.h` alongside whisper.h.
+    "whisper.cpp/include/parakeet.h",
     "whisper.cpp/ggml/cmake",
     "whisper.cpp/ggml/CMakeLists.txt",
     "whisper.cpp/ggml/src/**",
