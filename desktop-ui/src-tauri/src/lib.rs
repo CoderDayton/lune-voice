@@ -391,10 +391,10 @@ pub fn run() {
                 app,
                 &[
                     &show_i,
-                    &settings_i,
                     &toggle_i,
                     &copy_i,
                     &sep,
+                    &settings_i,
                     &updates_i,
                     &quit_i,
                 ],
