@@ -36,6 +36,20 @@ ignore = [
     # Unmaintained, not vulnerable. bincode 2 is a direct dep of lune-dict's
     # build script (the compiled vocab tables); the advisory offers no successor.
     { id = "RUSTSEC-2025-0141", reason = "bincode unmaintained — no safe upgrade exists" },
+    # zip 4 via tauri-plugin-updater: every 2.x release (2.14.0 included) pins
+    # zip ^4, and the fixed zip 9 only lands in the 3.0 alphas. Not reachable
+    # in practice: zip is a Windows-only dependency, the updater extracts only
+    # after the archive passes our minisign key check, and the SUID/symlink
+    # issues are Unix permission handling. Drop these on the updater 3.0 move.
+    { id = "RUSTSEC-2026-0367", reason = "zip via tauri-plugin-updater — signed archives only, no 2.x fix" },
+    { id = "RUSTSEC-2026-0368", reason = "zip via tauri-plugin-updater — signed archives only, no 2.x fix" },
+    { id = "RUSTSEC-2026-0369", reason = "zip via tauri-plugin-updater — signed archives only, no 2.x fix" },
+    # Unmaintained, not vulnerable: zbus 5's helper crates, used by lune-voice
+    # and notify-rust. Their successor is zbus 6, which notify-rust has not
+    # adopted yet.
+    { id = "RUSTSEC-2026-0370", reason = "zvariant unmaintained — zbus 5, successor is zbus 6" },
+    { id = "RUSTSEC-2026-0371", reason = "zbus_names unmaintained — zbus 5, successor is zbus 6" },
+    { id = "RUSTSEC-2026-0372", reason = "zvariant_derive unmaintained — zbus 5, successor is zbus 6" },
 ]
 
 [licenses]
