@@ -142,7 +142,7 @@ cgs gpu-plugin --env CUDA_ARCHS="89-real"   # narrow, for a local test
 cgs gpu-plugin-windows                      # Windows — run ON Windows
 ```
 
-The Linux script builds `libggml-cuda.so`, stages it with the three NVIDIA
+Both commands run `scripts/release/gpu-plugin-linux.sh` and `scripts/release/gpu-plugin-windows.sh`. The Linux script builds `libggml-cuda.so`, stages it with the three NVIDIA
 redistributables, strips it, asserts `RUNPATH=$ORIGIN` is present, verifies the
 architectures against the binary, writes the `ggml-version` stamp (ggml's
 `MAJOR.MINOR.PATCH` from `ggml/CMakeLists.txt`), then writes the tarball and its
@@ -157,12 +157,25 @@ upgrade that moves ggml's version needs a rebuilt plugin under a new release tag
 
 `cgs gpu-plugin-windows` is the same shape with the platform's differences: run
 it from Git Bash in a shell where MSVC and the CUDA toolkit are on `PATH`
-(`CUDA_PATH` must be set). There is no `$ORIGIN` to assert, so it checks the
+(`CUDA_PATH` must be set; CUDA 13 keeps its DLLs in `bin\x64`, which the script
+checks before `bin`). There is no `$ORIGIN` to assert, so it checks the
 staged file set against the app's allowlist instead — a stray file there would
 otherwise become a failed install for every user. **CUDA device code cannot be
 cross-compiled**: nvcc targets the host toolchain, so this artifact can only be
-produced on a Windows machine with an NVIDIA toolkit. Neither script runs in
-CI for that reason.
+produced on a Windows machine with an NVIDIA toolkit.
+
+The **GPU plugin** workflow (`.github/workflows/gpu-plugin.yml`) builds both
+archives on GitHub's runners and attaches them to a draft release. It runs only
+when started by hand, because a plugin is needed only when ggml's version
+changes:
+
+```bash
+gh workflow run gpu-plugin.yml -f tag=gpu-cuda13-v1
+```
+
+The Linux archive builds on Ubuntu 22.04, the same base as the app bundles, so
+its glibc floor matches the app's. The run summary lists each archive's byte
+size and digest for step 2 below.
 
 To publish, for either platform:
 

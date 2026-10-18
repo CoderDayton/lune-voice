@@ -153,7 +153,6 @@ jobs:
           path: release-artifacts/*
           if-no-files-found: error
 
-  # ── Windows bundle (CPU; the CUDA plugin is Linux-only for now) ───────────
   build-windows:
     name: Windows bundle
     needs: [verify-version]

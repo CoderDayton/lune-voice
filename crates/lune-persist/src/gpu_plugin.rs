@@ -118,12 +118,6 @@ pub const CUDA_LINUX_X86_64: GpuPluginRelease = GpuPluginRelease {
 /// redistributable CUDA runtime — because the extractor and its allowlist are
 /// shared. Only the member *names* differ (`ggml-cuda.dll`, `cudart64_13.dll`,
 /// …), which is what [`is_permitted_member`] switches on.
-///
-/// Unpublished until someone builds it: `cgs gpu-plugin-windows` needs a
-/// Windows host with MSVC and the CUDA toolkit, and there is no cross-compile
-/// for CUDA device code. Publishing means running that script, uploading both
-/// files to the release named in `url`, and pasting the digest and byte size
-/// here — the same loop the Linux archive went through.
 pub const CUDA_WINDOWS_X86_64: GpuPluginRelease = GpuPluginRelease {
     url: "https://github.com/CoderDayton/lune-voice/releases/download/gpu-cuda13-v1/\
           lune-voice-gpu-cuda13-windows-x86_64.tar.gz",

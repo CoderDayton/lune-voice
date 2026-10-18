@@ -1,0 +1,136 @@
+name: GPU plugin
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Release tag the archives attach to (the `url` in crates/lune-persist/src/gpu_plugin.rs)
+        default: gpu-cuda13-v1
+        required: true
+      cuda_archs:
+        description: CMAKE_CUDA_ARCHITECTURES
+        default: 75-real;86-real;89-real;120-real;75-virtual
+        required: true
+
+permissions:
+  contents: read
+
+env:
+  CUDA_VERSION: '13.1.1'
+
+jobs:
+  check-tag:
+    name: Tag is unpublished
+    runs-on: ubuntu-latest
+    steps:
+      - name: Refuse a published release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          TAG: ${{ inputs.tag }}
+        run: |
+          set -euo pipefail
+          if is_draft=$(gh release view "$TAG" --json isDraft --jq .isDraft 2>/dev/null) && [ "$is_draft" != "true" ]; then
+            echo "::error::release $TAG is already published; its assets are pinned by digest in gpu_plugin.rs. Use a new tag."
+            exit 1
+          fi
+
+  build-linux:
+    name: Linux plugin
+    needs: [check-tag]
+    runs-on: ubuntu-22.04
+    timeout-minutes: 300
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+
+      - uses: Jimver/cuda-toolkit@b8bf9c6c28f8a92fbb04dcfcaee872e60c57462d
+        id: cuda
+        with:
+          cuda: ${{ env.CUDA_VERSION }}
+          method: local
+          linux-local-args: '["--toolkit"]'
+          log-file-suffix: linux.txt
+
+      - name: Build plugin
+        env:
+          CUDA_LIB: ${{ steps.cuda.outputs.CUDA_PATH }}/targets/x86_64-linux/lib
+          CUDA_ARCHS: ${{ inputs.cuda_archs }}
+        run: bash scripts/release/gpu-plugin-linux.sh
+
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: gpu-plugin-linux
+          path: release-artifacts/lune-voice-gpu-*
+          if-no-files-found: error
+          retention-days: 1
+          compression-level: 0
+
+  build-windows:
+    name: Windows plugin
+    needs: [check-tag]
+    runs-on: windows-latest
+    timeout-minutes: 300
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+
+      - uses: Jimver/cuda-toolkit@b8bf9c6c28f8a92fbb04dcfcaee872e60c57462d
+        with:
+          cuda: ${{ env.CUDA_VERSION }}
+          method: local
+          log-file-suffix: windows.txt
+
+      - uses: ilammy/msvc-dev-cmd@0b201ec74fa43914dc39ae48a89fd1d8cb592756
+        with:
+          arch: x64
+
+      - name: Install Ninja
+        run: pip install ninja==1.13.0
+
+      - name: Build plugin
+        shell: bash
+        env:
+          CMAKE_GENERATOR: Ninja
+          CUDA_ARCHS: ${{ inputs.cuda_archs }}
+        run: bash scripts/release/gpu-plugin-windows.sh
+
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: gpu-plugin-windows
+          path: release-artifacts/lune-voice-gpu-*
+          if-no-files-found: error
+          retention-days: 1
+          compression-level: 0
+
+  publish:
+    name: Draft release
+    needs: [build-linux, build-windows]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          path: release-artifacts
+          merge-multiple: true
+
+      - name: Attach to draft release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          TAG: ${{ inputs.tag }}
+        run: |
+          set -euo pipefail
+          if is_draft=$(gh release view "$TAG" --json isDraft --jq .isDraft 2>/dev/null); then
+            if [ "$is_draft" != "true" ]; then
+              echo "::error::release $TAG is already published; its assets are pinned by digest in gpu_plugin.rs. Use a new tag."
+              exit 1
+            fi
+          else
+            gh release create "$TAG" --draft --target "$GITHUB_SHA" \
+              --title "GPU plugin ($TAG)" \
+              --notes "CUDA backend plugins. Pin each digest and byte size in crates/lune-persist/src/gpu_plugin.rs before publishing."
+          fi
+          gh release upload "$TAG" release-artifacts/* --clobber
+          for f in release-artifacts/*.tar.gz; do
+            echo "$(basename "$f"): $(stat -c %s "$f") bytes, sha256 $(cut -d' ' -f1 "$f.sha256")" >> "$GITHUB_STEP_SUMMARY"
+          done
