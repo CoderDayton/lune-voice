@@ -96,7 +96,7 @@ fn play_blocking(cue: Cue, volume: f32) -> Result<(), String> {
         return Ok(());
     }
 
-    let host = cpal::default_host();
+    let host = lune_audio::playback_host();
     let device = host
         .default_output_device()
         .ok_or("no default output device")?;

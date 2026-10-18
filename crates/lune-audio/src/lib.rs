@@ -26,10 +26,17 @@
 //! ```
 
 mod capture;
+mod devices;
 pub mod pcen;
+#[cfg(target_os = "linux")]
+mod pulse;
 mod ring;
 
-pub use capture::{AudioConfig, AudioStream, AudioStreamHandle, ConsumerGuard, list_input_devices};
+pub use capture::{AudioConfig, AudioStream, AudioStreamHandle, ConsumerGuard};
+pub use devices::{
+    capture_buffer_size, capture_host, list_input_devices, migrated_input_device_name,
+    playback_host,
+};
 pub use pcen::{
     DEFAULT_NOISE_CEILING_RMS, EXPECTED_OUTPUT_RMS, PCEN_HOP_SIZE, PcenAgc, PcenAgcConfig,
     PcenFrameStats,

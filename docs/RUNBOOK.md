@@ -75,9 +75,18 @@ Work down this list:
    for the body.
 2. **Mic not captured.** `RUST_LOG=info` and look for capture logs; check the
    input device in Settings. The level meter reads *post-AGC*, so a silent meter
-   means no audio is arriving at all. The picker lists one entry per card, not
-   per ALSA route, so a mic that never appears is either not a capture device or
-   shares its reported name with one already listed.
+   means no audio is arriving at all. The picker lists one entry per name, so a
+   mic that never appears is either not a capture device or shares its reported
+   name with one already listed. With a Pulse server (PulseAudio, or PipeWire's
+   `pipewire-pulse`) the names are the server's source names, e.g.
+   `Shure MV6 Mono`; without one they are ALSA card names.
+   `audio init: … temporarily busy` means capture went to raw ALSA while another
+   program held the card, because no Pulse server answered. `opening capture
+   stream host=Alsa` at INFO confirms it; check `systemctl --user status
+   pipewire-pulse` (or `pulseaudio`). `host=PulseAudio` plus a WARN ending in
+   `listing every input cpal reports instead` means the server answered cpal
+   but not the picker's own listing, so the picker shows every input cpal
+   reports, sink monitors included.
 3. **Everything dropped as non-speech.** Look for `dropping non-speech segment` /
    `dropping garbage segment` at WARN. Usually a mic gain problem.
 4. **Backend not compiled in.** An error containing `not compiled in` means the

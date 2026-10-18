@@ -21,8 +21,8 @@ use std::sync::{Arc, Mutex as StdMutex};
 use std::time::Instant;
 
 use bench_utils::{benchmark_asr_entry, detect_gpu, workspace_root};
+use cpal::StreamConfig;
 use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
-use cpal::{BufferSize, StreamConfig};
 use lune_asr::AsrRegistry;
 use lune_core::config::{DevicePolicy, UserSettings};
 use lune_core::llm::TextPostProcessor;
@@ -230,8 +230,11 @@ fn main() {
 /// Open a cpal input stream at 16kHz mono f32 for WAV recording.
 /// PipeWire/PulseAudio handles server-side resampling transparently.
 fn start_recording(pcm: Arc<StdMutex<Vec<f32>>>) -> Result<cpal::Stream, String> {
-    let host = cpal::default_host();
+    let host = lune_audio::capture_host();
     let device = host.default_input_device().ok_or("no input device found")?;
+    let supported = device
+        .default_input_config()
+        .map_err(|e| format!("query input config: {e}"))?;
 
     eprintln!(
         "  Mic: {}",
@@ -244,7 +247,7 @@ fn start_recording(pcm: Arc<StdMutex<Vec<f32>>>) -> Result<cpal::Stream, String>
     let config = StreamConfig {
         channels: 1,
         sample_rate: 16_000,
-        buffer_size: BufferSize::Default,
+        buffer_size: lune_audio::capture_buffer_size(&host, 16_000, supported.buffer_size()),
     };
 
     let stream = device

@@ -111,6 +111,8 @@ diesel = { version = "2", features = ["sqlite", "returning_clauses_for_sqlite_3_
 diesel_migrations = "2"
 dirs = "6"
 cpal = "0.18"
+pulseaudio = "0.3"
+futures-executor = "0.3"
 rubato = "5.0"
 audioadapter-buffers = "5"
 mimalloc = { version = "0.1", default-features = false }

@@ -19,8 +19,8 @@ use std::io::{self, BufRead, Write};
 use std::sync::{Arc, Mutex as StdMutex};
 
 use bench_utils::{BenchmarkHarness, char_error_rate, word_error_rate};
+use cpal::StreamConfig;
 use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
-use cpal::{BufferSize, StreamConfig};
 use lune_asr::AsrRegistry;
 use lune_audio::{AudioConfig, AudioStream};
 use lune_core::config::UserSettings;
@@ -72,12 +72,15 @@ fn references() -> Vec<String> {
 /// stream runs until dropped; we clear `pcm` at the start of each utterance and
 /// snapshot it at the end. (Mirrors `live_transcribe`'s capture.)
 fn start_recording(pcm: Arc<StdMutex<Vec<f32>>>) -> Result<cpal::Stream, String> {
-    let host = cpal::default_host();
+    let host = lune_audio::capture_host();
     let device = host.default_input_device().ok_or("no input device found")?;
+    let supported = device
+        .default_input_config()
+        .map_err(|e| format!("query input config: {e}"))?;
     let config = StreamConfig {
         channels: 1,
         sample_rate: 16_000,
-        buffer_size: BufferSize::Default,
+        buffer_size: lune_audio::capture_buffer_size(&host, 16_000, supported.buffer_size()),
     };
     let stream = device
         .build_input_stream(

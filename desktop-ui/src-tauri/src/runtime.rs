@@ -397,7 +397,8 @@ impl AppRuntime {
                 }
             }
         }
-        let loaded = load_settings_checked(&paths)?;
+        let mut loaded = load_settings_checked(&paths)?;
+        crate::persistence::migrate_input_device(&paths, &mut loaded).await;
         let settings = loaded.settings.clone();
 
         // Retention runs once per launch, not once per window load: with

@@ -25,6 +25,11 @@ crossbeam-channel = "0.5"
 # Error handling
 thiserror.workspace = true
 
+[target.'cfg(target_os = "linux")'.dependencies]
+cpal = { workspace = true, features = ["pulseaudio"] }
+pulseaudio.workspace = true
+futures-executor.workspace = true
+
 [dev-dependencies]
 tokio = { workspace = true, features = ["macros", "rt-multi-thread", "time"] }
 tracing-subscriber.workspace = true

@@ -783,6 +783,50 @@ fn save_settings(paths: &AppPaths, settings: &UserSettings) -> Result<(), String
         .map_err(|e| format!("save settings: {e}"))
 }
 
+pub(crate) fn renamed_input_device(
+    saved: Option<&str>,
+    trust: SettingsTrust,
+    current_name: impl FnOnce(&str) -> Option<String>,
+) -> Option<String> {
+    if trust != SettingsTrust::AsWritten {
+        return None;
+    }
+    current_name(saved?)
+}
+
+const INPUT_DEVICE_MIGRATION_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(3);
+
+pub(crate) async fn migrate_input_device(paths: &AppPaths, loaded: &mut CheckedSettings) {
+    let saved = loaded.settings.input_device.clone();
+    let trust = loaded.trust;
+    let lookup = tokio::task::spawn_blocking(move || {
+        renamed_input_device(
+            saved.as_deref(),
+            trust,
+            lune_audio::migrated_input_device_name,
+        )
+    });
+    let renamed = match tokio::time::timeout(INPUT_DEVICE_MIGRATION_TIMEOUT, lookup).await {
+        Ok(joined) => joined.ok().flatten(),
+        Err(_) => {
+            tracing::warn!("input device lookup timed out; keeping the saved name");
+            None
+        }
+    };
+    let Some(name) = renamed else {
+        return;
+    };
+    let previous = loaded.settings.input_device.replace(name);
+    match save_settings(paths, &loaded.settings) {
+        Ok(()) => tracing::info!(
+            from = ?previous,
+            to = ?loaded.settings.input_device,
+            "renamed the saved input device to its current name"
+        ),
+        Err(e) => tracing::warn!(error = %e, "saving the renamed input device failed"),
+    }
+}
+
 fn open_database(paths: &AppPaths) -> Result<Database, String> {
     Database::open(&paths.database_file()).map_err(|e| format!("open database: {e}"))
 }
@@ -1374,6 +1418,34 @@ fn session_status_label(status: &SessionStatus) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn a_saved_input_device_is_renamed_to_its_current_name() {
+        let renamed = renamed_input_device(
+            Some("Shure MV6, USB Audio"),
+            SettingsTrust::AsWritten,
+            |saved| (saved == "Shure MV6, USB Audio").then(|| "Shure MV6 Mono".to_owned()),
+        );
+        assert_eq!(renamed.as_deref(), Some("Shure MV6 Mono"));
+    }
+
+    #[test]
+    fn quarantined_settings_never_rename_the_input_device() {
+        let renamed = renamed_input_device(
+            Some("Shure MV6, USB Audio"),
+            SettingsTrust::Quarantined,
+            |_| panic!("a quarantined file must not be inspected"),
+        );
+        assert_eq!(renamed, None);
+    }
+
+    #[test]
+    fn the_system_default_input_is_never_renamed() {
+        let renamed = renamed_input_device(None, SettingsTrust::AsWritten, |_| {
+            panic!("no saved device to look up")
+        });
+        assert_eq!(renamed, None);
+    }
 
     /// A quarantined settings file leaves us holding defaults, not the user's
     /// choices. Acting on them destroys history the user asked to keep, and

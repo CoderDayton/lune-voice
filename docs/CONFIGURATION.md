@@ -88,7 +88,8 @@ sound_cues_enabled = true
 sound_cue_volume = 1.0
 session_history_days = 30
 # model_idle_unload_minutes is optional — omit to keep the model loaded.
-# input_device is optional — omit to follow the system default input.
+# input_device is optional — omit to follow the system default input. The value
+# is a name from the mic picker.
 vad_pcen = true
 start_minimized = false
 check_updates_on_launch = false
