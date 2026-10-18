@@ -1,14 +1,15 @@
 # Release & build matrix
 
-Lune Voice runs speech-to-text **in-process** through a native library. The
-styling LLM is remote-only (OpenAI-compatible HTTP) — no native build step.
+Lune Voice runs speech-to-text **inside the app** through a native library. The
+styling LLM is remote only (OpenAI-compatible HTTP), so it has no native build
+step.
 
-- ASR — [`whisper-rs`](https://github.com/tazz4843/whisper-rs) → bundled `whisper.cpp`
+- ASR: [`whisper-rs`](https://github.com/tazz4843/whisper-rs) → bundled `whisper.cpp`
 
-The `whisper-rs` `*-sys` crate **vendors and compiles the native C/C++ library
-from source at `cargo build` time** (CMake + a C++ toolchain + `libclang` for
-bindgen). It is vendored under `vendor/whisper-rs-sys/` via `[patch.crates-io]`,
-with whisper.cpp v1.9.4 inside it. Three files are modified, every change
+The `whisper-rs` `*-sys` crate **compiles the native C/C++ library from source
+during `cargo build`** (CMake, a C++ toolchain, and `libclang` for bindgen). It
+is vendored under `vendor/whisper-rs-sys/` through `[patch.crates-io]`, with
+whisper.cpp v1.9.4 inside it. Three files are modified, and every change is
 marked `LUNE FORK`:
 
 - `build.rs` adds `GGML_BACKEND_DL` support, refreshes the compiled copy of
@@ -26,45 +27,41 @@ To upgrade whisper.cpp, copy the same subset of upstream over
 ## Distribution model
 
 Releases ship as finished Tauri bundles (`.deb`, `.rpm`, `.AppImage`, and a
-Windows `-setup.exe`), so **end
-users never compile** anything.
+Windows `-setup.exe`), so **users never compile** anything.
 
-GPU support is **not** a separate artifact on Linux. The CUDA backend is a
-`dlopen`-able plugin the user downloads from the app, so one CPU bundle serves
-every Linux user and a machine with an NVIDIA driver opts in at runtime. See
+GPU support is **not** a separate download of the app. The CUDA backend is a
+`dlopen`-able plugin the user downloads from inside the app, so one CPU bundle
+serves everyone, and a machine with an NVIDIA driver opts in at runtime. See
 [GPU_PLUGIN.md](GPU_PLUGIN.md) for how that works and how to publish the archive.
 
-Linux and Windows are both built and tested; there is no macOS job yet. Each
-OS-specific subsystem — audio capture, text delivery, the global hotkey, the
-focused-window probe, the pill overlay — sits behind an interface with a half
-per platform (see the platform-split table in `CLAUDE.md`), so CI runs the
-**whole** workspace on `ubuntu-latest` and `windows-latest` alike. A bare local
-`cgs build` auto-detects the build host; see Build commands.
+Linux and Windows are both built and tested. There is no macOS build. Each
+OS-specific subsystem (audio capture, text delivery, the global hotkey, the
+focused-window check, the pill overlay) sits behind one interface with a Linux
+half and a Windows half (see the platform table in `CLAUDE.md`), so CI runs the
+**whole** workspace on both `ubuntu-latest` and `windows-latest`. A plain local
+`cgs build` detects what the machine has; see Build commands.
 
-Whisper models are **external assets**: GGML files are downloaded at runtime
-into the application models directory (`~/.local/share/lune-voice/models/` on
-Linux) and loaded from disk. They are **not** embedded in the executable or the
-bundle.
+Whisper models are **not** in the executable or the bundle. The GGML files are
+downloaded at runtime into the models directory
+(`~/.local/share/lune-voice/models/` on Linux) and loaded from disk.
 
 ## Release matrix
 
 | Target | OS / arch | Backend | Cargo features | Status |
 |---|---|---|---|---|
 | Linux | Linux x86_64 | CPU (any x86-64-v2; best CPU variant picked at runtime) | `whisper-cpp` | **Supported** |
-| Linux GPU plugin | Linux x86_64 + NVIDIA | CUDA, downloaded at runtime | — (built by `cgs gpu-plugin`) | **Supported** |
+| Linux GPU plugin | Linux x86_64 + NVIDIA | CUDA, downloaded at runtime | none (built by `cgs gpu-plugin`) | **Built; archive not published yet** |
 | Windows CPU | Windows x86_64 | CPU (any x86-64-v2; best CPU variant picked at runtime) | `whisper-cpp` | **Supported** (NSIS installer) |
-| Windows GPU plugin | Windows x86_64 + NVIDIA | CUDA, downloaded at runtime | — (built by `cgs gpu-plugin-windows`) | **Wired; archive not published yet** |
-| macOS Metal | macOS arm64 (Apple Silicon) | Metal | `whisper-metal` | **Planned** (see below) |
+| Windows GPU plugin | Windows x86_64 + NVIDIA | CUDA, downloaded at runtime | none (built by `cgs gpu-plugin-windows`) | **Built; archive not published yet** |
 
-The `whisper-cuda` feature forwards to `whisper-rs/cuda`; the CPU feature just
-compiles the library without a GPU backend. The Cargo feature graph is
-cross-platform — the same `--features` flag works on Linux and Windows — but that
-feature graph is the only cross-platform part; the crates a desktop app needs on
-top of it are not.
+The `whisper-cuda` feature passes through to `whisper-rs/cuda`. The CPU feature
+compiles the library with no GPU backend. The same `--features` flags work on
+Linux and Windows, but only the features are shared: the crates the desktop app
+needs on top of them differ by platform.
 
-The Linux GPU plugin is not a Cargo feature at all. It is built separately with
-`cgs gpu-plugin` and published as a standalone `.tar.gz` on the GitHub release;
-the application downloads and verifies it on request.
+The GPU plugin is not a Cargo feature at all. It is built separately with
+`cgs gpu-plugin` and published as its own `.tar.gz` on a GitHub release. The
+app downloads and verifies it when the user asks.
 
 ## Toolchain per runner
 
@@ -77,24 +74,25 @@ build and the platform's Tauri/WebView prerequisites.
   Toolkit** (`nvcc`).
 - **Windows**: MSVC build tools (or clang), CMake, LLVM (`libclang`). CUDA target
   also needs the **CUDA Toolkit**.
-- **macOS** (planned): Xcode command-line tools provide Metal; CMake + LLVM.
 
 ## Build commands
 
-`cgs build` **compiles only** — it produces the executable, not installers.
-Shippable `.deb`/`.rpm`/`.AppImage`/`.tar.gz` come from `cgs package`, which
-builds them in a container against an old glibc; a bundle made on the dev box
-links that box's libraries and is not distributable. `--env BUNDLE=1` bundles
-locally anyway, for testing the package layout itself.
+`cgs build` **only compiles**. It makes the executable, not installers. The
+`.deb`/`.rpm`/`.AppImage`/`.tar.gz` you ship come from `cgs package`, which
+builds them in a container against an old glibc. A bundle made on your own
+machine links your machine's libraries and won't run everywhere. `--env
+BUNDLE=1` bundles locally anyway, for testing the package layout.
 
-It has two profiles. The default is a **native** build tuned to the build host
-(fast, low memory); **release artifacts** are `--env PORTABLE=1`. Backend
-(CPU vs CUDA) auto-detects for native builds unless pinned with `--env BACKEND`;
-PORTABLE is CPU only, because GPU ships as the downloadable plugin.
+`cgs build` has two profiles. The default is a **native** build tuned to the
+machine building it (fast, low memory). **Release builds** use `--env
+PORTABLE=1`. Native builds pick CPU or CUDA by themselves unless you set `--env
+BACKEND`. PORTABLE is CPU only, because the GPU ships as the downloadable
+plugin.
 
 ```bash
-# Local build (default): NATIVE — static, ggml targets only this machine's CPU +
-# GPU arch. ~8x smaller CUDA compile, won't exhaust RAM. NOT portable to other HW.
+# Local build (default): NATIVE. Static; ggml targets only this machine's CPU
+# and GPU. The CUDA compile is ~8x smaller and won't run out of RAM. Does NOT
+# run on other hardware.
 cgs build
 
 # Distributable release artifact (what CI and `cgs package` build): PORTABLE.
@@ -110,36 +108,35 @@ Native runs, from `desktop-ui/`:
 GGML_NATIVE=ON bun tauri build --features "whisper-cuda"
 ```
 
-PORTABLE runs `scripts/release/build-bundles.sh`, which every distributable
-build shares — `cgs build`, `cgs package`, CI and the release workflow:
+PORTABLE runs `scripts/release/build-bundles.sh`. Every distributable build
+uses it: `cgs build`, `cgs package`, CI and the release workflow.
 
 - ggml is built as shared libraries with `GGML_BACKEND_DL=ON`, and the bundle
   ships two CPU backend plugins: `haswell` (AVX2 + FMA + F16C + BMI2) and
-  `sse42` for CPUs without AVX2. ggml loads the best one the CPU supports at
-  startup. ggml cannot build a chosen subset, so `GGML_CPU_ALL_VARIANTS=ON`
-  compiles every x86 variant and the script stages only those two
-  (`CPU_VARIANTS`). The same layout is what lets the downloaded CUDA plugin
-  load (docs/GPU_PLUGIN.md).
-- The Rust half has one baseline, `RUSTFLAGS=-C target-cpu=x86-64-v2`
-  (SSE4.2 + POPCNT), which the script sets; that is the oldest CPU a release
-  runs on.
+  `sse42` for CPUs without AVX2. At startup ggml loads the best one the CPU
+  supports. ggml can't build only some variants, so `GGML_CPU_ALL_VARIANTS=ON`
+  compiles all of them and the script keeps those two (`CPU_VARIANTS`). This
+  same layout is what lets the downloaded CUDA plugin load (docs/GPU_PLUGIN.md).
+- The Rust code has one baseline, `RUSTFLAGS=-C target-cpu=x86-64-v2`
+  (SSE4.2 + POPCNT), set by the script. That is the oldest CPU a release runs
+  on.
 - It builds twice: `tauri build --no-bundle` compiles everything, the ggml
   libraries and CPU plugins are staged into `desktop-ui/src-tauri/runtime/`,
   and a second `tauri build` with `tauri.runtime.conf.json` bundles that
   directory as resources. Only the app crate recompiles.
 
-Installed, the libraries sit in Tauri's resource directory —
-`<prefix>/lib/LuneVoice/` on Linux, which the executable's `RUNPATH` names,
-and the install directory itself on Windows, where the loader finds DLLs beside
-the executable. The CPU plugins are in `backends/` below it. A PORTABLE binary
-run from the build tree needs them staged there first:
+Once installed, the libraries sit in Tauri's resource directory. On Linux that
+is `<prefix>/lib/LuneVoice/`, which the executable's `RUNPATH` points to. On
+Windows it is the install directory, since Windows finds DLLs next to the
+executable. The CPU plugins are in `backends/` below it. To run a PORTABLE
+binary from the build tree, copy them there first:
 `cgs stage-runtime --env PROFILE=release`.
 
-Host-tuned codegen is opt-in per build, not pinned in `.cargo/config.toml`: a
-committed `build.rustflags` would apply to a packager's plain `cargo build
---release` too, and that binary would `SIGILL` on any CPU older than the build
-host. `cgs dev` and the native branch of `cgs build` export
-`-C target-cpu=native` for themselves.
+Tuning for the build machine is turned on per build, not set in
+`.cargo/config.toml`. A committed `build.rustflags` would also apply to a
+packager's plain `cargo build --release`, and that binary would crash with
+`SIGILL` on any CPU older than the one that built it. `cgs dev` and the native
+`cgs build` set `-C target-cpu=native` for themselves.
 
 ### Windows specifics
 
@@ -150,45 +147,44 @@ shell where MSVC, CMake and LLVM are on `PATH` (`LIBCLANG_PATH` set):
 bash scripts/release/build-bundles.sh
 ```
 
-Tauri produces the `.msi`/`.exe` (NSIS) installers configured in
+Tauri builds the NSIS `-setup.exe` installer set up in
 `desktop-ui/src-tauri/tauri.conf.json`.
 
-From a Linux box, `cgs check-windows` type-checks the whole workspace —
-`lune-ui` included — for `x86_64-pc-windows-gnu`, so the
-`cfg(target_os = "windows")` halves of the platform split cannot rot between
-pushes. It needs two things, both wired in by `.cargo/config.toml`: `zig` as the
-C cross-compiler, and `binutils-mingw-w64-x86-64` for
+On Linux, `cgs check-windows` type-checks the whole workspace (`lune-ui`
+included) for `x86_64-pc-windows-gnu`, so the Windows code can't quietly break
+between pushes. It needs two things, both set up in `.cargo/config.toml`: `zig`
+as the C cross-compiler, and `binutils-mingw-w64-x86-64` for
 `x86_64-w64-mingw32-windres`, which compiles `lune-ui`'s icon and manifest
 resource with `zig cc` as its preprocessor. `lune-ui`'s build script reads
 `desktop-ui/dist`, so build the frontend once on a fresh clone.
 
-It is **check-only** — linking `x86_64-pc-windows-gnu` also needs a MinGW `gcc`
-as the linker driver, so producing an actual Windows binary stays the CI job on
+It **only checks**. Linking for `x86_64-pc-windows-gnu` would also need MinGW
+`gcc` as the linker, so real Windows binaries are built by the CI job on
 `windows-latest`.
 
 ### Linux bundles
 
 `cgs package` (`scripts/release/package-all.sh`) builds `.deb`, `.AppImage`,
 `.rpm` and a portable `.tar.gz` into `release-artifacts/`, in a single
-`ubuntu:22.04` container (honors `$CONTAINER_ENGINE`). It builds the CPU backend
-(`--features whisper-cpp`); GPU support reaches those bundles as the
-downloadable CUDA plugin, not as a second artifact.
+`ubuntu:22.04` container (it respects `$CONTAINER_ENGINE`). It builds the CPU
+backend (`--features whisper-cpp`). GPU support reaches these bundles as the
+downloadable CUDA plugin, not as a second build.
 
 One image covers all three package formats because tauri writes RPMs with the
-pure-Rust `rpm` crate — no `rpmbuild`, no Fedora. Ubuntu 22.04 is the right
-single host because it has the oldest glibc of the distros targeted, so its
-binary runs on the newer ones too. The `.rpm`'s `Requires` come from
-`tauri.conf.json`, not from the build host.
+pure-Rust `rpm` crate, so there is no `rpmbuild` and no Fedora. Ubuntu 22.04 has
+the oldest glibc of the distros we target, so a binary built there runs on the
+newer ones too. The `.rpm`'s `Requires` come from `tauri.conf.json`, not from
+the build machine.
 
-The `.tar.gz` is the `.deb` payload repacked, not a second compile: the deb's
-`usr/` tree is kept intact (tauri resolves resources as
-`<prefix>/bin/lune-voice` -> `<prefix>/lib/LuneVoice`) with a top-level
-`lune-voice` launcher and a `README.txt` covering the udev rule. The binary's
-tauri bundle stamp is reset from `.deb` to "no bundle" (same length, and the
-script refuses unless exactly one stamp is found), so the portable copy offers
-a manual download instead of running `dpkg -i` through pkexec. Bundle file
-names are normalized from `LuneVoice_...` to `lune-voice_...`, by
-`package-all.sh` and by the release workflow alike.
+The `.tar.gz` is the `.deb`'s contents repacked, not a second compile. The
+deb's `usr/` tree is kept as is (tauri finds resources as
+`<prefix>/bin/lune-voice` -> `<prefix>/lib/LuneVoice`), with a `lune-voice`
+launcher at the top and a `README.txt` about the udev rule. The binary's tauri
+bundle stamp is changed from `.deb` to "no bundle" (same length, and the script
+stops unless it finds exactly one stamp). That way the portable copy offers a
+manual download instead of running `dpkg -i` through pkexec. Both
+`package-all.sh` and the release workflow rename bundle files from
+`LuneVoice_...` to `lune-voice_...`.
 
 | `--env TYPE=` | Produces |
 |---|---|
@@ -196,57 +192,35 @@ names are normalized from `LuneVoice_...` to `lune-voice_...`, by
 | `bundles` | `.deb`, `.AppImage`, `.rpm` |
 | `tarball` | repacks the newest `.deb` already in `release-artifacts/` |
 
-## macOS Metal (planned, not yet wired)
-
-To add the macOS Apple-Silicon artifact:
-
-1. Add a `metal` passthrough feature mirroring the CUDA one:
-   - `crates/lune-asr/Cargo.toml`: `whisper-metal = ["whisper-cpp", "whisper-rs/metal"]`
-   - `crates/lune-voice` + `desktop-ui/src-tauri`: `whisper-metal`
-     passthrough + a `metal` umbrella (mirroring `gpu`).
-2. Gate the runtime `use_gpu` decision on `cfg!(feature = "whisper-metal")`
-   alongside the existing CUDA `cfg!`s
-   (`crates/lune-asr/src/backend/registry.rs`).
-3. Build on a macOS arm64 runner:
-   `bun tauri build --features "whisper-metal"` → `.dmg`.
-
-`whisper-rs` exposes a `metal` feature, so no upstream work is required — only
-the passthrough wiring above. (`coreml` for whisper and `vulkan`/`rocm` are
-available too, but are out of scope unless an explicit product requirement.)
-
 ## CI
 
 Two workflows cover the build.
 
-**`.github/workflows/ci.yml`** gates every push and PR. Alongside fmt, clippy,
+**`.github/workflows/ci.yml`** checks every push and PR. Besides fmt, clippy,
 tests, DTO drift, the frontend and the dependency audits, a **`bundle`** job
-builds the real Linux artifact on `ubuntu-22.04` — the same PORTABLE CPU build
-`cgs build --env PORTABLE=1` produces — then asserts a `.deb`, `.rpm` and
-`.AppImage` all landed, that the udev rule is actually inside the `.deb`, and
-that the `.deb` carries the ggml libraries and CPU plugins and its binary
-resolves them. Every other job compiles the whisper *stub*, so without this job a
-feature-passthrough typo, a broken `resources` path or a missing icon passed CI
-and failed at release time instead.
+builds the real Linux bundles on `ubuntu-22.04` (the same PORTABLE CPU build as
+`cgs build --env PORTABLE=1`). It then checks that a `.deb`, `.rpm` and
+`.AppImage` were all made, that the udev rule is inside the `.deb`, and that the
+`.deb` has the ggml libraries and CPU plugins and its binary can find them.
+Every other job compiles the whisper *stub*, so without this job a typo in a
+feature, a broken `resources` path or a missing icon would pass CI and only
+fail at release time.
 
 **`.github/workflows/release.yml`** runs on a `v*` tag. It first fails fast if
-the tag disagrees with the version in `tauri.conf.json`, `Cargo.toml` and
-`desktop-ui/package.json`, then builds the Linux bundles and the Windows
+the tag doesn't match the version in `tauri.conf.json`, `Cargo.toml` and
+`desktop-ui/package.json`. Then it builds the Linux bundles and the Windows
 installer, writes checksums, and opens a **draft** GitHub release with them
-attached. The Windows leg runs after the Linux one so only one job creates the
-draft; it attaches to the release the Linux job made.
+attached. The Windows job runs after the Linux one, so only one job creates the
+draft, and Windows adds its files to it.
 
-It stops at draft on purpose: the updater's private key never enters CI, so
-`latest.json` does not exist yet. Finish by hand — see [In-app
-updater](#in-app-updater) below. A release published without `latest.json` is a
-release the updater cannot see.
+It stops at a draft on purpose. The updater's private key never goes into CI,
+so `latest.json` doesn't exist yet. You finish by hand; see [In-app
+updater](#in-app-updater) below. The updater can't see a release published
+without `latest.json`.
 
-> Status: **Linux CPU** and **Windows CPU** artifacts are both built. GPU
-> reaches users as the downloadable CUDA plugin rather than a second bundle,
-> and Windows has its own plugin build (`cgs gpu-plugin-windows`) whose archive
-> is not published yet.
-> `dmg` is not in `bundle.targets`: the macOS-Metal wiring remains to be
-> implemented, and adding it means a `macos-14` leg in `release.yml` plus the
-> feature work above.
+> Status: both **Linux CPU** and **Windows CPU** builds are made. GPU support
+> reaches users as the downloadable CUDA plugin (see [GPU_PLUGIN.md](GPU_PLUGIN.md)),
+> built by its own workflow. Neither plugin archive is published yet.
 
 ## GPU plugin
 
@@ -259,47 +233,48 @@ cgs stage-runtime     # copy ggml shared objects + backend plugins next to a bui
 
 Upload both files to the GitHub release, then record the digest and byte size in
 `CUDA_LINUX_X86_64` (`crates/lune-persist/src/gpu_plugin.rs`). Until that digest
-is filled in, the in-app install refuses rather than fetching something it
-cannot verify. Full details in [GPU_PLUGIN.md](GPU_PLUGIN.md).
+is filled in, the in-app install refuses instead of downloading something it
+can't verify. The Windows plugin and the CI workflow are covered in
+[GPU_PLUGIN.md](GPU_PLUGIN.md).
 
 ## In-app updater
 
-> **On, but checks currently fail.** `UPDATES_ENABLED` in
+> **On, but checks fail for now.** `UPDATES_ENABLED` in
 > `desktop-ui/src-tauri/src/update.rs` is `true`. The endpoint in
-> `tauri.conf.json` is a release asset on a private repository, and the updater
-> plugin sends no credentials, so GitHub answers every check with a 404. A check
-> you start ends in **Update check failed** in the update modal, with the error
-> text. The launch check stays silent. Setting the constant to `false` hides the
-> feature, and the flow then says updates are off.
+> `tauri.conf.json` is a release file on a private repository, and the updater
+> sends no credentials, so GitHub answers every check with a 404. A check you
+> start ends in **Update check failed** in the update dialog, with the error
+> text. The launch check stays quiet. Setting the constant to `false` hides the
+> feature, and the app then says updates are off.
 >
-> Everything below describes how the flow works and how to publish for it. Once
-> the release assets are anonymously reachable, checks succeed with no code
-> change. The GPU plugin pin waits on the same condition
-> ([GPU_PLUGIN.md](GPU_PLUGIN.md)). The signature verification is independent
-> of all this and is still tested (`cargo test -p lune-ui --lib updater`).
+> The rest of this section describes how updates work and how to publish them.
+> Once the release files can be downloaded without logging in, checks work with
+> no code change. The GPU plugin pin waits on the same thing
+> ([GPU_PLUGIN.md](GPU_PLUGIN.md)). Signature checking doesn't depend on any of
+> this and is still tested (`cargo test -p lune-ui --lib updater`).
 
 The tray's **Check for Updates…** fetches `latest.json` from the latest GitHub
 release, verifies the signature against the public key pinned in
-`tauri.conf.json`, and installs: an AppImage is swapped in place, a `.deb`/`.rpm`
-goes through `pkexec` (a graphical password prompt). Nothing downloads before
-the user agrees, and the app restarts itself afterwards.
+`tauri.conf.json`, and installs it. An AppImage is replaced in place; a
+`.deb`/`.rpm` goes through `pkexec` (a graphical password prompt). Nothing is
+downloaded until the user agrees, and the app restarts itself afterwards.
 
-**The signing key is the trust root.** It lives at
-`~/.tauri/lune-voice-updater.key` (mode 600), never in the repo. Anyone holding
-it can push a signed update to every user; lose it and no existing install can
-ever be updated again, because the public key is baked into shipped binaries.
-Back it up somewhere you would not lose, and keep it out of `git` and CI logs.
+**Everything rests on the signing key.** It lives at
+`~/.tauri/lune-voice-updater.key` (mode 600), never in the repo. Anyone who has
+it can push a signed update to every user. If you lose it, no existing install
+can ever update again, because the public key is built into shipped binaries.
+Back it up somewhere safe, and keep it out of `git` and CI logs.
 
-Builds stay key-free on purpose. Turning on `createUpdaterArtifacts` would make
-the bundler demand the private key on **every** `cgs build` — a pinned `pubkey`
-without a matching private key aborts `tauri build` outright (*"A public key has
-been found, but no private key"*), which would break the build for anyone who
-does not hold it. So nothing is signed during bundling; `cgs updater-manifest`
-packs the AppImage into the `.tar.gz` the plugin expects and signs all three
-formats afterwards, in one place.
+Builds don't need the key, on purpose. Turning on `createUpdaterArtifacts` would
+make the bundler ask for the private key on **every** `cgs build`: a pinned
+`pubkey` without its private key stops `tauri build` cold (*"A public key has
+been found, but no private key"*), which would break the build for anyone else.
+So nothing is signed while bundling. Afterwards, `cgs updater-manifest` packs
+the AppImage into the `.tar.gz` the updater expects and signs all three formats
+in one place.
 
-Per release. Bump the version in `tauri.conf.json`, `Cargo.toml` and
-`desktop-ui/package.json`, then push the tag — `release.yml` builds the bundles
+For each release, bump the version in `tauri.conf.json`, `Cargo.toml` and
+`desktop-ui/package.json`, then push the tag. `release.yml` builds the bundles
 and opens the draft release. Sign and finish it locally:
 
 ```bash
@@ -312,111 +287,108 @@ gh release edit v0.2.0 --draft=false
 ```
 
 To build the bundles locally instead of on CI, `cgs package` replaces the tag
-and download steps — but not the `rm -rf`. `cgs package` writes into the same
-directory, and a previous release's artifacts left there are exactly what the
-manifest's ambiguity check rejects. `cgs package` also builds Linux artifacts
-only, so the resulting `latest.json` carries no `windows-x86_64` key.
+and download steps, but not the `rm -rf`. `cgs package` writes into the same
+folder, and old release files left there are exactly what the manifest's
+duplicate check rejects. `cgs package` also builds only Linux files, so the
+resulting `latest.json` has no `windows-x86_64` key.
 
-`latest.json` must be uploaded to the release whose tag the endpoint resolves
-to, or clients keep seeing the previous version. Bump `version` in
-`tauri.conf.json` before building — the plugin compares against the running
-app's own version, so a release built with a stale version is invisible.
+Upload `latest.json` to the release the endpoint points to, or users keep
+seeing the previous version. Bump `version` in `tauri.conf.json` before
+building: the updater compares it with the running app's version, so a release
+built with an old version number is invisible.
 
-The manifest carries one key per package format —
-`linux-x86_64-{appimage,deb,rpm}` — because the plugin rejects bytes that do
-not match how the app was installed, so a single URL cannot serve all three.
+The manifest has one key per package format
+(`linux-x86_64-{appimage,deb,rpm}`), because the updater rejects a file that
+doesn't match how the app was installed. One URL can't serve all three.
 Windows has a single installer and so a single key, `windows-x86_64`.
-Those are the keys the plugin looks up on its own: it tries
-`{os}-{arch}-{installer}` for the format this install was packaged as and then
-falls back to the bare `{os}-{arch}` key, so the app pins no target of its own.
-The AppImage reaches clients as a `.tar.gz` (the plugin extracts it and looks
-for the `.AppImage` inside); `cgs updater-manifest` builds and signs that
-archive, and signs the deb and rpm, which the bundler would not sign even with
-`createUpdaterArtifacts` on.
-`cgs updater-manifest` refuses to run when the tag disagrees with the `version`
-in `tauri.conf.json`, and it selects artifacts **by that version**, not by glob
-order — glob order is version-ascending, so the oldest build used to win and the
-manifest would advertise 0.2.0 while pointing at 0.1.0 files. Two errors come
-out of that check:
+The updater finds these keys by itself. It tries `{os}-{arch}-{installer}` for
+the format this copy was installed from, then falls back to the plain
+`{os}-{arch}` key, so the app doesn't need to name a target. The AppImage is
+sent as a `.tar.gz` (the updater unpacks it and looks for the `.AppImage`
+inside). `cgs updater-manifest` builds and signs that archive, and also signs the
+deb and rpm, which the bundler wouldn't sign even with `createUpdaterArtifacts`
+on.
 
-- `no <kind> for <version> in <dir>, only: …` — the directory holds that format
-  for some other version. Almost always a missing `rm -rf release-artifacts`.
-- `more than one <kind> for <version>` — two builds of the same format and
-  version, for example a `-rc.1` alongside the final. Remove the one you are not
+`cgs updater-manifest` won't run when the tag doesn't match `version` in
+`tauri.conf.json`, and it picks files **by that version**, not by name order.
+Name order sorts the oldest version first, so it would pick 0.1.0 files for a
+0.2.0 manifest. This check gives two errors:
+
+- `no <kind> for <version> in <dir>, only: …`: the folder has that format, but
+  for another version. Almost always a missing `rm -rf release-artifacts`.
+- `more than one <kind> for <version>`: two builds of the same format and
+  version, such as a `-rc.1` next to the final. Remove the one you aren't
   shipping.
 
 Only the packed `.AppImage.tar.gz` and the portable archive may be absent.
 
 ### Testing the updater
 
-Two layers, both local — nothing here needs a published release:
+Two levels of testing, both local. Neither needs a published release:
 
 ```bash
 cargo test -p lune-ui --lib updater   # check + download + signature verification
 cgs updater-test                      # the install path, for real
 ```
 
-The unit tests stand a local HTTP endpoint in front of a fixture signed by a
-throwaway key and assert three things: a correctly signed payload is accepted,
-a payload with one flipped byte is refused, and a payload signed by a
-*different valid key* is refused. The last two are the ones that matter — they
-show verification is key-specific rather than merely well-formed.
+The unit tests serve a file signed with a throwaway key from a local HTTP
+server and check three things: a correctly signed file is accepted, a file with
+one flipped byte is refused, and a file signed by a *different valid key* is
+refused. The last two matter most, because they prove the check is tied to our
+key and isn't just checking the format.
 
-`cgs updater-test` covers what those cannot: replacing the running app. It
+`cgs updater-test` covers what unit tests can't: replacing the running app. It
 builds the current version and a `99.0.0` AppImage, serves a signed manifest on
 localhost, and prints the command to run the old one against it. Both bundles
-are `--debug` deliberately: release builds refuse plain-HTTP endpoints, so
-testing over HTTP needs no loosening of the shipped config, and the signature is
-still verified against the pinned key. `LUNE_UPDATER_ENDPOINT` is what points a
-build at the local manifest, and it is compiled out of release builds — a
-shipped binary always talks to the endpoint in `tauri.conf.json`.
+are `--debug` on purpose. Release builds refuse plain-HTTP endpoints, so testing
+over HTTP doesn't require loosening the shipped config, and the signature is
+still checked against the pinned key. `LUNE_UPDATER_ENDPOINT` points a build at
+the local manifest. It is compiled out of release builds, so a shipped binary
+always uses the endpoint in `tauri.conf.json`.
 
 ### How a found update is announced
 
 It depends on who asked.
 
-A check the user started — the tray's *Check for Updates…* or the button in
-Settings → General — answers in a modal dialog, every time, including *"you are
-on the latest version"* and every failure. A control that silently does nothing
-is indistinguishable from a broken one.
+A check the user started (the tray's *Check for Updates…*, or the button in
+Settings → General) always answers in a dialog, including *"you are on the
+latest version"* and every failure. A button that does nothing visible looks
+broken.
 
 A check started by **Check for updates on launch** (Settings → General, off by
-default) posts a **desktop notification** instead, via
-`tauri-plugin-notification` — libnotify on Linux, a WinRT toast on Windows,
-`NSUserNotification` on macOS, with no permission handshake needed off mobile.
-Twenty seconds into a session the user is working in another window, and a
-dialog that seizes focus there is more disruptive than the update is urgent.
-The notification announces and nothing more — *Lune Voice 1.4.0 is available* /
-*You're running 1.3.2.* None of the desktop backends expose a click callback
-(the plugin only wires notification actions up on Android and iOS), and
-spelling out where to click instead would be worse: a notification is a glance,
-not a manual. A launch check that finds *nothing*, or fails outright, stays
-silent: "no network yet" is the normal state a second after login.
+default) shows a **desktop notification** instead, through
+`tauri-plugin-notification`: libnotify on Linux, a toast on Windows. Neither
+needs a permission prompt. Twenty seconds after login the user is busy in
+another window, and a dialog stealing focus there would be more annoying than
+the update is urgent. The notification only announces: *Lune Voice 1.4.0 is
+available* / *You're running 1.3.2.* No desktop backend supports a click
+action (the plugin only has notification actions on Android and iOS), and
+writing out where to click would turn a quick glance into instructions. A
+launch check that finds *nothing*, or fails, stays quiet, since having no
+network a second after login is normal.
 
-**Delivery is not confirmable.** Every desktop backend hands the notification to
-a spawned task and returns `Ok` immediately, discarding the result, so a session
-with no notification daemon looks identical to a delivered one. The dialog
-fallback in `notify_update_available` therefore only catches the plugin
-*rejecting* the call — it cannot catch a notification nobody saw. A user whose
-session has no notification daemon gets no launch announcement at all, and finds
-the update the next time they check by hand. Closing that hole properly needs a
-durable in-app marker (a tray item that reads *Install 1.4.0…* until acted on)
-rather than a better notification.
+**There is no way to confirm a notification was shown.** Every desktop backend
+hands it to a background task and returns `Ok` right away, so a session with no
+notification daemon looks the same as one that showed it. The dialog fallback in
+`notify_update_available` only catches the plugin *rejecting* the call, not a
+notification nobody saw. A user with no notification daemon gets no launch
+announcement, and finds the update the next time they check by hand. Fixing
+that properly needs a lasting marker in the app (say, a tray item that reads
+*Install 1.4.0…* until used), not a better notification.
 
-`cargo test -p lune-ui --lib notification_tests` covers what is assertable
-without a daemon: the announcement text names the offered and installed versions
-the right way round, the plugin accepts the builder chain, and each `CheckMode`
-routes to the intended announcement. To see a real notification, turn the
-setting on and start the `cgs updater-test` build against the local endpoint.
+`cargo test -p lune-ui --lib notification_tests` covers what can be checked
+without a daemon: the text names the new and installed versions the right way
+round, the plugin accepts the builder calls, and each `CheckMode` leads to the
+right kind of announcement. To see a real notification, turn the setting on and
+run the `cgs updater-test` build against the local endpoint.
 
 ## Third-party notices
 
 `whisper.cpp` and `ggml` are MIT-licensed. They are statically linked into the
-default (native) `cgs build` artifact, and shipped as separate shared objects
-in every release bundle and wherever else `GGML_BACKEND_DL` is enabled. The GPU plugin archive also
-carries NVIDIA's redistributable CUDA runtime libraries. Keep
-`THIRD_PARTY_NOTICES.md` in sync with the bundled upstream when its version
-changes.
+default (native) `cgs build`, and shipped as separate shared libraries in every
+release bundle and anywhere else `GGML_BACKEND_DL` is on. The GPU plugin
+archive also contains NVIDIA's redistributable CUDA runtime libraries. Update
+`THIRD_PARTY_NOTICES.md` whenever the bundled upstream version changes.
 
 Every bundle ships two files:
 
@@ -436,10 +408,10 @@ cgs licenses --env CHECK=1                          # verify only
 ```
 
 The `build-linux` job in `release.yml` runs `--check` before building, so a tag
-with a stale file fails instead of shipping wrong notices; `build-windows`
-inherits that through `needs:`. cargo-about runs with `--fail`: a crate whose
-licence it cannot determine stops the run, and needs a `clarify` entry in
-`about.toml`.
+with an out-of-date file fails instead of shipping wrong notices.
+`build-windows` depends on it through `needs:`. cargo-about runs with `--fail`:
+a crate whose licence it can't work out stops the run and needs a `clarify`
+entry in `about.toml`.
 
 **Nothing checks this outside a tag build.** `ci.yml` has no licence step and
 `cgs package` does not call the script, so a dependency change can land on
@@ -452,9 +424,9 @@ dependency tree against the allow-list in `deny.toml`.
 
 ## Rollback
 
-Rolling back is reinstalling the previous package. There is no server side and
-no coordinated migration, so the only real question is what the newer version
-did to on-disk state before you rolled back.
+Rolling back means reinstalling the previous package. There is no server and no
+shared migration, so the only question is what the newer version changed on
+disk before you rolled back.
 
 ### What a rollback has to survive
 
@@ -468,7 +440,7 @@ did to on-disk state before you rolled back.
 
 ### Procedure
 
-1. **Back up state first** — this is the step that makes the rollback reversible:
+1. **Back up first.** This is what lets you undo the rollback:
 
    ```sh
    cp -r ~/.local/share/lune-voice ~/.local/share/lune-voice.bak
@@ -493,10 +465,10 @@ did to on-disk state before you rolled back.
    ```
 
    Versions newer than anything in the old build's `crates/lune-persist/migrations/`
-   mean the DB is ahead of the binary. Additive migrations (every one shipped so
-   far) are tolerated — the old code simply ignores the new columns. If the old
-   build fails to start, revert the extra migrations explicitly rather than
-   deleting the database:
+   mean the database is ahead of the binary. Migrations that only add things
+   (every one shipped so far) are fine, since the old code ignores the new
+   columns. If the old build won't start, revert the extra migrations instead
+   of deleting the database:
 
    ```sh
    diesel migration revert --migration-dir crates/lune-persist/migrations
@@ -504,9 +476,9 @@ did to on-disk state before you rolled back.
 
    Each migration's `down.sql` is exercised by
    `migrations_revert_and_reapply_cleanly` in `crates/lune-persist/src/db/mod.rs`,
-   so reverting is a tested path, not a hope.
+   so reverting is tested.
 
-4. **Verify** dictation end-to-end before declaring it done:
+4. **Check** that dictation works end to end before calling it done:
 
    ```sh
    cgs bench --env TYPE=transcribe --env WAV=fixtures/<clip>.wav
@@ -524,7 +496,7 @@ mv ~/.config/lune-voice.bak      ~/.config/lune-voice
 
 ### Release-side rule
 
-Because an older build silently drops settings fields it does not know, a
-release that **removes or renames** a `settings.toml` field is not
-rollback-safe. Migrate such fields in a release that still reads both spellings,
-and only drop the old one a release later.
+An older build quietly drops settings fields it doesn't know, so a release that
+**removes or renames** a `settings.toml` field can't be safely rolled back.
+Move such a field in a release that still reads both names, and drop the old
+name one release later.

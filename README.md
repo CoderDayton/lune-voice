@@ -15,7 +15,7 @@
 
 ---
 
-Lune Voice converts speech to text without sending your audio anywhere. You hold a hotkey (or toggle one), speak, and the transcribed text is inserted into whatever window has focus: an editor, an email draft, a chat box.
+Lune Voice turns speech into text without sending your audio anywhere. Hold a hotkey (or tap it to toggle), talk, and the text lands in whatever window you were using: an editor, an email, a chat box.
 
 Transcription and correction run locally, so the app keeps working after you disconnect from the internet. It is free software under the GPLv3: read the code, change it, redistribute it, and anyone you pass it to gets those same freedoms.
 
@@ -25,56 +25,56 @@ Transcription and correction run locally, so the app keeps working after you dis
 Mic → Whisper (speech-to-text + voice-activity trim) → Dictionary + formatting → [optional styling] → Paste
 ```
 
-Whisper handles transcription on your machine. Your dictionary corrects the names, acronyms, and terminology it would otherwise get wrong, and the formatter applies capitalization, punctuation, and filler removal.
+Whisper does the transcription on your machine. Your dictionary fixes the names, acronyms, and jargon it gets wrong, and the formatter handles capitalization, punctuation, and filler words.
 
-Styling is optional and off by default. When you enable it, an LLM rewrites the transcript in a tone you select: casual, professional, technical, or one you write yourself. Point it at a local Ollama or llama-server instance to keep transcripts on your machine, or at a hosted API if you would rather not run a model.
+Styling is optional and off by default. Turn it on and an LLM rewrites the transcript in the tone you pick: casual, professional, technical, or one you write. Point it at a local Ollama or llama-server to keep everything on your machine, or at a hosted API if you don't want to run a model yourself.
 
 First launch downloads about 540 MB of Whisper models. After that, dictation needs no network access.
 
 ## Features
 
-**Dictation pill.** A small floating overlay showing audio levels and session state. You can stop or cancel a session without switching away from the application you are working in.
+**Dictation pill.** A small floating overlay that shows your mic level and what the app is doing. You can stop or cancel without leaving the app you're typing into.
 
-**Style presets.** "Professional" tightens up loose phrasing. "Technical" preserves jargon and code formatting. You can define your own with custom prompts and few-shot examples, or leave styling off and keep only the dictionary and punctuation passes.
+**Style presets.** "Professional" tightens loose phrasing. "Technical" keeps jargon and code formatting intact. You can write your own with a custom prompt and examples, or leave styling off and keep just the dictionary and punctuation.
 
-**Custom dictionary.** Add the names, acronyms, and terms specific to your work. Exact matches always apply, close single-word misses are caught when the recognizer was unsure of the word, and priority ranking decides between competing entries.
+**Custom dictionary.** Add the names, acronyms, and terms you use at work. Exact matches always apply. A near miss on a single word is fixed only when Whisper wasn't sure of it, and priority decides when two entries compete.
 
-**Hold or toggle.** Hold the hotkey for short corrections, or toggle it for longer passages. `Ctrl+Space` by default, global, and works in any application.
+**Hold or toggle.** Hold the hotkey for a quick line, or toggle it for longer passages. The default is `Ctrl+Space`, and it works in any app.
 
-**Searchable history.** Every session is recorded with its transcript, timing, and the style applied.
+**Searchable history.** Every session is saved with its transcript, timing, and the style it used.
 
 ## Privacy
 
-On its own the app makes three kinds of network request: the Whisper model download on first launch, the CUDA plugin download if you ask for GPU acceleration, and the update check. The update check runs only when you ask for it — from the tray menu or Settings — unless you turn on "Check for updates on launch", which is off by default. Local transcription, dictionary correction, and formatting never reach the network.
+On its own the app makes three kinds of network request: the Whisper model download on first launch, the CUDA plugin download if you ask for GPU acceleration, and the update check. The update check only runs when you ask for it from the tray menu or Settings, unless you turn on "Check for updates on launch" (off by default). Transcription, dictionary fixes, and formatting never touch the network.
 
-Two settings can send your words out, and only once you pick them: remote styling, and a remote transcription backend in place of local Whisper. Neither runs until you also turn on "Allow remote services", which is off by default. Pointing either at a local endpoint keeps transcripts on your machine.
+Two settings can send your words out, and only if you choose them: remote styling, and a remote transcription backend instead of local Whisper. Neither runs until you also turn on "Allow remote services", which is off by default. If you point either one at a local endpoint, your transcripts stay on your machine.
 
-The app collects no telemetry and no analytics. Since the source is public, you do not have to take that on faith.
+There is no telemetry and no analytics. The source is public, so you can check that yourself.
 
 ## Install
 
 Grab the build for your platform from the [releases page](https://github.com/CoderDayton/lune-voice/releases).
 
-**Linux** — `.deb`, `.rpm`, or `.AppImage`:
+**Linux:** `.deb`, `.rpm`, or `.AppImage`:
 
 ```bash
 sudo apt install ./lune-voice_*_amd64.deb
 ```
 
-**Windows** — run the `-setup.exe` installer. The in-app updater keeps it
-current from there.
+**Windows:** run the `-setup.exe` installer. The built-in updater keeps it
+current after that.
 
 ### Uninstall
 
-Removing the app leaves your data behind, including the downloaded models (up
-to ~1.6 GB). Delete these folders to remove it too:
+Uninstalling leaves your data behind, including the downloaded models (up to
+~1.6 GB). Delete these folders to remove that too:
 
 - **Linux**: `~/.local/share/lune-voice/` (models, history) and `~/.config/lune-voice/` (settings)
 - **Windows**: `%APPDATA%\lune-voice\`
 
 The `.deb` and `.rpm` remove their udev rule themselves. The AppImage and the
-portable archive install it to `/etc/udev/rules.d/70-lune-voice-input.rules`;
-remove it from Settings → Text delivery before deleting the app, or with
+portable archive install it to `/etc/udev/rules.d/70-lune-voice-input.rules`.
+Remove it from Settings → Text delivery before you delete the app, or with
 `sudo rm` afterwards.
 
 ## Building from source
@@ -103,7 +103,7 @@ cgs package  # build the .deb / .rpm / .AppImage / .tar.gz installers
 |---|---|
 | **OS** | Linux (X11 or Wayland) or Windows 10/11 |
 | **Typing** | **Linux**: IBus when it is your input method, otherwise `/dev/uinput`. The .deb and .rpm install the udev rule for typing and the hotkey; the AppImage and portable archive ask for a polkit password once to install it. `wl-copy` or `xclip` for the paste path. **Windows**: the clipboard plus a synthetic paste, with per-key typing as the fallback. Either way the text goes to the window you were in when you started speaking. |
-| **Hotkey** | Toggle or push-to-talk on both platforms — Linux grabs the keyboard through evdev, Windows uses a low-level keyboard hook. |
+| **Hotkey** | Toggle or push-to-talk on both platforms. Linux grabs the keyboard through evdev; Windows uses a low-level keyboard hook. |
 | **GPU** | Optional, Linux only for now. If you have an NVIDIA card, the app offers a one-time download that moves transcription onto it. CPU-only works everywhere, just slower. |
 | **Disk** | ~540 MB for the default model, ~1.6 GB for all three |
 | **Internet** | Once, for the model download |
@@ -123,6 +123,6 @@ There is no separate GPU build to pick. The app detects an NVIDIA driver and off
 
 ## License
 
-GNU General Public License, version 3 or later. See [LICENSE](LICENSE) for the full text, [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) for the native libraries, models, fonts and data it ships or downloads — including the modified `whisper-rs-sys` fork — and [THIRD_PARTY_LICENSES.md](THIRD_PARTY_LICENSES.md) for the licences of every Rust crate and JavaScript package it includes.
+GNU General Public License, version 3 or later. See [LICENSE](LICENSE) for the full text, [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) for the native libraries, models, fonts and data it ships or downloads (including the modified `whisper-rs-sys` fork), and [THIRD_PARTY_LICENSES.md](THIRD_PARTY_LICENSES.md) for the licences of every Rust crate and JavaScript package it includes.
 
 If you distribute Lune Voice, modified or not, you have to make the source available to whoever you give it to, under these same terms.

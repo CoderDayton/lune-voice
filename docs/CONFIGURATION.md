@@ -1,6 +1,6 @@
 # Configuration
 
-Lune Voice stores user settings as TOML, exposes the same settings through the desktop UI, and applies most changes without restarting the app.
+Lune Voice keeps its settings in a TOML file. The same settings are in the app's Settings screens, and most changes apply without a restart.
 
 ---
 
@@ -34,12 +34,12 @@ Lune Voice stores user settings as TOML, exposes the same settings through the d
 
 ## Runtime Settings
 
-Settings are edited in the desktop UI or by hand in `settings.toml`. There is no
-command-line interface. Most changes apply through the runtime settings channel
-or on the next dictation session; backend changes are persisted immediately and
-the desktop runtime rebuilds the pipeline before the next start when needed.
+You change settings in the app, or by hand in `settings.toml`. There is no
+command-line interface. Most changes apply right away or at the next dictation.
+Backend changes are saved immediately, and the pipeline is rebuilt before the
+next session when needed.
 
-Settings mutability tiers:
+When each setting takes effect:
 
 | Tier | When Applied | Fields |
 |------|-------------|--------|
@@ -47,7 +47,7 @@ Settings mutability tiers:
 | **Warm** | Next session start, when the pipeline rebuilds | `asr_backend`, `llm_backend`, `device`, `privacy_mode`, `default_style`, `language`, `dictation_language`, `vad_pcen`, `brand_casing`, `dictation_mode`, `copy_to_clipboard`, `session_history_days` (it decides whether a dictation is recorded at all) |
 | **Cold** | Next app start | `terminal_mode`, `start_minimized`, `check_updates_on_launch` |
 
-All changes are persisted to disk immediately. The desktop app reloads a workspace snapshot after save, so the UI reflects the stored settings rather than a local guess.
+Every change is written to disk right away. After saving, the app reloads the settings from disk, so what you see is what was stored.
 
 ---
 
@@ -56,13 +56,13 @@ All changes are persisted to disk immediately. The desktop app reloads a workspa
 Settings are persisted as TOML at `~/.config/lune-voice/settings.toml` on Linux
 and `%APPDATA%\lune-voice\settings.toml` on Windows.
 
-If the file doesn't exist or fails to parse, defaults are used and a warning is logged. The daemon never crashes on invalid settings — it falls back gracefully.
+If the file is missing or can't be parsed, the app uses the defaults and logs a warning. Bad settings never crash it.
 
 ### Full Default Configuration
 
 ```toml
 device = "auto"
-# default_style is optional — omit for no styling (raw transcript, the default).
+# default_style is optional. Leave it out for no styling (the default).
 # Set it to a preset id (e.g. "casual") to enable the LLM style pass.
 language = "auto"
 dictation_language = "auto"
@@ -78,18 +78,18 @@ pill_corner = "Rounded"
 pill_edge_margin = 72
 pill_all_workspaces = true
 pill_locked = false
-# pill_all_workspaces is ignored on Windows — see the Pill Overlay section.
-# pill_monitor is optional — omit to follow the active monitor, or set a display
-# name (e.g. "DP-1") to pin the pill to one.
-# pill_position is set automatically when you drag the pill; omit for the anchor
-# default. Its units are per-platform — see the Pill Overlay section.
+# pill_all_workspaces is ignored on Windows (see Pill Overlay).
+# pill_monitor is optional. Leave it out to follow the active monitor, or set a
+# display name (e.g. "DP-1") to pin the pill to one.
+# pill_position is set when you drag the pill. Leave it out to use the anchor.
+# Its units differ per platform (see Pill Overlay).
 terminal_mode = "Auto"
 sound_cues_enabled = true
 sound_cue_volume = 1.0
 session_history_days = 30
-# model_idle_unload_minutes is optional — omit to keep the model loaded.
-# input_device is optional — omit to follow the system default input. The value
-# is a name from the mic picker.
+# model_idle_unload_minutes is optional. Leave it out to keep the model loaded.
+# input_device is optional. Leave it out to use the system default input. The
+# value is a name from the mic picker.
 vad_pcen = true
 start_minimized = false
 check_updates_on_launch = false
@@ -111,7 +111,7 @@ modifiers = []
 key = "Escape"
 ```
 
-Model files live under the app model directory. The settings file stores backend choice and policy, not resolved model paths.
+Model files live in the app's model directory. The settings file stores which model to use, not where the file is.
 
 ---
 
@@ -119,7 +119,7 @@ Model files live under the app model directory. The settings file stores backend
 
 ### WhisperCpp (Local, default)
 
-The default backend. Runs whisper.cpp locally via `whisper-rs` using GGML models downloaded from `ggerganov/whisper.cpp`.
+The default. Runs whisper.cpp locally through `whisper-rs`, using GGML models downloaded from `ggerganov/whisper.cpp`.
 
 ```toml
 [asr_backend]
@@ -140,18 +140,18 @@ model = "Medium"
 | `Medium` | `ggml-medium-q5_0.bin` | ~539 MB | Balanced (recommended) |
 | `LargeV3Turbo` | `ggml-large-v3-turbo-q8_0.bin` | ~874 MB | Best accuracy; turbo decoder keeps it fast |
 
-Device choice (CPU vs CUDA) comes from the top-level `device` field. GPU inference requires a registered CUDA device, which on Linux means the downloadable GPU plugin (or a build compiled with `whisper-cuda`) — see [GPU / Device Settings](#gpu--device-settings).
+CPU or GPU is set by the top-level `device` field. Running on the GPU needs a CUDA device, which on Linux means the downloadable GPU plugin (or a build compiled with `whisper-cuda`). See [GPU / Device Settings](#gpu--device-settings).
 
-**VAD:** Silero runs as a standalone endpoint-trim pass *before* decoding — it trims leading and trailing silence and keeps internal pauses, which whisper reads as a punctuation cue. whisper.cpp's in-decode `enable_vad` is deliberately not used: it concatenates speech spans and strips those pauses, producing run-on sentences. The VAD model (`ggml-silero-v5.1.2.bin`, downloaded to `models/whisper-vad-silero/`) is loaded automatically when present and always runs on CPU. If it is missing, the backend decodes without it and logs a warning.
+**VAD:** Silero runs as its own pass *before* decoding. It trims silence from the start and end and keeps the pauses inside your speech, because whisper uses them to place punctuation. whisper.cpp's built-in `enable_vad` is not used on purpose: it glues the speech together and removes those pauses, which gives run-on sentences. The VAD model (`ggml-silero-v5.1.2.bin`, in `models/whisper-vad-silero/`) loads automatically when it is there and always runs on the CPU. If it is missing, decoding runs without it and a warning is logged.
 
 **Inference details:**
-- Input: 16 kHz mono PCM (already in whisper's native format — no conversion)
-- Decoding: BeamSearch (beam size 5) for accuracy; one-shot per utterance (no streaming autoregressive loop)
-- Confidence: per-token probabilities folded into segment `confidence` (mean) and `min_token_confidence` (minimum); segments below the garbage threshold (0.25) are dropped before the session sees them
+- Input: 16 kHz mono PCM, which is whisper's native format, so nothing is converted
+- Decoding: beam search (beam size 5), once per utterance, with no streaming
+- Confidence: per-token probabilities become each segment's `confidence` (mean) and `min_token_confidence` (minimum). Segments below 0.25 are treated as garbage and dropped
 
 ### OpenAI-Compatible (Remote ASR)
 
-Use any OpenAI-compatible speech-to-text API (OpenAI Whisper, Groq, local Whisper server, etc.).
+Use any OpenAI-compatible speech-to-text API: OpenAI, Groq, a local Whisper server, and so on.
 
 ```toml
 [asr_backend]
@@ -164,14 +164,14 @@ streaming = "HttpPolling"
 
 | Field | Type | Default | Description |
 |-------|------|---------|-------------|
-| `base_url` | URL | — | API base URL |
-| `api_key` | string | — | API key (kept in the OS keyring when one is available, inline in `settings.toml` otherwise; redacted in logs, zeroized on drop) |
-| `model` | string | — | Model identifier |
-| `streaming` | enum | — | `"WebSocket"` or `"HttpPolling"` |
+| `base_url` | URL | none | API base URL |
+| `api_key` | string | none | API key (kept in the OS keyring when one is available, inline in `settings.toml` otherwise; redacted in logs, zeroized on drop) |
+| `model` | string | none | Model identifier |
+| `streaming` | enum | none | `"WebSocket"` or `"HttpPolling"` |
 
-> **Privacy note:** Remote backends send audio data to external servers, so they require `privacy_mode = "AllowRemote"` (**Allow remote services** in Settings → General). See [Privacy Mode](#privacy-mode).
+> **Privacy:** a remote backend sends your audio to another server, so it needs `privacy_mode = "AllowRemote"` (**Allow remote services** in Settings → General). See [Privacy Mode](#privacy-mode).
 
-> **Confidence:** Remote backends do not expose per-token confidence. Styling is still applied based on the style preset.
+> **Confidence:** remote backends don't report per-token confidence. Styling still works as usual.
 
 ---
 
@@ -179,7 +179,7 @@ streaming = "HttpPolling"
 
 ### Disabled LLM
 
-Disables LLM post-processing. Dictionary substitutions still run (applied via the dictionary seed before any LLM call). This is the default.
+Turns styling off. Dictionary fixes still apply. This is the default.
 
 ```toml
 [llm_backend]
@@ -201,12 +201,12 @@ max_tokens = 512
 
 | Field | Type | Default | Description |
 |-------|------|---------|-------------|
-| `base_url` | URL | — | API base URL |
-| `api_key` | string | — | API key (kept in the OS keyring when one is available, inline in `settings.toml` otherwise; redacted in logs, zeroized on drop) |
-| `model` | string | — | Model identifier |
-| `max_tokens` | u32 | — | Maximum output tokens |
+| `base_url` | URL | none | API base URL |
+| `api_key` | string | none | API key (kept in the OS keyring when one is available, inline in `settings.toml` otherwise; redacted in logs, zeroized on drop) |
+| `model` | string | none | Model identifier |
+| `max_tokens` | u32 | none | Maximum output tokens |
 
-> Sends transcript text to the configured endpoint, so it requires `privacy_mode = "AllowRemote"` (**Allow remote services** in Settings → General). See [Privacy Mode](#privacy-mode).
+> This sends your transcript to the endpoint, so it needs `privacy_mode = "AllowRemote"` (**Allow remote services** in Settings → General). See [Privacy Mode](#privacy-mode).
 
 ---
 
@@ -219,12 +219,12 @@ device = "auto"
 | Value | Behavior |
 |-------|----------|
 | `"auto"` | Use CUDA when a CUDA device is registered; fall back to CPU otherwise. **(default)** |
-| `"cuda"` | Require CUDA. Runtime falls back to CPU if CUDA is unavailable even when explicitly requested. |
-| `"cpu"` | Force CPU-only inference. |
+| `"cuda"` | Ask for CUDA. If no CUDA device is available, it still falls back to CPU. |
+| `"cpu"` | Always use the CPU. |
 
-**GPU support is a runtime capability.** The CUDA backend is a plugin the app downloads on request, so `device = "cuda"` can start working on a binary that was never built with CUDA linked in. What it needs is an NVIDIA driver, which is not redistributable and so has to be installed by you. Query the current state with the `gpu_backend_status` command, or read it in Settings under Models, where the plugin is also downloaded. The onboarding acceleration card appears only when accepting it can change something: the state is `ready`, `needs-restart`, or `not-installed` with a published plugin archive for this build. Setup downloads the plugin itself when the card is accepted and the state is `not-installed`.
+**GPU support is decided at runtime.** The CUDA backend is a plugin the app downloads when you ask, so `device = "cuda"` can work on a binary that was never built with CUDA. What you do need is an NVIDIA driver, which can't be bundled, so you install it yourself. You can see the current state in Settings → Models, which is also where you download the plugin (or with the `gpu_backend_status` command). The GPU card during setup only appears when accepting it would change something: the state is `ready`, `needs-restart`, or `not-installed` with a published plugin for this build. If you accept it while the state is `not-installed`, setup downloads the plugin.
 
-The plugin installs into `~/.local/share/lune-voice/backends/`, so removing that directory reverts to CPU. Because ggml builds its device registry once per process, a freshly installed plugin only takes effect after a restart — the UI says so rather than silently doing nothing.
+The plugin installs into `~/.local/share/lune-voice/backends/`. Delete that folder to go back to CPU. ggml builds its device list once per run, so a newly installed plugin only works after a restart, and the app tells you so.
 
 See [docs/GPU_PLUGIN.md](GPU_PLUGIN.md) for how detection and installation work, and [docs/RELEASE.md](RELEASE.md) for the build matrix.
 
@@ -246,16 +246,16 @@ privacy_mode = "LocalOnly"
 
 `LocalPreferred` is a former name for `AllowRemote` and still loads as it.
 
-Under `LocalOnly`, a remote transcription backend fails the pipeline build with
-an actionable message — there is no local fallback to silently substitute.
-Remote styling is optional, so it degrades to passthrough (the deterministic
-transcript) and logs the reason.
+Under `LocalOnly`, a remote transcription backend stops the pipeline from
+starting, with a message that says what to change. It doesn't quietly switch to
+local Whisper. Remote styling is optional, so it is skipped instead: you get the
+unstyled transcript, and the reason is logged.
 
 ---
 
 ## Dictation Modes
 
-`dictation_mode` selects how text is delivered to the focused app after styling. The orthogonal `copy_to_clipboard` toggle decides whether a copy is also left on the clipboard.
+`dictation_mode` picks how the text gets into your app. The separate `copy_to_clipboard` switch decides whether a copy is also left on the clipboard.
 
 ```toml
 dictation_mode = "TypeInPlace"
@@ -264,24 +264,26 @@ copy_to_clipboard = false
 
 | Mode | Behavior |
 |------|----------|
-| `TypeInPlace` | Types the text into the focused field, character by character — a `uinput` virtual keyboard on Linux, `enigo` on Windows and macOS. Non-ASCII text (accents, CJK, emoji) is delivered via a clipboard paste instead, so nothing is dropped. **(default)** |
-| `Clipboard` | Delivers by setting the clipboard and sending a paste chord. Text that cannot be typed safely per key — anything multi-line — is dropped with a warning rather than delivered, since a newline would press Enter into the focused app. |
+| `TypeInPlace` | Types the text. On Linux, short ASCII text is typed key by key through a `uinput` virtual keyboard, and text over 80 characters, multi-line text, or non-ASCII text (accents, CJK, emoji) is pasted instead, so it is fast and nothing is lost. On Windows, `enigo` types all of it. **(default)** |
+| `Clipboard` | Puts the text on the clipboard and sends the paste keystroke. |
 
-**The chord is per-platform.** On Linux it is `Ctrl+V`, or `Ctrl+Shift+V` when a terminal is focused, with an adaptive post-paste delay (EMA of clipboard round-trip) and a per-key fallback if `wl-copy` / `xclip` are missing. On Windows it is always `Ctrl+V` — every console accepts it — and terminal detection instead decides whether newlines and tabs must be collapsed first. macOS uses `Cmd+V`. The clipboard is in-process on Windows and macOS, so there is no helper that can be missing.
+If the clipboard fails, the app types the text instead. On Linux, multi-line text is the exception: typing it would press Enter in your app, so it is not sent, and a warning is logged. It is still in history.
 
-**The target window is the one focused when you started speaking**, not when the text arrives. On Windows, if one of the app's own windows took focus in between — clicking the pill, say — focus is put back before the paste. See [Architecture → Text Delivery](ARCHITECTURE.md#5-text-delivery).
+**The paste keystroke depends on the platform.** On Linux it is `Ctrl+V`, or `Ctrl+Shift+V` in a terminal. The wait after a paste adapts to how fast your clipboard is, and typing takes over if `wl-copy` or `xclip` is missing. On Windows it is always `Ctrl+V`, which every console accepts. There, spotting a terminal decides whether newlines and tabs are flattened first. Windows handles the clipboard inside the app, so there is no helper program to install.
 
-> When IBus is the active input method (common on GNOME/Wayland), both modes commit text directly through IBus and never touch the clipboard.
+**The text goes to the window that was focused when you started speaking**, not when it arrives. On Windows, if one of the app's own windows took focus in between (say you clicked the pill), focus is moved back before the paste. See [Architecture → Text Delivery](ARCHITECTURE.md#5-text-delivery).
+
+> When IBus is your input method (common on GNOME and Wayland), both modes send the text through IBus and never touch the clipboard.
 
 ### Copy to Clipboard
 
-Independent of the delivery method — works with either `TypeInPlace` or `Clipboard`.
+Works with either `TypeInPlace` or `Clipboard`.
 
 ```toml
 copy_to_clipboard = false
 ```
 
-When `true`, the dictated text is left on the system clipboard after delivery. When `false` (default), the clipboard is preserved: if the `Clipboard` paste path borrowed it to send `Ctrl+V`, the previous contents — text or images — are snapshotted first and restored byte-for-byte afterward.
+When `true`, the dictated text stays on the clipboard afterwards. When `false` (the default), your clipboard is left as it was: if a paste had to borrow it, whatever was there before is saved first and put back. On Linux that includes images. On Windows only text can be saved, so if the clipboard held something else, the dictated text is left there instead of wiping it.
 
 ---
 
@@ -295,16 +297,16 @@ activation_mode = "Toggle"
 
 | Mode | Behavior |
 |------|----------|
-| `Toggle` | Press hotkey once to start, press again to stop **(default)** |
-| `Hold` | Hold hotkey to dictate, release to stop |
+| `Toggle` | Press the hotkey to start, press it again to stop **(default)** |
+| `Hold` | Hold the hotkey while you talk, release to stop |
 
 ---
 
 ## Pill Overlay
 
-The floating dictation pill shows live audio levels and session state and can be
-placed anywhere. All fields are edited from the **Pill** section in Settings and
-take effect on save.
+The floating pill shows your mic level and what the app is doing, and you can
+put it anywhere. Every field below is in the **Pill** section of Settings and
+applies on save.
 
 ```toml
 pill_visibility = "Always"       # Always | WhenDictating | Never
@@ -313,7 +315,7 @@ pill_size = "Standard"           # Compact | Standard | Large
 pill_orientation = "Horizontal"  # Horizontal | Vertical
 pill_corner = "Rounded"          # Pill | Rounded | Square
 pill_edge_margin = 72            # gap from the screen edge for the anchor, in logical px
-pill_all_workspaces = true       # follow you across workspaces (Linux/macOS only)
+pill_all_workspaces = true       # follow you across workspaces (Linux only)
 pill_locked = false              # true disables dragging
 # pill_monitor = "DP-1"          # pin to a display by name; omit to follow the active one
 # pill_position = { x = 40, y = 900 }  # set automatically when you drag the pill
@@ -326,34 +328,35 @@ pill_locked = false              # true disables dragging
 | `pill_size` | `Compact`, `Standard`, `Large` | Overall footprint |
 | `pill_orientation` | `Horizontal`, `Vertical` | `Vertical` swaps width and height |
 | `pill_corner` | `Pill`, `Rounded`, `Square` | Corner rounding of the bar |
-| `pill_edge_margin` | `0`–`512` | Distance from the anchored screen edge, in **logical** px — on a 150% display, 72 becomes 108 device px |
-| `pill_all_workspaces` | `true` / `false` | Show on every workspace. **Linux and macOS only**; Windows virtual desktops cannot be addressed per-window, so the value is ignored there and Settings hides the control |
+| `pill_edge_margin` | `0`–`512` | Distance from the anchored screen edge, in **logical** px. On a 150% display, 72 becomes 108 device px |
+| `pill_all_workspaces` | `true` / `false` | Show on every workspace. **Linux only**: Windows doesn't let an app pin one window to every virtual desktop, so the value is ignored there and Settings hides the switch |
 | `pill_locked` | `true` / `false` | Lock the pill against dragging |
-| `pill_monitor` | display name or unset | Pin to a specific display. The name is whatever the platform reports — a DRM connector like `DP-1` on Linux, a device name on Windows. Unnamed displays are not listed |
+| `pill_monitor` | display name or unset | Pin to one display. The name is what the system reports: a connector like `DP-1` on Linux, a device name on Windows. Displays without a name aren't listed |
 | `pill_position` | `{ x, y }` or unset | Written when you drag the pill; clears when you pick a new anchor |
 
-**`pill_position` is not monitor-relative, and its units are per-platform:** logical
-pixels on Linux, device pixels on Windows and macOS, matching what each platform
-reports for monitor geometry. On the Linux layer-shell path it is a per-output
-margin instead. Hand-editing it on a scaled display is therefore guesswork — drag
+**`pill_position` is not relative to a monitor, and its units differ by
+platform:** logical pixels on Linux, device pixels on Windows, matching how each
+system reports monitor positions. With Linux layer-shell it is a margin on that
+output instead. On a scaled display, editing it by hand is guesswork, so drag
 the pill and let it write the value.
 
-Changing the size, orientation, corner or anchor rebuilds the overlay window on
-Windows and macOS rather than resizing it. That is normally invisible, but if the
-rebuild fails the pill stays hidden until you change a pill setting again or
-restart, and the log says so. See
+On Windows, changing the size, orientation, corner or anchor rebuilds the pill
+window instead of resizing it. You normally won't notice. If the rebuild fails,
+the pill stays hidden until you change a pill setting again or restart, and the
+log says so. See
 [Architecture → The Pill Overlay](ARCHITECTURE.md#the-pill-overlay).
 
-On GNOME/Mutter and other compositors without `wlr-layer-shell`, the app runs the
-overlay under XWayland so it can position itself and stay on top.
+On GNOME (Mutter) and other compositors without `wlr-layer-shell`, the app runs
+under XWayland so the pill can position itself and stay on top.
 
 ---
 
 ## Hotkey Configuration
 
-The app reads the keyboard devices directly (evdev), so its hotkeys are global
-and need no desktop-environment binding. Record a combination from Settings
-rather than editing this by hand.
+Hotkeys are global and don't need a shortcut set up in your desktop. On Linux
+the app reads the keyboards directly through evdev; on Windows it uses a
+low-level keyboard hook. Record a combination in Settings instead of editing
+this by hand.
 
 ```toml
 [hotkey]
@@ -378,9 +381,9 @@ cancel_dictation = { modifiers = [], key = "Escape" }
 | `professional` | Professional | Clear workplace communication | Standard capitalization, broken run-ons, no contractions |
 | `formal` | Formal | Official correspondence and documents | Formal register, expanded contractions, structured sentences |
 | `technical` | Technical | Code and developer communication | Wraps identifiers/keywords in backticks; preserves jargon |
-| `writing` | Writing | Long-form content — articles, docs, essays | Polished prose, varied sentence length, filler words removed |
+| `writing` | Writing | Long-form writing: articles, docs, essays | Polished prose, varied sentence length, filler words removed |
 
-Set the default style (omit the key entirely for no styling):
+Set the default style (leave the key out for no styling):
 
 ```toml
 default_style = "casual"
@@ -388,24 +391,30 @@ default_style = "casual"
 
 ### Brand Casing
 
-`brand_casing` (default `true`) controls whether known names are re-cased: `github` becomes `GitHub`, `home depot` becomes `Home Depot`. Turn it off to keep Whisper's own capitals. Your dictionary entries always apply, and so does the short built-in always-replace list.
+`brand_casing` (default `true`) fixes the capitals of known names: `github` becomes `GitHub`, `home depot` becomes `Home Depot`. Turn it off to keep Whisper's own capitals. Your dictionary entries always apply, and so does the short built-in list of fixed replacements.
 
-A style can override the global value. Each style's `formatting.brand_casing` is `true`, `false`, or unset; unset follows `brand_casing`. Built-in presets are unset. In the app, the global switch is Settings → Transcription → Correction, and the per-style choice is in the style editor.
+A style can override the global setting. Each style's `formatting.brand_casing` is `true`, `false`, or unset, and unset follows `brand_casing`. Built-in presets leave it unset. In the app, the global switch is in Settings → Transcription → Correction, and the per-style choice is in the style editor.
 
 ### Prompt Structure
 
-Each style preset builds a `(system, user)` message pair via `StylePreset::build_styling_prompt`:
+Each style builds a `(system, user)` message pair with `StylePreset::build_styling_prompt`:
 
 | Role | Content |
 |------|---------|
 | `system` | Style name, rules, and few-shot examples (when the preset has any) |
 | `user` | The transcript to rewrite |
 
-These are sent as standard `system` + `user` chat-completion messages to the configured OpenAI-compatible endpoint — no custom prompt templating or chat-template rendering happens client-side. A reasoning model's private thinking never reaches your document: reasoning returned in a separate `reasoning_content` field is not read at all, and reasoning inlined into the response is stripped — `<think>` / `<thinking>` / `<reasoning>` / `<thought>` blocks in any case, an unwrapped block ending at one of those closing tags, and harmony channels, of which only the final one is kept. A response that is nothing but unclosed reasoning is discarded and the unstyled text is delivered instead.
+They go to your endpoint as normal `system` + `user` chat messages. The app does no chat-template rendering of its own.
+
+A reasoning model's thinking never ends up in your text:
+
+- Reasoning in a separate `reasoning_content` field is ignored.
+- Reasoning inside the reply is removed. That covers `<think>`, `<thinking>`, `<reasoning>` and `<thought>` blocks in any case, a block that only has the closing tag, and harmony channels (only the final channel is kept).
+- A reply that is nothing but unfinished reasoning is thrown away, and you get the unstyled text.
 
 ### Few-Shot Examples
 
-Each preset includes 2 input/output pairs that teach the LLM the expected transformation:
+Each preset has two input/output examples that show the LLM what to do:
 
 **Casual:**
 ```
@@ -435,19 +444,19 @@ Output: The problem is that it scales poorly. Once you hit ten thousand users, t
 
 ## User Dictionary
 
-The dictionary provides substitution rules applied before the LLM ever sees the transcript. Useful for proper nouns, brand names, and domain-specific terms.
+The dictionary holds replacements that run before styling. Use it for names, brands, and terms from your field.
 
-`apply_dictionary_seed` performs Unicode case-insensitive matching on the alphanumeric core of each whitespace-delimited token, with longest-match wins at each position.
+`apply_dictionary_seed` matches each word without regard to case (Unicode-aware), ignoring punctuation around it. When several entries match at the same spot, the longest one wins.
 
 Each entry has:
 
 | Field | Type | Description |
 |-------|------|-------------|
-| `phrase` | string | The spoken/misheard form |
-| `replacement` | string | The correct written form |
+| `phrase` | string | What you say, or what Whisper mishears |
+| `replacement` | string | How it should be written |
 | `priority` | u8 | Higher priority entries are matched first |
 
-Dictionary entries are not sent to the styling LLM — the substitution happens before the call, so the model only ever sees the corrected text.
+Your dictionary is not sent to the styling LLM. The replacements happen first, so the model only sees the corrected text.
 
 ---
 
@@ -461,14 +470,14 @@ session_history_days = 30    # days to retain, 0 to keep forever, or null to rec
 
 | Field | Type | Description |
 |-------|------|-------------|
-| `session_history_days` | u32 (0, or 1–3650) or null | Days to retain session history. Older sessions are pruned at startup and whenever settings are saved. `0` means **keep forever** — sessions are recorded and never pruned. `null` disables history: no session row, transcript or correction pair is written, and anything already stored is cleared when the setting changes |
+| `session_history_days` | u32 (0, or 1–3650) or null | How many days of history to keep. Older sessions are deleted at startup and whenever settings are saved. `0` means **keep forever**. `null` turns history off: nothing is recorded, and anything already stored is deleted when you change the setting |
 
-The three choices are decoded once by `UserSettings::history_retention()`
-(`Off` / `Forever` / `Days(n)`); never read the raw field as a prune window, or
-`0` would delete everything.
+In code, read this through `UserSettings::history_retention()`
+(`Off` / `Forever` / `Days(n)`). Treating the raw field as a number of days
+would make `0` delete everything.
 
-Sessions can also be removed by hand from the Sessions page — one row at a
-time, or by ticking several and using **Delete selected** (up to 1000 per call,
+You can also delete sessions by hand on the Sessions page, one at a time, or by
+ticking several and using **Delete selected** (up to 1000 at once,
 `HISTORY_BULK_DELETE_MAX`).
 
 Each session record contains:
@@ -477,41 +486,37 @@ Each session record contains:
 |--------|------|-------------|
 | `id` | UUID | Unique session identifier |
 | `started_at` | datetime | Session start timestamp |
-| `ended_at` | datetime | Session end timestamp (null if crashed) |
+| `ended_at` | datetime | Session end timestamp (null if the app crashed) |
 | `style` | string | Style preset ID used |
 | `backend` | enum | ASR backend type (`WhisperCpp` / `OpenAiCompatible`) |
 | `status` | enum | `Active`, `Completed`, `Failed(reason)`, or `Cancelled` |
 | `transcript` | string | Final styled transcript (null if empty) |
 
-Database location: `~/.local/share/lune-voice/lune.db`.
+Database location: `~/.local/share/lune-voice/lune.db` on Linux, `%APPDATA%\lune-voice\lune.db` on Windows.
 
 ---
 
 ## Pipeline Tuning
 
-These live in the `[pipeline]` section of `settings.toml` (`PipelineOverrides`); each overrides the ASR backend's resolved default. All fields are optional — omitting a field inherits the backend's recommended default.
+These go in the `[pipeline]` section of `settings.toml` (`PipelineOverrides`). Each one overrides the transcription backend's default, and all of them are optional.
 
 | Parameter | Default | Effect | Tradeoff |
 |-----------|---------|--------|----------|
-| `word_confidence_threshold` | 0.50 (whisper.cpp) | Words below this count as low-confidence, gating single-word fuzzy dictionary matches | Higher gates more aggressively |
-| `max_speech_secs` | 300 (local Whisper), 120 (remote) | Auto-end the session after this many seconds of audio | Higher allows longer single dictations |
-| `llm_timeout_secs` | 30 | Fall back to unstyled text if LLM styling takes too long | Lower bounds worst-case latency |
+| `word_confidence_threshold` | 0.50 (whisper.cpp) | Words below this count as uncertain. Only uncertain single words can get a near-miss dictionary fix | Higher allows more near-miss fixes |
+| `max_speech_secs` | 300 (local Whisper), 120 (remote) | Ends the session after this many seconds of audio | Higher allows longer dictations |
+| `llm_timeout_secs` | 30 | Uses the unstyled text if styling takes longer than this | Lower caps the worst-case wait |
 
-There are no VAD timing knobs: the utterance is bounded by the hotkey, and whisper's own VAD only trims leading and trailing silence.
+There are no VAD timing settings. The hotkey decides when you start and stop, and the VAD only trims silence at the ends.
 
 ### Recommended Profiles
 
-**Quick commands:**
+**Quick commands** (a stuck-open mic gives up after 30 s):
 ```toml
 [pipeline]
 max_speech_secs = 30
 ```
 
-**Long dictation:**
-```toml
-[pipeline]
-max_speech_secs = 120
-```
+**Long dictation:** keep the default. With local Whisper it already allows 300 s (five minutes) per session.
 
 ---
 
@@ -527,9 +532,9 @@ Models are downloaded automatically on first run from HuggingFace Hub.
 | Whisper Large v3 Turbo | `ggerganov/whisper.cpp` | `whisper-large-v3-turbo-q8_0` | `ggml-large-v3-turbo-q8_0.bin` | ~874 MB |
 | Whisper VAD | `ggml-org/whisper-vad` | `whisper-vad-silero` | `ggml-silero-v5.1.2.bin` | ~9 MB |
 
-Models are stored in `~/.local/share/lune-voice/models/`.
+Models are stored in `~/.local/share/lune-voice/models/` on Linux and `%APPDATA%\lune-voice\models\` on Windows.
 
-Styling runs against a remote OpenAI-compatible endpoint; custom model paths are not part of the public settings surface. To configure one:
+Styling has no local model to manage. It runs against an OpenAI-compatible endpoint, set up like this:
 
 ```toml
 [llm_backend]
@@ -547,7 +552,7 @@ max_tokens = 512
 | Variable | Purpose |
 |----------|---------| 
 | `RUST_LOG` | Tracing filter (e.g., `lune_asr=debug,lune_llm=info`) |
-| `LUNE_LOG_TRANSCRIPTS` | Set to `1` to include transcript text in logs. Redacted by default — leave it unset outside recognition debugging |
+| `LUNE_LOG_TRANSCRIPTS` | Set to `1` to include transcript text in logs. It is redacted by default; only set this while debugging recognition |
 | `LUNE_DISABLE_IBUS` | Set to any value to skip the IBus delivery path and always type through `uinput` |
 | `HF_TOKEN` | HuggingFace token for model downloads; only needed for gated or private repos |
 | `LUNE_UPDATER_ENDPOINT` | Override the release manifest URL used by the update check |

@@ -1,6 +1,6 @@
 # Architecture
 
-Lune Voice has one dictation pipeline and one control surface: the desktop app, which drives the runtime through typed Tauri commands and a session event stream.
+Lune Voice has one dictation pipeline and one way to control it: the desktop app, which talks to the runtime through typed Tauri commands and a session event stream.
 
 ---
 
@@ -24,9 +24,9 @@ Lune Voice has one dictation pipeline and one control surface: the desktop app, 
 
 ## System Overview
 
-Lune Voice turns microphone audio into styled text, then delivers that text to the focused app. The runtime keeps one active session at a time. Everything else exists to feed that session, configure it, or show its state.
+Lune Voice turns microphone audio into text, optionally styles it, and sends it to the focused app. Only one session runs at a time. Everything else feeds that session, configures it, or shows its state.
 
-Dictation is **hotkey-bounded**: the session collects audio for as long as the hotkey is held (Hold mode) or until the hotkey is pressed again (Toggle mode). There is no online VAD gate during recording; Silero trims silence off the ends of the buffered audio in a separate pass just before decode.
+The **hotkey decides when dictation starts and stops**: the session records while the hotkey is held (Hold mode) or until it is pressed again (Toggle mode). No VAD runs during recording. Silero trims silence off the ends of the recorded audio in a separate pass just before decode.
 
 The runtime pipeline uses interchangeable backends:
 
@@ -37,9 +37,9 @@ The runtime pipeline uses interchangeable backends:
 | LLM       | OpenAI-compatible (remote), disabled           | remote API               | HTTP                            |
 
 
-The native ASR backend compiles its C/C++ library from source at build time via a `*-sys` crate. GPU (CUDA) support on Linux is a **runtime** capability: ggml's compute backends are built as `dlopen`-able plugins (`GGML_BACKEND_DL`), so the CUDA backend is downloaded on request rather than linked in — see [docs/GPU_PLUGIN.md](GPU_PLUGIN.md). The styling LLM is remote-only — point it at Ollama, llama-server, LM Studio, or a hosted API. See [docs/RELEASE.md](RELEASE.md) for the full build matrix.
+The native ASR backend compiles its C/C++ library from source at build time through a `*-sys` crate. GPU (CUDA) support is decided at **runtime**: ggml's compute backends are built as `dlopen`-able plugins (`GGML_BACKEND_DL`), so the CUDA backend is downloaded on request instead of linked in. See [docs/GPU_PLUGIN.md](GPU_PLUGIN.md). The styling LLM is remote only; point it at Ollama, llama-server, LM Studio, or a hosted API. See [docs/RELEASE.md](RELEASE.md) for the full build matrix.
 
-Backend selection is centralized through registries and DTO mappers. The desktop UI never builds model paths or backend structs itself; it sends typed settings and receives snapshots.
+Backends are chosen in one place, through registries and DTO mappers. The desktop UI never builds model paths or backend structs itself. It sends typed settings and gets snapshots back.
 
 ---
 
@@ -56,7 +56,7 @@ lune-core (types, config, errors)
           └─ desktop-ui/src-tauri (tauri IPC, hotkey, backend registry wiring, pill, persistence bridge)
 ```
 
-Each crate has a single responsibility. `lune-core` defines shared types and traits but contains no runtime logic. All inter-crate communication flows through trait objects and channels.
+Each crate has one job. `lune-core` defines shared types and traits but has no runtime logic. Crates talk to each other only through trait objects and channels.
 
 ---
 
@@ -68,24 +68,24 @@ Each crate has a single responsibility. `lune-core` defines shared types and tra
 **Orchestration:** `crates/lune-voice/src/capture.rs`
 
 - Uses `cpal` for microphone access. Host choice lives in `crates/lune-audio/src/devices.rs` and nowhere else:
-  - **Capture** (`capture_host`) uses cpal's PulseAudio host whenever a Pulse server answers — PulseAudio itself, or PipeWire through `pipewire-pulse` — and ALSA otherwise. Through the server, a mic another program holds (a noise filter, a browser) is shared; opening the raw ALSA `hw:` device instead fails with "device busy" while anything else has the card. The Pulse client is the pure-Rust `pulseaudio` crate: no system library, no headers, no extra runtime dependency
+  - **Capture** (`capture_host`) uses cpal's PulseAudio host whenever a Pulse server answers (PulseAudio itself, or PipeWire through `pipewire-pulse`), and ALSA otherwise. Through the server, a mic that another program is using (a noise filter, a browser) can be shared. Opening the raw ALSA `hw:` device instead fails with "device busy" while anything else has the card. The Pulse client is the pure-Rust `pulseaudio` crate, so there is no system library, no headers, and no extra runtime dependency
   - **Playback** (`playback_host`, sound cues) stays on ALSA's `default`, which PipeWire and PulseAudio serve through their ALSA plugins
-- The picker and the device opened both go through `enumerate_input_devices`, so the list the user picks from and the device that opens cannot disagree. One entry per display name:
-  - **Pulse:** sources read from the server (`crates/lune-audio/src/pulse.rs`), minus sink monitors (`monitor_of_sink_index`). Recording streams are not sources, so a filter's capture side never appears; its output source does. cpal keeps its Pulse device type private, so these facts come from a second, short-lived client of the same crate
-  - **ALSA:** one card-backed capture route per name. ALSA enumerates one PCM per *route*, so otherwise 4 microphones list as 29 indistinguishable entries alongside `null` and `pipewire`
-- A saved `input_device` matches a display name first, then a source's ALSA name (`"{alsa.card_name}, {alsa.name}"`, the name the ALSA host shows). Startup rewrites a setting matched the second way to the current name (`persistence::migrate_input_device`), only for a settings file that parsed. The rewrite is one-way: with no Pulse server the ALSA host has no record of a source name, so capture uses the system default and reports the fallback. Identity is the display name, so two mics that share one are a single picker entry
-- Pulse capture requests a fixed 20 ms period (`capture_buffer_size`). Left to the server, a record stream's fragment defaults to about 2 s, and the first audio arrives 2 s after the stream opens
-- Delivers 16 kHz mono PCM in 80 ms chunks (1280 samples). Most hardware captures at 44.1 or 48 kHz, so a `rubato` async resampler converts to 16 kHz in the capture path whenever the device's native rate differs
-- `MicAgc` (PCEN) normalizes each frame toward a target RMS before it leaves the capture loop, gated by the `vad_pcen` setting (default on). The volume meter reads the **post-AGC** signal, so it reflects what the recognizer hears
-- Chunks are pushed to the ASR backend via `push_audio` as they arrive; there is no online VAD gate at this stage
-- The session loop handles Stop/Cancel/deadline/max-speech control signals and terminates the capture loop accordingly
-- After Stop, the producer is asked to flush and given a 30 ms grace period to hand over the chunk it still holds (up to ~80 ms — the last phonemes of the final word), followed by the AGC's held sub-hop remainder; then `poll_final` decodes the buffer
+- The picker and the device that opens both go through `enumerate_input_devices`, so they can't disagree. There is one entry per display name:
+  - **Pulse:** sources read from the server (`crates/lune-audio/src/pulse.rs`), minus sink monitors (`monitor_of_sink_index`). Recording streams aren't sources, so a filter's input side never shows up, but its output source does. cpal keeps its Pulse device type private, so this information comes from a second, short-lived client of the same crate. That client opens its own socket and shuts it down if the server doesn't answer within 2 s, so a stuck server leaves no thread behind
+  - **ALSA:** one card-backed capture route per name. ALSA lists one PCM per *route*, so without this, 4 microphones would show up as 29 identical-looking entries next to `null` and `pipewire`
+- A saved `input_device` matches a display name first, then a source's ALSA name (`"{alsa.card_name}, {alsa.name}"`, the name the ALSA host shows). At startup, a setting that matched the second way is rewritten to the current name (`persistence::migrate_input_device`), but only if the settings file parsed, and only if the saved name looks like an ALSA name (it contains `", "`), so most launches skip the device listing. The lookup gives up after 3 s and keeps the saved name. The rewrite only goes one way: with no Pulse server, the ALSA host doesn't know source names, so capture uses the system default and says so. A device is identified by its display name, so two mics with the same name are one picker entry
+- Pulse capture asks for a fixed 20 ms period (`capture_buffer_size`). Left to the server, a recording stream's fragment defaults to about 2 s, and the first audio arrives 2 s after the stream opens
+- Delivers 16 kHz mono PCM in 80 ms chunks (1280 samples). Most hardware records at 44.1 or 48 kHz, so a `rubato` async resampler converts to 16 kHz whenever the device's rate differs
+- `MicAgc` (PCEN) brings each frame toward a target level before it leaves the capture loop, controlled by the `vad_pcen` setting (default on). The level meter shows the signal **after** this gain, so it matches what whisper hears
+- Chunks go to the ASR backend through `push_audio` as they arrive. No VAD runs at this stage
+- The session loop handles Stop, Cancel, deadline and max-speech signals and ends the capture loop when one arrives
+- After Stop, the producer is asked to flush and gets 30 ms to hand over the chunk it still holds (up to ~80 ms, which is the end of the last word), then the AGC's leftover partial frame. Then `poll_final` decodes the buffer
 
 ### 2. ASR
 
 **Crate:** `lune-asr`
 
-Both backends implement the same `AsrBackend` trait, so the session code does not branch on backend type.
+Both backends implement the same `AsrBackend` trait, so the session code never checks which one it has.
 
 #### 2a. WhisperCpp (local, default)
 
@@ -93,13 +93,13 @@ Both backends implement the same `AsrBackend` trait, so the session code does no
 
 The `WhisperCppBackend` wraps `whisper-rs`, which vendors and compiles `whisper.cpp`:
 
-- The `WhisperContext` (model weights) is loaded **once** at backend construction and shared across all sessions. Per-session `WhisperState` is a decode context that allocates its own KV-cache and compute buffers when created.
-- `push_audio` appends PCM to a per-session buffer pre-allocated for 30 s of audio (grows once for longer utterances; reset without freeing after each decode).
-- `poll_final` decodes the entire buffer in one shot using **BeamSearch** (beam size 5) — whisper.cpp's accuracy-oriented default. Decoding is one-shot per utterance, so the extra compute is worthwhile.
-- **Silero endpoint trim:** when the VAD model is present (`models/whisper-vad-silero/ggml-silero-v5.1.2.bin`), `poll_final` first runs `WhisperVadContext::segments_from_samples` over the buffer and decodes only the span between the first and last speech segment. Internal pauses are kept, because whisper reads them as punctuation cues. whisper.cpp's in-decode `enable_vad` is deliberately **not** used — it concatenates speech spans and strips those pauses, producing run-ons. The VAD context always runs on CPU (silero is tiny, and a GPU context crashed at init). If the model file is missing, the backend logs a warning and decodes the whole buffer.
-- **Chunking at pauses:** a trimmed span longer than 28 s is cut in the middle of a pause between two VAD speech segments and each piece is decoded on its own (`plan_chunks`). Left to its own 30 s window, whisper decodes whatever is left over separately, and a leftover of a second or less comes back as invented text ("Thank you."). A cut leaves at least 3 s on both sides and prefers the longest pause in the back half of the window, so each piece keeps its own pauses whole. A stretch with no pause is decoded in one piece.
-- **Per-token confidence:** whisper exposes per-token probabilities. `poll_final` folds them into `AsrSegment::confidence` (mean) and `min_token_confidence` (minimum), excluding special tokens. Segments whose mean confidence falls below `GARBAGE_DROP_THRESHOLD` (0.25) are dropped by the capture layer before reaching the session.
-- Language detection: the `language` field from `AsrSessionConfig` is passed to `set_language`; `None` uses `"auto"` (whisper detects from audio). With several chunks, the first one detects and the rest reuse its language.
+- The `WhisperContext` (model weights) is loaded **once** when the backend is built and shared by every session. Each session gets a `WhisperState`, a decode context that allocates its own KV-cache and compute buffers.
+- `push_audio` appends PCM to a per-session buffer sized for 30 s of audio. It grows once for longer utterances, and is cleared without freeing after each decode.
+- `poll_final` decodes the whole buffer at once with **beam search** (beam size 5), whisper.cpp's accuracy-first setting. There is only one decode per utterance, so the extra compute is worth it.
+- **Silero trim:** when the VAD model is there (`models/whisper-vad-silero/ggml-silero-v5.1.2.bin`), `poll_final` first runs `WhisperVadContext::segments_from_samples` over the buffer and decodes only the span from the first speech segment to the last. Pauses inside that span are kept, because whisper uses them to place punctuation. whisper.cpp's built-in `enable_vad` is **not** used on purpose: it glues speech together and removes those pauses, which gives run-on sentences. The VAD always runs on the CPU, because Silero is tiny and a GPU VAD context crashes at init. If the model file is missing, a warning is logged and the whole buffer is decoded.
+- **Splitting at pauses:** a trimmed span longer than 28 s is cut in the middle of a pause between two speech segments, and each piece is decoded on its own (`plan_chunks`). Left alone, whisper works in 30 s windows and decodes the leftover separately, and a leftover of a second or less comes back as made-up text ("Thank you."). Each cut leaves at least 3 s on both sides and prefers the longest pause in the back half of the window, so every piece keeps its pauses whole. A stretch with no pause is decoded in one piece.
+- **Per-token confidence:** whisper reports a probability for each token. `poll_final` turns them into `AsrSegment::confidence` (mean) and `min_token_confidence` (minimum), leaving out special tokens. The capture layer drops segments whose mean is below `GARBAGE_DROP_THRESHOLD` (0.25) before the session sees them.
+- Language: the `language` field from `AsrSessionConfig` goes to `set_language`. `None` means `"auto"`, so whisper detects it from the audio. With several pieces, the first one detects the language and the rest reuse it.
 
 Four GGML model sizes are available, all from `ggerganov/whisper.cpp`:
 
@@ -118,42 +118,47 @@ Four GGML model sizes are available, all from `ggerganov/whisper.cpp`:
 
 ggml's compute backends are built as `dlopen`-able plugins (`GGML_BACKEND_DL`), so the executable carries no `DT_NEEDED` on the CUDA runtime and starts on a machine with no NVIDIA driver at all. Two directories are scanned at startup: `<exe dir>/backends/` for the bundled CPU backends, and `<data dir>/backends/` for the CUDA plugin the user downloads.
 
-`load_plugins` **must run before the first `WhisperContext` is created** — ggml selects a device from whatever is in the backend registry at context-creation time, which is why `desktop-ui/src-tauri/src/lib.rs` calls it before the Tauri builder. It is idempotent via a `OnceLock`, because the registry is process-global and has no unload.
+`load_plugins` **must run before the first `WhisperContext` is created**. ggml picks a device from whatever is in the backend registry when the context is created, which is why `desktop-ui/src-tauri/src/lib.rs` calls it before the Tauri builder. A `OnceLock` makes it run only once, because the registry is global to the process and has no unload.
 
-Each plugin carries `RUNPATH=$ORIGIN` so it resolves its own CUDA libraries from its own directory. Setting `LD_LIBRARY_PATH` in-process would not work: glibc caches the search path at startup.
+On Linux each plugin carries `RUNPATH=$ORIGIN`, so it finds its CUDA libraries in its own directory. Setting `LD_LIBRARY_PATH` from inside the app wouldn't work, because glibc caches the search path at startup. Windows has no `$ORIGIN`, so the app loads the CUDA DLLs by full path first.
 
 See [docs/GPU_PLUGIN.md](GPU_PLUGIN.md) for the states, the archive contents, and the publishing flow.
 
 #### 2b. OpenAI-Compatible (remote)
 
-Remote ASR is useful when the user explicitly allows remote processing. It returns transcript text through the same `AsrSegment` type but does not expose per-token confidence. Missing confidence disables LLM routing confidence gates; the styling call is still driven by the style preset.
+Remote ASR is only used when the user allows remote services. It returns text through the same `AsrSegment` type, but without per-token confidence. Styling doesn't depend on confidence, so it still follows the style preset.
 
 ##### Transport: when plaintext is allowed
 
-Both remote backends (`crates/lune-asr/src/backend/openai.rs`, `crates/lune-llm/src/backend/openai.rs`) refuse to construct against a plaintext `http://` endpoint unless it is *local* by `lune_core::config::is_local_endpoint` — loopback, the RFC 1918 / RFC 4193 private ranges, and `.local` / `.localhost` names. A public host must use HTTPS.
+Both remote backends (`crates/lune-asr/src/backend/openai.rs`, `crates/lune-llm/src/backend/openai.rs`) refuse a plain `http://` endpoint unless `lune_core::config::is_local_endpoint` calls it *local*: loopback, the RFC 1918 / RFC 4193 private ranges, and `.local` / `.localhost` names. A public host must use HTTPS.
 
-That carve-out is wider than loopback on purpose, and it is a deliberate tradeoff worth stating plainly: **against a LAN endpoint, the API key and every dictated transcript cross the local network in cleartext.** Self-hosted inference servers (Ollama, llama-server, LM Studio) ship without TLS, so requiring HTTPS would break the common setup of running the model on another box on the same network. The exposure is bounded by the LAN, and the same predicate governs whether an endpoint may be used keyless, so the two decisions cannot drift apart.
+This allows more than loopback on purpose, and the cost is real: **with a LAN endpoint, the API key and every transcript cross your local network unencrypted.** Self-hosted servers (Ollama, llama-server, LM Studio) ship without TLS, so requiring HTTPS would break the common setup of running the model on another machine on the same network. The exposure stays inside the LAN. The same check decides whether an endpoint may be used without a key, so the two rules can't drift apart.
 
-Users who do not accept that tradeoff should put the endpoint behind HTTPS (a reverse proxy with a local certificate) rather than relying on the private-range carve-out. Tightening the predicate to loopback-only would refuse remote ASR at construction and silently degrade styling to passthrough for every LAN user, so it is a posture change rather than a fix.
+If you don't accept that, put the endpoint behind HTTPS (a reverse proxy with a local certificate). Narrowing the check to loopback only would block remote ASR and quietly turn off styling for everyone on a LAN, so it would be a policy change, not a fix.
 
 ### 3. Dictionary Application
 
 **Crates:** `lune-voice`, `lune-dict`  
 **Files:** `crates/lune-voice/src/session.rs`, `crates/lune-dict/src/corrector.rs`
 
-After ASR segments are collected, the session runs a deterministic text pass:
+Once the ASR segments are in, the session runs a fixed, rule-based text pass:
 
-1. Voice commands are stripped from the ASR text (whole-utterance matching).
-2. The deterministic corrector (`LexicalGate::correct_with_risk_threshold` in `corrector.rs`, via `correct_and_format` in `session.rs`) rewrites the transcript: user-dictionary matches (exact — a phrase of several words, or a word carrying punctuation such as `node.js` or `c++`, matches whole transcript words as written — plus single-word fuzzy — one edit, words of four characters or more — gated by `FUZZY_DICT_RISK_GATE` and never applied to a word the lexicon knows or one carrying a digit), bundled-vocab recognition (exact case-insensitive re-casing only — no fuzzy guessing), and the `ALWAYS_REPLACE` built-in mishear→canonical table. `formatting` then applies capitalization, terminal punctuation, filler stripping, and wrapping-quote removal.
-3. The corrected text and the dictionary entries are packaged into `PostProcessInput` for the optional LLM styling stage.
+1. Voice commands are removed from the text (the whole utterance must match).
+2. The corrector (`LexicalGate::correct_with_risk_threshold` in `corrector.rs`, called from `correct_and_format` in `session.rs`) rewrites the transcript in three ways:
+   - **Your dictionary.** Exact matches always apply. A phrase of several words, or a word with punctuation such as `node.js` or `c++`, matches whole words exactly as written. A single word of four or more characters can also match with one edit, but only when `FUZZY_DICT_RISK_GATE` allows it, and never on a word the lexicon knows or a word with a digit in it.
+   - **Bundled vocabulary.** Exact, case-insensitive matches get their capitals fixed. There is no fuzzy guessing here.
+   - **`ALWAYS_REPLACE`.** A built-in table of common mishearings and their fixes.
 
-Styling is not gated on word confidence. It runs only when a style preset is selected: when `default_style` is `None`, the LLM is skipped and the deterministic output is delivered as-is. (`apply_dictionary_seed`, below, is a secondary pass inside the styling stage — it only affects the text sent to the LLM, not this deterministic output.)
+   `formatting` then handles capitalization, end punctuation, filler words, and quotes wrapped around the whole text.
+3. The corrected text and the dictionary entries go into `PostProcessInput` for the optional styling stage.
+
+Styling doesn't depend on word confidence. It only runs when a style is selected: when `default_style` is `None`, the LLM is skipped and this output is delivered as is. (`apply_dictionary_seed`, below, is a second pass inside the styling stage. It only changes the text sent to the LLM, not this output.)
 
 ### 4. LLM Styling
 
 **Crate:** `lune-llm` | **File:** `crates/lune-llm/src/pipeline.rs`
 
-The session calls `StylePipeline::transform()` for LLM post-processing.
+The session calls `StylePipeline::transform()` for styling.
 
 `PostProcessInput` carries:
 
@@ -168,55 +173,65 @@ The session calls `StylePipeline::transform()` for LLM post-processing.
 
 `StylePipeline` runs two steps:
 
-1. **Dictionary seed** — `apply_dictionary_seed` replaces dictionary phrases in the raw text (Unicode case-insensitive, longest-match). This happens before the LLM ever sees the text.
-2. **Styling pass** — runs only when a style preset is selected. When `default_style` is `None` the LLM is skipped and the seeded text is returned; for any selected preset the LLM is called via `llm.complete()`. Output is run through `fix_all_number_spaces` and a `contains_forbidden_output` filter; a failing or empty output keeps the seeded text.
+1. **Dictionary seed:** `apply_dictionary_seed` replaces dictionary phrases in the text (case-insensitive, Unicode-aware, longest match wins). This happens before the LLM sees anything.
+2. **Styling:** only when a style is selected. When `default_style` is `None`, the LLM is skipped and the seeded text is returned. Otherwise the LLM is called through `llm.complete()`. Its output goes through `fix_all_number_spaces` and the `contains_forbidden_output` filter. If the output fails the filter or is empty, the seeded text is kept.
 
-**Reasoning suppression:** a reasoning model puts its private thinking somewhere in the response, and none of it may reach the user's document. The backend reads `message.content` alone, so reasoning returned in a separate `reasoning_content` field is discarded by construction; reasoning inlined into the content is stripped by `strip_reasoning` — a wrapped `<think>` / `<thinking>` / `<reasoning>` / `<thought>` block in any case and repeated any number of times, an unwrapped block ending at one of those closing tags (what a template that pre-fills the opening tag produces), or harmony channels, of which only `<|channel|>final<|message|>` is kept. Reasoning that never closes collapses to an empty string, which the pipeline treats as "keep the text we already had".
+**Removing reasoning:** a reasoning model puts its thinking somewhere in the reply, and none of it may reach the user's text. The backend reads only `message.content`, so reasoning in a separate `reasoning_content` field is never seen. Reasoning inside the content is removed by `strip_reasoning`:
 
-When no styling engine is configured (`llm_backend` is `Disabled`), the runtime uses `NullPostProcessor`, which returns the seeded text unchanged. When the configured remote engine's request fails, `StylePipeline` keeps the seeded (dictionary-substituted) text instead of failing the session.
+- `<think>`, `<thinking>`, `<reasoning>` and `<thought>` blocks, in any case and any number of times
+- a block with only a closing tag, which is what you get from a template that fills in the opening tag itself
+- harmony channels, keeping only `<|channel|>final<|message|>`
 
-The LLM backend (`OpenAiLlmBackend`) wraps an `async-openai` `Client` and makes one chat-completion HTTP request per call, directly on the async runtime — no local model, no blocking thread pool.
+Reasoning that never closes becomes an empty string, which the pipeline treats as "keep the text we already had".
+
+When styling is off (`llm_backend` is `Disabled`), the runtime uses `NullPostProcessor`, which returns the seeded text unchanged. When the remote request fails, `StylePipeline` keeps the seeded (dictionary-corrected) text instead of failing the session.
+
+The LLM backend (`OpenAiLlmBackend`) wraps an `async-openai` `Client` and makes one chat-completion request per call, right on the async runtime. There is no local model and no blocking thread pool.
 
 ### 5. Text Delivery
 
 **Crate:** `lune-voice` | **Files:** `crates/lune-voice/src/delivery.rs`, `uinput_typer.rs`, `ibus.rs`, `focus.rs` + `focus/unix.rs` + `focus/windows.rs`, `probe.rs`
 
-`delivery.rs` defines one `PlatformDriver` trait with a half per platform. `focus.rs` owns focused-window detection, terminal classification and focus restore, with a half per platform: the compositor probes in `focus/unix.rs`, the Win32 calls in `focus/windows.rs`. Every external probe (compositor sockets, `wl-paste`, `swaymsg`, `xdotool`) runs through `probe.rs`, which time-bounds it and drains both child pipes for the whole wait so a chatty child is not killed mid-answer.
+`delivery.rs` defines one `PlatformDriver` trait with a Linux half and a Windows half. `focus.rs` handles finding the focused window, deciding whether it is a terminal, and restoring focus, also split by platform: compositor queries in `focus/unix.rs`, Win32 calls in `focus/windows.rs`. Every outside command (compositor sockets, `wl-paste`, `swaymsg`, `xdotool`) runs through `probe.rs`, which gives it a time limit and keeps reading both of its output pipes the whole time, so a command with a lot to say isn't killed halfway through its answer.
 
-**The target window is captured once, when the dictation starts** (`capture_focus_target`, run off the start path because the Unix probes can cost ~500 ms) and consumed seconds later at delivery. Two things can move focus in between: the user, deliberately, and one of our own windows — the pill above all. So capture drops the restore token when the foreground window belongs to this process, and delivery restores the captured window before typing, but only while one of our own windows holds focus. Someone who switched apps on purpose keeps the app they switched to. The restore therefore covers focus that moves *after* capture only — a dictation that starts while one of our windows is already in front has no token to restore to, which is why the pill refuses activation in the first place.
+**The target window is recorded once, when dictation starts** (`capture_focus_target`, run outside the start path because the Unix queries can take ~500 ms), and used seconds later at delivery. Two things can move focus in between: the user, on purpose, and one of our own windows, the pill most of all. So if the focused window belongs to this app at start, no restore target is kept. At delivery, the recorded window is focused again before typing, but only if one of our own windows has focus right then. If you switched apps on purpose, you stay where you went. This means the restore only covers focus that moves *after* dictation starts. If one of our windows was already in front at the start, there is nothing to go back to, which is why the pill refuses focus in the first place.
 
-The session emits the delivery payload directly on the event channel as
-`FinalizedText { session_id, text }` — styled text for delivery.
+The session sends the final text on the event channel as
+`FinalizedText { session_id, text }`.
 
-Delivery runs on a dedicated thread and picks a backend once at startup. On Linux there are two:
+Delivery runs on its own thread and picks a driver once at startup. Linux has two:
 
-- **IBus** — used when IBus is the active input method (e.g. GNOME/Wayland; detected via `GTK_IM_MODULE` / `QT_IM_MODULE` / `XMODIFIERS`). Commits Unicode straight into the focused input context — no terminal detection, paste chord, or clipboard.
-- **uinput** — the universal fallback. Drives a virtual keyboard through `/dev/uinput`.
+- **IBus:** used when IBus is the input method (GNOME and Wayland, for example; detected from `GTK_IM_MODULE`, `QT_IM_MODULE` or `XMODIFIERS`). It commits Unicode text straight into the focused input field, with no terminal check, paste keystroke, or clipboard.
+- **uinput:** the fallback that works everywhere. It drives a virtual keyboard through `/dev/uinput`.
 
-On Windows (and macOS) there is one: **arboard + enigo** — `arboard` for the clipboard, `enigo` for the paste chord and for per-key Unicode typing. `arboard` reads and writes the clipboard in-process, so there is no child process to bound; it reads text only, so a non-text clipboard is snapshotted as "nothing to restore" rather than as bytes. On Windows this driver first restores the captured window (`focus::restore_focus` — `SetForegroundWindow`, guarded by `IsWindow` because Windows reuses handles) and waits 30 ms for the activation to land, because the paste chord goes wherever focus is.
+Windows has one: **arboard + enigo**. `arboard` handles the clipboard, and `enigo` sends the paste keystroke and types Unicode key by key. `arboard` works inside the app, so there is no helper process to time out. It only reads text, so a clipboard holding anything else counts as "nothing to restore". Before pasting, this driver focuses the recorded window again (`focus::restore_focus`: `SetForegroundWindow`, checked with `IsWindow` because Windows reuses handles) and waits 30 ms for it to take effect, because the paste goes wherever focus is.
 
-`dictation_mode` selects the delivery method; `copy_to_clipboard` is an orthogonal toggle for whether a copy is *kept*:
-
-
-| Mode          | uinput (Linux)                                                                                                                                                                     | IBus (Linux)  | arboard + enigo (Windows / macOS)                                                |
-| ------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------- | -------------------------------------------------------------------------------- |
-| `TypeInPlace` | Types each key (US-QWERTY). Non-ASCII text routes through the clipboard paste path so it is never dropped.                                                                         | `commit_text` | `enigo.text()` — there is no uinput here                                         |
-| `Clipboard`   | Sets the clipboard (`wl-copy`/`xclip`), detects terminals, sends Ctrl+V / Ctrl+Shift+V. Adaptive post-paste delay (EMA of clipboard RTT); per-key fallback for paste-hostile apps. | `commit_text` | In-process clipboard, then Ctrl+V — Cmd+V on macOS — **always**, terminal or not |
+`dictation_mode` picks how the text is delivered. `copy_to_clipboard` separately decides whether a copy is *kept*:
 
 
-Terminal classification means something different on each side. On Linux it picks the chord. On Windows every console takes Ctrl+V, so it only decides whether the text must be flattened first.
+| Mode | uinput (Linux) | IBus (Linux) | arboard + enigo (Windows) |
+| --- | --- | --- | --- |
+| `TypeInPlace` | Types each key (US-QWERTY). Text over 80 characters, multi-line text, and non-ASCII text is pasted instead, so it is fast and never dropped. | `commit_text` | `enigo.text()` |
+| `Clipboard` | Sets the clipboard (`wl-copy`/`xclip`), checks for a terminal, sends Ctrl+V or Ctrl+Shift+V. The wait after the paste adapts to the clipboard's measured speed (an EMA of its round trip). Falls back to typing if the clipboard fails. | `commit_text` | Clipboard inside the app, then Ctrl+V **always**, terminal or not |
 
-**Undeliverable text.** Delivery reports back whether the text reached the focused app. Multi-line text is never typed key-by-key — a newline would press Enter into whatever has focus — so if the clipboard is also unavailable the text is dropped rather than sent, and the session raises a warning instead of reporting success.
 
-**Text that could not be typed, but is recoverable.** Some failures leave the text on the clipboard instead of dropping it, and the session warning says to paste it: an IBus commit that did not land (the focused app has no IBus input context, so IBus never enables the engine — or the daemon is unreachable), a Windows target running at a higher integrity level (UIPI discards synthetic input without an error, so capture checks the target's elevation before sending), and a paste chord the system refused.
+Spotting a terminal does different things on each platform. On Linux it picks the paste keystroke. On Windows every console accepts Ctrl+V, so it only decides whether line breaks must be flattened first.
 
-**One window, every mode.** `TypeInPlace` aims at the captured window the same way `Clipboard` does: focus is restored to it first, and terminal classification comes from it rather than from a live probe.
+**Text that can't be delivered.** Delivery reports whether the text reached the app. On Linux, multi-line text is never typed key by key, because a newline would press Enter in whatever has focus. So if the clipboard is also unavailable, the text is not sent, and the session shows a warning instead of reporting success.
 
-**Slow targets.** The text stays on the clipboard for at least `focus::paste_read_floor` after the chord for apps that read a paste late (Office, remote-desktop and VM clients, Electron shells). Windows also keeps a transient copy out of clipboard history and cloud sync.
+**Text that can't be typed but can be recovered.** Some failures leave the text on the clipboard instead, and the warning tells the user to paste it:
 
-**Delivery thread.** A driver that fails to start (a cancelled polkit prompt, say) is retried when the app next polls `health()`, at most every 30 s. A driver call that panics drops that one delivery and the thread carries on. IBus D-Bus calls time out after 2 s.
+- an IBus commit that didn't land (the app has no IBus input field, so IBus never turns the engine on, or the IBus daemon can't be reached)
+- a Windows app running with higher privileges (Windows silently ignores simulated input sent to it, so the app checks the target's privilege level before sending)
+- a paste keystroke the system refused
 
-**Clipboard preservation.** The `Clipboard` path borrows the system clipboard as a transport. When `copy_to_clipboard` is off, the prior clipboard is snapshotted before delivery (its preferred MIME type and raw bytes, so images survive) and restored afterward. When `copy_to_clipboard` is on, the dictated text is kept and the otherwise-redundant re-copy is skipped. The IBus path never touches the clipboard.
+**One window for every mode.** `TypeInPlace` aims at the recorded window the same way `Clipboard` does: focus goes back to it first, and the terminal check uses it, not whatever is focused right then.
+
+**Slow apps.** After the paste, the text stays on the clipboard for at least `focus::paste_read_floor`, for apps that read a paste late (Office, remote desktop and VM clients, Electron apps). On Windows, that temporary copy is also kept out of clipboard history and cloud sync.
+
+**Delivery thread.** If a driver fails to start (say the user cancelled the polkit prompt), it is tried again the next time the app checks `health()`, at most every 30 s. If a driver call panics, that one delivery is lost and the thread keeps going. IBus D-Bus calls time out after 2 s.
+
+**Keeping your clipboard.** A paste borrows the clipboard to carry the text. When `copy_to_clipboard` is off, the old clipboard is saved before delivery and put back afterwards. On Linux it is saved as its preferred MIME type and raw bytes, so images survive. When `copy_to_clipboard` is on, the dictated text is kept and the extra copy step is skipped. The IBus path never touches the clipboard.
 
 ---
 
@@ -237,26 +252,26 @@ Teardown    poll final ASR, apply dictionary, style, finalize DB
 Stopped     SessionEvent::Stopped emitted
 ```
 
-Only one session may be active at a time (enforced by `Arc<Mutex<Option<ActiveHandle>>>`). The session task runs on the Tauri async runtime via `tokio::task::spawn`.
+Only one session can be active at a time (`Arc<Mutex<Option<ActiveHandle>>>` enforces this). The session task runs on the Tauri async runtime through `tokio::task::spawn`.
 
 **Teardown sequence:**
 
-1. Stop or cancel drains recording control messages.
-2. Final ASR segments are polled (batch decode via `poll_final`) unless the session was cancelled.
-3. Empty sessions finish without transcript output.
-4. Voice commands are routed before dictionary application.
+1. Stop or cancel clears out the pending recording control messages.
+2. Unless the session was cancelled, the final ASR segments are collected (one decode, through `poll_final`).
+3. An empty session ends with no transcript.
+4. Voice commands are handled before the dictionary runs.
 5. Dictionary seed and `StylePipeline` run on the transcript.
 6. Final text is emitted, delivered, and persisted.
 
-Cancellation is checked before LLM styling and again before final output. A cancellation during styling marks the session cancelled and skips `FinalizedText`.
+Cancellation is checked before styling and again before the final output. Cancelling during styling marks the session cancelled and skips `FinalizedText`.
 
-Terminal events are sent with a timeout so a stalled listener cannot wedge teardown. A `Stopped` that follows a dropped `Error` carries `error_dropped`, so the listener still reports the session as failed.
+The final events are sent with a timeout, so a stuck listener can't hang the teardown. If an `Error` event was dropped, the `Stopped` that follows carries `error_dropped`, so the listener still reports the session as failed.
 
 ---
 
 ## Desktop Bridge
 
-The desktop app does not scrape logs or poll for session state. It uses typed Tauri commands for control and a `Channel<SessionStreamEvent>` for live runtime events.
+The desktop app doesn't read logs or poll for session state. It uses typed Tauri commands for control and a `Channel<SessionStreamEvent>` for live events.
 
 ### Commands
 
@@ -269,9 +284,9 @@ The desktop app does not scrape logs or poll for session state. It uses typed Ta
 | `subscribe_session_stream` / `detach_session_stream`                                                | `main`         | Live session event subscription                                                                                                                                                                                                                                                                         |
 | `start_dictation` / `stop_dictation` / `cancel_dictation` / `toggle_dictation`                      | `main`, `pill` | Session control                                                                                                                                                                                                                                                                                         |
 | `load_pill_snapshot`                                                                                | `pill`         | Minimal state for the overlay                                                                                                                                                                                                                                                                           |
-| `nudge_pill` / `save_pill_position`                                                                 | `pill`         | Drag the overlay and persist where it lands (webview pill only). Deltas arrive as webview CSS px and are scaled into the monitor's space, carrying the sub-pixel remainder between frames                                                                                                               |
+| `nudge_pill` / `save_pill_position`                                                                 | `pill`         | Drag the overlay and save where it lands (webview pill only). Movements arrive in webview CSS px and are scaled into the monitor's space, carrying the sub-pixel remainder between frames                                                                                                               |
 | `reset_pill_position`                                                                               | `main`         | Clear the saved position back to the anchor default                                                                                                                                                                                                                                                     |
-| `list_monitors`                                                                                     | `main`         | Named displays for the pill's monitor picker, sized in the pill's placement space — device px on Windows/macOS, GDK logical px on Linux                                                                                                                                                                 |
+| `list_monitors`                                                                                     | `main`         | Named displays for the pill's monitor picker, sized in the pill's placement space: device px on Windows, GDK logical px on Linux                                                                                                                                                                        |
 | `gpu_backend_status`                                                                                | `main`         | Runtime GPU state: `unsupported`, `driver-missing`, `not-installed`, `ready`, `failed`                                                                                                                                                                                                                  |
 | `install_gpu_backend`                                                                               | `main`         | Downloads and verifies the CUDA plugin, streaming progress over a channel                                                                                                                                                                                                                               |
 | `list_history_page` / `delete_session` / `delete_sessions`                                          | `main`         | History paging, single and bulk deletion                                                                                                                                                                                                                                                                |
@@ -281,12 +296,12 @@ The desktop app does not scrape logs or poll for session state. It uses typed Ta
 | `list_audio_input_devices`                                                                          | `main`         | Input device picker                                                                                                                                                                                                                                                                                     |
 | `start_trigger_capture`                                                                             | `main`         | Capture-only session for the snippet voice-trigger recorder (transcript streamed back, nothing typed, no history row)                                                                                                                                                                                   |
 | `check_model_status` / `download_model_cmd` / `delete_model_cmd`                                    | `main`         | Model management                                                                                                                                                                                                                                                                                        |
-| `required_models_ready`                                                                             | `main`         | Whether the configured ASR backend has what it needs on disk — the same check the pipeline builds against, so setup and runtime cannot drift                                                                                                                                                            |
-| `active_model_download` / `cancel_model_download`                                                   | `main`         | The download slot is global, so a transfer survives the window closing and a reopened window re-attaches to it instead of restarting setup. A second `download_model_cmd` for the same model joins the running transfer and reports its outcome                                                         |
-| `uinput_access_ready` / `grant_uinput_access` / `uinput_rule_installed` / `remove_uinput_rule`      | `main`         | The udev rule (`assets/udev/70-lune-voice-input.rules`; it must sort before systemd's `73-seat-late.rules`, which applies `uaccess` only to devices already tagged): write access to `/dev/uinput` for typing, read access to keyboards for the hotkey. Asked for during setup rather than mid-dictation; a .deb/.rpm applies it at install, so packaged users are never asked. Ready means `/dev/uinput` is writable and at least one keyboard is readable; the typing driver itself needs only `/dev/uinput`. `grant_uinput_access` returns `false` when the rule is installed but needs a reboot to take effect; `Err` means the install itself failed. Removal is offered only for a rule this app wrote (a .deb/.rpm ships its own) |
+| `required_models_ready`                                                                             | `main`         | Whether the configured ASR backend has what it needs on disk. It is the same check the pipeline uses, so setup and runtime can't disagree                                                                                                                                                               |
+| `active_model_download` / `cancel_model_download`                                                   | `main`         | There is one download slot for the whole app, so a download keeps going when the window closes, and a reopened window picks it up instead of restarting setup. A second `download_model_cmd` for the same model joins the running download and reports its result                                                         |
+| `uinput_access_ready` / `grant_uinput_access` / `uinput_rule_installed` / `remove_uinput_rule`      | `main`         | The udev rule (`assets/udev/70-lune-voice-input.rules`). Its number must sort before systemd's `73-seat-late.rules`, which only grants `uaccess` to devices already tagged. It gives write access to `/dev/uinput` for typing and read access to keyboards for the hotkey. The app asks for it during setup, not mid-dictation, and a .deb/.rpm installs it, so packaged users are never asked. Ready means `/dev/uinput` is writable and at least one keyboard is readable; the typing driver only needs `/dev/uinput`. `grant_uinput_access` returns `false` when the rule is installed but needs a reboot, and `Err` when the install itself failed. Removal is only offered for a rule this app wrote (a .deb/.rpm ships its own) |
 | `export_transcript`                                                                                 | `main`         | Write a session transcript to a file                                                                                                                                                                                                                                                                    |
-| `app_version` / `start_update_check` / `update_state` / `install_pending_update` / `dismiss_update` | `main`         | Version string and the in-app update flow. State is held in the backend, so an offer survives the window closing                                                                                                                                                                                        |
-| `quit_app`                                                                                          | `main`         | Runtime lifecycle                                                                                                                                                                                                                                                                                       |
+| `app_version` / `start_update_check` / `update_state` / `install_pending_update` / `dismiss_update` | `main`         | Version string and the in-app update flow. The state lives in the backend, so an offer survives the window closing                                                                                                                                                                                        |
+| `quit_app`                                                                                          | `main`         | Quit the app                                                                                                                                                                                                                                                                                            |
 
 
 ### Session Stream
@@ -299,19 +314,19 @@ The stream uses a tagged enum serialized in camel case:
 { "type": "finalizedText", "text": "..." }
 ```
 
-The frontend store treats this stream as the source of truth for live runtime state. Workspace snapshots remain the source of truth for persisted data. When a completed session writes text, the backend emits `lune://history-changed`; the bridge reloads the snapshot once and updates history.
+The frontend trusts this stream for live state, and workspace snapshots for saved data. When a finished session saves its text, the backend emits `lune://history-changed`, and the frontend reloads the snapshot once to update history.
 
 ### The Pill Overlay
 
-Two implementations, chosen at compile time, behind one interface in `pill.rs` — which owns the config, the saved position and the placement maths for both.
+There are two implementations, picked at compile time, behind one interface in `pill.rs`. `pill.rs` owns the config, the saved position and the placement maths for both.
 
-- **Linux — native.** A bare `gtk::Window` with a 32-bit ARGB visual, drawn with cairo (`pill_native.rs` + `pill_paint.rs`). WebKitGTK's accelerated compositor loses the alpha channel on the Nvidia + GNOME stack, so a webview pill can only ever be a flat opaque rectangle; cairo draws through XRender and never enters that path. Not a Tauri window: every Tauri window carries a webview, and the pill needs none. tao *is* GTK3 on Linux and drives the one GTK main loop, so the window just joins it.
-- **Windows/macOS — webview.** A Tauri window rendering `pill.html` (`src/features/dictation/`), styled by the `.pill-*` rules in `components.css`. It carries `WS_EX_NOACTIVATE` on Windows, because the window holding focus when a dictation ends is the window the transcript is typed into — an overlay that activates on click eats the user's text. The builder's `focused(false)` covers creation only. The Linux pill makes the same promise with `set_accept_focus(false)`.
-- **`pill_all_workspaces` is Linux and macOS only.** Windows virtual desktops are not addressable per-window, so tao leaves the call unimplemented and the setting is ignored there. `WorkspaceSnapshot.capabilities` (`PlatformCapabilitiesDto`) reports this to the frontend, which drops the Settings row rather than showing a toggle that does nothing.
+- **Linux: native.** A bare `gtk::Window` with a 32-bit ARGB visual, drawn with cairo (`pill_native.rs` + `pill_paint.rs`). On Nvidia + GNOME, WebKitGTK's accelerated compositor loses the alpha channel, so a webview pill could only ever be a flat, opaque rectangle. cairo draws through XRender and avoids that path. It is not a Tauri window, because every Tauri window has a webview and the pill doesn't need one. On Linux tao *is* GTK3 and runs the one GTK main loop, so the window just joins it.
+- **Windows: webview.** A Tauri window that renders `pill.html` (`src/features/dictation/`), styled by the `.pill-*` rules in `components.css`. It has `WS_EX_NOACTIVATE`, because the transcript is typed into whichever window has focus when dictation ends, and an overlay that takes focus on click would swallow the user's text. The builder's `focused(false)` only covers creation. The Linux pill does the same with `set_accept_focus(false)`.
+- **`pill_all_workspaces` is Linux only.** Windows doesn't let an app pin one window to every virtual desktop, so tao doesn't implement the call and the setting is ignored. `WorkspaceSnapshot.capabilities` (`PlatformCapabilitiesDto`) tells the frontend, which hides the Settings row instead of showing a switch that does nothing.
 
-Both draw the same thing: a bar with a circular control at each end while listening — stop-and-transcribe on the left (top when vertical), discard on the right — and the level meter between them, each chip centred in the space between the bar's end and the meter. Outside a live session both caps are absent, and the bar itself starts a session. The two implementations are kept visually in step by hand; what is checked is the shared numbers. `pill_paint.rs` mirrors the theme's oklch tokens and the meter's geometry, and unit tests read `tokens.css`/`daisyui.css` and `dot-style.ts` back, failing if either side moves.
+Both draw the same thing. While listening, the bar has a round button at each end (stop and transcribe on the left, or top when vertical; discard on the right) with the level meter between them, and each button is centred between the bar's end and the meter. Outside a session there are no buttons, and clicking the bar starts a session. The two are kept looking the same by hand, but the shared numbers are tested: `pill_paint.rs` copies the theme's oklch tokens and the meter's geometry, and unit tests read `tokens.css`/`daisyui.css` and `dot-style.ts` back and fail if either side changes.
 
-State reaches the native pill by direct call (`pill::publish_status` / `publish_audio_level`), and the webview pill by targeted event, so it can react without owning the main session channel:
+The native pill gets state through direct calls (`pill::publish_status` / `publish_audio_level`). The webview pill gets targeted events, so it can react without owning the main session channel:
 
 
 | Event                  | Payload                                                |
@@ -321,17 +336,17 @@ State reaches the native pill by direct call (`pill::publish_status` / `publish_
 | `lune://pill-settings` | `pillLocked`                                           |
 
 
-Rust shows or hides the pill directly on status changes (`should_show_pill`) — the frontend never decides visibility, so the mapped window and its contents cannot desync.
+Rust shows or hides the pill itself when the status changes (`should_show_pill`). The frontend never decides visibility, so the window and its contents can't get out of sync.
 
-**Placement is in the desktop's own coordinate space, and there are two of them.** `MonitorRect` holds GDK logical coordinates on Linux, where the whole layout is logical and `scale` is 1.0, and device pixels straight from the platform on Windows and macOS. A desktop spanning monitors at different DPI has exactly one coherent space and it is the physical one: dividing each monitor by its own scale makes neighbouring screens claim overlapping coordinates, so a drag lands on the wrong screen.
+**Placement uses the desktop's own coordinates, and there are two kinds.** `MonitorRect` holds GDK logical coordinates on Linux, where the whole layout is logical and `scale` is 1.0, and device pixels straight from the system on Windows. A desktop with monitors at different DPI has only one consistent space, the physical one. Dividing each monitor by its own scale makes neighbouring screens claim the same coordinates, so a drag lands on the wrong screen.
 
-The pill's own geometry stays logical, because that is what the webview lays itself out in. `pill_extent` converts the footprint and the edge margin into the target monitor's space, so a 168×50 pill stays 168×50 to the eye on a 150% panel. `monitor_for_pill` resolves in two passes — the corner picks a candidate, that candidate's scale gives the footprint, the centre picks the answer — because the pill's size in device pixels depends on the monitor being searched for. The saved position is in the same space, so `pill_position` in `settings.toml` means different numbers on different platforms.
+The pill's own size stays logical, because that is what the webview lays itself out in. `pill_extent` converts the size and the edge margin into the target monitor's space, so a 168×50 pill still looks 168×50 on a 150% screen. `monitor_for_pill` works in two passes (the corner picks a candidate monitor, that monitor's scale gives the size, and the centre picks the final answer), because the pill's size in device pixels depends on which monitor it is on. The saved position uses the same space, so `pill_position` in `settings.toml` holds different numbers on different platforms.
 
-**A geometry change rebuilds the window.** The webview pill is never resized live (compositor ghosting during resize), so any change to size, orientation, corner or anchor destroys it and builds a new one. `destroy` unregisters on the event loop, so the label frees asynchronously and building under one still taken is a silent no-op; the rebuild waits up to 5 s for it. If the label never frees, the overlay stays hidden until the next pill settings change or a restart, and says so at `error` level.
+**Changing the geometry rebuilds the window.** The webview pill is never resized live, because the compositor leaves ghost frames during a resize. Any change to size, orientation, corner or anchor destroys it and builds a new one. `destroy` unregisters on the event loop, so the window's label is freed later, and building with a label still taken silently does nothing. The rebuild waits up to 5 s for the label. If it never frees, the pill stays hidden until the next pill setting change or a restart, and an `error` is logged.
 
 ### Sound Cues
 
-Short audio cues play from the Rust backend on status transitions — Start on `listening`, Stop when leaving an active state, Error on `error` — deduplicated on the previous status so each fires once. Embedded 16-bit mono WAVs are decoded and played through a short-lived `cpal` output stream on one serialized worker thread, behind a small bounded queue so a burst of transitions cannot pile up streams. Playback is gated by `sound_cues_enabled` / `sound_cue_volume` and every failure is swallowed, so audio never disrupts dictation.
+The Rust backend plays short sounds when the status changes: Start on `listening`, Stop when leaving an active state, Error on `error`. Each plays once per change. Built-in 16-bit mono WAVs are decoded and played through a short-lived `cpal` output stream on one worker thread, behind a small queue, so a burst of changes can't pile up streams. `sound_cues_enabled` and `sound_cue_volume` control playback, and every failure is ignored, so sound never gets in the way of dictation.
 
 ---
 
@@ -360,31 +375,30 @@ dedicated OS threads
 ```
 
 The runtime is **tokio multi-thread** (Tauri's default). The `WhisperContext` is
-wrapped in an `Arc` and shared across all sessions. Each session creates a
-`WhisperState` via `ctx.create_state()`, which allocates that session's KV-cache
-and compute buffers. The state is held behind a
-`Mutex<WhisperCppSession>` so the async and blocking layers can both access it
-safely.
+wrapped in an `Arc` and shared by all sessions. Each session creates a
+`WhisperState` with `ctx.create_state()`, which allocates that session's KV-cache
+and compute buffers. The state sits behind a `Mutex<WhisperCppSession>` so the
+async and blocking code can both use it safely.
 
 Blocking work is dispatched as follows:
 
-- **whisper decode** (`poll_final`) uses `block_in_place`, not `spawn_blocking`:
-the whisper session is `!Send` (it wraps raw C pointers) and cannot move to
-the blocking pool. `block_in_place` hands the current worker thread off to
-the blocking pool so other tasks keep running during the multi-second decode.
-On a multi-thread runtime (the app) this is a true handoff; on a current-thread
+- **whisper decode** (`poll_final`) uses `block_in_place`, not `spawn_blocking`.
+The whisper session is `!Send` (it wraps raw C pointers), so it can't move to
+the blocking pool. `block_in_place` hands the current worker thread over to
+blocking work, so other tasks keep running during a decode that takes seconds.
+On the app's multi-thread runtime that is a real handoff. On a current-thread
 runtime (unit tests) it runs inline and warns once.
-- **LLM styling** is a plain async HTTP request (via `async-openai`), so it runs
-directly on the async runtime.
-- **Persistence** never stalls the runtime. The Tauri command layer and the
-GPU-plugin unpack use `spawn_blocking`. The session lifecycle cannot: its
-`Database` lives behind a shared `tokio::sync::Mutex` whose guard cannot cross
-into a spawned task, so it uses `block_in_place` instead — same handoff, no
-`Send` bound, and no extra cancellation point in `start`.
+- **LLM styling** is a plain async HTTP request (through `async-openai`), so it
+runs on the async runtime.
+- **Persistence** never blocks the runtime. The Tauri commands and the GPU
+plugin unpack use `spawn_blocking`. The session code can't, because its
+`Database` sits behind a shared `tokio::sync::Mutex` whose guard can't move
+into a spawned task. It uses `block_in_place` instead: the same handoff, no
+`Send` requirement, and no extra cancellation point in `start`.
 
-The audio capture callback runs on cpal's own high-priority thread and pushes
-into a lock-free ring buffer; the session loop polls it, so the real-time path
-does no allocation and takes no locks.
+The audio callback runs on cpal's own high-priority thread and writes into a
+lock-free ring buffer that the session loop reads. The real-time path never
+allocates or takes a lock.
 
 ---
 
