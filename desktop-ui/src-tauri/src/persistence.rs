@@ -15,8 +15,8 @@ use lune_persist::{
 use crate::dto::{
     ActivationModeDto, AsrBackendTypeDto, CreateCustomStyleInput, CreateDictionaryEntryInput,
     DevicePolicyDto, DictationModeDto, DictionaryItemDto, HistoryItemDto, HistoryPageDto,
-    LlmBackendTypeDto, PillAnchorDto, PillCornerDto, PillOrientationDto, PillSizeDto,
-    PillVisibilityDto, PlatformCapabilitiesDto, PrivacyModeDto, SaveSnippetInput,
+    LlmBackendTypeDto, ParakeetModelDto, PillAnchorDto, PillCornerDto, PillOrientationDto,
+    PillSizeDto, PillVisibilityDto, PlatformCapabilitiesDto, PrivacyModeDto, SaveSnippetInput,
     SaveWorkspaceSettingsInput, SessionStatsDto, SettingsCoreDto, SnippetItemDto, StylePresetDto,
     TerminalModeDto, UpdateCustomStyleInput, UpdateDictionaryEntryInput, WhisperModelDto,
     WorkspaceSettingsDto, WorkspaceSnapshot,
@@ -908,6 +908,10 @@ fn settings_to_dto(settings: &UserSettings) -> WorkspaceSettingsDto {
             AsrBackendConfig::WhisperCpp { model } => (*model).into(),
             _ => WhisperModelDto::default(),
         },
+        parakeet_model: match &settings.asr_backend {
+            AsrBackendConfig::ParakeetCpp { model } => (*model).into(),
+            _ => ParakeetModelDto::default(),
+        },
     }
 }
 
@@ -922,6 +926,7 @@ fn apply_settings_dto(
         openai_asr_api_key,
         openai_llm_api_key,
         whisper_model,
+        parakeet_model,
     } = input;
     settings.activation_mode = activation_mode_from_dto(input.activation_mode);
     settings.pill_visibility = pill_visibility_from_dto(input.pill_visibility);
@@ -954,6 +959,7 @@ fn apply_settings_dto(
         &input,
         openai_asr_api_key.as_deref(),
         whisper_model,
+        parakeet_model,
     )?;
 
     // Validate numeric thresholds — reject NaN/Inf/out-of-range.
@@ -1012,6 +1018,18 @@ fn apply_settings_dto(
             "dictationLanguage must be \"auto\" or a well-formed BCP-47 tag (e.g. \"en\", \"de\")"
                 .into(),
         );
+    }
+    // Parakeet never reports the language it heard, so it needs one set — see
+    // `ParakeetModel::accepts_dictation_language`. The UI switches the
+    // language along with the engine; this keeps any other caller honest.
+    if let AsrBackendConfig::ParakeetCpp { model } = &settings.asr_backend
+        && !model.accepts_dictation_language(dictation_language)
+    {
+        return Err(format!(
+            "Parakeet needs a dictation language it supports, set explicitly — \
+             \"{dictation_language}\" is not one. Choose one of: {}",
+            model.languages().join(", ")
+        ));
     }
     settings.dictation_language = dictation_language.to_owned();
     // Zero is normalized to "off" rather than "unload the moment a dictation
@@ -1231,6 +1249,7 @@ fn asr_backend_from_type(
     input: &SettingsCoreDto,
     api_key: Option<&str>,
     whisper_model: Option<WhisperModelDto>,
+    parakeet_model: Option<ParakeetModelDto>,
 ) -> Result<AsrBackendConfig, String> {
     Ok(match kind {
         AsrBackendTypeDto::WhisperCpp => {
@@ -1248,6 +1267,17 @@ fn asr_backend_from_type(
                 .unwrap_or_default();
             AsrBackendConfig::WhisperCpp { model }
         }
+        AsrBackendTypeDto::ParakeetCpp => AsrBackendConfig::ParakeetCpp {
+            // Same precedence as Whisper: the incoming choice, else the saved
+            // one when already on Parakeet, else the default.
+            model: parakeet_model
+                .map(Into::into)
+                .or(match current {
+                    AsrBackendConfig::ParakeetCpp { model } => Some(*model),
+                    _ => None,
+                })
+                .unwrap_or_default(),
+        },
         AsrBackendTypeDto::OpenAiCompatible => {
             // Prefer incoming DTO fields; fall back to current config values if already OpenAI.
             let (cur_url, cur_key, cur_model) = match current {
@@ -1596,6 +1626,7 @@ mod tests {
             openai_asr_api_key: None,
             openai_llm_api_key: None,
             whisper_model: Some(dto.whisper_model),
+            parakeet_model: Some(dto.parakeet_model),
         }
     }
 
@@ -1627,6 +1658,71 @@ mod tests {
         let mut input = default_save_input();
         input.core.confidence_threshold = Some(1.5);
         assert!(apply_settings_dto(&mut settings, input, &mut db).is_err());
+    }
+
+    #[test]
+    fn choosing_parakeet_saves_it_and_reports_it_back() {
+        use lune_core::config::ParakeetModel;
+        let mut settings = UserSettings::default();
+        let mut db = Database::open_in_memory().expect("db");
+
+        // Auto-detect is refused: Parakeet cannot report the language.
+        let mut input = default_save_input();
+        input.core.asr_backend_type = AsrBackendTypeDto::ParakeetCpp;
+        input.core.dictation_language = "auto".into();
+        let err = apply_settings_dto(&mut settings, input, &mut db).unwrap_err();
+        assert!(err.contains("Parakeet"), "{err}");
+        // So is a language it does not cover.
+        let mut input = default_save_input();
+        input.core.asr_backend_type = AsrBackendTypeDto::ParakeetCpp;
+        input.core.dictation_language = "ja".into();
+        assert!(apply_settings_dto(&mut settings, input, &mut db).is_err());
+
+        let mut input = default_save_input();
+        input.core.asr_backend_type = AsrBackendTypeDto::ParakeetCpp;
+        input.core.dictation_language = "de".into();
+        apply_settings_dto(&mut settings, input, &mut db).unwrap();
+        assert!(matches!(
+            settings.asr_backend,
+            AsrBackendConfig::ParakeetCpp {
+                model: ParakeetModel::TdtV3Q8
+            }
+        ));
+        let dto = settings_to_dto(&settings);
+        assert_eq!(dto.core.asr_backend_type, AsrBackendTypeDto::ParakeetCpp);
+        assert_eq!(dto.parakeet_model, ParakeetModelDto::TdtV3Q8);
+
+        // The smaller quantization is saved and reported back as such.
+        let mut input = default_save_input();
+        input.core.asr_backend_type = AsrBackendTypeDto::ParakeetCpp;
+        input.core.dictation_language = "de".into();
+        input.parakeet_model = Some(ParakeetModelDto::TdtV3Q4K);
+        apply_settings_dto(&mut settings, input, &mut db).unwrap();
+        assert!(matches!(
+            settings.asr_backend,
+            AsrBackendConfig::ParakeetCpp {
+                model: ParakeetModel::TdtV3Q4K
+            }
+        ));
+        assert_eq!(
+            settings_to_dto(&settings).parakeet_model,
+            ParakeetModelDto::TdtV3Q4K
+        );
+        let dto = settings_to_dto(&settings);
+        // Word confidences exist, so the confidence gate is offered.
+        assert!(dto.core.confidence_threshold.is_some());
+
+        // Back to Whisper: the whisper size sent along is the one used.
+        let mut input = default_save_input();
+        input.core.asr_backend_type = AsrBackendTypeDto::WhisperCpp;
+        input.whisper_model = Some(WhisperModelDto::Small);
+        apply_settings_dto(&mut settings, input, &mut db).unwrap();
+        assert!(matches!(
+            settings.asr_backend,
+            AsrBackendConfig::WhisperCpp {
+                model: lune_core::config::WhisperModel::Small
+            }
+        ));
     }
 
     #[test]

@@ -5,5 +5,6 @@ pub mod gpu_backend;
 
 pub use backend::{
     AsrRegistry, AsrSessionHandle, LeadIn, OpenAiAsrConfig, OpenAiCompatibleAsrBackend,
-    WhisperCppBackend, WhisperCppConfig, check_ggml_file, install_logging_hooks,
+    ParakeetCppBackend, ParakeetCppConfig, WhisperCppBackend, WhisperCppConfig, check_ggml_file,
+    install_logging_hooks,
 };

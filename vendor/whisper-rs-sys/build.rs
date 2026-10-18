@@ -378,8 +378,12 @@ fn main() {
     // LUNE FORK: upstream keys this purely off `intel-sycl`; it has to follow
     // the actual BUILD_SHARED_LIBS value or a shared build emits `static=`
     // flags that cannot resolve against the produced `.so` files.
+    // LUNE FORK: `parakeet` is whisper.cpp's Parakeet TDT runtime, a sibling
+    // library of `whisper` built from the same tree against the same ggml.
+    // Upstream builds it but never links it; `wrapper.h` binds its header.
     if shared_libs {
         println!("cargo:rustc-link-lib=whisper");
+        println!("cargo:rustc-link-lib=parakeet");
         println!("cargo:rustc-link-lib=ggml");
         println!("cargo:rustc-link-lib=ggml-base");
         // LUNE FORK: with GGML_BACKEND_DL the CPU backend is itself a dlopen-ed
@@ -390,6 +394,7 @@ fn main() {
         }
     } else {
         println!("cargo:rustc-link-lib=static=whisper");
+        println!("cargo:rustc-link-lib=static=parakeet");
         println!("cargo:rustc-link-lib=static=ggml");
         println!("cargo:rustc-link-lib=static=ggml-base");
         println!("cargo:rustc-link-lib=static=ggml-cpu");

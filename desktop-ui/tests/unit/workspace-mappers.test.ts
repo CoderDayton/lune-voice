@@ -246,6 +246,7 @@ describe("workspace mappers", () => {
   test("summarizeAsrBackend gives a short label", () => {
     const i18n = setupI18n({ locale: "en", messages: { en: {} } });
     expect(summarizeAsrBackend(i18n, "WhisperCpp")).toBe("Whisper");
+    expect(summarizeAsrBackend(i18n, "ParakeetCpp")).toBe("Parakeet");
     expect(summarizeAsrBackend(i18n, "OpenAiCompatible")).toBe("OpenAI-compatible");
   });
 

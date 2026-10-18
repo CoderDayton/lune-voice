@@ -48,6 +48,7 @@ export function mapWorkspaceSettings(snapshot: WorkspaceSnapshot): WorkspaceSett
     activationMode: snapshot.settings.activationMode,
     asrBackend: snapshot.settings.asrBackendType,
     whisperModel: snapshot.settings.whisperModel,
+    parakeetModel: snapshot.settings.parakeetModel ?? DEFAULT_SETTINGS.parakeetModel,
     useGpu: snapshot.settings.useGpu,
     devicePolicy: snapshot.settings.devicePolicy,
     confidenceThreshold: formatThreshold(
@@ -131,6 +132,7 @@ export function settingsToSaveInput(settings: WorkspaceSettings): SaveWorkspaceS
     devicePolicy: settings.devicePolicy,
     asrBackendType: settings.asrBackend,
     whisperModel: settings.whisperModel,
+    parakeetModel: settings.parakeetModel,
     confidenceThreshold: Number(settings.confidenceThreshold),
     stylePreset: settings.stylePreset,
     hotkeyToggle: settings.hotkeyToggle,

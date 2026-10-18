@@ -7,7 +7,7 @@ use std::sync::OnceLock;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::Duration;
 
-use lune_core::config::{AsrBackendConfig, WhisperModel};
+use lune_core::config::{AsrBackendConfig, ParakeetModel, WhisperModel};
 use sha2::{Digest, Sha256};
 use tracing::{info, warn};
 
@@ -20,7 +20,7 @@ use crate::error::{PersistError, PersistResult};
 #[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize)]
 #[serde(rename_all = "kebab-case")]
 pub enum ModelRole {
-    /// Whisper speech-to-text models and their bundled VAD.
+    /// Speech-to-text models (Whisper and Parakeet) and their bundled VAD.
     SpeechToText,
 }
 
@@ -94,6 +94,20 @@ impl ModelSpec {
         }
     }
 
+    /// One Parakeet TDT GGML model — a single `ggml-parakeet-*.bin` file, the
+    /// same shape as a whisper model.
+    pub fn parakeet(model: ParakeetModel) -> Self {
+        Self::Directory {
+            repo_id: ParakeetModel::REPO_ID.into(),
+            required_files: vec![model.ggml_file().into()],
+            suffix_patterns: vec![],
+            local_name: model.dir().into(),
+            description: model.description(),
+            required: false,
+            role: ModelRole::SpeechToText,
+        }
+    }
+
     /// whisper.cpp's built-in VAD model (silero ggml). The local whisper backend
     /// uses it to gate speech before decoding; it degrades to raw decode when
     /// absent, so it's optional.
@@ -118,6 +132,8 @@ impl ModelSpec {
             model_dirs::DIR_WHISPER_SMALL => WhisperModel::Small.display_name(),
             model_dirs::DIR_WHISPER_MEDIUM => WhisperModel::Medium.display_name(),
             model_dirs::DIR_WHISPER_LARGE_V3_TURBO => WhisperModel::LargeV3Turbo.display_name(),
+            model_dirs::DIR_PARAKEET_TDT_V3_Q8 => ParakeetModel::TdtV3Q8.display_name(),
+            model_dirs::DIR_PARAKEET_TDT_V3_Q4K => ParakeetModel::TdtV3Q4K.display_name(),
             _ => local_name,
         }
     }
@@ -184,6 +200,7 @@ impl ModelSpec {
     pub fn all() -> Vec<Self> {
         let mut specs = vec![Self::vad_model()];
         specs.extend(WhisperModel::ALL.map(Self::whisper));
+        specs.extend(ParakeetModel::ALL.map(Self::parakeet));
         specs
     }
 
@@ -277,7 +294,7 @@ pub fn styling_llm_readiness(
 }
 
 /// Status of the full installable model library. Returns every spec EXCEPT the
-/// VAD model — that one is bundled with any Whisper size and never surfaced as
+/// VAD model — that one is bundled with any speech-to-text model and never surfaced as
 /// its own entry. Each entry carries `ready`, `in_use` (whether the active
 /// backend selection uses it), `role`, and on-disk `size_bytes`. Does NOT
 /// download anything.
@@ -311,11 +328,17 @@ fn installed_size_bytes(models_dir: &Path, local_name: &str) -> Option<u64> {
 }
 
 /// Whether `spec` corresponds to a local model the active backend selection uses.
-/// A whisper spec is needed only when the WhisperCpp backend is active AND this
-/// is the selected model — so the UI offers exactly one whisper card.
+/// A model is needed only when its engine is active AND it is that engine's
+/// selected model — so the UI offers exactly one speech-to-text card. The
+/// shared VAD is fetched alongside it by [`download_model`] and never counts
+/// on its own.
 fn spec_needed(spec: &ModelSpec, asr: &AsrBackendConfig) -> bool {
-    matches!(asr, AsrBackendConfig::WhisperCpp { model } if model.dir() == spec.local_name())
-        || spec.required()
+    let selected = match asr {
+        AsrBackendConfig::WhisperCpp { model } => Some(model.dir()),
+        AsrBackendConfig::ParakeetCpp { model } => Some(model.dir()),
+        _ => None,
+    };
+    selected == Some(spec.local_name()) || spec.required()
 }
 
 /// Delete a downloaded model by local_name. Returns Ok(true) if removed,
@@ -356,8 +379,8 @@ pub fn download_model(
         .find(|s| s.local_name() == local_name)
         .ok_or_else(|| PersistError::ModelDownload(format!("unknown model: {local_name}")))?;
 
-    // Bundle the VAD model with any Whisper size: the local whisper backend
-    // gates speech with it, but it's never offered as its own library entry.
+    // Bundle the VAD model with any speech-to-text model: both local backends
+    // endpoint-trim with it, but it's never offered as its own library entry.
     // Fetched first (when absent) so the final `done` event below belongs to the
     // requested model and the UI clears progress on the right name.
     if spec.role() == ModelRole::SpeechToText && spec.local_name() != model_dirs::DIR_WHISPER_VAD {
@@ -461,11 +484,17 @@ const PINNED_REVISIONS: &[(&str, &str)] = &[
 struct PinnedFile {
     repo_id: &'static str,
     file: &'static str,
+    /// Commit the file is fetched at when it differs from its repository's
+    /// entry in [`PINNED_REVISIONS`] — for a repository whose files were
+    /// uploaded in separate commits, each pinned at the one that last changed
+    /// it. `None` uses the repository's commit.
+    revision: Option<&'static str>,
     size: u64,
     sha256: &'static str,
 }
 
-/// Size and SHA-256 of every file the app offers, at [`PINNED_REVISIONS`].
+/// Size and SHA-256 of every file the app offers, at [`PINNED_REVISIONS`] or
+/// the file's own pinned commit.
 ///
 /// These are the trust root for model bytes. whisper.cpp's loader parses the
 /// file in C++, so the digest has to come from this source rather than from
@@ -475,30 +504,49 @@ const PINNED_FILES: &[PinnedFile] = &[
     PinnedFile {
         repo_id: WhisperModel::REPO_ID,
         file: "ggml-base-q8_0.bin",
+        revision: None,
         size: 81_768_585,
         sha256: "c577b9a86e7e048a0b7eada054f4dd79a56bbfa911fbdacf900ac5b567cbb7d9",
     },
     PinnedFile {
         repo_id: WhisperModel::REPO_ID,
         file: "ggml-small-q5_1.bin",
+        revision: None,
         size: 190_085_487,
         sha256: "ae85e4a935d7a567bd102fe55afc16bb595bdb618e11b2fc7591bc08120411bb",
     },
     PinnedFile {
         repo_id: WhisperModel::REPO_ID,
         file: "ggml-medium-q5_0.bin",
+        revision: None,
         size: 539_212_467,
         sha256: "19fea4b380c3a618ec4723c3eef2eb785ffba0d0538cf43f8f235e7b3b34220f",
     },
     PinnedFile {
         repo_id: WhisperModel::REPO_ID,
         file: "ggml-large-v3-turbo-q8_0.bin",
+        revision: None,
         size: 874_188_075,
         sha256: "317eb69c11673c9de1e1f0d459b253999804ec71ac4c23c17ecf5fbe24e259a1",
     },
     PinnedFile {
+        repo_id: ParakeetModel::REPO_ID,
+        file: "ggml-parakeet-tdt-0.6b-v3-q8_0.bin",
+        revision: Some("1a5397ea24a11208f2169d7bd133f4bfe52ae057"),
+        size: 668_757_119,
+        sha256: "4d64e9e96c2792186d072fde0034df0ad670cf680a2f53069052ead827fd600e",
+    },
+    PinnedFile {
+        repo_id: ParakeetModel::REPO_ID,
+        file: "ggml-parakeet-tdt-0.6b-v3-q4_k.bin",
+        revision: Some("a2ea980ac83c8c8a71ac9fb4c00d0d5a89758ca7"),
+        size: 415_611_879,
+        sha256: "8b205b8b39c6535e153de6fb11c51db46125d45c4f16ba496fe41a0fe71b885e",
+    },
+    PinnedFile {
         repo_id: VAD_REPO_ID,
         file: "ggml-silero-v5.1.2.bin",
+        revision: None,
         size: 885_098,
         sha256: "29940d98d42b91fbd05ce489f3ecf7c72f0a42f027e4875919a28fb4c04ea2cf",
     },
@@ -523,9 +571,30 @@ fn pinned_meta(repo_id: &str, filename: &str) -> Option<FileMetadata> {
         })
 }
 
-/// Download URL for `filename` at the repository's pinned commit.
+/// The commit `filename` is fetched at: its own pin when it has one, else its
+/// repository's.
+fn file_revision(repo_id: &str, filename: &str) -> &'static str {
+    PINNED_FILES
+        .iter()
+        .find(|p| p.repo_id == repo_id && p.file == filename)
+        .and_then(|p| p.revision)
+        .unwrap_or_else(|| revision(repo_id))
+}
+
+/// Whether every file `spec` downloads is pinned here, size, digest and
+/// commit. Such a model needs nothing from the hub but the bytes: its file
+/// list and metadata are known, and asking the hub for them would only read a
+/// repository listing at one commit that need not hold every file.
+fn fully_pinned(repo_id: &str, required_files: &[String], suffix_patterns: &[String]) -> bool {
+    suffix_patterns.is_empty()
+        && required_files
+            .iter()
+            .all(|f| pinned_meta(repo_id, f).is_some() && file_revision(repo_id, f) != "main")
+}
+
+/// Download URL for `filename` at its pinned commit.
 fn resolve_url(repo_id: &str, filename: &str) -> String {
-    let rev = revision(repo_id);
+    let rev = file_revision(repo_id, filename);
     format!("https://huggingface.co/{repo_id}/resolve/{rev}/{filename}")
 }
 
@@ -920,7 +989,12 @@ fn ensure_directory_model_with_progress(
     // a truncated file can't be accepted just because the metadata fetch
     // failed this time.
     let mut manifest = load_integrity_manifest(&local_dir);
-    let remote_meta = fetch_repo_file_metadata(repo_id);
+    let pinned = fully_pinned(repo_id, required_files, suffix_patterns);
+    let remote_meta = if pinned {
+        HashMap::new()
+    } else {
+        fetch_repo_file_metadata(repo_id)
+    };
 
     if local_dir.exists()
         && required_files.iter().all(|f| {
@@ -940,7 +1014,9 @@ fn ensure_directory_model_with_progress(
     // Determine which files to download. The tree call above already listed
     // them, so prefer its keys; the repo-info endpoint is only the fallback for
     // when that call failed.
-    let all_files: Vec<String> = if remote_meta.is_empty() {
+    let all_files: Vec<String> = if pinned {
+        required_files.clone()
+    } else if remote_meta.is_empty() {
         list_repo_files(repo_id)?
     } else {
         remote_meta.keys().cloned().collect()
@@ -1146,18 +1222,26 @@ mod tests {
         }
     }
 
-    /// The library always lists every Whisper size and never the bundled VAD model.
+    /// The library always lists every Whisper size and every Parakeet model,
+    /// and never the bundled VAD model.
     fn assert_full_library(statuses: &[ModelStatus]) {
         let names: Vec<&str> = statuses.iter().map(|s| s.local_name.as_str()).collect();
         for model in WhisperModel::ALL {
+            assert!(names.contains(&model.dir()), "{names:?}");
+        }
+        for model in ParakeetModel::ALL {
             assert!(names.contains(&model.dir()), "{names:?}");
         }
         assert!(
             !names.contains(&lune_core::models::DIR_WHISPER_VAD),
             "VAD must stay out of the library: {names:?}"
         );
-        // Whisper sizes only, no more.
-        assert_eq!(statuses.len(), WhisperModel::ALL.len(), "{names:?}");
+        // Speech-to-text models only, no more.
+        assert_eq!(
+            statuses.len(),
+            WhisperModel::ALL.len() + ParakeetModel::ALL.len(),
+            "{names:?}"
+        );
     }
 
     fn in_use_names(statuses: &[ModelStatus]) -> Vec<&str> {
@@ -1194,6 +1278,84 @@ mod tests {
             vec![WhisperModel::Medium.dir()],
             "only the selected whisper size is in use"
         );
+    }
+
+    #[test]
+    fn check_model_status_marks_only_the_parakeet_model_in_use_on_parakeet() {
+        let tmp = tempfile::tempdir().unwrap();
+        let asr = AsrBackendConfig::ParakeetCpp {
+            model: ParakeetModel::TdtV3Q8,
+        };
+        let statuses = check_model_status(tmp.path(), &asr);
+        assert_full_library(&statuses);
+        assert_eq!(
+            in_use_names(&statuses),
+            vec![ParakeetModel::TdtV3Q8.dir()],
+            "switching engine moves the in-use model with it"
+        );
+        let card = statuses
+            .iter()
+            .find(|s| s.local_name == ParakeetModel::TdtV3Q8.dir())
+            .expect("listed");
+        assert_eq!(card.name, ParakeetModel::TdtV3Q8.display_name());
+        assert_eq!(card.repo_id, ParakeetModel::REPO_ID);
+    }
+
+    #[test]
+    fn the_selected_parakeet_quantization_is_the_one_in_use() {
+        let tmp = tempfile::tempdir().unwrap();
+        let statuses = check_model_status(
+            tmp.path(),
+            &AsrBackendConfig::ParakeetCpp {
+                model: ParakeetModel::TdtV3Q4K,
+            },
+        );
+        assert_eq!(in_use_names(&statuses), vec![ParakeetModel::TdtV3Q4K.dir()]);
+    }
+
+    /// Readiness for Parakeet means its own model is present; a Whisper model
+    /// on disk does not stand in for it, nor the other way round.
+    #[test]
+    fn required_models_follow_the_active_engine() {
+        let tmp = tempfile::tempdir().unwrap();
+        let parakeet = AsrBackendConfig::ParakeetCpp {
+            model: ParakeetModel::TdtV3Q8,
+        };
+        let whisper = AsrBackendConfig::WhisperCpp {
+            model: WhisperModel::Small,
+        };
+        let place = |dir: &str, file: &str| {
+            std::fs::create_dir_all(tmp.path().join(dir)).unwrap();
+            let pin = pinned_meta(
+                if dir.starts_with("parakeet") {
+                    ParakeetModel::REPO_ID
+                } else {
+                    WhisperModel::REPO_ID
+                },
+                file,
+            )
+            .expect("offered files are pinned");
+            let f = std::fs::File::create(tmp.path().join(dir).join(file)).unwrap();
+            f.set_len(pin.size.unwrap()).unwrap();
+        };
+        place(WhisperModel::Small.dir(), WhisperModel::Small.ggml_file());
+        assert!(has_required_models(tmp.path(), &whisper));
+        assert!(!has_required_models(tmp.path(), &parakeet));
+        place(
+            ParakeetModel::TdtV3Q8.dir(),
+            ParakeetModel::TdtV3Q8.ggml_file(),
+        );
+        assert!(has_required_models(tmp.path(), &parakeet));
+    }
+
+    #[test]
+    fn a_parakeet_model_can_be_deleted_by_name() {
+        let tmp = tempfile::tempdir().unwrap();
+        let dir = tmp.path().join(ParakeetModel::TdtV3Q8.dir());
+        std::fs::create_dir_all(&dir).unwrap();
+        std::fs::write(dir.join("x"), b"x").unwrap();
+        assert!(delete_model(tmp.path(), ParakeetModel::TdtV3Q8.dir()).unwrap());
+        assert!(!dir.exists());
     }
 
     #[test]
@@ -1510,8 +1672,12 @@ mod tests {
                 required_files,
                 ..
             } = &spec;
-            assert_ne!(revision(repo_id), "main", "{repo_id} has no pinned commit");
             for file in required_files {
+                assert_ne!(
+                    file_revision(repo_id, file),
+                    "main",
+                    "{repo_id}/{file} has no pinned commit"
+                );
                 let pin = pinned_meta(repo_id, file)
                     .unwrap_or_else(|| panic!("{repo_id}/{file} has no pinned digest"));
                 assert!(pin.size.is_some_and(|s| s > 0), "{file}");
@@ -1548,6 +1714,51 @@ mod tests {
         let url = resolve_url(WhisperModel::REPO_ID, WhisperModel::Small.ggml_file());
         assert!(url.contains(revision(WhisperModel::REPO_ID)), "{url}");
         assert!(!url.contains("/main/"), "{url}");
+    }
+
+    /// Each Parakeet file was uploaded in its own commit, so each is fetched
+    /// at the commit that holds it rather than at one repository-wide pin.
+    #[test]
+    fn a_file_with_its_own_commit_is_fetched_at_that_commit() {
+        let q8 = resolve_url(ParakeetModel::REPO_ID, ParakeetModel::TdtV3Q8.ggml_file());
+        let q4 = resolve_url(ParakeetModel::REPO_ID, ParakeetModel::TdtV3Q4K.ggml_file());
+        assert!(
+            q8.contains("/resolve/1a5397ea24a11208f2169d7bd133f4bfe52ae057/"),
+            "{q8}"
+        );
+        assert!(
+            q4.contains("/resolve/a2ea980ac83c8c8a71ac9fb4c00d0d5a89758ca7/"),
+            "{q4}"
+        );
+        assert!(q8.ends_with("/ggml-parakeet-tdt-0.6b-v3-q8_0.bin"), "{q8}");
+    }
+
+    /// A model whose files are all pinned is downloaded from the pins alone;
+    /// one with a file missing a pin still asks the hub for its listing.
+    #[test]
+    fn only_a_fully_pinned_model_skips_the_hub_listing() {
+        for spec in ModelSpec::all() {
+            let ModelSpec::Directory {
+                repo_id,
+                required_files,
+                suffix_patterns,
+                ..
+            } = &spec;
+            assert!(
+                fully_pinned(repo_id, required_files, suffix_patterns),
+                "{repo_id}"
+            );
+        }
+        assert!(!fully_pinned(
+            ParakeetModel::REPO_ID,
+            &["ggml-parakeet-unpinned.bin".to_string()],
+            &[]
+        ));
+        assert!(!fully_pinned(
+            WhisperModel::REPO_ID,
+            &[WhisperModel::Small.ggml_file().to_string()],
+            &[".onnx".to_string()]
+        ));
     }
 
     /// The digest is computed while the body streams, so the finished file is

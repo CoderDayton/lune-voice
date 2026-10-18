@@ -6,6 +6,7 @@ import type {
   AsrBackendValue,
   DictationModeValue,
   LlmBackendValue,
+  ParakeetModelValue,
   PillAnchorValue,
   PillCornerValue,
   PillOrientationValue,
@@ -25,6 +26,7 @@ export interface WorkspaceSettings {
   activationMode: ActivationModeValue;
   asrBackend: AsrBackendValue;
   whisperModel: WhisperModelValue;
+  parakeetModel: ParakeetModelValue;
   useGpu: boolean;
   devicePolicy: 'Cpu' | 'Cuda' | 'Auto';
   confidenceThreshold: string;
@@ -152,6 +154,7 @@ export const DEFAULT_SETTINGS: WorkspaceSettings = {
   activationMode: 'Toggle',
   asrBackend: 'WhisperCpp',
   whisperModel: 'Medium',
+  parakeetModel: 'TdtV3Q8',
   useGpu: true,
   devicePolicy: 'Auto',
   confidenceThreshold: '0.55',

@@ -6,6 +6,14 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Added
+
+- Parakeet, a second on-device speech engine: NVIDIA Parakeet TDT 0.6B v3, run by whisper.cpp's own `parakeet` library. Many times faster than Whisper on a CPU, punctuates and capitalizes by itself, and detects which of its 25 European languages is spoken. Pick it in Settings → Transcription or during setup, in a 669 MB (q8_0, recommended) or a 416 MB (q4_k) size; it shares the GPU plugin and the voice-activity model with Whisper and adds about 0.15 MB to the app. Parakeet cannot report which language it heard, so it has no Auto-detect: the language selector lists only its languages, switching to it picks your system language (or English) in the same step, and a note next to the engine explains why. The language list itself now covers all 25 European languages for Whisper too, and each is formatted by its own rules instead of falling back to English
+
+### Fixed
+
+- A plugin build with a missing or damaged `backends/` folder used to close the instant a model loaded. It now reports that no CPU backend is available and asks for a reinstall
+
 ## [0.1.0]
 
 First release, for Linux and Windows.

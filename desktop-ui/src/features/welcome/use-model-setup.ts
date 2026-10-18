@@ -14,13 +14,20 @@ import {
   workspaceActions,
   workspaceStore,
 } from '../../store/workspace-store';
-import type { AsrBackendValue, WhisperModelValue } from '../settings/data/settings-data';
+import {
+  type AsrBackendValue,
+  languageForEngine,
+  type ParakeetModelValue,
+  systemLanguages,
+  type WhisperModelValue,
+} from '../settings/data/settings-data';
 import {
   asrModelLocalName,
   buildInitialSelection,
   type GpuAccelerationOffer,
   gpuAccelerationOffer,
   hasOptionalModels,
+  initialSetupEngine,
   initialWhisperModel,
   type ModelStatus,
   relevantSetupModels,
@@ -188,6 +195,14 @@ interface ModelSetup {
   engineBackend: AsrBackendValue;
   /** Chosen Whisper size, used when engineBackend is WhisperCpp. */
   engineWhisper: WhisperModelValue;
+  /** Chosen Parakeet size, used when engineBackend is ParakeetCpp. */
+  engineParakeet: ParakeetModelValue;
+  /**
+   * Dictation language for the chosen engine. With Parakeet this is always a
+   * language it covers — never Auto, which it cannot report back — starting
+   * from the saved one, else the system's, else English.
+   */
+  engineLanguage: string;
   /** On-disk dir of the chosen engine's model — treated as required to finish. */
   asrLocalName: string;
   /** What the GPU acceptance card should offer, or `null` to hide it. */
@@ -211,6 +226,8 @@ interface ModelSetup {
   gpuError: string | null;
   setEngineBackend: (backend: AsrBackendValue) => void;
   setEngineWhisper: (model: WhisperModelValue) => void;
+  setEngineParakeet: (model: ParakeetModelValue) => void;
+  setEngineLanguage: (language: string) => void;
   confirmEngine: () => void;
   backToEngine: () => void;
   toggleModel: (localName: string) => void;
@@ -235,8 +252,13 @@ export function useModelSetup({ onFinish }: { onFinish: () => void }): ModelSetu
   const [totalToDownload, setTotalToDownload] = useState(0);
   const [engineBackend, setEngineBackend] = useState<AsrBackendValue>('WhisperCpp');
   const [engineWhisper, setEngineWhisper] = useState<WhisperModelValue>('Medium');
+  const [engineParakeet, setEngineParakeet] = useState<ParakeetModelValue>('TdtV3Q8');
+  // The saved (or picked) language; `engineLanguage` below adapts it to the
+  // chosen engine without overwriting what the user had.
+  const [pickedLanguage, setEngineLanguage] = useState<string>('auto');
+  const engineLanguage = languageForEngine(engineBackend, pickedLanguage, systemLanguages());
   const [asrLocalName, setAsrLocalName] = useState<string>(() =>
-    asrModelLocalName('WhisperCpp', 'Medium'),
+    asrModelLocalName('WhisperCpp', 'Medium', 'TdtV3Q8'),
   );
   const [gpuOffer, setGpuOffer] = useState<GpuAccelerationOffer | null>(null);
   const [useGpu, setUseGpuState] = useState(true);
@@ -290,9 +312,9 @@ export function useModelSetup({ onFinish }: { onFinish: () => void }): ModelSetu
         }
         if (cancelled) return;
         const cur = workspaceStore.state.settings;
-        // Onboarding only offers on-device engines; whisper.cpp is the sole
-        // local backend (the remote OpenAI option lives in Settings).
-        const backend: AsrBackendValue = 'WhisperCpp';
+        // Onboarding only offers on-device engines (the remote OpenAI option
+        // lives in Settings); a saved Parakeet choice is kept.
+        const backend = initialSetupEngine(cur.asrBackend);
         setEngineBackend(backend);
         setUseGpuState(cur.useGpu);
         // Runtime GPU state gates the acceptance card; treat a probe failure as
@@ -314,7 +336,9 @@ export function useModelSetup({ onFinish }: { onFinish: () => void }): ModelSetu
           cpuThreads: navigator.hardwareConcurrency || 1,
         });
         setEngineWhisper(whisper);
-        const asrName = asrModelLocalName(backend, whisper);
+        setEngineParakeet(cur.parakeetModel);
+        setEngineLanguage(cur.dictationLanguage);
+        const asrName = asrModelLocalName(backend, whisper, cur.parakeetModel);
         setAsrLocalName(asrName);
         const s = relevantSetupModels(library);
         setModels(s);
@@ -539,12 +563,18 @@ export function useModelSetup({ onFinish }: { onFinish: () => void }): ModelSetu
     setPhase('loading');
     setError(null);
     try {
-      const asrName = asrModelLocalName(engineBackend, engineWhisper);
+      const asrName = asrModelLocalName(engineBackend, engineWhisper, engineParakeet);
       if (engineBackend === 'WhisperCpp') {
         // Stage the backend locally so the single save persists both keys in one
         // round trip (settingsToSaveInput serializes the whole store).
         workspaceActions.updateSetting('asrBackend', engineBackend);
         await saveWorkspaceSetting('whisperModel', engineWhisper);
+      } else if (engineBackend === 'ParakeetCpp') {
+        // Engine, size and language in one save: the backend refuses
+        // Parakeet with Auto, so they cannot go separately.
+        workspaceActions.updateSetting('asrBackend', engineBackend);
+        workspaceActions.updateSetting('dictationLanguage', engineLanguage);
+        await saveWorkspaceSetting('parakeetModel', engineParakeet);
       } else {
         await saveWorkspaceSetting('asrBackend', engineBackend);
       }
@@ -570,7 +600,7 @@ export function useModelSetup({ onFinish }: { onFinish: () => void }): ModelSetu
       setError(String(err));
       setPhase('engine');
     }
-  }, [engineBackend, engineWhisper, onFinish, gpuStatus, useGpu]);
+  }, [engineBackend, engineWhisper, engineParakeet, engineLanguage, onFinish, gpuStatus, useGpu]);
 
   const backToEngine = useCallback(() => {
     setError(null);
@@ -643,6 +673,8 @@ export function useModelSetup({ onFinish }: { onFinish: () => void }): ModelSetu
     totalToDownload,
     engineBackend,
     engineWhisper,
+    engineParakeet,
+    engineLanguage,
     asrLocalName,
     gpuOffer,
     useGpu,
@@ -654,6 +686,8 @@ export function useModelSetup({ onFinish }: { onFinish: () => void }): ModelSetu
     gpuError,
     setEngineBackend,
     setEngineWhisper,
+    setEngineParakeet,
+    setEngineLanguage,
     confirmEngine,
     backToEngine,
     toggleModel,

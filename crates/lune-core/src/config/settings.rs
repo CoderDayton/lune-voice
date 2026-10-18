@@ -468,6 +468,112 @@ impl WhisperModel {
     }
 }
 
+/// Which Parakeet TDT model the local Parakeet backend loads.
+///
+/// The Parakeet counterpart of [`WhisperModel`]: the one place a selection is
+/// tied to its on-disk directory, HuggingFace file and display name, read by
+/// the downloader (`lune-persist`) and the loader (`lune-asr`) alike. Both are
+/// quantizations of the same NVIDIA parakeet-tdt-0.6b-v3 weights, so they
+/// cover the same 25 languages and differ only in size and a little accuracy.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
+#[non_exhaustive]
+pub enum ParakeetModel {
+    /// q8_0, ~669 MB. Near-lossless against the original weights.
+    #[default]
+    TdtV3Q8,
+    /// q4_k, ~416 MB. Smaller download and footprint, slightly less accurate.
+    TdtV3Q4K,
+}
+
+impl ParakeetModel {
+    /// The HuggingFace repo whisper.cpp publishes its Parakeet conversions in.
+    pub const REPO_ID: &'static str = "ggml-org/parakeet-GGUF";
+
+    /// Every selectable model, in ascending size order. Drives the
+    /// downloader's spec list and the settings selector.
+    pub const ALL: [ParakeetModel; 2] = [Self::TdtV3Q4K, Self::TdtV3Q8];
+
+    /// Languages parakeet-tdt-0.6b-v3 was trained on, as ISO 639-1 codes.
+    /// It identifies which one is spoken by itself and cannot be told; asked
+    /// for anything else it still transcribes, as the nearest European
+    /// language it knows.
+    const TDT_V3_LANGUAGES: [&'static str; 25] = [
+        "bg", "cs", "da", "de", "el", "en", "es", "et", "fi", "fr", "hr", "hu", "it", "lt", "lv",
+        "mt", "nl", "pl", "pt", "ro", "ru", "sk", "sl", "sv", "uk",
+    ];
+
+    /// Local `models/` subdirectory holding this model's GGML file.
+    pub fn dir(self) -> &'static str {
+        match self {
+            Self::TdtV3Q8 => crate::models::DIR_PARAKEET_TDT_V3_Q8,
+            Self::TdtV3Q4K => crate::models::DIR_PARAKEET_TDT_V3_Q4K,
+        }
+    }
+
+    /// Filename to download from [`ParakeetModel::REPO_ID`] and to load from disk.
+    pub fn ggml_file(self) -> &'static str {
+        match self {
+            Self::TdtV3Q8 => "ggml-parakeet-tdt-0.6b-v3-q8_0.bin",
+            Self::TdtV3Q4K => "ggml-parakeet-tdt-0.6b-v3-q4_k.bin",
+        }
+    }
+
+    /// Human-readable name for UI and model-status cards.
+    pub fn display_name(self) -> &'static str {
+        match self {
+            Self::TdtV3Q8 => "Parakeet TDT 0.6B v3 (q8_0)",
+            Self::TdtV3Q4K => "Parakeet TDT 0.6B v3 (q4_k)",
+        }
+    }
+
+    /// Blurb for model-status cards.
+    pub fn description(self) -> &'static str {
+        match self {
+            Self::TdtV3Q8 => {
+                "NVIDIA Parakeet TDT v3 (~669 MB). Much faster than Whisper on a \
+                 CPU, with punctuation and capitalization built in. 25 European \
+                 languages, detected automatically. Runs fully on-device."
+            }
+            Self::TdtV3Q4K => {
+                "NVIDIA Parakeet TDT v3, smaller quantization (~416 MB). Less \
+                 memory and a quicker download for a little accuracy. 25 European \
+                 languages, detected automatically. Runs fully on-device."
+            }
+        }
+    }
+
+    /// Languages this model transcribes, as ISO 639-1 codes.
+    pub fn languages(self) -> &'static [&'static str] {
+        match self {
+            Self::TdtV3Q8 | Self::TdtV3Q4K => &Self::TDT_V3_LANGUAGES,
+        }
+    }
+
+    /// Whether `tag` is a dictation language this model can be set to: one it
+    /// transcribes, given explicitly. Unlike [`Self::supports_language`],
+    /// `"auto"` does not count — Parakeet recognizes its languages itself but
+    /// never reports which one it heard, so with auto the rest of the pipeline
+    /// would format every dictation by English rules. Settings refuse it.
+    pub fn accepts_dictation_language(self, tag: &str) -> bool {
+        let tag = tag.trim();
+        !tag.is_empty() && !tag.eq_ignore_ascii_case("auto") && self.supports_language(tag)
+    }
+
+    /// Whether `tag` names a language this model transcribes. Only the primary
+    /// subtag counts (`pt-BR` is Portuguese), case-insensitively. `"auto"` and
+    /// an empty tag always pass: the model detects the language itself.
+    pub fn supports_language(self, tag: &str) -> bool {
+        let tag = tag.trim();
+        if tag.is_empty() || tag.eq_ignore_ascii_case("auto") {
+            return true;
+        }
+        let primary = tag.split(['-', '_']).next().unwrap_or(tag);
+        self.languages()
+            .iter()
+            .any(|code| primary.eq_ignore_ascii_case(code))
+    }
+}
+
 #[derive(Debug, Clone, Serialize)]
 #[serde(tag = "type")]
 #[non_exhaustive]
@@ -482,6 +588,12 @@ pub enum AsrBackendConfig {
     WhisperCpp {
         #[serde(default)]
         model: WhisperModel,
+    },
+    /// Local NVIDIA Parakeet TDT inference via whisper.cpp's `parakeet`
+    /// library and the GGML model `model`.
+    ParakeetCpp {
+        #[serde(default)]
+        model: ParakeetModel,
     },
 }
 
@@ -507,6 +619,10 @@ impl<'de> Deserialize<'de> for AsrBackendConfig {
                 #[serde(default, deserialize_with = "lenient")]
                 model: WhisperModel,
             },
+            ParakeetCpp {
+                #[serde(default, deserialize_with = "lenient")]
+                model: ParakeetModel,
+            },
             #[serde(other)]
             Unknown,
         }
@@ -524,6 +640,7 @@ impl<'de> Deserialize<'de> for AsrBackendConfig {
                 streaming,
             },
             Repr::WhisperCpp { model } => AsrBackendConfig::WhisperCpp { model },
+            Repr::ParakeetCpp { model } => AsrBackendConfig::ParakeetCpp { model },
             Repr::Unknown => AsrBackendConfig::WhisperCpp {
                 model: WhisperModel::default(),
             },
@@ -538,6 +655,7 @@ impl AsrBackendConfig {
         match self {
             Self::OpenAiCompatible { .. } => AsrBackendKind::OpenAiCompatible,
             Self::WhisperCpp { .. } => AsrBackendKind::WhisperCpp,
+            Self::ParakeetCpp { .. } => AsrBackendKind::ParakeetCpp,
         }
     }
 }
@@ -705,6 +823,103 @@ mod tests {
         assert_eq!(WhisperModel::ALL[0], WhisperModel::Base);
         assert_eq!(WhisperModel::Base.ggml_file(), "ggml-base-q8_0.bin");
         assert_eq!(WhisperModel::Base.dir(), "whisper-base-q8_0");
+    }
+
+    #[test]
+    fn a_parakeet_backend_round_trips_through_toml() {
+        let settings = UserSettings {
+            asr_backend: AsrBackendConfig::ParakeetCpp {
+                model: ParakeetModel::TdtV3Q8,
+            },
+            ..UserSettings::default()
+        };
+        let raw = toml::to_string(&settings).expect("serialize");
+        assert!(raw.contains("type = \"ParakeetCpp\""), "{raw}");
+        let back: UserSettings = toml::from_str(&raw).expect("parse");
+        assert!(matches!(
+            back.asr_backend,
+            AsrBackendConfig::ParakeetCpp {
+                model: ParakeetModel::TdtV3Q8
+            }
+        ));
+        assert_eq!(
+            back.asr_backend.kind(),
+            crate::asr::AsrBackendKind::ParakeetCpp
+        );
+    }
+
+    /// A newer build may offer a Parakeet model this one does not know. The
+    /// engine choice survives; only the model falls back to the default.
+    #[test]
+    fn an_unknown_parakeet_model_keeps_the_parakeet_engine() {
+        let back: UserSettings =
+            toml::from_str("[asr_backend]\ntype = \"ParakeetCpp\"\nmodel = \"TdtV9\"\n")
+                .expect("an unknown model must not fail the load");
+        assert!(matches!(
+            back.asr_backend,
+            AsrBackendConfig::ParakeetCpp {
+                model: ParakeetModel::TdtV3Q8
+            }
+        ));
+    }
+
+    #[test]
+    fn parakeet_v3_supports_its_european_languages_only() {
+        let model = ParakeetModel::TdtV3Q8;
+        assert_eq!(model.languages().len(), 25);
+        for tag in [
+            "auto", "", "en", "EN", "en-US", "pt_BR", "de", "uk", "ru", "mt",
+        ] {
+            assert!(model.supports_language(tag), "{tag} should be supported");
+        }
+        for tag in ["ja", "ko", "zh", "zh-Hans", "ar", "hi", "e", "eng"] {
+            assert!(!model.supports_language(tag), "{tag} should be refused");
+        }
+    }
+
+    /// Both quantizations are the same weights: same languages, distinct files.
+    #[test]
+    fn the_two_parakeet_quantizations_differ_only_in_their_file() {
+        let [small, large] = ParakeetModel::ALL;
+        assert_eq!(small, ParakeetModel::TdtV3Q4K, "ascending size order");
+        assert_eq!(large, ParakeetModel::default());
+        assert_eq!(small.languages(), large.languages());
+        assert_ne!(small.dir(), large.dir());
+        assert_ne!(small.ggml_file(), large.ggml_file());
+        let raw = toml::to_string(&UserSettings {
+            asr_backend: AsrBackendConfig::ParakeetCpp { model: small },
+            ..UserSettings::default()
+        })
+        .expect("serialize");
+        let back: UserSettings = toml::from_str(&raw).expect("parse");
+        assert!(matches!(
+            back.asr_backend,
+            AsrBackendConfig::ParakeetCpp {
+                model: ParakeetModel::TdtV3Q4K
+            }
+        ));
+    }
+
+    #[test]
+    fn parakeet_needs_an_explicit_dictation_language() {
+        let model = ParakeetModel::default();
+        for tag in ["de", "en-GB", "uk"] {
+            assert!(model.accepts_dictation_language(tag), "{tag}");
+        }
+        for tag in ["auto", "AUTO", "", " ", "ja", "zh"] {
+            assert!(!model.accepts_dictation_language(tag), "{tag:?}");
+        }
+    }
+
+    #[test]
+    fn parakeet_and_whisper_models_live_in_separate_directories() {
+        for parakeet in ParakeetModel::ALL {
+            for whisper in WhisperModel::ALL {
+                assert_ne!(parakeet.dir(), whisper.dir());
+            }
+            assert_ne!(parakeet.dir(), crate::models::DIR_WHISPER_VAD);
+            assert!(parakeet.ggml_file().ends_with(".bin"));
+        }
     }
 
     fn local(url: &str) -> bool {

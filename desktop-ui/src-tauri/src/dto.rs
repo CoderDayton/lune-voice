@@ -38,6 +38,9 @@ pub enum DevicePolicyDto {
 pub enum AsrBackendTypeDto {
     OpenAiCompatible,
     WhisperCpp,
+    /// NVIDIA Parakeet TDT, on-device; the quantization rides in
+    /// `parakeet_model`.
+    ParakeetCpp,
 }
 
 /// Which styling-LLM engine the user picked. `Disabled` is carried by
@@ -54,6 +57,7 @@ impl From<lune_core::asr::AsrBackendKind> for AsrBackendTypeDto {
         match kind {
             AsrBackendKind::OpenAiCompatible => Self::OpenAiCompatible,
             AsrBackendKind::WhisperCpp => Self::WhisperCpp,
+            AsrBackendKind::ParakeetCpp => Self::ParakeetCpp,
             // `AsrBackendKind` is `#[non_exhaustive]`. The catch-all fires only
             // when a new lune-core variant ships without a matching
             // `AsrBackendTypeDto` variant + arm here. Loud in dev, fall back to
@@ -75,6 +79,7 @@ impl From<AsrBackendTypeDto> for lune_core::asr::AsrBackendKind {
         match dto {
             AsrBackendTypeDto::OpenAiCompatible => Self::OpenAiCompatible,
             AsrBackendTypeDto::WhisperCpp => Self::WhisperCpp,
+            AsrBackendTypeDto::ParakeetCpp => Self::ParakeetCpp,
         }
     }
 }
@@ -116,6 +121,41 @@ impl From<WhisperModelDto> for lune_core::config::WhisperModel {
             WhisperModelDto::Small => Self::Small,
             WhisperModelDto::Medium => Self::Medium,
             WhisperModelDto::LargeV3Turbo => Self::LargeV3Turbo,
+        }
+    }
+}
+
+/// Which Parakeet quantization the ParakeetCpp backend uses. Mirrors
+/// [`lune_core::config::ParakeetModel`].
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize, TS)]
+#[ts(export, export_to = "../../src/lib/backend/generated/")]
+pub enum ParakeetModelDto {
+    #[default]
+    TdtV3Q8,
+    TdtV3Q4K,
+}
+
+impl From<lune_core::config::ParakeetModel> for ParakeetModelDto {
+    fn from(model: lune_core::config::ParakeetModel) -> Self {
+        use lune_core::config::ParakeetModel;
+        match model {
+            ParakeetModel::TdtV3Q8 => Self::TdtV3Q8,
+            ParakeetModel::TdtV3Q4K => Self::TdtV3Q4K,
+            // `ParakeetModel` is `#[non_exhaustive]`: fall back loudly in dev,
+            // safely in release if a new variant ships without an arm here.
+            other => {
+                debug_assert!(false, "unhandled ParakeetModel variant {other:?}");
+                Self::TdtV3Q8
+            }
+        }
+    }
+}
+
+impl From<ParakeetModelDto> for lune_core::config::ParakeetModel {
+    fn from(dto: ParakeetModelDto) -> Self {
+        match dto {
+            ParakeetModelDto::TdtV3Q8 => Self::TdtV3Q8,
+            ParakeetModelDto::TdtV3Q4K => Self::TdtV3Q4K,
         }
     }
 }
@@ -411,6 +451,8 @@ pub struct WorkspaceSettingsDto {
     pub openai_llm_active: bool,
     /// Selected local whisper model (meaningful when asr_backend_type == WhisperCpp).
     pub whisper_model: WhisperModelDto,
+    /// Selected Parakeet model (meaningful when asr_backend_type == ParakeetCpp).
+    pub parakeet_model: ParakeetModelDto,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, TS)]
@@ -626,6 +668,9 @@ pub struct SaveWorkspaceSettingsInput {
     /// Selected local whisper model (sent when asr_backend_type == WhisperCpp).
     #[serde(default)]
     pub whisper_model: Option<WhisperModelDto>,
+    /// Selected Parakeet model (sent when asr_backend_type == ParakeetCpp).
+    #[serde(default)]
+    pub parakeet_model: Option<ParakeetModelDto>,
 }
 
 fn default_pill_edge_margin_dto() -> u32 {
@@ -784,7 +829,11 @@ mod tests {
     #[test]
     fn asr_backend_kind_dto_round_trip() {
         use lune_core::asr::AsrBackendKind;
-        for kind in [AsrBackendKind::WhisperCpp, AsrBackendKind::OpenAiCompatible] {
+        for kind in [
+            AsrBackendKind::WhisperCpp,
+            AsrBackendKind::ParakeetCpp,
+            AsrBackendKind::OpenAiCompatible,
+        ] {
             let dto: AsrBackendTypeDto = kind.into();
             let back: AsrBackendKind = dto.into();
             assert_eq!(back, kind);

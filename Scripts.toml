@@ -232,7 +232,8 @@ command = '''
 set -euo pipefail
 # Assemble the runtime layout a GGML_BACKEND_DL build needs beside the binary:
 #
-#   <bin dir>/libwhisper.so.1, libggml.so.0, libggml-base.so.0   (DT_NEEDED)
+#   <bin dir>/libwhisper.so.1, libparakeet.so.1,
+#             libggml.so.0, libggml-base.so.0                      (DT_NEEDED)
 #   <bin dir>/backends/libggml-cpu-*.so, libggml-cuda.so         (dlopen-ed)
 #
 # The executable carries RUNPATH=$ORIGIN (desktop-ui/src-tauri/build.rs), so the
@@ -260,7 +261,8 @@ fi
 # The test harness runs binaries from target/<profile>/deps, so stage there too.
 mkdir -p "$BIN_DIR/backends" "$BIN_DIR/deps/backends"
 for dest in "$BIN_DIR" "$BIN_DIR/deps"; do
-  cp -a "$SRC_DIR"/out/lib/libwhisper.so* "$SRC_DIR"/out/lib/libggml*.so* "$dest/"
+  cp -a "$SRC_DIR"/out/lib/libwhisper.so* "$SRC_DIR"/out/lib/libparakeet.so* \
+    "$SRC_DIR"/out/lib/libggml*.so* "$dest/"
   cp -a "$SRC_DIR"/out/bin/libggml-cpu-*.so "$dest/backends/"
   # A `whisper-cuda` build emits the CUDA backend as a plugin as well, and ggml
   # only ever dlopen-s it from a backends dir — without this, `cgs dev --env

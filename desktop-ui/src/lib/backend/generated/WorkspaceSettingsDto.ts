@@ -3,6 +3,7 @@ import type { ActivationModeDto } from "./ActivationModeDto";
 import type { AsrBackendTypeDto } from "./AsrBackendTypeDto";
 import type { DevicePolicyDto } from "./DevicePolicyDto";
 import type { DictationModeDto } from "./DictationModeDto";
+import type { ParakeetModelDto } from "./ParakeetModelDto";
 import type { PillAnchorDto } from "./PillAnchorDto";
 import type { PillCornerDto } from "./PillCornerDto";
 import type { PillOrientationDto } from "./PillOrientationDto";
@@ -29,7 +30,11 @@ openaiLlmActive: boolean,
 /**
  * Selected local whisper model (meaningful when asr_backend_type == WhisperCpp).
  */
-whisperModel: WhisperModelDto, activationMode: ActivationModeDto, dictationMode: DictationModeDto, 
+whisperModel: WhisperModelDto, 
+/**
+ * Selected Parakeet model (meaningful when asr_backend_type == ParakeetCpp).
+ */
+parakeetModel: ParakeetModelDto, activationMode: ActivationModeDto, dictationMode: DictationModeDto, 
 /**
  * Keep the dictated text on the clipboard after delivery (orthogonal to the
  * send method).

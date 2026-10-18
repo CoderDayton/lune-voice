@@ -18,14 +18,17 @@ license = "GPL-3.0-or-later"
 repository = "https://github.com/CoderDayton/lune-voice"
 homepage = "https://github.com/CoderDayton/lune-voice"
 
-# Vendored fork of `whisper-rs-sys` 0.15.0, carrying whisper.cpp v1.9.4. Three
-# files differ from upstream — `build.rs`, `src/lib.rs` and
-# `whisper.cpp/src/whisper.cpp`; every change is marked `LUNE FORK`.
+# Vendored fork of `whisper-rs-sys` 0.15.0, carrying whisper.cpp v1.9.4. Five
+# files differ from upstream — `build.rs`, `src/lib.rs`, `wrapper.h`,
+# `Cargo.toml` and `whisper.cpp/src/whisper.cpp`; every change is marked
+# `LUNE FORK`.
 # Upstream pins `BUILD_SHARED_LIBS=OFF` and decides the link kind from the
 # `intel-sycl` feature, which makes ggml's dlopen-able backends
 # (`GGML_BACKEND_DL`) impossible to build. The fork routes both off that one
 # switch so the CUDA backend can ship as a downloadable plugin instead of a
 # hard `DT_NEEDED` on the CUDA runtime. See docs/GPU_PLUGIN.md.
+# It also binds and links whisper.cpp's `parakeet` library, which upstream
+# builds but never exposes — the Parakeet TDT backend in `lune-asr`.
 [patch.crates-io]
 whisper-rs-sys = { path = "vendor/whisper-rs-sys" }
 

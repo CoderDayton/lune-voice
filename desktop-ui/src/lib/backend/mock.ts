@@ -33,6 +33,7 @@ function createMockSnapshot(): WorkspaceSnapshot {
       devicePolicy: 'Auto',
       asrBackendType: 'WhisperCpp',
       whisperModel: 'Medium',
+      parakeetModel: 'TdtV3Q8',
       llmEnabled: true,
       confidenceThreshold: 0.55,
       stylePreset: null,
@@ -277,6 +278,7 @@ function applySettings(input: SaveWorkspaceSettingsInput) {
       ...fields,
       devicePolicy: fields.useGpu ? fields.devicePolicy : 'Cpu',
       whisperModel: fields.whisperModel ?? mockSnapshot.settings.whisperModel,
+      parakeetModel: fields.parakeetModel ?? mockSnapshot.settings.parakeetModel,
       openaiAsrApiKeySet: !!_openaiAsrApiKey,
       // Provider persists regardless of the active engine (blank keeps saved).
       openaiLlmBaseUrl:

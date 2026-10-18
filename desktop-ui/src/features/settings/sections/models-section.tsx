@@ -6,6 +6,7 @@ import {
   AlertTriangle,
   Check,
   Download,
+  Gauge,
   HardDrive,
   Loader2,
   type LucideIcon,
@@ -22,6 +23,7 @@ import { modelDownloadSizes } from '../data/settings-data';
 import { type DownloadProgress, type ModelStatus, useModelStatus } from '../hooks/use-model-status';
 
 function modelIcon(localName: string): LucideIcon {
+  if (localName.startsWith('parakeet')) return Gauge;
   return localName.includes('asr') || localName.includes('whisper') ? Mic : Wand2;
 }
 
@@ -33,20 +35,21 @@ function sizeLabel(model: ModelStatus): string {
 
 export function ModelsSection() {
   const { t } = useLingui();
-  // `inUse` flags depend on the ASR backend / Whisper size / correction-LLM
+  // `inUse` flags depend on the ASR engine / Whisper size / correction-LLM
   // toggle (all on the Transcription tab), so re-check status when they change.
   const llmEnabled = useStore(workspaceStore, (s) => s.settings.llmEnabled);
   const asrBackend = useStore(workspaceStore, (s) => s.settings.asrBackend);
   const whisperModel = useStore(workspaceStore, (s) => s.settings.whisperModel);
+  const parakeetModel = useStore(workspaceStore, (s) => s.settings.parakeetModel);
 
   const { models, loading, downloading, progress, refresh, download, remove } = useModelStatus();
   const [confirmDelete, setConfirmDelete] = useState<ModelStatus | null>(null);
   const dialogRef = useRef<HTMLDialogElement>(null);
 
-  // biome-ignore lint/correctness/useExhaustiveDependencies: llmEnabled/asrBackend/whisperModel are deliberate re-run triggers, not used in the body.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: llmEnabled/asrBackend/whisperModel/parakeetModel are deliberate re-run triggers, not used in the body.
   useEffect(() => {
     refresh();
-  }, [refresh, llmEnabled, asrBackend, whisperModel]);
+  }, [refresh, llmEnabled, asrBackend, whisperModel, parakeetModel]);
 
   function handleDeleteClick(model: ModelStatus) {
     setConfirmDelete(model);

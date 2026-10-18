@@ -1505,6 +1505,11 @@ mod tests {
             decode_backend("\"OpenAiCompatible\""),
             BackendDecode::Parsed(AsrBackendKind::OpenAiCompatible)
         ));
+        // A Parakeet dictation is recorded as itself, not folded into Whisper.
+        assert!(matches!(
+            decode_backend("\"ParakeetCpp\""),
+            BackendDecode::Parsed(AsrBackendKind::ParakeetCpp)
+        ));
     }
 
     #[test]

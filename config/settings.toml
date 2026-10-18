@@ -7,7 +7,7 @@
 
 # ── Compute device ────────────────────────────────────────────────────────────
 #
-# Controls whether the local whisper.cpp ASR backend uses CUDA.
+# Controls whether the local ASR backends (whisper.cpp, Parakeet) use CUDA.
 #
 #   "auto"  — Try CUDA at startup; fall back to CPU if unavailable. (default)
 #   "cuda"  — Prefer CUDA; still falls back gracefully if CUDA init fails.
@@ -85,6 +85,9 @@ start_minimized = false
 # Supported types:
 #   "WhisperCpp"        — Local whisper.cpp GGML model. (default, local)
 #                         Optional `model = "Base" | "Small" | "Medium" | "LargeV3Turbo"` (default Medium).
+#   "ParakeetCpp"       — Local NVIDIA Parakeet TDT v3 via whisper.cpp. Fastest on a CPU;
+#                         25 European languages, detected automatically.
+#                         Optional `model = "TdtV3Q8" | "TdtV3Q4K"` (default TdtV3Q8).
 #   "OpenAiCompatible"  — Remote Whisper-compatible HTTP endpoint.
 #
 [asr_backend]

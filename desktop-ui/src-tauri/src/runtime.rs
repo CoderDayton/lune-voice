@@ -99,6 +99,10 @@ fn asr_backend_needs_reload(current: &AsrBackendConfig, next: &AsrBackendConfig)
         (AsrBackendConfig::WhisperCpp { model: a }, AsrBackendConfig::WhisperCpp { model: b }) => {
             a != b
         }
+        (
+            AsrBackendConfig::ParakeetCpp { model: a },
+            AsrBackendConfig::ParakeetCpp { model: b },
+        ) => a != b,
         _ => true,
     }
 }
@@ -1704,7 +1708,7 @@ async fn build_pipeline(
             AsrBackendConfig::OpenAiCompatible { .. }
         )
     {
-        return Err("remote services are turned off, but transcription is set to use one. Switch transcription back to Whisper, or turn on Allow remote services in Settings → General.".into());
+        return Err("remote services are turned off, but transcription is set to use one. Switch transcription to an on-device engine (Whisper or Parakeet), or turn on Allow remote services in Settings → General.".into());
     }
     // Whisper model load takes seconds on the larger models; keep it off the
     // async workers so IPC and the UI stay responsive during startup/reload.
@@ -2301,6 +2305,23 @@ mod tests {
         // ~874 MB of weights for it is the cost this check exists to avoid.
         assert!(!asr_backend_needs_reload(&small, &small));
         assert!(asr_backend_needs_reload(&small, &medium));
+    }
+
+    #[test]
+    fn switching_between_local_engines_reloads_and_staying_does_not() {
+        let whisper = AsrBackendConfig::WhisperCpp {
+            model: WhisperModel::Small,
+        };
+        let parakeet = AsrBackendConfig::ParakeetCpp {
+            model: lune_core::config::ParakeetModel::TdtV3Q8,
+        };
+        assert!(!asr_backend_needs_reload(&parakeet, &parakeet));
+        let smaller = AsrBackendConfig::ParakeetCpp {
+            model: lune_core::config::ParakeetModel::TdtV3Q4K,
+        };
+        assert!(asr_backend_needs_reload(&parakeet, &smaller));
+        assert!(asr_backend_needs_reload(&whisper, &parakeet));
+        assert!(asr_backend_needs_reload(&parakeet, &whisper));
     }
 
     /// Startup runs inside Tauri's `setup`, which panics on any error. A

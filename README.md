@@ -22,14 +22,14 @@ Transcription and correction run locally, so the app keeps working after you dis
 ## How it works
 
 ```
-Mic → Whisper (speech-to-text + voice-activity trim) → Dictionary + formatting → [optional styling] → Paste
+Mic → Whisper or Parakeet (speech-to-text + voice-activity trim) → Dictionary + formatting → [optional styling] → Paste
 ```
 
-Whisper does the transcription on your machine. Your dictionary fixes the names, acronyms, and jargon it gets wrong, and the formatter handles capitalization, punctuation, and filler words.
+Whisper or Parakeet does the transcription on your machine. Whisper covers the most languages and comes in four sizes. Parakeet, NVIDIA's speech model, handles 25 European languages many times faster on a CPU and punctuates by itself. Your dictionary fixes the names, acronyms, and jargon they get wrong, and the formatter handles capitalization, punctuation, and filler words.
 
 Styling is optional and off by default. Turn it on and an LLM rewrites the transcript in the tone you pick: casual, professional, technical, or one you write. Point it at a local Ollama or llama-server to keep everything on your machine, or at a hosted API if you don't want to run a model yourself.
 
-First launch downloads about 540 MB of Whisper models. After that, dictation needs no network access.
+First launch downloads the model you pick — about 540 MB for the default Whisper, 416 or 669 MB for Parakeet. After that, dictation needs no network access.
 
 ## Features
 
@@ -45,9 +45,9 @@ First launch downloads about 540 MB of Whisper models. After that, dictation nee
 
 ## Privacy
 
-On its own the app makes three kinds of network request: the Whisper model download on first launch, the CUDA plugin download if you ask for GPU acceleration, and the update check. The update check only runs when you ask for it from the tray menu or Settings, unless you turn on "Check for updates on launch" (off by default). Transcription, dictionary fixes, and formatting never touch the network.
+On its own the app makes three kinds of network request: the speech model download on first launch, the CUDA plugin download if you ask for GPU acceleration, and the update check. The update check only runs when you ask for it from the tray menu or Settings, unless you turn on "Check for updates on launch" (off by default). Transcription, dictionary fixes, and formatting never touch the network.
 
-Two settings can send your words out, and only if you choose them: remote styling, and a remote transcription backend instead of local Whisper. Neither runs until you also turn on "Allow remote services", which is off by default. If you point either one at a local endpoint, your transcripts stay on your machine.
+Two settings can send your words out, and only if you choose them: remote styling, and a remote transcription backend instead of the on-device engines. Neither runs until you also turn on "Allow remote services", which is off by default. If you point either one at a local endpoint, your transcripts stay on your machine.
 
 There is no telemetry and no analytics. The source is public, so you can check that yourself.
 

@@ -9,6 +9,14 @@ pub const DIR_WHISPER_SMALL: &str = "whisper-small-q5_1";
 pub const DIR_WHISPER_MEDIUM: &str = "whisper-medium-q5_0";
 pub const DIR_WHISPER_LARGE_V3_TURBO: &str = "whisper-large-v3-turbo-q8_0";
 
+// whisper.cpp's Parakeet TDT conversions of NVIDIA's parakeet-tdt-0.6b-v3, from
+// the `ggml-org/parakeet-GGUF` HuggingFace repo. Each holds one `ggml-*.bin`
+// file, loaded by the `parakeet` library that ships in the same whisper.cpp
+// tree. q8_0 is near-lossless; q4_k trades a little accuracy for a smaller
+// download and less memory.
+pub const DIR_PARAKEET_TDT_V3_Q8: &str = "parakeet-tdt-0.6b-v3-q8_0";
+pub const DIR_PARAKEET_TDT_V3_Q4K: &str = "parakeet-tdt-0.6b-v3-q4_k";
+
 // whisper.cpp's VAD model (silero v5, ggml). Downloaded from the
 // `ggml-org/whisper-vad` HuggingFace repo and loaded into a standalone
 // `WhisperVadContext` that trims leading/trailing silence off an utterance

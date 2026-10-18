@@ -14,7 +14,7 @@ import {
   SettingsSection,
 } from '../components/section';
 import {
-  dictationLanguages,
+  dictationLanguagesFor,
   localizeOptions,
   modelIdleUnloadMinutes,
   modelIdleUnloadOptions,
@@ -33,8 +33,9 @@ export function TranscriptionSection({
   );
 
   // Confidence-gated correction needs per-word probabilities, which only the
-  // local recognizer provides — the remote (OpenAI-compatible) backend reports
-  // none, so the sensitivity control has no effect there and the section hides.
+  // local recognizers (Whisper, Parakeet) provide — the remote
+  // (OpenAI-compatible) backend reports none, so the sensitivity control has
+  // no effect there and the section hides.
   const hasWordConfidence = settings.asrBackend !== 'OpenAiCompatible';
 
   return (
@@ -47,7 +48,7 @@ export function TranscriptionSection({
       >
         <SettingsBlock
           label={t`Voice model`}
-          description={t`Choose the engine that turns your speech into text. Local engines run fully on-device; Whisper is multilingual with selectable model sizes.`}
+          description={t`Choose the engine that turns your speech into text. Local engines run fully on-device: Whisper covers the most languages with selectable model sizes, Parakeet is the fastest for 25 European languages.`}
         >
           <AsrEngineCards settings={settings} onManageModels={onManageModels} />
         </SettingsBlock>
@@ -64,16 +65,23 @@ export function TranscriptionSection({
         )}
         {settings.asrBackend === 'OpenAiCompatible' && settings.privacyMode === 'LocalOnly' && (
           <div role="alert" className="alert alert-warning alert-soft sm:flex-row">
-            <span>{t`Remote services are turned off, so dictation cannot start with this engine. Turn on Allow remote services in General, or switch back to Whisper.`}</span>
+            <span>{t`Remote services are turned off, so dictation cannot start with this engine. Turn on Allow remote services in General, or switch to an on-device engine.`}</span>
           </div>
         )}
         <SettingsRow
           label={t`Dictation language`}
-          description={t`Set the language you speak. Auto uses detection from speech.`}
+          description={
+            settings.asrBackend === 'ParakeetCpp'
+              ? t`The language you speak. Parakeet needs it set.`
+              : t`Set the language you speak. Auto uses detection from speech.`
+          }
           control={
             <DescriptiveDropdown
               value={settings.dictationLanguage}
-              options={localizeOptions(i18n, dictationLanguages)}
+              options={localizeOptions(
+                i18n,
+                dictationLanguagesFor(settings.asrBackend, settings.dictationLanguage),
+              )}
               ariaLabel={t`Dictation language`}
               onChange={(next) =>
                 void saveWorkspaceSetting(
