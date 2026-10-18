@@ -68,14 +68,18 @@
         ],
         "section": "utils",
         "files": {
-          "/usr/lib/udev/rules.d/99-lune-voice-uinput.rules": "../../assets/udev/99-lune-voice-uinput.rules"
-        }
+          "/usr/lib/udev/rules.d/70-lune-voice-input.rules": "../../assets/udev/70-lune-voice-input.rules"
+        },
+        "postInstallScript": "../../assets/udev/apply-rules.sh",
+        "postRemoveScript": "../../assets/udev/apply-rules.sh"
       },
       "rpm": {
         "depends": ["webkit2gtk4.1", "gtk3", "libappindicator-gtk3"],
         "files": {
-          "/usr/lib/udev/rules.d/99-lune-voice-uinput.rules": "../../assets/udev/99-lune-voice-uinput.rules"
-        }
+          "/usr/lib/udev/rules.d/70-lune-voice-input.rules": "../../assets/udev/70-lune-voice-input.rules"
+        },
+        "postInstallScript": "../../assets/udev/apply-rules.sh",
+        "postRemoveScript": "../../assets/udev/apply-rules.sh"
       },
       "appimage": {
         "bundleMediaFramework": false

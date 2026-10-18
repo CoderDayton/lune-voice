@@ -1184,24 +1184,24 @@ msgid "Lune Voice {version} is available. You have {currentVersion}."
 msgstr "Lune Voice {version} 已发布。你当前使用的是 {currentVersion}。"
 
 #: src/features/settings/components/uinput-rule-row.tsx:95
-msgid "Lune Voice added a system rule so it can type into other apps. It also lets any other program you run send keystrokes. Removing it stops typed delivery from working until you allow it again."
-msgstr "Lune Voice 添加了一条系统规则，以便向其他应用输入文字。该规则也允许你运行的任���其他程序发送按键。移除后，键入式输出将无法使用，直到你再次允许。"
+msgid "Lune Voice added a system rule so it can type into other apps and listen for your hotkey. It also lets any other program you run read and send keystrokes. Removing it stops typing and the hotkey from working until you allow it again."
+msgstr "Lune Voice 添加了一条系统规则，以便向其他应用输入文字并识别你的快捷键。该规则也允许你运行的任何其他程序读取和发送按键。移除后，输入和快捷键将无法使用，直到你再次允许。"
 
 #: src/features/welcome/components/ready-checks.tsx:115
-msgid "Lune Voice can type into your other apps."
-msgstr "Lune Voice 可以在你的其他应用中输入文字。"
+msgid "Lune Voice can type into your other apps and hear your hotkey."
+msgstr "Lune Voice 可以在你的其他应用中输入文字并识别你的快捷键。"
 
 #: src/features/settings/sections/general-section.tsx:168
 msgid "Lune Voice is free software under the GNU General Public License, version 3 or later, and comes with no warranty. You may copy, change and share it under those terms; the source code is at {REPO_URL}."
 msgstr "Lune Voice 是依据 GNU 通用公共许可证第 3 版或更高版本发布的自由软件，不提供任何担保。你可以按照这些条款复制、修改和分享它；源代码位于 {REPO_URL}。"
 
 #: src/features/settings/components/uinput-rule-row.tsx:96
-msgid "Lune Voice needs permission to type into other apps. Allowing it also lets any other program you run send keystrokes. Your system will ask for your password."
-msgstr "Lune Voice 需要权限才能在其他应用中输入文字。授予后，你运行的其他程序也能发送按键。系统会要求输入密码。"
+msgid "Lune Voice needs permission to type into other apps and listen for your hotkey. Allowing it also lets any other program you run read and send keystrokes. Your system will ask for your password."
+msgstr "Lune Voice 需要权限才能在其他应用中输入文字并识别你的快捷键。授予后，你运行的其他程序也能读取和发送按键。系统会要求输入密码。"
 
 #: src/features/welcome/components/ready-checks.tsx:116
-msgid "Lune Voice needs permission to type into other apps. Your system will ask for your password."
-msgstr "Lune Voice 需要权限才能在其他应用中输入文字。系统会要求输入密码。"
+msgid "Lune Voice needs permission to type into other apps and listen for your hotkey. Your system will ask for your password."
+msgstr "Lune Voice 需要权限才能在其他应用中输入文字并识别你的快捷键。系统会要求输入密码。"
 
 #: src/features/dictionary/components/dictionary-form.tsx:82
 msgid "Lune Voice writes"

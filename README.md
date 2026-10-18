@@ -73,7 +73,7 @@ to ~1.6 GB). Delete these folders to remove it too:
 - **Windows**: `%APPDATA%\lune-voice\`
 
 The `.deb` and `.rpm` remove their udev rule themselves. The AppImage and the
-portable archive install it to `/etc/udev/rules.d/99-lune-voice-uinput.rules`;
+portable archive install it to `/etc/udev/rules.d/70-lune-voice-input.rules`;
 remove it from Settings → Text delivery before deleting the app, or with
 `sudo rm` afterwards.
 
@@ -102,7 +102,7 @@ cgs package  # build the .deb / .rpm / .AppImage / .tar.gz installers
 | | |
 |---|---|
 | **OS** | Linux (X11 or Wayland) or Windows 10/11 |
-| **Typing** | **Linux**: IBus when it is your input method, otherwise `/dev/uinput` — the first run asks for a polkit password to install a udev rule. `wl-copy` or `xclip` for the paste path. **Windows**: the clipboard plus a synthetic paste, with per-key typing as the fallback. Either way the text goes to the window you were in when you started speaking. |
+| **Typing** | **Linux**: IBus when it is your input method, otherwise `/dev/uinput`. The .deb and .rpm install the udev rule for typing and the hotkey; the AppImage and portable archive ask for a polkit password once to install it. `wl-copy` or `xclip` for the paste path. **Windows**: the clipboard plus a synthetic paste, with per-key typing as the fallback. Either way the text goes to the window you were in when you started speaking. |
 | **Hotkey** | Toggle or push-to-talk on both platforms — Linux grabs the keyboard through evdev, Windows uses a low-level keyboard hook. |
 | **GPU** | Optional, Linux only for now. If you have an NVIDIA card, the app offers a one-time download that moves transcription onto it. CPU-only works everywhere, just slower. |
 | **Disk** | ~540 MB for the default model, ~1.6 GB for all three |

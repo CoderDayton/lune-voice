@@ -1184,24 +1184,24 @@ msgid "Lune Voice {version} is available. You have {currentVersion}."
 msgstr "Lune Voice {version} ist verfügbar. Sie haben {currentVersion}."
 
 #: src/features/settings/components/uinput-rule-row.tsx:95
-msgid "Lune Voice added a system rule so it can type into other apps. It also lets any other program you run send keystrokes. Removing it stops typed delivery from working until you allow it again."
-msgstr "Lune Voice hat eine Systemregel hinzugefügt, damit die App in andere Programme tippen kann. Sie erlaubt es außerdem jedem anderen Programm, das Sie ausführen, Tastenanschläge zu senden. Wenn Sie sie entfernen, funktioniert die Eingabe per Tastendruck nicht mehr, bis Sie sie erneut erlauben."
+msgid "Lune Voice added a system rule so it can type into other apps and listen for your hotkey. It also lets any other program you run read and send keystrokes. Removing it stops typing and the hotkey from working until you allow it again."
+msgstr "Lune Voice hat eine Systemregel hinzugefügt, damit die App in andere Programme tippen und Ihr Tastenkürzel erkennen kann. Sie erlaubt es außerdem jedem anderen Programm, das Sie ausführen, Tastenanschläge zu lesen und zu senden. Wenn Sie sie entfernen, funktionieren das Tippen und das Tastenkürzel nicht mehr, bis Sie sie erneut erlauben."
 
 #: src/features/welcome/components/ready-checks.tsx:115
-msgid "Lune Voice can type into your other apps."
-msgstr "Lune Voice kann in Ihre anderen Apps schreiben."
+msgid "Lune Voice can type into your other apps and hear your hotkey."
+msgstr "Lune Voice kann in Ihre anderen Apps schreiben und Ihr Tastenkürzel erkennen."
 
 #: src/features/settings/sections/general-section.tsx:168
 msgid "Lune Voice is free software under the GNU General Public License, version 3 or later, and comes with no warranty. You may copy, change and share it under those terms; the source code is at {REPO_URL}."
 msgstr "Lune Voice ist freie Software unter der GNU General Public License, Version 3 oder neuer, und wird ohne jede Gewährleistung bereitgestellt. Du darfst sie unter diesen Bedingungen kopieren, ändern und weitergeben; der Quellcode liegt unter {REPO_URL}."
 
 #: src/features/settings/components/uinput-rule-row.tsx:96
-msgid "Lune Voice needs permission to type into other apps. Allowing it also lets any other program you run send keystrokes. Your system will ask for your password."
-msgstr "Lune Voice braucht die Berechtigung, in andere Apps zu schreiben. Damit dürfen auch alle anderen Programme, die Sie ausführen, Tastendrücke senden. Ihr System fragt nach Ihrem Passwort."
+msgid "Lune Voice needs permission to type into other apps and listen for your hotkey. Allowing it also lets any other program you run read and send keystrokes. Your system will ask for your password."
+msgstr "Lune Voice braucht die Berechtigung, in andere Apps zu schreiben und Ihr Tastenkürzel zu erkennen. Damit dürfen auch alle anderen Programme, die Sie ausführen, Tastendrücke lesen und senden. Ihr System fragt nach Ihrem Passwort."
 
 #: src/features/welcome/components/ready-checks.tsx:116
-msgid "Lune Voice needs permission to type into other apps. Your system will ask for your password."
-msgstr "Lune Voice braucht die Berechtigung, in andere Apps zu schreiben. Ihr System fragt nach Ihrem Passwort."
+msgid "Lune Voice needs permission to type into other apps and listen for your hotkey. Your system will ask for your password."
+msgstr "Lune Voice braucht die Berechtigung, in andere Apps zu schreiben und Ihr Tastenkürzel zu erkennen. Ihr System fragt nach Ihrem Passwort."
 
 #: src/features/dictionary/components/dictionary-form.tsx:82
 msgid "Lune Voice writes"

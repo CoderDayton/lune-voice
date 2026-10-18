@@ -229,7 +229,7 @@ Run it:
 Text delivery needs write access to /dev/uinput. The .deb and .rpm set this up;
 for this archive, install the rule once and log back in:
 
-    sudo cp usr/lib/udev/rules.d/99-lune-voice-uinput.rules /etc/udev/rules.d/
+    sudo cp usr/lib/udev/rules.d/70-lune-voice-input.rules /etc/udev/rules.d/
     sudo udevadm control --reload-rules && sudo udevadm trigger
 
 Speech models are downloaded by the app on first run into

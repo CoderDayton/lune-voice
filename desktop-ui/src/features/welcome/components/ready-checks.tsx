@@ -112,8 +112,8 @@ export function ReadyChecks() {
             keyboard.state === 'checking'
               ? t`Checking…`
               : keyboardOk
-                ? t`Lune Voice can type into your other apps.`
-                : t`Lune Voice needs permission to type into other apps. Your system will ask for your password.`
+                ? t`Lune Voice can type into your other apps and hear your hotkey.`
+                : t`Lune Voice needs permission to type into other apps and listen for your hotkey. Your system will ask for your password.`
           }
           action={
             keyboard.state !== 'checking' && !keyboardOk ? (

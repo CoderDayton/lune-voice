@@ -1,14 +1,16 @@
 # Grant the logged-in user write access to /dev/uinput, which Lune Voice needs
-# to deliver dictated text as keystrokes.
+# to deliver dictated text as keystrokes, and read access to keyboards, which
+# the hotkey listener needs.
 #
 # TAG+="uaccess" hands the device to whoever is logged in at the local seat, via
 # systemd-logind's ACL. That is the same mechanism the kernel uses for webcams
 # and sound devices — but note what it means here: any process running as that
-# user can synthesise input events into any application. Lune Voice needs it;
-# nothing narrower exists.
+# user can synthesise input events into any application and read every
+# keystroke. Lune Voice needs it; nothing narrower exists.
 #
 # Shipped by the .deb and .rpm so the package manager removes it on uninstall.
 # The AppImage and development builds have no package, so they install an
 # identical rule to /etc/udev/rules.d at first run instead, and offer to remove
 # it again from Settings.
 KERNEL=="uinput", SUBSYSTEM=="misc", OPTIONS+="static_node=uinput", TAG+="uaccess"
+SUBSYSTEM=="input", KERNEL=="event*", ENV{ID_INPUT_KEYBOARD}=="1", TAG+="uaccess"

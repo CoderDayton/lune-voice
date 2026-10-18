@@ -1184,24 +1184,24 @@ msgid "Lune Voice {version} is available. You have {currentVersion}."
 msgstr "Lune Voice {version} が利用できます。現在は {currentVersion} です。"
 
 #: src/features/settings/components/uinput-rule-row.tsx:95
-msgid "Lune Voice added a system rule so it can type into other apps. It also lets any other program you run send keystrokes. Removing it stops typed delivery from working until you allow it again."
-msgstr "Lune Voice は他のアプリに入力するためにシステムルールを追加しました。このルールは、実行中の他のプログラムにも���ー入力の送信を許可します。削除すると、再び許可するまでキー入力による貼り付けは機能しなくなります。"
+msgid "Lune Voice added a system rule so it can type into other apps and listen for your hotkey. It also lets any other program you run read and send keystrokes. Removing it stops typing and the hotkey from working until you allow it again."
+msgstr "Lune Voice は他のアプリに入力し、ホットキーを検出するためにシステムルールを追加しました。このルールは、実行中の他のプログラムにもキー入力の読み取りと送信を許可します。削除すると、再び許可するまで入力とホットキーは機能しなくなります。"
 
 #: src/features/welcome/components/ready-checks.tsx:115
-msgid "Lune Voice can type into your other apps."
-msgstr "Lune Voice は他のアプリに入力できます。"
+msgid "Lune Voice can type into your other apps and hear your hotkey."
+msgstr "Lune Voice は他のアプリに入力し、ホットキーを検出できます。"
 
 #: src/features/settings/sections/general-section.tsx:168
 msgid "Lune Voice is free software under the GNU General Public License, version 3 or later, and comes with no warranty. You may copy, change and share it under those terms; the source code is at {REPO_URL}."
 msgstr "Lune Voice は GNU 一般公衆利用許諾書（バージョン 3 以降）に基づくフリーソフトウェアで、一切の保証はありません。この条件のもとでコピー、改変、共有できます。ソースコードは {REPO_URL} にあります。"
 
 #: src/features/settings/components/uinput-rule-row.tsx:96
-msgid "Lune Voice needs permission to type into other apps. Allowing it also lets any other program you run send keystrokes. Your system will ask for your password."
-msgstr "Lune Voice が他のアプリに入力するには権限が必要です。許可すると、実行中の他のプログラムも���ー入力を送れるようになります。システムがパスワードを求めます。"
+msgid "Lune Voice needs permission to type into other apps and listen for your hotkey. Allowing it also lets any other program you run read and send keystrokes. Your system will ask for your password."
+msgstr "Lune Voice が他のアプリに入力し、ホットキーを検出するには権限が必要です。許可すると、実行中の他のプログラムもキー入力を読み取ったり送ったりできるようになります。システムがパスワードを求めます。"
 
 #: src/features/welcome/components/ready-checks.tsx:116
-msgid "Lune Voice needs permission to type into other apps. Your system will ask for your password."
-msgstr "Lune Voice が他のアプリに入力するには権限が必要です。システムがパスワードを求めます。"
+msgid "Lune Voice needs permission to type into other apps and listen for your hotkey. Your system will ask for your password."
+msgstr "Lune Voice が他のアプリに入力し、ホットキーを検出するには権限が必要です。システムがパスワードを求めます。"
 
 #: src/features/dictionary/components/dictionary-form.tsx:82
 msgid "Lune Voice writes"

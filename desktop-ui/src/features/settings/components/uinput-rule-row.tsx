@@ -92,8 +92,8 @@ export function UinputRuleRow() {
         label={t`Keyboard access`}
         description={
           accessReady
-            ? t`Lune Voice added a system rule so it can type into other apps. It also lets any other program you run send keystrokes. Removing it stops typed delivery from working until you allow it again.`
-            : t`Lune Voice needs permission to type into other apps. Allowing it also lets any other program you run send keystrokes. Your system will ask for your password.`
+            ? t`Lune Voice added a system rule so it can type into other apps and listen for your hotkey. It also lets any other program you run read and send keystrokes. Removing it stops typing and the hotkey from working until you allow it again.`
+            : t`Lune Voice needs permission to type into other apps and listen for your hotkey. Allowing it also lets any other program you run read and send keystrokes. Your system will ask for your password.`
         }
         control={
           accessReady ? (

@@ -34,8 +34,7 @@ const CLIPBOARD_TIMEOUT: Duration = Duration::from_secs(2);
 
 // ─── Bootstrap ───────────────────────────────────────────────────────────────
 
-const UDEV_RULE: &str =
-    r#"KERNEL=="uinput", SUBSYSTEM=="misc", OPTIONS+="static_node=uinput", TAG+="uaccess""#;
+const UDEV_RULE: &str = include_str!("../../../assets/udev/70-lune-voice-input.rules");
 
 /// Where the runtime installs the rule when nothing else has.
 ///
@@ -47,7 +46,9 @@ const UDEV_RULE: &str =
 /// a packaged install never reaches this path and the package manager owns the
 /// file's whole life. Only AppImage and `cargo run` fall back to installing it
 /// here at runtime.
-const UDEV_RULE_PATH: &str = "/etc/udev/rules.d/99-lune-voice-uinput.rules";
+const UDEV_RULE_PATH: &str = "/etc/udev/rules.d/70-lune-voice-input.rules";
+
+const LEGACY_UDEV_RULE_PATH: &str = "/etc/udev/rules.d/99-lune-voice-uinput.rules";
 
 /// Whether this session can already write to `/dev/uinput`.
 ///
@@ -56,7 +57,69 @@ const UDEV_RULE_PATH: &str = "/etc/udev/rules.d/99-lune-voice-uinput.rules";
 /// have granted access some other way entirely (a distro rule, group
 /// membership). What matters is whether typing will work, not who arranged it.
 pub fn uinput_access_ready() -> bool {
+    uinput_writable() && keyboard_access_ready(keyboard_nodes())
+}
+
+fn uinput_writable() -> bool {
     OpenOptions::new().write(true).open("/dev/uinput").is_ok()
+}
+
+fn keyboard_nodes() -> Vec<(bool, bool)> {
+    let Ok(entries) = std::fs::read_dir("/sys/class/input") else {
+        return Vec::new();
+    };
+    entries
+        .flatten()
+        .filter_map(|entry| {
+            let node = entry.file_name().into_string().ok()?;
+            node.starts_with("event").then_some(())?;
+            let device = entry.path().join("device");
+            let name = std::fs::read_to_string(device.join("name")).unwrap_or_default();
+            if name.starts_with("lune-voice") {
+                return None;
+            }
+            let caps = std::fs::read_to_string(device.join("capabilities/key")).unwrap_or_default();
+            let typing = is_typing_keyboard_caps(&caps);
+            let readable = typing
+                && OpenOptions::new()
+                    .read(true)
+                    .open(format!("/dev/input/{node}"))
+                    .is_ok();
+            Some((typing, readable))
+        })
+        .collect()
+}
+
+fn has_key(caps: &str, key: KeyCode) -> bool {
+    let bits = usize::BITS as usize;
+    let code = usize::from(key.0);
+    let words: Vec<&str> = caps.split_whitespace().collect();
+    let Some(word) = words
+        .len()
+        .checked_sub(1 + code / bits)
+        .and_then(|i| words.get(i))
+    else {
+        return false;
+    };
+    usize::from_str_radix(word, 16).is_ok_and(|w| (w >> (code % bits)) & 1 == 1)
+}
+
+fn is_typing_keyboard_caps(caps: &str) -> bool {
+    [KeyCode::KEY_A, KeyCode::KEY_SPACE, KeyCode::KEY_ENTER]
+        .into_iter()
+        .all(|key| has_key(caps, key))
+        && (has_key(caps, KeyCode::KEY_LEFTSHIFT) || has_key(caps, KeyCode::KEY_RIGHTSHIFT))
+}
+
+fn keyboard_access_ready(nodes: impl IntoIterator<Item = (bool, bool)>) -> bool {
+    let mut any_keyboard = false;
+    for (typing, readable) in nodes {
+        if typing && readable {
+            return true;
+        }
+        any_keyboard |= typing;
+    }
+    !any_keyboard
 }
 
 /// Install the udev rule so this user can synthesise keystrokes.
@@ -71,7 +134,7 @@ pub fn uinput_access_ready() -> bool {
 /// fixes. That is a different thing to tell the user than a failed install, so
 /// only a failure of the installation itself is an `Err`.
 pub fn grant_uinput_access() -> Result<bool, String> {
-    match ensure_kernel_access() {
+    match ensure_kernel_access(uinput_access_ready) {
         Ok(()) => Ok(true),
         Err(e) if e == REBOOT_REQUIRED => Ok(false),
         Err(e) => Err(e),
@@ -81,8 +144,7 @@ pub fn grant_uinput_access() -> Result<bool, String> {
 /// Returned by [`ensure_kernel_access`] when the rule is in place but the ACL
 /// has not taken effect yet. Matched rather than reported verbatim by
 /// [`grant_uinput_access`], so the two cannot drift apart.
-const REBOOT_REQUIRED: &str =
-    "udev rule installed but /dev/uinput still inaccessible — reboot may be required";
+const REBOOT_REQUIRED: &str = "udev rule installed but /dev/uinput or the keyboards are still inaccessible — reboot may be required";
 
 /// Whether the runtime-installed rule is present.
 ///
@@ -90,7 +152,9 @@ const REBOOT_REQUIRED: &str =
 /// is not ours to report on or remove — `dpkg`/`rpm` owns it, and deleting it
 /// from under them would leave the package believing it is still installed.
 pub fn uinput_rule_is_self_installed() -> bool {
-    std::path::Path::new(UDEV_RULE_PATH).is_file()
+    [UDEV_RULE_PATH, LEGACY_UDEV_RULE_PATH]
+        .iter()
+        .any(|path| std::path::Path::new(path).is_file())
 }
 
 /// Remove the rule this app installed, restoring the system to how it was.
@@ -151,27 +215,25 @@ const PKEXEC_TIMEOUT: Duration = Duration::from_secs(120);
 /// Make a rule change take effect on `/dev/uinput` now rather than at the
 /// next boot. Best-effort, so it never fails the script: if it does not
 /// apply, the access check afterwards reports that a reboot is needed.
-///
-/// The trigger is filtered to the uinput node. An unfiltered `udevadm
-/// trigger` replays a change event for every device on the machine.
 const APPLY_UDEV_RULES: &str = "udevadm control --reload-rules; \
-     udevadm trigger --subsystem-match=misc --sysname-match=uinput; exit 0";
+     udevadm trigger --subsystem-match=misc --sysname-match=uinput; \
+     udevadm trigger --subsystem-match=input --property-match=ID_INPUT_KEYBOARD=1; exit 0";
 
 /// Root half of [`grant_uinput_access`], run as `pkexec /bin/sh -c`: write
 /// the rule from stdin, then apply it. One `pkexec` is one password prompt,
 /// so everything that needs root happens in this one call. A failed write
 /// exits non-zero; applying is best-effort.
 fn grant_script() -> String {
-    format!("cat > {UDEV_RULE_PATH} || exit 1; {APPLY_UDEV_RULES}")
+    format!("cat > {UDEV_RULE_PATH} || exit 1; rm -f {LEGACY_UDEV_RULE_PATH}; {APPLY_UDEV_RULES}")
 }
 
 /// Root half of [`remove_uinput_rule`], shaped like [`grant_script`].
 fn remove_script() -> String {
-    format!("rm -f {UDEV_RULE_PATH} || exit 1; {APPLY_UDEV_RULES}")
+    format!("rm -f {UDEV_RULE_PATH} || exit 1; rm -f {LEGACY_UDEV_RULE_PATH}; {APPLY_UDEV_RULES}")
 }
 
-fn ensure_kernel_access() -> Result<(), String> {
-    if OpenOptions::new().write(true).open("/dev/uinput").is_ok() {
+fn ensure_kernel_access(ready: fn() -> bool) -> Result<(), String> {
+    if ready() {
         return Ok(());
     }
 
@@ -219,7 +281,7 @@ fn ensure_kernel_access() -> Result<(), String> {
     // Give udevd 500ms to apply the new ACL.
     std::thread::sleep(Duration::from_millis(500));
 
-    if OpenOptions::new().write(true).open("/dev/uinput").is_err() {
+    if !ready() {
         return Err(REBOOT_REQUIRED.into());
     }
 
@@ -770,7 +832,7 @@ pub struct UinputTyper {
 
 impl UinputTyper {
     pub fn with_terminal_mode(terminal_mode: TerminalMode) -> Result<Self, String> {
-        ensure_kernel_access()?;
+        ensure_kernel_access(uinput_writable)?;
 
         let mut keys = AttributeSet::<KeyCode>::new();
         for i in 1u16..255 {
@@ -1162,6 +1224,23 @@ mod tests {
     /// Each `pkexec` is its own password prompt, so writing the rule and
     /// applying it are one root command, not three.
     #[test]
+    fn the_rule_sorts_before_systemd_applies_uaccess() {
+        let name = super::UDEV_RULE_PATH.rsplit('/').next().unwrap();
+        let order: u32 = name.split('-').next().unwrap().parse().unwrap();
+        assert!(order < 73, "{name}");
+    }
+
+    #[test]
+    fn a_rule_change_removes_the_legacy_rule() {
+        for script in [super::grant_script(), super::remove_script()] {
+            assert!(
+                script.contains(&format!("rm -f {}", super::LEGACY_UDEV_RULE_PATH)),
+                "{script}"
+            );
+        }
+    }
+
+    #[test]
     fn a_rule_change_is_one_root_command() {
         for (script, action) in [
             (super::grant_script(), "cat > "),
@@ -1191,6 +1270,60 @@ mod tests {
             assert!(trigger.contains("--subsystem-match=misc"), "{trigger}");
             assert!(trigger.contains("--sysname-match=uinput"), "{trigger}");
         }
+    }
+
+    #[test]
+    fn a_rule_change_retriggers_keyboards_and_nothing_unfiltered() {
+        for script in [super::grant_script(), super::remove_script()] {
+            let triggers: Vec<&str> = script
+                .split(';')
+                .filter(|step| step.contains("udevadm trigger"))
+                .collect();
+            assert!(
+                triggers
+                    .iter()
+                    .any(|t| t.contains("--subsystem-match=input")
+                        && t.contains("--property-match=ID_INPUT_KEYBOARD=1")),
+                "{script}"
+            );
+            assert!(
+                triggers.iter().all(|t| t.contains("--subsystem-match=")),
+                "{script}"
+            );
+        }
+    }
+
+    #[test]
+    fn the_rule_grants_keyboards() {
+        assert!(super::UDEV_RULE.lines().any(|line| {
+            line.contains(r#"SUBSYSTEM=="input""#)
+                && line.contains(r#"ENV{ID_INPUT_KEYBOARD}=="1""#)
+                && line.contains(r#"TAG+="uaccess""#)
+        }));
+    }
+
+    const KEYCHRON_KEYBOARD: &str =
+        "1000000000007 ff98007a000007ff febeffdfffefffff fffffffffffffffe";
+    const KEYCHRON_CONSUMER_CONTROL: &str = "733fff 0 0 483ffff17aff32d bfd4444600000000 1 \
+         130ff38b17c000 677bfad9415fed 19ed68000004400 10000002";
+    const MOUSE: &str = "ff0000 0 0 0 0";
+    const SLEEP_BUTTON: &str = "4000 0 0";
+
+    #[test]
+    fn sysfs_key_caps_identify_a_typing_keyboard() {
+        assert!(super::is_typing_keyboard_caps(KEYCHRON_KEYBOARD));
+        assert!(!super::is_typing_keyboard_caps(KEYCHRON_CONSUMER_CONTROL));
+        assert!(!super::is_typing_keyboard_caps(MOUSE));
+        assert!(!super::is_typing_keyboard_caps(SLEEP_BUTTON));
+        assert!(!super::is_typing_keyboard_caps(""));
+    }
+
+    #[test]
+    fn keyboard_access_needs_one_readable_keyboard() {
+        assert!(super::keyboard_access_ready([]));
+        assert!(super::keyboard_access_ready([(false, false)]));
+        assert!(!super::keyboard_access_ready([(true, false)]));
+        assert!(super::keyboard_access_ready([(true, false), (true, true)]));
     }
 
     /// A short phrase types faster than the clipboard round trip and leaves the
