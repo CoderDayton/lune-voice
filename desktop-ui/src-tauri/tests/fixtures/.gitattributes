@@ -1,0 +1,5 @@
+# The updater tests embed these with include_bytes!/include_str! and check them
+# against a minisign signature, so they must be byte-exact on every platform.
+# Without this, Git on Windows (core.autocrlf) rewrites the payload's LF as
+# CRLF at checkout and the correctly signed payload stops verifying.
+* -text
