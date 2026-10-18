@@ -83,7 +83,7 @@ msgstr "本日 {todayMinutes} 分"
 
 #: src/features/history/components/history-table.tsx:127
 msgid "{totalCount} sessions"
-msgstr "{totalCount} セッ���ョン"
+msgstr "{totalCount} セッション"
 
 #: src/features/overview/overview-page.tsx:339
 msgid "{totalSessions} total"
@@ -164,7 +164,7 @@ msgstr "修正を追加すると、音声入力のたびに Lune Voice が適用
 
 #: src/features/snippets/snippets-page.tsx:356
 msgid "Add snippet"
-msgstr "スニペッ���を追加"
+msgstr "スニペットを追加"
 
 #: src/features/settings/data/settings-data.ts:323
 msgid "After 1 hour"
@@ -420,12 +420,12 @@ msgstr "Lune Voiceの見た目を選択します。"
 
 #: src/features/settings/sections/styling-engine-section.tsx:40
 msgid "Choose how transcripts are restyled — sent to an OpenAI-compatible endpoint you configure, local or hosted, or left off entirely."
-msgstr "文字起こしの整形方法を選びます — 設定した OpenAI 互換エンドポイント（ローカルでも���スト型でも）に送信するか、まったく行わないかを選べます。"
+msgstr "文字起こしの整形方法を選びます — 設定した OpenAI 互換エンドポイント（ローカルでもホスト型でも）に送信するか、まったく行わないかを選べます。"
 
 #: src/features/welcome/welcome-page.tsx:214
 #: src/features/welcome/welcome-page.tsx:220
 msgid "Choose the AI models to install. Everything runs offline — no cloud, no accounts."
-msgstr "インストールする AI モデルを選択します。すべてがオフラインで実行されます。クラウドも���カウントもありません。"
+msgstr "インストールする AI モデルを選択します。すべてがオフラインで実行されます。クラウドもアカウントもありません。"
 
 #: src/features/settings/sections/transcription-section.tsx:50
 msgid "Choose the engine that turns your speech into text. Local engines run fully on-device; Whisper is multilingual with selectable model sizes."
@@ -484,7 +484,7 @@ msgstr "接続中"
 
 #: src/features/settings/sections/general-section.tsx:131
 msgid "Contact the release server shortly after startup and tell you only when a newer version exists. Off by default — dictation itself never needs the network."
-msgstr "起動の少し後にリリースサーバーへ接続し、新しいバージョンがあるときだけ通知します。既定はオフです — 音声入力そのも���にネッ���ワークは不要です。"
+msgstr "起動の少し後にリリースサーバーへ接続し、新しいバージョンがあるときだけ通知します。既定はオフです — 音声入力そのものにネットワークは不要です。"
 
 #: src/features/welcome/welcome-page.tsx:387
 #: src/features/welcome/welcome-page.tsx:466
@@ -506,7 +506,7 @@ msgstr "コピー"
 #: src/features/settings/sections/output-section.tsx:56
 #: src/features/settings/sections/output-section.tsx:66
 msgid "Copy to clipboard"
-msgstr "クリッ���ボードにコピー"
+msgstr "クリップボードにコピー"
 
 #: src/features/history/components/session-detail-modal.tsx:129
 msgid "Copy transcript"
@@ -547,11 +547,11 @@ msgstr "ブラウザーを開けませんでした。{url} に直接アクセス
 
 #: src/components/feedback/help-feedback-dialog.tsx:269
 msgid "Couldn't reach the feedback service. Use the links above, or reopen this dialog to retry."
-msgstr "フィードバッ���サービスに接続できませんでした。上のリンクを使うか、このダイアログを開き直してやり直してください。"
+msgstr "フィードバックサービスに接続できませんでした。上のリンクを使うか、このダイアログを開き直してやり直してください。"
 
 #: src/features/snippets/snippets-page.tsx:103
 msgid "Couldn't save that snippet. Try again."
-msgstr "そのスニペッ���を保存できませんでした。もう一度お試しください。"
+msgstr "そのスニペットを保存できませんでした。もう一度お試しください。"
 
 #: src/components/feedback/help-feedback-dialog.tsx:59
 msgid "Crash or freeze"
@@ -622,7 +622,7 @@ msgstr "選択項目を削除"
 #: src/features/history/components/history-table.tsx:498
 #: src/features/history/components/session-detail-modal.tsx:197
 msgid "Delete session?"
-msgstr "セッ���ョンを削除しますか?"
+msgstr "セッションを削除しますか?"
 
 #: src/features/snippets/snippets-page.tsx:460
 msgid "Delete snippet?"
@@ -687,7 +687,7 @@ msgstr "音声入力を破棄"
 
 #: src/features/settings/sections/dictation-section.tsx:87
 msgid "Discard the current draft and return to idle. Click the binding to change it."
-msgstr "現在のドラフトを破棄し、アイドル状態に戻ります。バインディングをクリッ���して変更します。"
+msgstr "現在のドラフトを破棄し、アイドル状態に戻ります。バインディングをクリックして変更します。"
 
 #: src/features/overview/overview-page.tsx:287
 msgid "Disconnected"
@@ -809,7 +809,7 @@ msgstr "「{spokenTrigger}」を編集中"
 #: src/features/history/components/history-table.tsx:451
 #: src/features/overview/overview-page.tsx:185
 msgid "Empty session"
-msgstr "空のセッ���ョン"
+msgstr "空のセッション"
 
 #: src/features/styles/styles-page.tsx:244
 msgid "Enable styling"
@@ -855,7 +855,7 @@ msgstr "Lune Voice {version} をダウンロードしています。完了する
 
 #: src/features/welcome/welcome-page.tsx:208
 msgid "Fetching the NVIDIA runtime. This is the last step, and it only happens once."
-msgstr "NVIDIA ランタイムを取得しています。これが最後のステッ���で、一度だけ行われます。"
+msgstr "NVIDIA ランタイムを取得しています。これが最後のステップで、一度だけ行われます。"
 
 #: src/features/styles/components/style-editor-modal.tsx:199
 msgid "Few-shot examples"
@@ -895,7 +895,7 @@ msgstr "端末用の貼り付けショートカットを強制します。主に
 
 #: src/features/settings/sections/pill-section.tsx:183
 msgid "Forget where you dragged the pill and return it to its preset spot."
-msgstr "インジケーターをドラッ���した位置を破棄し、既定の位置に戻します。"
+msgstr "インジケーターをドラッグした位置を破棄し、既定の位置に戻します。"
 
 #: src/features/styles/components/style-editor-modal.tsx:161
 #: src/features/styles/components/style-hero.tsx:59
@@ -966,7 +966,7 @@ msgstr "GPU サポートはインストールされていますが、動作し�
 #: src/components/feedback/help-feedback-dialog.tsx:240
 #: src/features/shell/components/sidebar-quick-actions.tsx:83
 msgid "Help & feedback"
-msgstr "ヘルプとフィードバッ���"
+msgstr "ヘルプとフィードバック"
 
 #: src/features/history/components/history-table.tsx:216
 #: src/features/overview/overview-page.tsx:362
@@ -1090,7 +1090,7 @@ msgstr "読み込んだままにする"
 
 #: src/features/settings/sections/output-section.tsx:57
 msgid "Keep the dictated text on the clipboard after every dictation, so you can paste it again yourself."
-msgstr "ディクテーションのたびに、書き取ったテキストをクリッ���ボードに保持し、自分で再度貼り付けられるようにします。"
+msgstr "ディクテーションのたびに、書き取ったテキストをクリップボードに保持し、自分で再度貼り付けられるようにします。"
 
 #: src/features/settings/sections/pill-section.tsx:94
 msgid "Keep the pill with you when you switch workspaces or virtual desktops."
@@ -1154,7 +1154,7 @@ msgstr "聞き取り中"
 
 #: src/components/ui/voice-capture-field.tsx:194
 msgid "Listening — say the phrase, then click again to stop."
-msgstr "聞き取り中 — フレーズを話し、も���一度クリックすると停止します。"
+msgstr "聞き取り中 — フレーズを話し、もう一度クリックすると停止します。"
 
 #: src/components/ui/voice-capture-field.tsx:136
 msgid "Listening — say the phrase…"
@@ -1282,7 +1282,7 @@ msgstr "表示しない"
 #: src/features/snippets/snippets-page.tsx:244
 #: src/features/snippets/snippets-page.tsx:503
 msgid "New snippet"
-msgstr "新しいスニペッ���"
+msgstr "新しいスニペット"
 
 #: src/features/history/components/history-table.tsx:253
 msgid "Next"
@@ -1314,7 +1314,7 @@ msgstr "セッションはありません"
 
 #: src/features/history/components/history-table.tsx:149
 msgid "No sessions found."
-msgstr "セッ���ョンが見つかりませんでした。"
+msgstr "セッションが見つかりませんでした。"
 
 #. placeholder {0}: search.trim()
 #: src/features/history/components/history-table.tsx:146
@@ -1327,7 +1327,7 @@ msgstr "まだセッションはありません"
 
 #: src/features/history/components/history-table.tsx:148
 msgid "No sessions yet. Start dictating to see your transcripts here."
-msgstr "まだセッ���ョンはありません。音声入力を開始すると、ここに文字起こしが表示されます。"
+msgstr "まだセッションはありません。音声入力を開始すると、ここに文字起こしが表示されます。"
 
 #: src/features/snippets/snippets-page.tsx:428
 msgid "No snippets match “{query}”."
@@ -1366,7 +1366,7 @@ msgstr "インストールされていません"
 
 #: src/features/settings/sections/models-section.tsx:136
 msgid "Nothing installed"
-msgstr "何も���ンストールされていません"
+msgstr "何もインストールされていません"
 
 #: src/features/settings/data/settings-data.ts:154
 #: src/features/styles/components/style-editor-modal.tsx:192
@@ -1531,7 +1531,7 @@ msgstr "キーの組み合わせを押してください — Esc を長押しす
 
 #: src/features/welcome/welcome-page.tsx:509
 msgid "Press your hotkey, speak, then press it again. The text is typed into whatever app you were using."
-msgstr "ホッ���キーを押して話し、もう一度押してください。テキストは使用中のアプリに入力されます。"
+msgstr "ホットキーを押して話し、もう一度押してください。テキストは使用中のアプリに入力されます。"
 
 #: src/features/history/components/history-table.tsx:238
 msgid "Prev"
@@ -1539,7 +1539,7 @@ msgstr "前へ"
 
 #: src/features/settings/sections/pill-section.tsx:170
 msgid "Prevent moving the pill by dragging it."
-msgstr "ドラッ���によるインジケーターの移動を禁止します。"
+msgstr "ドラッグによるインジケーターの移動を禁止します。"
 
 #: src/features/history/components/history-table.tsx:236
 msgid "Previous page"
@@ -1633,7 +1633,7 @@ msgstr "必須"
 
 #: src/features/settings/sections/pill-section.tsx:194
 msgid "Reset"
-msgstr "リセッ���"
+msgstr "リセット"
 
 #: src/features/settings/sections/pill-section.tsx:182
 msgid "Reset position"
@@ -1699,7 +1699,7 @@ msgstr "保存済みスニペット"
 
 #: src/features/snippets/snippets-page.tsx:270
 msgid "Say <0>“{spokenTrigger}”</0> as the whole utterance — or <1>“insert {spokenTrigger}”</1> — to type this snippet."
-msgstr "<0>「{spokenTrigger}」</0> だけを発話する — または <1>「insert {spokenTrigger}」</1> — と、このスニペッ���が入力されます。"
+msgstr "<0>「{spokenTrigger}」</0> だけを発話する — または <1>「insert {spokenTrigger}」</1> — と、このスニペットが入力されます。"
 
 #: src/features/snippets/snippets-page.tsx:477
 msgid "Say a trigger as your whole utterance to expand it"
@@ -1752,11 +1752,11 @@ msgstr "指定した OpenAI 互換エンドポイントに文字起こしを送�
 
 #: src/features/overview/overview-page.tsx:147
 msgid "session"
-msgstr "セッ���ョン"
+msgstr "セッション"
 
 #: src/features/history/components/session-detail-modal.tsx:190
 msgid "Session details"
-msgstr "セッ���ョン詳細"
+msgstr "セッション詳細"
 
 #: src/store/workspace-store.ts:208
 msgid "Session timed out — backend may be unresponsive"
@@ -1970,7 +1970,7 @@ msgstr "テキストの送信"
 
 #: src/components/feedback/help-feedback-dialog.tsx:115
 msgid "Thanks — your feedback was sent."
-msgstr "ありがとうございます。フィードバッ���を送信しました。"
+msgstr "ありがとうございます。フィードバックを送信しました。"
 
 #: src/features/settings/sections/pill-section.tsx:74
 msgid "The floating status pill you see while dictating."
@@ -2019,7 +2019,7 @@ msgstr "選択したディクテーションセッションとその文字起こ
 #: src/features/history/components/history-table.tsx:499
 #: src/features/history/components/session-detail-modal.tsx:198
 msgid "This will permanently remove this dictation session and its transcript."
-msgstr "この音声入力セッ���ョンと文字起こしを完全に削除します。"
+msgstr "この音声入力セッションと文字起こしを完全に削除します。"
 
 #: src/features/history/components/history-table.tsx:171
 #: src/features/overview/overview-page.tsx:221
@@ -2128,7 +2128,7 @@ msgstr "入力"
 
 #: src/features/snippets/snippets-page.tsx:277
 msgid "Type a phrase, or tap the mic to capture it exactly as Lune Voice hears it."
-msgstr "フレーズを入力するか、マイクをタッ���して Lune Voice が聞き取ったとおりに登録してください。"
+msgstr "フレーズを入力するか、マイクをタップして Lune Voice が聞き取ったとおりに登録してください。"
 
 #: src/features/settings/data/settings-data.ts:223
 msgid "Type into app"
@@ -2250,7 +2250,7 @@ msgstr "ディクテーション中にインジケーターを表示するタイ
 
 #: src/features/settings/sections/pill-section.tsx:112
 msgid "Where the pill sits on screen. Dragging it overrides the preset until you reset."
-msgstr "インジケーターを画面のどこに置くか。ドラッ���すると、リセットするまで既定位置より優先されます。"
+msgstr "インジケーターを画面のどこに置くか。ドラッグすると、リセットするまで既定位置より優先されます。"
 
 #: src/features/settings/sections/dictation-section.tsx:140
 msgid "Which input device dictation captures from. Changes apply right away."
@@ -2258,7 +2258,7 @@ msgstr "ディクテーションがどの入力デバイスから取り込むか
 
 #: src/features/settings/sections/output-section.tsx:42
 msgid "Which paste shortcut to send. Automatic detects terminals; override if paste lands in the wrong place."
-msgstr "送信する貼り付けショートカッ���。「自動」はターミナルを検出します。貼り付けが誤った場所に入る場合は上書きしてください。"
+msgstr "送信する貼り付けショートカット。「自動」はターミナルを検出します。貼り付けが誤った場所に入る場合は上書きしてください。"
 
 #: src/features/settings/sections/pill-section.tsx:156
 msgid "Which screen the pill appears on."
@@ -2321,7 +2321,7 @@ msgstr "最新の状態です"
 
 #: src/features/settings/components/openai-fields.tsx:50
 msgid "Your API key. Leave it blank to keep the saved key — or if the endpoint runs on your own machine or network and needs none."
-msgstr "API キーです。保存済みのキーをそのまま使う場合、またはエンドポイントが自分のマシンやネッ���ワーク上にあってキーが不要な場合は、空欄のままにしてください。"
+msgstr "API キーです。保存済みのキーをそのまま使う場合、またはエンドポイントが自分のマシンやネットワーク上にあってキーが不要な場合は、空欄のままにしてください。"
 
 #: src/components/feedback/help-feedback-dialog.tsx:92
 msgid "Your feedback"

@@ -372,7 +372,7 @@ msgstr "用语音录制"
 
 #: src/features/settings/sections/dictation-section.tsx:135
 msgid "Capture device and how recording detects when you speak."
-msgstr "采���设备以及录音如何检测您何时说话。"
+msgstr "采集设备以及录音如何检测您何时说话。"
 
 #: src/features/welcome/welcome-page.tsx:472
 msgid "Change engine"
@@ -737,7 +737,7 @@ msgstr "下载中断"
 #: src/features/settings/sections/models-section.tsx:233
 #: src/features/welcome/components/model-card.tsx:105
 msgid "Download progress"
-msgstr "下载���度"
+msgstr "下载进度"
 
 #: src/features/history/components/session-detail-modal.tsx:121
 msgid "Download transcript"
@@ -1366,7 +1366,7 @@ msgstr "未安装"
 
 #: src/features/settings/sections/models-section.tsx:136
 msgid "Nothing installed"
-msgstr "未安装任���内容"
+msgstr "未安装任何内容"
 
 #: src/features/settings/data/settings-data.ts:154
 #: src/features/styles/components/style-editor-modal.tsx:192
@@ -1756,7 +1756,7 @@ msgstr "会议"
 
 #: src/features/history/components/session-detail-modal.tsx:190
 msgid "Session details"
-msgstr "会议���情"
+msgstr "会话详情"
 
 #: src/store/workspace-store.ts:208
 msgid "Session timed out — backend may be unresponsive"
@@ -1994,7 +1994,7 @@ msgstr "模型常驻内存。每次听写都能立即开始。"
 
 #: src/features/settings/sections/transcription-section.tsx:141
 msgid "The words the recognizer is least sure about are checked against your dictionary and vocabulary. Higher checks more words; lower trusts the raw transcription."
-msgstr "识别器最不确定的词语会与您的词典和词汇进行核对。数值越高核对的词越多；越低则越信任原始转录��"
+msgstr "识别器最不确定的词语会与您的词典和词汇进行核对。数值越高核对的词越多；越低则越信任原始转录。"
 
 #: src/features/updates/update-dialog.tsx:160
 msgid "This copy can't update itself. Download the new version from {RELEASES_URL} and replace this one. Your settings, history and models are kept."
@@ -2002,7 +2002,7 @@ msgstr "此副本无法自行更新。请从 {RELEASES_URL} 下载新版本并�
 
 #: src/features/settings/sections/models-section.tsx:307
 msgid "This model is in use by your current configuration. Dictation may not work until you reinstall it or pick another."
-msgstr "此模型正被您当前的配置使用。在您重新安装它或选择其他模型之前，听写可能无法正常���作。"
+msgstr "此模型正被您当前的配置使用。在您重新安装它或选择其他模型之前，听写可能无法正常工作。"
 
 #: src/features/welcome/welcome-page.tsx:205
 msgid "This only happens once. You can keep using your computer in the meantime."
@@ -2254,7 +2254,7 @@ msgstr "指示器在屏幕上的位置。拖动它会覆盖预设位置，直到
 
 #: src/features/settings/sections/dictation-section.tsx:140
 msgid "Which input device dictation captures from. Changes apply right away."
-msgstr "听写从哪个输入设备采���。更改会立即生效。"
+msgstr "听写从哪个输入设备采集。更改会立即生效。"
 
 #: src/features/settings/sections/output-section.tsx:42
 msgid "Which paste shortcut to send. Automatic detects terminals; override if paste lands in the wrong place."

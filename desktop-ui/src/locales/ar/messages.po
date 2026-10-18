@@ -2226,7 +2226,7 @@ msgstr "مرحبًا بك في Lune Voice"
 
 #: src/components/feedback/help-feedback-dialog.tsx:93
 msgid "What happened, or what would you like to see?"
-msgstr "ماذا حدث، أو ما الذي تودّ ��ؤيته؟"
+msgstr "ماذا حدث، أو ما الذي تودّ رؤيته؟"
 
 #: src/components/feedback/help-feedback-dialog.tsx:72
 msgid "What is this about?"
