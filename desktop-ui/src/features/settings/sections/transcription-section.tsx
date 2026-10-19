@@ -6,7 +6,7 @@ import { DescriptiveDropdown } from '../../../components/ui/descriptive-dropdown
 import { LIMITS } from '../../../lib/backend/generated/limits';
 import { saveWorkspaceSetting } from '../../../store/workspace-store';
 import { AsrEngineCards } from '../components/asr-engine-cards';
-import { OpenAiFields } from '../components/openai-fields';
+import { GpuBackendCard } from '../components/gpu-backend-card';
 import {
   SettingsBlock,
   type SettingsProps,
@@ -22,10 +22,7 @@ import {
 } from '../data/settings-data';
 import { useDebouncedSetting } from '../hooks/use-debounced-setting';
 
-export function TranscriptionSection({
-  settings,
-  onManageModels,
-}: SettingsProps & { onManageModels?: () => void }) {
+export function TranscriptionSection({ settings }: SettingsProps) {
   const { t, i18n } = useLingui();
   const [confidence, setConfidence] = useDebouncedSetting(
     'confidenceThreshold',
@@ -48,21 +45,10 @@ export function TranscriptionSection({
       >
         <SettingsBlock
           label={t`Voice model`}
-          description={t`Choose the engine that turns your speech into text. Local engines run fully on-device: Whisper covers the most languages with selectable model sizes, Parakeet is the fastest for 25 European languages.`}
+          description={t`What turns your speech into text. The local engines run on your machine.`}
         >
-          <AsrEngineCards settings={settings} onManageModels={onManageModels} />
+          <AsrEngineCards settings={settings} />
         </SettingsBlock>
-        {settings.asrBackend === 'OpenAiCompatible' && (
-          <OpenAiFields
-            settings={settings}
-            baseUrlKey="openaiAsrBaseUrl"
-            apiKeyKey="openaiAsrApiKey"
-            modelKey="openaiAsrModel"
-            apiDescription="transcription API"
-            modelDescription="Transcription model name, e.g. whisper-1."
-            modelPlaceholder="whisper-1"
-          />
-        )}
         {settings.asrBackend === 'OpenAiCompatible' && settings.privacyMode === 'LocalOnly' && (
           <div role="alert" className="alert alert-warning alert-soft sm:flex-row">
             <span>{t`Remote services are turned off, so dictation cannot start with this engine. Turn on Allow remote services in General, or switch to an on-device engine.`}</span>
@@ -105,6 +91,7 @@ export function TranscriptionSection({
             />
           }
         />
+        {settings.useGpu && <GpuBackendCard />}
         <SettingsRow
           label={t`Free the model when idle`}
           description={t`Give the memory back after a quiet spell. The next dictation reloads the model, which adds up to a second before it starts listening — your speech is recorded during the wait, so nothing is lost.`}

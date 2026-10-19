@@ -2,20 +2,12 @@
 
 import { useLingui } from '@lingui/react/macro';
 import { Check, Cpu, Download, Loader2, RefreshCw, Zap } from 'lucide-react';
+import type { ReactNode } from 'react';
 import { ByteProgress } from '../../../components/ui/byte-progress';
 import type { GpuBackendStatusDto } from '../../../lib/backend/generated/GpuBackendStatusDto';
 import { formatBytes } from '../../../lib/format-bytes';
 import { useGpuBackend } from '../hooks/use-gpu-backend';
 
-/**
- * GPU acceleration, managed alongside the models.
- *
- * The app ships with no NVIDIA code at all — the executable has no load-time
- * dependency on the CUDA runtime, and the bundled CPU backends are enough to
- * run. Turning the GPU on means downloading the optional CUDA plugin, which is
- * a several-hundred-megabyte file that lands on disk next to the models, so it
- * belongs on the same screen as they do.
- */
 export function GpuBackendCard() {
   const { t } = useLingui();
   const { status, progress, installing, error, install } = useGpuBackend();
@@ -31,111 +23,92 @@ export function GpuBackendCard() {
   // error is worse than offering nothing.
   const offerDownload = status.state === 'not-installed' && status.downloadAvailable;
 
-  const stateClass = active
-    ? 'border-success/40 bg-success/5'
-    : installing
-      ? 'border-primary/50 bg-primary/8'
-      : 'border-surface-border bg-surface-inset';
-
-  const iconBg = active
-    ? 'bg-success/15 text-success'
-    : installing
-      ? 'bg-primary/15 text-primary'
-      : 'bg-surface-elevated text-content-subtle';
+  let side: ReactNode = null;
+  if (installing) {
+    side = (
+      <span className="inline-flex items-center gap-1.5 text-[13px] font-medium text-primary">
+        <Loader2 size={13} className="animate-spin" />
+        {t`Downloading…`}
+      </span>
+    );
+  } else if (offerDownload) {
+    side = (
+      <button
+        type="button"
+        className="btn btn-sm btn-ghost gap-1.5 border border-surface-border-strong text-content-strong hover:border-primary"
+        onClick={install}
+      >
+        <Download size={13} />
+        {t`Download`}
+      </button>
+    );
+  } else {
+    side = <StatusTag status={status} />;
+  }
 
   return (
-    <div className="flex flex-col gap-2">
-      <h3 className="text-xs font-medium uppercase tracking-wider text-content-subtle">
-        {t`Acceleration`}
-      </h3>
-      <div className={`rounded-box border p-4 transition-colors ${stateClass}`}>
-        <div className="flex items-start gap-3 sm:gap-4">
-          <div
-            className={`flex size-10 shrink-0 items-center justify-center rounded-field ${iconBg}`}
-          >
-            {active ? (
-              <Check size={18} strokeWidth={2.5} />
-            ) : installing ? (
-              <span className="loading loading-spinner loading-sm" />
-            ) : (
-              <Zap size={18} strokeWidth={1.6} />
+    <div className="mx-4 rounded-box border border-surface-border bg-surface-card px-5 py-4">
+      <div className="flex items-center gap-4">
+        <Zap
+          size={18}
+          strokeWidth={1.8}
+          className={`shrink-0 ${active ? 'text-success' : 'text-content-muted'}`}
+        />
+        <div className="flex min-w-0 flex-1 flex-col gap-0.5">
+          <span className="flex flex-wrap items-baseline gap-x-2 text-[15px] font-medium text-content-strong">
+            {t`GPU acceleration`}
+            {offerDownload && (
+              <span className="text-[13px] font-normal tabular-nums text-content-muted">
+                {formatBytes(status.downloadBytes)}
+              </span>
             )}
-          </div>
+          </span>
 
-          <div className="min-w-0 flex-1">
-            <div className="flex flex-wrap items-center gap-2">
-              <p className="truncate text-sm font-medium text-content-default sm:text-base">
-                {t`GPU acceleration`}
-              </p>
-              {offerDownload && (
-                <span className="text-xs tabular-nums text-content-subtle">
-                  {formatBytes(status.downloadBytes)}
-                </span>
-              )}
-              <StatusBadge status={status} />
-            </div>
-
-            {/* Progress replaces the description for the whole install, not
+          {/* Progress replaces the description for the whole install, not
                 just from the first channel message on: the gap before the
                 server answers would otherwise show the download pitch under a
                 spinner that is already downloading it. */}
-            {installing ? (
-              <ByteProgress
-                downloadedBytes={progress?.downloadedBytes ?? 0}
-                totalBytes={progress?.totalBytes ?? 0}
-                fallbackTotalBytes={status.downloadBytes}
-              />
-            ) : (
-              <p className="mt-1 text-xs leading-snug text-content-subtle sm:text-sm">
-                <StatusLine status={status} />
-              </p>
-            )}
-
-            {error && (
-              <p className="mt-2 text-sm text-error" role="alert">
-                {error}
-              </p>
-            )}
-          </div>
-
-          {offerDownload && (
-            <div className="shrink-0">
-              <button
-                type="button"
-                className="btn btn-primary btn-sm gap-1.5 whitespace-nowrap"
-                disabled={installing}
-                onClick={install}
-              >
-                {installing ? (
-                  <Loader2 size={13} className="animate-spin" />
-                ) : (
-                  <Download size={13} />
-                )}
-                {installing ? t`Downloading…` : t`Download`}
-              </button>
-            </div>
+          {installing ? (
+            <ByteProgress
+              downloadedBytes={progress?.downloadedBytes ?? 0}
+              totalBytes={progress?.totalBytes ?? 0}
+              fallbackTotalBytes={status.downloadBytes}
+            />
+          ) : (
+            <span className="text-[13px] text-content-muted">
+              <StatusLine status={status} />
+            </span>
+          )}
+          {error && (
+            <p className="mt-1 text-[13px] text-error" role="alert">
+              {error}
+            </p>
           )}
         </div>
+        <span className="flex min-w-24 shrink-0 justify-end">{side}</span>
       </div>
     </div>
   );
 }
 
-function StatusBadge({ status }: { status: GpuBackendStatusDto }) {
+function StatusTag({ status }: { status: GpuBackendStatusDto }) {
   const { t } = useLingui();
 
   if (status.state === 'ready') {
-    return <span className="badge badge-xs badge-soft badge-success">{t`Active`}</span>;
-  }
-  if (status.state === 'needs-restart') {
-    return <span className="badge badge-xs badge-soft badge-warning">{t`Restart needed`}</span>;
-  }
-  if (status.state === 'not-installed') {
     return (
-      <span className="badge badge-xs badge-soft text-content-subtle">{t`Not installed`}</span>
+      <span className="inline-flex items-center gap-1 text-[13px] font-medium text-success">
+        <Check size={13} strokeWidth={2.5} />
+        {t`Active`}
+      </span>
     );
   }
-  return <span className="badge badge-xs badge-soft text-content-subtle">{t`Running on CPU`}</span>;
+  if (status.state === 'needs-restart') {
+    return <span className="text-[13px] font-medium text-warning">{t`Restart needed`}</span>;
+  }
+  if (status.state === 'not-installed') {
+    return <span className="text-[13px] text-content-muted">{t`Not installed`}</span>;
+  }
+  return <span className="text-[13px] text-content-muted">{t`Running on CPU`}</span>;
 }
 
 function StatusLine({ status }: { status: GpuBackendStatusDto }): React.ReactNode {

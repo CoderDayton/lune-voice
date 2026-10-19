@@ -364,6 +364,33 @@ export function languageForEngine(
   return 'en';
 }
 
+export type ModelChoice =
+  | { engine: 'WhisperCpp'; model: WhisperModelValue }
+  | { engine: 'ParakeetCpp'; model: ParakeetModelValue }
+  | { engine: 'OpenAiCompatible' };
+
+export interface ModelChoiceSettings {
+  asrBackend: AsrBackendValue;
+  dictationLanguage: string;
+  whisperModel?: WhisperModelValue;
+  parakeetModel?: ParakeetModelValue;
+}
+
+export function modelChoiceSettings(
+  choice: ModelChoice,
+  currentLanguage: string,
+  preferred: readonly string[],
+): ModelChoiceSettings {
+  const dictationLanguage = languageForEngine(choice.engine, currentLanguage, preferred);
+  if (choice.engine === 'WhisperCpp') {
+    return { asrBackend: choice.engine, whisperModel: choice.model, dictationLanguage };
+  }
+  if (choice.engine === 'ParakeetCpp') {
+    return { asrBackend: choice.engine, parakeetModel: choice.model, dictationLanguage };
+  }
+  return { asrBackend: choice.engine, dictationLanguage };
+}
+
 /** The system's preferred languages, most wanted first; empty off a browser. */
 export function systemLanguages(): string[] {
   if (typeof navigator === 'undefined') return [];

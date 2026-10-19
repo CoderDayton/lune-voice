@@ -5,7 +5,6 @@ import { useNavigate, useSearch } from '@tanstack/react-router';
 import { useStore } from '@tanstack/react-store';
 import {
   AudioLines,
-  HardDrive,
   type LucideIcon,
   Mic,
   Palette,
@@ -21,7 +20,6 @@ import type { SettingsSectionId } from './sections';
 import { AppearanceSection } from './sections/appearance-section';
 import { DictationSection } from './sections/dictation-section';
 import { GeneralSection } from './sections/general-section';
-import { ModelsSection } from './sections/models-section';
 import { OutputSection } from './sections/output-section';
 import { PillSection } from './sections/pill-section';
 import { StylingEngineSection } from './sections/styling-engine-section';
@@ -76,7 +74,6 @@ export function SettingsPage() {
     { id: 'transcription', label: t`Transcription`, icon: AudioLines },
     { id: 'styling', label: t`Styling`, icon: Wand2 },
     { id: 'output', label: t`Output`, icon: Send },
-    { id: 'models', label: t`Models`, icon: HardDrive },
   ];
 
   const content: Record<SectionId, ReactNode> = {
@@ -84,12 +81,9 @@ export function SettingsPage() {
     appearance: <AppearanceSection />,
     dictation: <DictationSection settings={settings} />,
     pill: <PillSection />,
-    transcription: (
-      <TranscriptionSection settings={settings} onManageModels={() => setActive('models')} />
-    ),
+    transcription: <TranscriptionSection settings={settings} />,
     styling: <StylingEngineSection settings={settings} />,
     output: <OutputSection settings={settings} />,
-    models: <ModelsSection />,
   };
 
   return (

@@ -15,7 +15,6 @@ export const SETTINGS_SECTION_IDS = [
   'transcription',
   'styling',
   'output',
-  'models',
 ] as const;
 
 export type SettingsSectionId = (typeof SETTINGS_SECTION_IDS)[number];

@@ -103,29 +103,29 @@ msgstr "## Besprechung — {date}\n"
 "Teilnehmer:\n"
 "- "
 
-#: src/features/settings/data/settings-data.ts:523
+#: src/features/settings/data/settings-data.ts:550
 msgid "1 year"
 msgstr "1 Jahr"
 
-#: src/features/settings/data/settings-data.ts:521
+#: src/features/settings/components/asr-engine-cards.tsx:230
+msgid "25 European languages"
+msgstr "25 europäische Sprachen"
+
+#: src/features/settings/data/settings-data.ts:548
 msgid "30 days"
 msgstr "30 Tage"
 
-#: src/features/settings/data/settings-data.ts:520
+#: src/features/settings/data/settings-data.ts:547
 msgid "7 days"
 msgstr "7 Tage"
 
-#: src/features/settings/data/settings-data.ts:522
+#: src/features/settings/data/settings-data.ts:549
 msgid "90 days"
 msgstr "90 Tage"
 
 #: src/features/settings/sections/pill-section.tsx:221
 msgid "A vertical pill hugs the side of the screen."
 msgstr "Eine senkrechte Anzeige schmiegt sich an den Bildschirmrand."
-
-#: src/features/settings/components/gpu-backend-card.tsx:49
-msgid "Acceleration"
-msgstr "Beschleunigung"
 
 #: src/features/settings/components/uinput-rule-row.tsx:66
 #: src/features/welcome/components/ready-checks.tsx:59
@@ -136,7 +136,7 @@ msgstr "Der Zugriff funktioniert noch nicht. Möglicherweise ist ein Neustart n�
 msgid "Action"
 msgstr "Aktion"
 
-#: src/features/settings/components/gpu-backend-card.tsx:128
+#: src/features/settings/components/gpu-backend-card.tsx:101
 #: src/features/styles/components/style-preset-card.tsx:74
 msgid "Active"
 msgstr "Aktiv"
@@ -166,29 +166,25 @@ msgstr "Fügen Sie einen Fix hinzu und Lune Voice wendet ihn jedes Mal an, wenn 
 msgid "Add snippet"
 msgstr "Textbaustein hinzufügen"
 
-#: src/features/settings/data/settings-data.ts:557
+#: src/features/settings/data/settings-data.ts:584
 msgid "After 1 hour"
 msgstr "Nach 1 Stunde"
 
-#: src/features/settings/data/settings-data.ts:555
+#: src/features/settings/data/settings-data.ts:582
 msgid "After 15 minutes"
 msgstr "Nach 15 Minuten"
 
-#: src/features/settings/data/settings-data.ts:558
+#: src/features/settings/data/settings-data.ts:585
 msgid "After 2 hours"
 msgstr "Nach 2 Stunden"
 
-#: src/features/settings/data/settings-data.ts:556
+#: src/features/settings/data/settings-data.ts:583
 msgid "After 30 minutes"
 msgstr "Nach 30 Minuten"
 
-#: src/features/settings/data/settings-data.ts:554
+#: src/features/settings/data/settings-data.ts:581
 msgid "After 5 minutes"
 msgstr "Nach 5 Minuten"
-
-#: src/features/settings/sections/models-section.tsx:103
-msgid "AI models stored on your device."
-msgstr "Auf Ihrem Gerät gespeicherte KI-Modelle."
 
 #: src/features/welcome/welcome-page.tsx:225
 msgid "All required models are already installed. Continue when you're ready."
@@ -212,11 +208,11 @@ msgstr "Remote-Dienste zulassen"
 msgid "Always"
 msgstr "Immer"
 
-#: src/features/settings/data/settings-data.ts:509
+#: src/features/settings/data/settings-data.ts:536
 msgid "Always Ctrl+Shift+V"
 msgstr "Immer Strg+Umschalt+V"
 
-#: src/features/settings/data/settings-data.ts:504
+#: src/features/settings/data/settings-data.ts:531
 msgid "Always Ctrl+V"
 msgstr "Immer Strg+V"
 
@@ -229,7 +225,7 @@ msgid "API key"
 msgstr "API-Schlüssel"
 
 #: src/features/settings/sections/appearance-section.tsx:16
-#: src/features/settings/settings-page.tsx:73
+#: src/features/settings/settings-page.tsx:71
 msgid "Appearance"
 msgstr "Aussehen"
 
@@ -274,11 +270,11 @@ msgstr "Audio-Feedback beim Start, Ende oder bei Fehlern des Diktats."
 msgid "Auto-capitalize sentences"
 msgstr "Sätze automatisch großschreiben"
 
-#: src/features/settings/data/settings-data.ts:461
+#: src/features/settings/data/settings-data.ts:488
 msgid "Auto-detect"
 msgstr "Automatisch erkennen"
 
-#: src/features/settings/data/settings-data.ts:499
+#: src/features/settings/data/settings-data.ts:526
 #: src/features/settings/sections/pill-section.tsx:55
 msgid "Automatic"
 msgstr "Automatisch"
@@ -302,6 +298,10 @@ msgstr "Bevor Sie loslegen"
 #: src/features/settings/data/settings-data.ts:214
 msgid "Best accuracy; turbo decoder keeps it fast."
 msgstr "Beste Genauigkeit; der Turbo-Decoder hält es schnell."
+
+#: src/features/settings/components/asr-engine-cards.tsx:223
+msgid "Bigger is more accurate, but slower"
+msgstr "Größer ist genauer, aber langsamer"
 
 #: src/features/settings/data/settings-data.ts:116
 msgid "Bottom center"
@@ -342,7 +342,7 @@ msgstr "Eingebaut"
 
 #: src/components/feedback/confirm-dialog.tsx:61
 #: src/features/dictionary/components/dictionary-table.tsx:112
-#: src/features/settings/sections/models-section.tsx:315
+#: src/features/settings/components/asr-engine-cards.tsx:396
 #: src/features/snippets/snippets-page.tsx:248
 #: src/features/styles/components/style-editor-modal.tsx:247
 msgid "Cancel"
@@ -356,8 +356,8 @@ msgstr "Aktuelle Aufnahme abbrechen"
 msgid "Cancel download"
 msgstr "Download abbrechen"
 
-#: src/features/settings/sections/transcription-section.tsx:134
-#: src/features/settings/sections/transcription-section.tsx:142
+#: src/features/settings/sections/transcription-section.tsx:121
+#: src/features/settings/sections/transcription-section.tsx:129
 msgid "Capitalize known names"
 msgstr "Bekannte Namen großschreiben"
 
@@ -404,7 +404,7 @@ msgstr "Nach Updates suchen"
 msgid "Checking installed models…"
 msgstr "Installierte Modelle prüfen…"
 
-#: src/features/settings/components/asr-engine-cards.tsx:246
+#: src/features/settings/components/asr-engine-cards.tsx:314
 #: src/features/settings/sections/general-section.tsx:159
 #: src/features/welcome/components/ready-checks.tsx:113
 msgid "Checking…"
@@ -427,11 +427,7 @@ msgstr "Wählen Sie, wie Transkripte umformuliert werden — an einen von Ihnen 
 msgid "Choose the AI models to install. Everything runs offline — no cloud, no accounts."
 msgstr "Wählen Sie die zu installierenden KI-Modelle aus. Alles läuft offline – keine Cloud, keine Konten."
 
-#: src/features/settings/sections/transcription-section.tsx:51
-msgid "Choose the engine that turns your speech into text. Local engines run fully on-device: Whisper covers the most languages with selectable model sizes, Parakeet is the fastest for 25 European languages."
-msgstr "Wählen Sie die Engine, die Ihre Sprache in Text umwandelt. Lokale Engines laufen vollständig auf dem Gerät: Whisper deckt die meisten Sprachen ab und bietet wählbare Modellgrößen, Parakeet ist für 25 europäische Sprachen am schnellsten."
-
-#: src/features/settings/components/asr-engine-cards.tsx:397
+#: src/features/settings/components/asr-engine-cards.tsx:422
 msgid "Choose your dictation language below. Parakeet cannot tell Lune which language it heard, so until one is set every dictation is formatted as English."
 msgstr "Wählen Sie unten Ihre Diktatsprache. Parakeet kann Lune nicht mitteilen, welche Sprache es gehört hat, daher wird jedes Diktat als Englisch formatiert, bis eine festgelegt ist."
 
@@ -453,7 +449,7 @@ msgstr "schließen"
 
 #: src/components/feedback/help-feedback-dialog.tsx:281
 #: src/features/history/components/session-detail-modal.tsx:206
-#: src/features/settings/sections/models-section.tsx:327
+#: src/features/settings/components/asr-engine-cards.tsx:406
 #: src/features/styles/components/style-editor-modal.tsx:238
 #: src/features/updates/update-dialog.tsx:326
 #: src/features/updates/update-dialog.tsx:338
@@ -496,7 +492,7 @@ msgstr "Kurz nach dem Start den Release-Server kontaktieren und Sie nur benachri
 msgid "Continue"
 msgstr "Weitermachen"
 
-#: src/features/settings/sections/transcription-section.tsx:46
+#: src/features/settings/sections/transcription-section.tsx:43
 msgid "Control how your speech is turned into text."
 msgstr "Steuern Sie, wie Ihre Rede in Text umgewandelt wird."
 
@@ -525,12 +521,12 @@ msgstr "Eckenrundung der Anzeigeleiste."
 msgid "Corners"
 msgstr "Ecken"
 
-#: src/features/settings/sections/transcription-section.tsx:129
+#: src/features/settings/sections/transcription-section.tsx:116
 msgid "Correction"
 msgstr "Korrektur"
 
-#: src/features/settings/sections/transcription-section.tsx:148
-#: src/features/settings/sections/transcription-section.tsx:163
+#: src/features/settings/sections/transcription-section.tsx:135
+#: src/features/settings/sections/transcription-section.tsx:150
 msgid "Correction sensitivity"
 msgstr "Korrekturempfindlichkeit"
 
@@ -598,7 +594,8 @@ msgstr "Dunkel"
 #: src/components/feedback/confirm-dialog.tsx:72
 #: src/features/history/components/history-table.tsx:500
 #: src/features/history/components/session-detail-modal.tsx:199
-#: src/features/settings/sections/models-section.tsx:263
+#: src/features/settings/components/asr-engine-cards.tsx:330
+#: src/features/settings/components/asr-engine-cards.tsx:331
 msgid "Delete"
 msgstr "Löschen"
 
@@ -612,7 +609,7 @@ msgid "Delete {0}"
 msgstr "{0} löschen"
 
 #. placeholder {0}: model.name
-#: src/features/settings/sections/models-section.tsx:300
+#: src/features/settings/components/asr-engine-cards.tsx:387
 msgid "Delete {0}?"
 msgstr "{0} löschen?"
 
@@ -620,7 +617,7 @@ msgstr "{0} löschen?"
 msgid "Delete {count, plural, one {# session} other {# sessions}}?"
 msgstr "{count, plural, one {# Sitzung} other {# Sitzungen}} löschen?"
 
-#: src/features/settings/sections/models-section.tsx:318
+#: src/features/settings/components/asr-engine-cards.tsx:399
 msgid "Delete model"
 msgstr "Modell löschen"
 
@@ -657,11 +654,15 @@ msgstr "Beschreibung"
 msgid "Description is too long."
 msgstr "Die Beschreibung ist zu lang."
 
-#: src/features/settings/data/settings-data.ts:500
+#: src/features/settings/data/settings-data.ts:527
 msgid "Detects terminals and picks the matching paste shortcut. Works on most compositors."
 msgstr "Erkennt Terminals und wählt das passende Einfüge-Kürzel. Funktioniert mit den meisten Compositors."
 
-#: src/features/settings/data/settings-data.ts:462
+#: src/features/settings/components/asr-engine-cards.tsx:222
+msgid "Detects the language you speak"
+msgstr "Erkennt die Sprache, die Sie sprechen"
+
+#: src/features/settings/data/settings-data.ts:489
 msgid "Detects the spoken language each session."
 msgstr "Erkennt die gesprochene Sprache bei jeder Sitzung."
 
@@ -669,20 +670,16 @@ msgstr "Erkennt die gesprochene Sprache bei jeder Sitzung."
 msgid "Deterministic fixes applied before any AI styling."
 msgstr "Deterministische Korrekturen werden vor jedem KI-Styling angewendet."
 
-#: src/features/settings/settings-page.tsx:74
+#: src/features/settings/settings-page.tsx:72
 msgid "Dictation"
 msgstr "Diktat"
 
-#: src/features/settings/sections/transcription-section.tsx:72
-#: src/features/settings/sections/transcription-section.tsx:85
+#: src/features/settings/sections/transcription-section.tsx:58
+#: src/features/settings/sections/transcription-section.tsx:71
 #: src/features/welcome/components/engine-step.tsx:286
 #: src/features/welcome/components/engine-step.tsx:294
 msgid "Dictation language"
 msgstr "Diktatsprache"
-
-#: src/features/settings/components/asr-engine-cards.tsx:386
-msgid "Dictation language set to {languageName}. Parakeet cannot tell Lune which language it heard, so it has no Auto-detect — change the language below whenever you dictate in another one."
-msgstr "Diktatsprache auf {languageName} gesetzt. Parakeet kann Lune nicht mitteilen, welche Sprache es gehört hat, daher gibt es kein „Automatisch erkennen“ – ändern Sie die Sprache unten, wenn Sie in einer anderen diktieren."
 
 #: src/features/settings/sections/pill-section.tsx:73
 msgid "Dictation pill"
@@ -708,7 +705,7 @@ msgstr "Verwerfen Sie den aktuellen Entwurf und kehren Sie in den Leerlauf zurü
 msgid "Disconnected"
 msgstr "Getrennt"
 
-#: src/features/settings/sections/models-section.tsx:137
+#: src/features/settings/components/asr-engine-cards.tsx:143
 msgid "Disk usage"
 msgstr "Speicherplatznutzung"
 
@@ -716,19 +713,15 @@ msgstr "Speicherplatznutzung"
 msgid "Dismiss error"
 msgstr "Fehler schließen"
 
-#: src/features/settings/data/settings-data.ts:519
+#: src/features/settings/data/settings-data.ts:546
 msgid "Don't save history"
 msgstr "Verlauf nicht speichern"
 
 #: src/features/history/components/history-table.tsx:494
-#: src/features/settings/components/gpu-backend-card.tsx:114
-#: src/features/settings/sections/models-section.tsx:277
+#: src/features/settings/components/asr-engine-cards.tsx:344
+#: src/features/settings/components/gpu-backend-card.tsx:42
 msgid "Download"
 msgstr "Herunterladen"
-
-#: src/features/settings/components/asr-engine-cards.tsx:312
-msgid "Download {label}"
-msgstr "{label} herunterladen"
 
 #: src/features/welcome/welcome-page.tsx:466
 msgid "Download {pendingCount} models"
@@ -747,8 +740,7 @@ msgid "Download interrupted"
 msgstr "Download unterbrochen"
 
 #: src/components/ui/byte-progress.tsx:37
-#: src/features/settings/components/asr-engine-cards.tsx:297
-#: src/features/settings/sections/models-section.tsx:236
+#: src/features/settings/components/asr-engine-cards.tsx:356
 #: src/features/welcome/components/model-card.tsx:105
 msgid "Download progress"
 msgstr "Download-Fortschritt"
@@ -769,9 +761,8 @@ msgstr "NVIDIAs CUDA-Laufzeitumgebung wird heruntergeladen."
 msgid "Downloading update"
 msgstr "Update wird heruntergeladen"
 
-#: src/features/settings/components/asr-engine-cards.tsx:300
-#: src/features/settings/components/gpu-backend-card.tsx:114
-#: src/features/settings/sections/models-section.tsx:277
+#: src/features/settings/components/asr-engine-cards.tsx:318
+#: src/features/settings/components/gpu-backend-card.tsx:31
 #: src/features/welcome/welcome-page.tsx:410
 msgid "Downloading…"
 msgstr "Herunterladen…"
@@ -851,6 +842,10 @@ msgstr "Beispiele bringen der Styling-Engine Ihren Stil bei. Erzeugen Sie sie na
 msgid "Expand sidebar"
 msgstr "Seitenleiste erweitern"
 
+#: src/features/settings/components/asr-engine-cards.tsx:236
+msgid "Fast on a CPU"
+msgstr "Schnell auf einer CPU"
+
 #: src/features/settings/data/settings-data.ts:200
 msgid "Fast; less accurate than Medium."
 msgstr "Schnell; weniger genau als Mittel."
@@ -895,7 +890,7 @@ msgstr "Textbausteine filtern"
 msgid "Filter snippets…"
 msgstr "Textbausteine filtern…"
 
-#: src/features/settings/sections/transcription-section.tsx:130
+#: src/features/settings/sections/transcription-section.tsx:117
 msgid "Fix recognizer errors with your dictionary and known vocabulary, on your device. It uses per-word confidence and statistical patterns — no AI model, and it never rewrites what you said."
 msgstr "Beheben Sie Erkennungsfehler mit Ihrem Wörterbuch und bekanntem Vokabular, direkt auf Ihrem Gerät. Es nutzt die Konfidenz pro Wort und statistische Muster — kein KI-Modell, und es formuliert niemals um, was Sie gesagt haben."
 
@@ -903,11 +898,11 @@ msgstr "Beheben Sie Erkennungsfehler mit Ihrem Wörterbuch und bekanntem Vokabul
 msgid "Follow Settings"
 msgstr "Einstellungen folgen"
 
-#: src/features/settings/data/settings-data.ts:505
+#: src/features/settings/data/settings-data.ts:532
 msgid "Force the standard paste shortcut for every app."
 msgstr "Erzwingt das Standard-Einfüge-Kürzel für jede App."
 
-#: src/features/settings/data/settings-data.ts:510
+#: src/features/settings/data/settings-data.ts:537
 msgid "Force the terminal paste shortcut. Use on COSMIC if you mostly dictate into terminals."
 msgstr "Erzwingt das Terminal-Einfüge-Kürzel. Unter COSMIC sinnvoll, wenn Sie überwiegend in Terminals diktieren."
 
@@ -920,8 +915,8 @@ msgstr "Vergisst, wohin Sie die Anzeige gezogen haben, und setzt sie an ihre vor
 msgid "Formatting"
 msgstr "Formatierung"
 
-#: src/features/settings/sections/transcription-section.tsx:109
-#: src/features/settings/sections/transcription-section.tsx:115
+#: src/features/settings/sections/transcription-section.tsx:96
+#: src/features/settings/sections/transcription-section.tsx:102
 msgid "Free the model when idle"
 msgstr "Modell bei Inaktivität freigeben"
 
@@ -938,7 +933,7 @@ msgid "Gap between the pill and the screen edge, so it clears a taskbar or dock.
 msgstr "Abstand zwischen der Anzeige und dem Bildschirmrand, damit sie eine Taskleiste oder ein Dock frei lässt."
 
 #: src/features/settings/sections/general-section.tsx:62
-#: src/features/settings/settings-page.tsx:72
+#: src/features/settings/settings-page.tsx:70
 msgid "General"
 msgstr "Allgemein"
 
@@ -959,7 +954,7 @@ msgstr "Github"
 msgid "GitHub"
 msgstr "GitHub"
 
-#: src/features/settings/sections/transcription-section.tsx:110
+#: src/features/settings/sections/transcription-section.tsx:97
 msgid "Give the memory back after a quiet spell. The next dictation reloads the model, which adds up to a second before it starts listening — your speech is recorded during the wait, so nothing is lost."
 msgstr "Gibt den Speicher nach einer Ruhephase frei. Das nächste Diktat lädt das Modell neu, was bis zu einer Sekunde dauert, bevor die Aufnahme beginnt — Ihre Sprache wird währenddessen aufgezeichnet, es geht also nichts verloren."
 
@@ -975,13 +970,13 @@ msgstr "Guten Abend."
 msgid "Good morning."
 msgstr "Guten Morgen."
 
-#: src/features/settings/components/gpu-backend-card.tsx:68
+#: src/features/settings/components/gpu-backend-card.tsx:59
 #: src/features/welcome/components/engine-step.tsx:350
 #: src/features/welcome/welcome-page.tsx:309
 msgid "GPU acceleration"
 msgstr "GPU-Beschleunigung"
 
-#: src/features/settings/components/gpu-backend-card.tsx:176
+#: src/features/settings/components/gpu-backend-card.tsx:149
 msgid "GPU support is installed but not working."
 msgstr "GPU-Unterstützung ist installiert, funktioniert aber nicht."
 
@@ -1054,7 +1049,9 @@ msgstr "So diktieren Sie"
 msgid "Idle · mic ready"
 msgstr "Inaktiv · Mikrofon bereit"
 
-#: src/features/settings/sections/models-section.tsx:220
+#: src/features/settings/components/asr-engine-cards.tsx:196
+#: src/features/settings/components/asr-engine-cards.tsx:197
+#: src/features/settings/components/asr-engine-cards.tsx:307
 msgid "In use"
 msgstr "In Verwendung"
 
@@ -1070,14 +1067,13 @@ msgstr "Platzhalter einfügen"
 msgid "Install and restart"
 msgstr "Installieren und neu starten"
 
-#: src/features/settings/components/asr-engine-cards.tsx:250
-#: src/features/settings/sections/models-section.tsx:223
+#: src/features/settings/components/asr-engine-cards.tsx:324
 #: src/features/welcome/components/model-card.tsx:88
 #: src/features/welcome/welcome-page.tsx:311
 msgid "Installed"
 msgstr "Installiert"
 
-#: src/features/settings/components/gpu-backend-card.tsx:154
+#: src/features/settings/components/gpu-backend-card.tsx:127
 #: src/features/welcome/components/engine-step.tsx:340
 msgid "Installed. Restart Lune Voice to start using your GPU."
 msgstr "Installiert. Starten Sie Lune Voice neu, um Ihre GPU zu nutzen."
@@ -1102,11 +1098,11 @@ msgstr "An den Diskussionen teilnehmen"
 msgid "Just now"
 msgstr "Gerade eben"
 
-#: src/features/settings/data/settings-data.ts:524
+#: src/features/settings/data/settings-data.ts:551
 msgid "Keep forever"
 msgstr "Dauerhaft behalten"
 
-#: src/features/settings/data/settings-data.ts:551
+#: src/features/settings/data/settings-data.ts:578
 msgid "Keep loaded"
 msgstr "Geladen lassen"
 
@@ -1135,10 +1131,6 @@ msgstr "Tastaturkürzel („Super H“ → „Super+H“)"
 #: src/features/settings/sections/general-section.tsx:72
 msgid "Language"
 msgstr "Sprache"
-
-#: src/features/settings/components/asr-engine-cards.tsx:379
-msgid "Languages: {languages}"
-msgstr "Sprachen: {languages}"
 
 #: src/features/settings/data/settings-data.ts:123
 msgid "Large"
@@ -1233,10 +1225,6 @@ msgstr "Lune Voice braucht die Berechtigung, in andere Apps zu schreiben und Ihr
 msgid "Lune Voice writes"
 msgstr "Lune Voice schreibt"
 
-#: src/features/settings/components/asr-engine-cards.tsx:320
-msgid "Manage in Models"
-msgstr "In „Modelle“ verwalten"
-
 #: src/features/settings/data/settings-data.ts:206
 msgid "Medium"
 msgstr "Mittel"
@@ -1269,11 +1257,6 @@ msgstr "Modus"
 msgid "Model size"
 msgstr "Modellgröße"
 
-#: src/features/settings/sections/models-section.tsx:102
-#: src/features/settings/settings-page.tsx:79
-msgid "Models"
-msgstr "Modelle"
-
 #: src/features/welcome/welcome-page.tsx:534
 msgid "Models are stored locally. No telemetry, no accounts."
 msgstr "Modelle werden lokal gespeichert. Keine Telemetrie, keine Konten."
@@ -1301,6 +1284,10 @@ msgstr "Name"
 msgid "Name is too long."
 msgstr "Der Name ist zu lang."
 
+#: src/features/settings/components/asr-engine-cards.tsx:221
+msgid "Nearly 100 languages"
+msgstr "Fast 100 Sprachen"
+
 #: src/features/settings/data/settings-data.ts:108
 msgid "Never"
 msgstr "Nie"
@@ -1323,11 +1310,15 @@ msgstr "Nächste Seite"
 msgid "No"
 msgstr "Nein"
 
+#: src/features/settings/components/asr-engine-cards.tsx:237
+msgid "No auto-detect: set your language below"
+msgstr "Keine automatische Erkennung: Sprache unten festlegen"
+
 #: src/features/welcome/components/ready-checks.tsx:103
 msgid "No microphone found. Plug one in, then pick it in Settings › Dictation."
 msgstr "Kein Mikrofon gefunden. Schließen Sie eines an und wählen Sie es unter Einstellungen › Diktat aus."
 
-#: src/features/settings/components/gpu-backend-card.tsx:163
+#: src/features/settings/components/gpu-backend-card.tsx:136
 msgid "No NVIDIA driver was found. Install the driver for your GPU and the download will appear here."
 msgstr "Kein NVIDIA-Treiber gefunden. Installieren Sie den Treiber für Ihre GPU, dann erscheint der Download hier."
 
@@ -1386,12 +1377,11 @@ msgstr "Normalisiert den Mikrofonpegel vor der Spracherkennung. Hilft, Mikrofone
 msgid "not connected"
 msgstr "nicht verbunden"
 
-#: src/features/settings/components/gpu-backend-card.tsx:135
-#: src/features/settings/sections/models-section.tsx:226
+#: src/features/settings/components/gpu-backend-card.tsx:109
 msgid "Not installed"
 msgstr "Nicht installiert"
 
-#: src/features/settings/sections/models-section.tsx:139
+#: src/features/settings/components/asr-engine-cards.tsx:145
 msgid "Nothing installed"
 msgstr "Nichts installiert"
 
@@ -1437,7 +1427,7 @@ msgstr "Release-Seite öffnen"
 msgid "Open session from {time}"
 msgstr "Offene Sitzung vom {time}"
 
-#: src/features/settings/data/settings-data.ts:596
+#: src/features/settings/data/settings-data.ts:623
 msgid "OpenAI-compatible"
 msgstr "OpenAI-kompatibel"
 
@@ -1458,7 +1448,7 @@ msgstr "oder direkt senden"
 msgid "Orientation"
 msgstr "Ausrichtung"
 
-#: src/features/settings/settings-page.tsx:78
+#: src/features/settings/settings-page.tsx:76
 msgid "Output"
 msgstr "Ausgabe"
 
@@ -1474,7 +1464,8 @@ msgstr "Gesamtfortschritt"
 msgid "Pagination"
 msgstr "Pagination"
 
-#: src/features/settings/data/settings-data.ts:595
+#: src/features/settings/components/asr-engine-cards.tsx:170
+#: src/features/settings/data/settings-data.ts:622
 #: src/features/welcome/components/engine-step.tsx:84
 msgid "Parakeet"
 msgstr "Parakeet"
@@ -1483,23 +1474,15 @@ msgstr "Parakeet"
 msgid "Parakeet (local)"
 msgstr "Parakeet (lokal)"
 
-#: src/features/settings/components/asr-engine-cards.tsx:387
-msgid "Parakeet cannot tell Lune which language it heard, so it has no Auto-detect. Set the dictation language below to the one you speak, and change it when you switch languages."
-msgstr "Parakeet kann Lune nicht mitteilen, welche Sprache es gehört hat, daher gibt es kein „Automatisch erkennen“. Stellen Sie die Diktatsprache unten auf die Sprache, die Sie sprechen, und ändern Sie sie, wenn Sie die Sprache wechseln."
-
 #: src/features/welcome/components/engine-step.tsx:288
 msgid "Parakeet cannot tell Lune which language it heard, so set the one you speak. You can change it later in Settings."
 msgstr "Parakeet kann Lune nicht mitteilen, welche Sprache es gehört hat, legen Sie daher die Sprache fest, die Sie sprechen. Sie können sie später in den Einstellungen ändern."
 
-#: src/features/settings/components/asr-engine-cards.tsx:398
+#: src/features/settings/components/asr-engine-cards.tsx:423
 msgid "Parakeet cannot transcribe {languageName}, so dictation will not start. Choose a language it covers below, or use Whisper."
 msgstr "Parakeet kann {languageName} nicht transkribieren, daher startet das Diktat nicht. Wählen Sie unten eine unterstützte Sprache oder verwenden Sie Whisper."
 
-#: src/features/settings/components/asr-engine-cards.tsx:363
-msgid "Parakeet model size"
-msgstr "Parakeet-Modellgröße"
-
-#: src/features/settings/data/settings-data.ts:600
+#: src/features/settings/data/settings-data.ts:627
 msgid "Paste"
 msgstr "Einfügen"
 
@@ -1508,7 +1491,7 @@ msgstr "Einfügen"
 msgid "Paste compatibility"
 msgstr "Einfügekompatibilität"
 
-#: src/features/settings/data/settings-data.ts:409
+#: src/features/settings/data/settings-data.ts:436
 msgid "Paste into app"
 msgstr "In App einfügen"
 
@@ -1525,7 +1508,7 @@ msgstr "Leistung oder Geschwindigkeit"
 msgid "Phrase"
 msgstr "Ausdruck"
 
-#: src/features/settings/settings-page.tsx:75
+#: src/features/settings/settings-page.tsx:73
 msgid "Pill"
 msgstr "Anzeige"
 
@@ -1655,7 +1638,11 @@ msgstr "Aufnahmemodus"
 msgid "Refresh few-shot examples"
 msgstr "Few-Shot-Beispiele aktualisieren"
 
-#: src/features/settings/sections/transcription-section.tsx:68
+#: src/features/settings/components/asr-engine-cards.tsx:171
+msgid "Remote"
+msgstr "Remote"
+
+#: src/features/settings/sections/transcription-section.tsx:54
 msgid "Remote services are turned off, so dictation cannot start with this engine. Turn on Allow remote services in General, or switch to an on-device engine."
 msgstr "Remote-Dienste sind ausgeschaltet, daher kann das Diktat mit dieser Engine nicht starten. Schalten Sie „Remote-Dienste zulassen“ unter „Allgemein“ ein oder wechseln Sie zu einer Engine auf dem Gerät."
 
@@ -1707,7 +1694,7 @@ msgstr "Position zurücksetzen"
 msgid "Restart Lune Voice to start using your GPU."
 msgstr "Starten Sie Lune Voice neu, um Ihre GPU zu nutzen."
 
-#: src/features/settings/components/gpu-backend-card.tsx:131
+#: src/features/settings/components/gpu-backend-card.tsx:106
 msgid "Restart needed"
 msgstr "Neustart erforderlich"
 
@@ -1727,7 +1714,7 @@ msgstr "Formuliert jedes Transkript in einem gewählten Stil um. Ist die Option 
 msgid "Rounded"
 msgstr "Abgerundet"
 
-#: src/features/settings/components/gpu-backend-card.tsx:138
+#: src/features/settings/components/gpu-backend-card.tsx:111
 msgid "Running on CPU"
 msgstr "Läuft auf der CPU"
 
@@ -1802,9 +1789,13 @@ msgstr "Senden"
 msgid "Send method"
 msgstr "Sendemethode"
 
-#: src/features/settings/data/settings-data.ts:410
+#: src/features/settings/data/settings-data.ts:437
 msgid "Sends a paste shortcut into the focused app. Fastest for long dictations."
 msgstr "Sendet ein Einfüge-Kürzel an die aktive App. Am schnellsten für lange Diktate."
+
+#: src/features/settings/components/asr-engine-cards.tsx:240
+msgid "Sends audio to an endpoint you set up"
+msgstr "Sendet Audio an einen Endpunkt, den Sie einrichten"
 
 #: src/features/settings/data/settings-data.ts:155
 msgid "Sends audio to an OpenAI-compatible endpoint you configure — a server on your own machine, or a hosted API."
@@ -1834,7 +1825,7 @@ msgstr "Sitzungen"
 msgid "Set hotkey"
 msgstr "Hotkey festlegen"
 
-#: src/features/settings/sections/transcription-section.tsx:76
+#: src/features/settings/sections/transcription-section.tsx:62
 msgid "Set the language you speak. Auto uses detection from speech."
 msgstr "Legen Sie die Sprache fest, die Sie sprechen. Auto nutzt die Spracherkennung."
 
@@ -1846,7 +1837,7 @@ msgstr "GPU-Beschleunigung einrichten"
 msgid "Setting up your GPU"
 msgstr "Ihre GPU wird eingerichtet"
 
-#: src/features/settings/settings-page.tsx:106
+#: src/features/settings/settings-page.tsx:100
 msgid "Settings sections"
 msgstr "Abschnitte „Einstellungen“."
 
@@ -1869,7 +1860,7 @@ msgstr "{0} von {totalSessions} Sitzungen"
 msgid "Showing {start}–{end} of {visibleCount} sessions"
 msgstr "{start}–{end} von {visibleCount} Sitzungen"
 
-#: src/features/settings/data/settings-data.ts:416
+#: src/features/settings/data/settings-data.ts:443
 msgid "Simulates keystrokes one character at a time. Works where paste is blocked."
 msgstr "Simuliert Tastenanschläge Zeichen für Zeichen. Funktioniert, wo Einfügen blockiert ist."
 
@@ -1928,10 +1919,6 @@ msgstr "Sprechzeit"
 #: src/features/welcome/components/engine-step.tsx:100
 msgid "Speech engine"
 msgstr "Spracherkennung"
-
-#: src/features/settings/sections/models-section.tsx:74
-msgid "Speech-to-text"
-msgstr "Sprache-zu-Text"
 
 #: src/features/dictionary/components/dictionary-table.tsx:78
 msgid "Spoken phrase"
@@ -1996,7 +1983,7 @@ msgstr "Auf diesem Gerät gespeichert"
 msgid "Style"
 msgstr "Stil"
 
-#: src/features/settings/settings-page.tsx:77
+#: src/features/settings/settings-page.tsx:75
 msgid "Styling"
 msgstr "Styling"
 
@@ -2044,7 +2031,7 @@ msgstr "Danke — Ihr Feedback wurde gesendet."
 msgid "The floating status pill you see while dictating."
 msgstr "Die schwebende Statusanzeige, die beim Diktieren erscheint."
 
-#: src/features/settings/sections/transcription-section.tsx:75
+#: src/features/settings/sections/transcription-section.tsx:61
 msgid "The language you speak. Parakeet needs it set."
 msgstr "Die Sprache, die Sie sprechen. Parakeet braucht sie festgelegt."
 
@@ -2060,11 +2047,11 @@ msgstr "Die wichtigste Tastenkombination für die Spracheingabe. Klicken Sie auf
 msgid "The microphone is in use"
 msgstr "Das Mikrofon wird gerade verwendet"
 
-#: src/features/settings/data/settings-data.ts:552
+#: src/features/settings/data/settings-data.ts:579
 msgid "The model stays in memory. Every dictation starts instantly."
 msgstr "Das Modell bleibt im Speicher. Jedes Diktat startet sofort."
 
-#: src/features/settings/sections/transcription-section.tsx:149
+#: src/features/settings/sections/transcription-section.tsx:136
 msgid "The words the recognizer is least sure about are checked against your dictionary and vocabulary. Higher checks more words; lower trusts the raw transcription."
 msgstr "Die Wörter, bei denen die Erkennung am unsichersten ist, werden mit Ihrem Wörterbuch und Vokabular abgeglichen. Höher prüft mehr Wörter; niedriger vertraut der Rohtranskription."
 
@@ -2072,7 +2059,7 @@ msgstr "Die Wörter, bei denen die Erkennung am unsichersten ist, werden mit Ihr
 msgid "This copy can't update itself. Download the new version from {RELEASES_URL} and replace this one. Your settings, history and models are kept."
 msgstr "Diese Kopie kann sich nicht selbst aktualisieren. Lade die neue Version von {RELEASES_URL} herunter und ersetze diese. Deine Einstellungen, dein Verlauf und deine Modelle bleiben erhalten."
 
-#: src/features/settings/sections/models-section.tsx:310
+#: src/features/settings/components/asr-engine-cards.tsx:391
 msgid "This model is in use by your current configuration. Dictation may not work until you reinstall it or pick another."
 msgstr "Dieses Modell wird von Ihrer aktuellen Konfiguration verwendet. Das Diktat funktioniert möglicherweise erst wieder, wenn Sie es neu installieren oder ein anderes wählen."
 
@@ -2155,8 +2142,8 @@ msgstr "Transkribiere…"
 msgid "Transcript"
 msgstr "Transkript"
 
-#: src/features/settings/sections/transcription-section.tsx:45
-#: src/features/settings/settings-page.tsx:76
+#: src/features/settings/sections/transcription-section.tsx:42
+#: src/features/settings/settings-page.tsx:74
 msgid "Transcription"
 msgstr "Transkription"
 
@@ -2165,19 +2152,19 @@ msgid "Transcription accuracy"
 msgstr "Transkriptionsgenauigkeit"
 
 #. placeholder {0}: status.devices.join(', ')
-#: src/features/settings/components/gpu-backend-card.tsx:146
+#: src/features/settings/components/gpu-backend-card.tsx:119
 msgid "Transcription is running on {0}."
 msgstr "Die Transkription läuft auf {0}."
 
-#: src/features/settings/components/gpu-backend-card.tsx:147
+#: src/features/settings/components/gpu-backend-card.tsx:120
 msgid "Transcription is running on your GPU."
 msgstr "Die Transkription läuft auf Ihrer GPU."
 
-#: src/features/settings/components/gpu-backend-card.tsx:170
+#: src/features/settings/components/gpu-backend-card.tsx:143
 msgid "Transcription runs on the CPU. An optional download moves it to your NVIDIA GPU for noticeably lower latency — most of it is NVIDIA's CUDA maths libraries, which cannot be redistributed in a smaller form."
 msgstr "Die Transkription läuft auf der CPU. Ein optionaler Download verlagert sie auf Ihre NVIDIA-GPU und senkt die Latenz spürbar — der größte Teil davon sind NVIDIAs CUDA-Mathematikbibliotheken, die sich nicht kleiner weitergeben lassen."
 
-#: src/features/settings/components/gpu-backend-card.tsx:171
+#: src/features/settings/components/gpu-backend-card.tsx:144
 msgid "Transcription runs on the CPU. No GPU download has been published for this build yet."
 msgstr "Die Transkription läuft auf der CPU. Für diese Version wurde noch kein GPU-Download veröffentlicht."
 
@@ -2194,7 +2181,7 @@ msgstr "Auslösesatz"
 msgid "Try again"
 msgstr "Erneut versuchen"
 
-#: src/features/settings/data/settings-data.ts:601
+#: src/features/settings/data/settings-data.ts:628
 msgid "Type"
 msgstr "Tippen"
 
@@ -2202,7 +2189,7 @@ msgstr "Tippen"
 msgid "Type a phrase, or tap the mic to capture it exactly as Lune Voice hears it."
 msgstr "Geben Sie einen Satz ein oder tippen Sie auf das Mikrofon, um ihn genau so aufzunehmen, wie Lune Voice ihn hört."
 
-#: src/features/settings/data/settings-data.ts:415
+#: src/features/settings/data/settings-data.ts:442
 msgid "Type into app"
 msgstr "In App tippen"
 
@@ -2235,8 +2222,8 @@ msgstr "Updates"
 msgid "Use GPU acceleration"
 msgstr "GPU-Beschleunigung verwenden"
 
-#: src/features/settings/sections/transcription-section.tsx:96
-#: src/features/settings/sections/transcription-section.tsx:104
+#: src/features/settings/sections/transcription-section.tsx:82
+#: src/features/settings/sections/transcription-section.tsx:90
 msgid "Use hardware acceleration"
 msgstr "Hardwarebeschleunigung verwenden"
 
@@ -2244,6 +2231,10 @@ msgstr "Hardwarebeschleunigung verwenden"
 #: src/features/styles/components/style-preset-card.tsx:45
 msgid "Use the {0} style"
 msgstr "Verwenden Sie den {0}-Stil"
+
+#: src/features/settings/components/asr-engine-cards.tsx:135
+msgid "Use the remote API"
+msgstr "Remote-API verwenden"
 
 #: src/features/welcome/components/ready-checks.tsx:100
 msgid "Using {activeDevice}. Change it in Settings › Dictation."
@@ -2274,7 +2265,8 @@ msgstr "Stil anzeigen"
 msgid "Visibility"
 msgstr "Sichtbarkeit"
 
-#: src/features/settings/sections/transcription-section.tsx:50
+#: src/features/settings/components/asr-engine-cards.tsx:176
+#: src/features/settings/sections/transcription-section.tsx:47
 msgid "Voice model"
 msgstr "Sprachmodell"
 
@@ -2304,11 +2296,15 @@ msgstr "Was ist passiert, oder was würden Sie sich wünschen?"
 msgid "What is this about?"
 msgstr "Worum geht es?"
 
+#: src/features/settings/sections/transcription-section.tsx:48
+msgid "What turns your speech into text. The local engines run on your machine."
+msgstr "Wandelt Ihre Sprache in Text um. Die lokalen Engines laufen auf Ihrem Rechner."
+
 #: src/features/updates/update-dialog.tsx:263
 msgid "What's new"
 msgstr "Was ist neu"
 
-#: src/features/settings/sections/transcription-section.tsx:97
+#: src/features/settings/sections/transcription-section.tsx:83
 msgid "When available, this can make transcription finish faster."
 msgstr "Sofern verfügbar, kann die Transkription dadurch schneller abgeschlossen werden."
 
@@ -2336,7 +2332,8 @@ msgstr "Welche Einfügen-Tastenkombination gesendet wird. „Automatisch“ erke
 msgid "Which screen the pill appears on."
 msgstr "Auf welchem Bildschirm die Anzeige erscheint."
 
-#: src/features/settings/data/settings-data.ts:594
+#: src/features/settings/components/asr-engine-cards.tsx:169
+#: src/features/settings/data/settings-data.ts:621
 #: src/features/welcome/components/engine-step.tsx:77
 msgid "Whisper"
 msgstr "Whisper"
@@ -2344,10 +2341,6 @@ msgstr "Whisper"
 #: src/features/settings/data/settings-data.ts:140
 msgid "Whisper (local)"
 msgstr "Whisper (lokal)"
-
-#: src/features/settings/components/asr-engine-cards.tsx:175
-msgid "Whisper model size"
-msgstr "Whisper-Modellgröße"
 
 #: src/features/welcome/components/engine-step.tsx:79
 msgid "whisper.cpp running on-device. Choose a size to trade speed for accuracy."
@@ -2367,7 +2360,7 @@ msgstr "Worte"
 msgid "WPM"
 msgstr "WPM"
 
-#: src/features/settings/sections/transcription-section.tsx:135
+#: src/features/settings/sections/transcription-section.tsx:122
 msgid "Write names like GitHub and iPhone the way their owners do. Turn this off to keep the recognizer's own capitals. A style can override this."
 msgstr "Schreibt Namen wie GitHub und iPhone so, wie ihre Hersteller es tun. Schalte dies aus, um die Großschreibung der Spracherkennung zu behalten. Ein Stil kann dies überschreiben."
 

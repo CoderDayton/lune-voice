@@ -103,29 +103,29 @@ msgstr "## 会议 — {date}\n"
 "与会者：\n"
 "- "
 
-#: src/features/settings/data/settings-data.ts:523
+#: src/features/settings/data/settings-data.ts:550
 msgid "1 year"
 msgstr "1 年"
 
-#: src/features/settings/data/settings-data.ts:521
+#: src/features/settings/components/asr-engine-cards.tsx:230
+msgid "25 European languages"
+msgstr "25 种欧洲语言"
+
+#: src/features/settings/data/settings-data.ts:548
 msgid "30 days"
 msgstr "30 天"
 
-#: src/features/settings/data/settings-data.ts:520
+#: src/features/settings/data/settings-data.ts:547
 msgid "7 days"
 msgstr "7 天"
 
-#: src/features/settings/data/settings-data.ts:522
+#: src/features/settings/data/settings-data.ts:549
 msgid "90 days"
 msgstr "90 天"
 
 #: src/features/settings/sections/pill-section.tsx:221
 msgid "A vertical pill hugs the side of the screen."
 msgstr "竖向指示器紧贴屏幕边缘。"
-
-#: src/features/settings/components/gpu-backend-card.tsx:49
-msgid "Acceleration"
-msgstr "加速"
 
 #: src/features/settings/components/uinput-rule-row.tsx:66
 #: src/features/welcome/components/ready-checks.tsx:59
@@ -136,7 +136,7 @@ msgstr "仍然无法访问。可能需要重启后才能生效。"
 msgid "Action"
 msgstr "操作"
 
-#: src/features/settings/components/gpu-backend-card.tsx:128
+#: src/features/settings/components/gpu-backend-card.tsx:101
 #: src/features/styles/components/style-preset-card.tsx:74
 msgid "Active"
 msgstr "积极的"
@@ -166,29 +166,25 @@ msgstr "添加修复后，Lune Voice 会在您每次听写时应用它。尝试�
 msgid "Add snippet"
 msgstr "添加片段"
 
-#: src/features/settings/data/settings-data.ts:557
+#: src/features/settings/data/settings-data.ts:584
 msgid "After 1 hour"
 msgstr "1 小时后"
 
-#: src/features/settings/data/settings-data.ts:555
+#: src/features/settings/data/settings-data.ts:582
 msgid "After 15 minutes"
 msgstr "15 分钟后"
 
-#: src/features/settings/data/settings-data.ts:558
+#: src/features/settings/data/settings-data.ts:585
 msgid "After 2 hours"
 msgstr "2 小时后"
 
-#: src/features/settings/data/settings-data.ts:556
+#: src/features/settings/data/settings-data.ts:583
 msgid "After 30 minutes"
 msgstr "30 分钟后"
 
-#: src/features/settings/data/settings-data.ts:554
+#: src/features/settings/data/settings-data.ts:581
 msgid "After 5 minutes"
 msgstr "5 分钟后"
-
-#: src/features/settings/sections/models-section.tsx:103
-msgid "AI models stored on your device."
-msgstr "AI 模型存储在您的设备上。"
 
 #: src/features/welcome/welcome-page.tsx:225
 msgid "All required models are already installed. Continue when you're ready."
@@ -212,11 +208,11 @@ msgstr "允许远程服务"
 msgid "Always"
 msgstr "始终显示"
 
-#: src/features/settings/data/settings-data.ts:509
+#: src/features/settings/data/settings-data.ts:536
 msgid "Always Ctrl+Shift+V"
 msgstr "始终使用 Ctrl+Shift+V"
 
-#: src/features/settings/data/settings-data.ts:504
+#: src/features/settings/data/settings-data.ts:531
 msgid "Always Ctrl+V"
 msgstr "始终使用 Ctrl+V"
 
@@ -229,7 +225,7 @@ msgid "API key"
 msgstr "API密钥"
 
 #: src/features/settings/sections/appearance-section.tsx:16
-#: src/features/settings/settings-page.tsx:73
+#: src/features/settings/settings-page.tsx:71
 msgid "Appearance"
 msgstr "外貌"
 
@@ -274,11 +270,11 @@ msgstr "听写开始、完成或出错时播放的音频反馈。"
 msgid "Auto-capitalize sentences"
 msgstr "自动大写句子"
 
-#: src/features/settings/data/settings-data.ts:461
+#: src/features/settings/data/settings-data.ts:488
 msgid "Auto-detect"
 msgstr "自动检测"
 
-#: src/features/settings/data/settings-data.ts:499
+#: src/features/settings/data/settings-data.ts:526
 #: src/features/settings/sections/pill-section.tsx:55
 msgid "Automatic"
 msgstr "自动"
@@ -302,6 +298,10 @@ msgstr "开始之前"
 #: src/features/settings/data/settings-data.ts:214
 msgid "Best accuracy; turbo decoder keeps it fast."
 msgstr "准确度最高；turbo 解码器让它依然很快。"
+
+#: src/features/settings/components/asr-engine-cards.tsx:223
+msgid "Bigger is more accurate, but slower"
+msgstr "越大越准确，但越慢"
 
 #: src/features/settings/data/settings-data.ts:116
 msgid "Bottom center"
@@ -342,7 +342,7 @@ msgstr "内置"
 
 #: src/components/feedback/confirm-dialog.tsx:61
 #: src/features/dictionary/components/dictionary-table.tsx:112
-#: src/features/settings/sections/models-section.tsx:315
+#: src/features/settings/components/asr-engine-cards.tsx:396
 #: src/features/snippets/snippets-page.tsx:248
 #: src/features/styles/components/style-editor-modal.tsx:247
 msgid "Cancel"
@@ -356,8 +356,8 @@ msgstr "取消当前录音"
 msgid "Cancel download"
 msgstr "取消下载"
 
-#: src/features/settings/sections/transcription-section.tsx:134
-#: src/features/settings/sections/transcription-section.tsx:142
+#: src/features/settings/sections/transcription-section.tsx:121
+#: src/features/settings/sections/transcription-section.tsx:129
 msgid "Capitalize known names"
 msgstr "已知名称首字母大写"
 
@@ -404,7 +404,7 @@ msgstr "正在检查更新"
 msgid "Checking installed models…"
 msgstr "检查已安装的型号..."
 
-#: src/features/settings/components/asr-engine-cards.tsx:246
+#: src/features/settings/components/asr-engine-cards.tsx:314
 #: src/features/settings/sections/general-section.tsx:159
 #: src/features/welcome/components/ready-checks.tsx:113
 msgid "Checking…"
@@ -427,11 +427,7 @@ msgstr "选择如何润色转写结果 — 发送到你配置的 OpenAI 兼容�
 msgid "Choose the AI models to install. Everything runs offline — no cloud, no accounts."
 msgstr "选择要安装的 AI 模型。一切都离线运行——没有云，没有账户。"
 
-#: src/features/settings/sections/transcription-section.tsx:51
-msgid "Choose the engine that turns your speech into text. Local engines run fully on-device: Whisper covers the most languages with selectable model sizes, Parakeet is the fastest for 25 European languages."
-msgstr "选择将您的语音转换为文本的引擎。本地引擎完全在设备端运行：Whisper 支持的语言最多，并可选择模型大小；Parakeet 在 25 种欧洲语言上速度最快。"
-
-#: src/features/settings/components/asr-engine-cards.tsx:397
+#: src/features/settings/components/asr-engine-cards.tsx:422
 msgid "Choose your dictation language below. Parakeet cannot tell Lune which language it heard, so until one is set every dictation is formatted as English."
 msgstr "请在下方选择听写语言。Parakeet 无法告诉 Lune 它听到的是哪种语言，因此在设置语言之前，每次听写都会按英语格式化。"
 
@@ -453,7 +449,7 @@ msgstr "关闭"
 
 #: src/components/feedback/help-feedback-dialog.tsx:281
 #: src/features/history/components/session-detail-modal.tsx:206
-#: src/features/settings/sections/models-section.tsx:327
+#: src/features/settings/components/asr-engine-cards.tsx:406
 #: src/features/styles/components/style-editor-modal.tsx:238
 #: src/features/updates/update-dialog.tsx:326
 #: src/features/updates/update-dialog.tsx:338
@@ -496,7 +492,7 @@ msgstr "启动后不久联系发布服务器，仅在存在更新版本时才提
 msgid "Continue"
 msgstr "继续"
 
-#: src/features/settings/sections/transcription-section.tsx:46
+#: src/features/settings/sections/transcription-section.tsx:43
 msgid "Control how your speech is turned into text."
 msgstr "控制如何将语音转换为文本。"
 
@@ -525,12 +521,12 @@ msgstr "指示器条的圆角程度。"
 msgid "Corners"
 msgstr "圆角"
 
-#: src/features/settings/sections/transcription-section.tsx:129
+#: src/features/settings/sections/transcription-section.tsx:116
 msgid "Correction"
 msgstr "校正"
 
-#: src/features/settings/sections/transcription-section.tsx:148
-#: src/features/settings/sections/transcription-section.tsx:163
+#: src/features/settings/sections/transcription-section.tsx:135
+#: src/features/settings/sections/transcription-section.tsx:150
 msgid "Correction sensitivity"
 msgstr "校正灵敏度"
 
@@ -598,7 +594,8 @@ msgstr "深色"
 #: src/components/feedback/confirm-dialog.tsx:72
 #: src/features/history/components/history-table.tsx:500
 #: src/features/history/components/session-detail-modal.tsx:199
-#: src/features/settings/sections/models-section.tsx:263
+#: src/features/settings/components/asr-engine-cards.tsx:330
+#: src/features/settings/components/asr-engine-cards.tsx:331
 msgid "Delete"
 msgstr "删除"
 
@@ -612,7 +609,7 @@ msgid "Delete {0}"
 msgstr "删除 {0}"
 
 #. placeholder {0}: model.name
-#: src/features/settings/sections/models-section.tsx:300
+#: src/features/settings/components/asr-engine-cards.tsx:387
 msgid "Delete {0}?"
 msgstr "删除{0}？"
 
@@ -620,7 +617,7 @@ msgstr "删除{0}？"
 msgid "Delete {count, plural, one {# session} other {# sessions}}?"
 msgstr "删除 {count, plural, other {# 个会话}}？"
 
-#: src/features/settings/sections/models-section.tsx:318
+#: src/features/settings/components/asr-engine-cards.tsx:399
 msgid "Delete model"
 msgstr "删除模型"
 
@@ -657,11 +654,15 @@ msgstr "描述"
 msgid "Description is too long."
 msgstr "描述过长。"
 
-#: src/features/settings/data/settings-data.ts:500
+#: src/features/settings/data/settings-data.ts:527
 msgid "Detects terminals and picks the matching paste shortcut. Works on most compositors."
 msgstr "检测终端并选用对应的粘贴快捷键。适用于大多数合成器。"
 
-#: src/features/settings/data/settings-data.ts:462
+#: src/features/settings/components/asr-engine-cards.tsx:222
+msgid "Detects the language you speak"
+msgstr "自动识别你说的语言"
+
+#: src/features/settings/data/settings-data.ts:489
 msgid "Detects the spoken language each session."
 msgstr "每次会话自动检测所说的语言。"
 
@@ -669,20 +670,16 @@ msgstr "每次会话自动检测所说的语言。"
 msgid "Deterministic fixes applied before any AI styling."
 msgstr "在任何 AI 样式之前应用确定性修复。"
 
-#: src/features/settings/settings-page.tsx:74
+#: src/features/settings/settings-page.tsx:72
 msgid "Dictation"
 msgstr "听写"
 
-#: src/features/settings/sections/transcription-section.tsx:72
-#: src/features/settings/sections/transcription-section.tsx:85
+#: src/features/settings/sections/transcription-section.tsx:58
+#: src/features/settings/sections/transcription-section.tsx:71
 #: src/features/welcome/components/engine-step.tsx:286
 #: src/features/welcome/components/engine-step.tsx:294
 msgid "Dictation language"
 msgstr "听写语言"
-
-#: src/features/settings/components/asr-engine-cards.tsx:386
-msgid "Dictation language set to {languageName}. Parakeet cannot tell Lune which language it heard, so it has no Auto-detect — change the language below whenever you dictate in another one."
-msgstr "听写语言已设为{languageName}。Parakeet 无法告诉 Lune 它听到的是哪种语言，因此没有“自动检测”——用其他语言听写时，请在下方更改语言。"
 
 #: src/features/settings/sections/pill-section.tsx:73
 msgid "Dictation pill"
@@ -708,7 +705,7 @@ msgstr "放弃当前草稿并返回空闲状态。单击绑定以更改它。"
 msgid "Disconnected"
 msgstr "已断开连接"
 
-#: src/features/settings/sections/models-section.tsx:137
+#: src/features/settings/components/asr-engine-cards.tsx:143
 msgid "Disk usage"
 msgstr "磁盘使用情况"
 
@@ -716,19 +713,15 @@ msgstr "磁盘使用情况"
 msgid "Dismiss error"
 msgstr "消除错误"
 
-#: src/features/settings/data/settings-data.ts:519
+#: src/features/settings/data/settings-data.ts:546
 msgid "Don't save history"
 msgstr "不保存历史"
 
 #: src/features/history/components/history-table.tsx:494
-#: src/features/settings/components/gpu-backend-card.tsx:114
-#: src/features/settings/sections/models-section.tsx:277
+#: src/features/settings/components/asr-engine-cards.tsx:344
+#: src/features/settings/components/gpu-backend-card.tsx:42
 msgid "Download"
 msgstr "下载"
-
-#: src/features/settings/components/asr-engine-cards.tsx:312
-msgid "Download {label}"
-msgstr "下载 {label}"
 
 #: src/features/welcome/welcome-page.tsx:466
 msgid "Download {pendingCount} models"
@@ -747,8 +740,7 @@ msgid "Download interrupted"
 msgstr "下载中断"
 
 #: src/components/ui/byte-progress.tsx:37
-#: src/features/settings/components/asr-engine-cards.tsx:297
-#: src/features/settings/sections/models-section.tsx:236
+#: src/features/settings/components/asr-engine-cards.tsx:356
 #: src/features/welcome/components/model-card.tsx:105
 msgid "Download progress"
 msgstr "下载进度"
@@ -769,9 +761,8 @@ msgstr "正在下载 NVIDIA 的 CUDA 运行时。"
 msgid "Downloading update"
 msgstr "正在下载更新"
 
-#: src/features/settings/components/asr-engine-cards.tsx:300
-#: src/features/settings/components/gpu-backend-card.tsx:114
-#: src/features/settings/sections/models-section.tsx:277
+#: src/features/settings/components/asr-engine-cards.tsx:318
+#: src/features/settings/components/gpu-backend-card.tsx:31
 #: src/features/welcome/welcome-page.tsx:410
 msgid "Downloading…"
 msgstr "正在下载..."
@@ -851,6 +842,10 @@ msgstr "示例向润色引擎传授您的风格。编辑提示词后请重新生
 msgid "Expand sidebar"
 msgstr "展开侧边栏"
 
+#: src/features/settings/components/asr-engine-cards.tsx:236
+msgid "Fast on a CPU"
+msgstr "在 CPU 上也很快"
+
 #: src/features/settings/data/settings-data.ts:200
 msgid "Fast; less accurate than Medium."
 msgstr "速度快，但准确度低于“中”。"
@@ -895,7 +890,7 @@ msgstr "筛选片段"
 msgid "Filter snippets…"
 msgstr "筛选片段…"
 
-#: src/features/settings/sections/transcription-section.tsx:130
+#: src/features/settings/sections/transcription-section.tsx:117
 msgid "Fix recognizer errors with your dictionary and known vocabulary, on your device. It uses per-word confidence and statistical patterns — no AI model, and it never rewrites what you said."
 msgstr "在您的设备上，用您的词典和已知词汇修正识别错误。它使用逐词置信度和统计模式——无 AI 模型，也绝不会改写您所说的内容。"
 
@@ -903,11 +898,11 @@ msgstr "在您的设备上，用您的词典和已知词汇修正识别错误。
 msgid "Follow Settings"
 msgstr "跟随设置"
 
-#: src/features/settings/data/settings-data.ts:505
+#: src/features/settings/data/settings-data.ts:532
 msgid "Force the standard paste shortcut for every app."
 msgstr "对所有应用强制使用标准粘贴快捷键。"
 
-#: src/features/settings/data/settings-data.ts:510
+#: src/features/settings/data/settings-data.ts:537
 msgid "Force the terminal paste shortcut. Use on COSMIC if you mostly dictate into terminals."
 msgstr "强制使用终端粘贴快捷键。若主要在终端里听写，可在 COSMIC 上使用。"
 
@@ -920,8 +915,8 @@ msgstr "忘记你拖动指示器的位置，并将其恢复到预设位置。"
 msgid "Formatting"
 msgstr "格式化"
 
-#: src/features/settings/sections/transcription-section.tsx:109
-#: src/features/settings/sections/transcription-section.tsx:115
+#: src/features/settings/sections/transcription-section.tsx:96
+#: src/features/settings/sections/transcription-section.tsx:102
 msgid "Free the model when idle"
 msgstr "空闲时释放模型"
 
@@ -938,7 +933,7 @@ msgid "Gap between the pill and the screen edge, so it clears a taskbar or dock.
 msgstr "指示器与屏幕边缘之间的间距，以便避开任务栏或程序坞。"
 
 #: src/features/settings/sections/general-section.tsx:62
-#: src/features/settings/settings-page.tsx:72
+#: src/features/settings/settings-page.tsx:70
 msgid "General"
 msgstr "通用"
 
@@ -959,7 +954,7 @@ msgstr "github"
 msgid "GitHub"
 msgstr "GitHub"
 
-#: src/features/settings/sections/transcription-section.tsx:110
+#: src/features/settings/sections/transcription-section.tsx:97
 msgid "Give the memory back after a quiet spell. The next dictation reloads the model, which adds up to a second before it starts listening — your speech is recorded during the wait, so nothing is lost."
 msgstr "闲置一段时间后释放内存。下次听写会重新加载模型，开始聆听前最多多出一秒——等待期间语音照样录制，不会丢失内容。"
 
@@ -975,13 +970,13 @@ msgstr "晚上好。"
 msgid "Good morning."
 msgstr "早上好。"
 
-#: src/features/settings/components/gpu-backend-card.tsx:68
+#: src/features/settings/components/gpu-backend-card.tsx:59
 #: src/features/welcome/components/engine-step.tsx:350
 #: src/features/welcome/welcome-page.tsx:309
 msgid "GPU acceleration"
 msgstr "GPU 加速"
 
-#: src/features/settings/components/gpu-backend-card.tsx:176
+#: src/features/settings/components/gpu-backend-card.tsx:149
 msgid "GPU support is installed but not working."
 msgstr "GPU 支持已安装，但无法正常工作。"
 
@@ -1054,7 +1049,9 @@ msgstr "如何听写"
 msgid "Idle · mic ready"
 msgstr "空闲 · 麦克风就绪"
 
-#: src/features/settings/sections/models-section.tsx:220
+#: src/features/settings/components/asr-engine-cards.tsx:196
+#: src/features/settings/components/asr-engine-cards.tsx:197
+#: src/features/settings/components/asr-engine-cards.tsx:307
 msgid "In use"
 msgstr "使用中"
 
@@ -1070,14 +1067,13 @@ msgstr "插入占位符"
 msgid "Install and restart"
 msgstr "安装并重启"
 
-#: src/features/settings/components/asr-engine-cards.tsx:250
-#: src/features/settings/sections/models-section.tsx:223
+#: src/features/settings/components/asr-engine-cards.tsx:324
 #: src/features/welcome/components/model-card.tsx:88
 #: src/features/welcome/welcome-page.tsx:311
 msgid "Installed"
 msgstr "已安装"
 
-#: src/features/settings/components/gpu-backend-card.tsx:154
+#: src/features/settings/components/gpu-backend-card.tsx:127
 #: src/features/welcome/components/engine-step.tsx:340
 msgid "Installed. Restart Lune Voice to start using your GPU."
 msgstr "已安装。重启 Lune Voice 即可开始使用你的 GPU。"
@@ -1102,11 +1098,11 @@ msgstr "参与讨论"
 msgid "Just now"
 msgstr "刚刚"
 
-#: src/features/settings/data/settings-data.ts:524
+#: src/features/settings/data/settings-data.ts:551
 msgid "Keep forever"
 msgstr "永久保留"
 
-#: src/features/settings/data/settings-data.ts:551
+#: src/features/settings/data/settings-data.ts:578
 msgid "Keep loaded"
 msgstr "保持加载"
 
@@ -1135,10 +1131,6 @@ msgstr "键盘快捷键（“Super H”→“Super+H”）"
 #: src/features/settings/sections/general-section.tsx:72
 msgid "Language"
 msgstr "语言"
-
-#: src/features/settings/components/asr-engine-cards.tsx:379
-msgid "Languages: {languages}"
-msgstr "支持语言：{languages}"
 
 #: src/features/settings/data/settings-data.ts:123
 msgid "Large"
@@ -1233,10 +1225,6 @@ msgstr "Lune Voice 需要权限才能在其他应用中输入文字并识别你�
 msgid "Lune Voice writes"
 msgstr "月光之声写道"
 
-#: src/features/settings/components/asr-engine-cards.tsx:320
-msgid "Manage in Models"
-msgstr "在“型号”中管理"
-
 #: src/features/settings/data/settings-data.ts:206
 msgid "Medium"
 msgstr "中"
@@ -1269,11 +1257,6 @@ msgstr "模式"
 msgid "Model size"
 msgstr "模型大小"
 
-#: src/features/settings/sections/models-section.tsx:102
-#: src/features/settings/settings-page.tsx:79
-msgid "Models"
-msgstr "型号"
-
 #: src/features/welcome/welcome-page.tsx:534
 msgid "Models are stored locally. No telemetry, no accounts."
 msgstr "模型存储在本地。没有遥测，没有账户。"
@@ -1301,6 +1284,10 @@ msgstr "姓名"
 msgid "Name is too long."
 msgstr "名称过长。"
 
+#: src/features/settings/components/asr-engine-cards.tsx:221
+msgid "Nearly 100 languages"
+msgstr "近 100 种语言"
+
 #: src/features/settings/data/settings-data.ts:108
 msgid "Never"
 msgstr "从不显示"
@@ -1323,11 +1310,15 @@ msgstr "下一页"
 msgid "No"
 msgstr "否"
 
+#: src/features/settings/components/asr-engine-cards.tsx:237
+msgid "No auto-detect: set your language below"
+msgstr "不支持自动检测：请在下方设置语言"
+
 #: src/features/welcome/components/ready-checks.tsx:103
 msgid "No microphone found. Plug one in, then pick it in Settings › Dictation."
 msgstr "未找到麦克风。请接入一个，然后在“设置 › 听写”中选择。"
 
-#: src/features/settings/components/gpu-backend-card.tsx:163
+#: src/features/settings/components/gpu-backend-card.tsx:136
 msgid "No NVIDIA driver was found. Install the driver for your GPU and the download will appear here."
 msgstr "未找到 NVIDIA 驱动。安装你的 GPU 驱动后，下载会出现在这里。"
 
@@ -1386,12 +1377,11 @@ msgstr "在语音检测之前标准化麦克风电平。有助于安静的麦克
 msgid "not connected"
 msgstr "未连接"
 
-#: src/features/settings/components/gpu-backend-card.tsx:135
-#: src/features/settings/sections/models-section.tsx:226
+#: src/features/settings/components/gpu-backend-card.tsx:109
 msgid "Not installed"
 msgstr "未安装"
 
-#: src/features/settings/sections/models-section.tsx:139
+#: src/features/settings/components/asr-engine-cards.tsx:145
 msgid "Nothing installed"
 msgstr "未安装任何内容"
 
@@ -1437,7 +1427,7 @@ msgstr "打开发布页面"
 msgid "Open session from {time}"
 msgstr "{time} 开始的会议"
 
-#: src/features/settings/data/settings-data.ts:596
+#: src/features/settings/data/settings-data.ts:623
 msgid "OpenAI-compatible"
 msgstr "OpenAI 兼容"
 
@@ -1458,7 +1448,7 @@ msgstr "或直接发送"
 msgid "Orientation"
 msgstr "方向"
 
-#: src/features/settings/settings-page.tsx:78
+#: src/features/settings/settings-page.tsx:76
 msgid "Output"
 msgstr "输出"
 
@@ -1474,7 +1464,8 @@ msgstr "总体进展"
 msgid "Pagination"
 msgstr "分页"
 
-#: src/features/settings/data/settings-data.ts:595
+#: src/features/settings/components/asr-engine-cards.tsx:170
+#: src/features/settings/data/settings-data.ts:622
 #: src/features/welcome/components/engine-step.tsx:84
 msgid "Parakeet"
 msgstr "Parakeet"
@@ -1483,23 +1474,15 @@ msgstr "Parakeet"
 msgid "Parakeet (local)"
 msgstr "Parakeet（本地）"
 
-#: src/features/settings/components/asr-engine-cards.tsx:387
-msgid "Parakeet cannot tell Lune which language it heard, so it has no Auto-detect. Set the dictation language below to the one you speak, and change it when you switch languages."
-msgstr "Parakeet 无法告诉 Lune 它听到的是哪种语言，因此没有“自动检测”。请在下方将听写语言设为您所说的语言，切换语言时也请随之更改。"
-
 #: src/features/welcome/components/engine-step.tsx:288
 msgid "Parakeet cannot tell Lune which language it heard, so set the one you speak. You can change it later in Settings."
 msgstr "Parakeet 无法告诉 Lune 它听到的是哪种语言，请设置您所说的语言。之后可以在设置中更改。"
 
-#: src/features/settings/components/asr-engine-cards.tsx:398
+#: src/features/settings/components/asr-engine-cards.tsx:423
 msgid "Parakeet cannot transcribe {languageName}, so dictation will not start. Choose a language it covers below, or use Whisper."
 msgstr "Parakeet 无法转写{languageName}，因此听写不会开始。请在下方选择它支持的语言，或改用 Whisper。"
 
-#: src/features/settings/components/asr-engine-cards.tsx:363
-msgid "Parakeet model size"
-msgstr "Parakeet 模型大小"
-
-#: src/features/settings/data/settings-data.ts:600
+#: src/features/settings/data/settings-data.ts:627
 msgid "Paste"
 msgstr "粘贴"
 
@@ -1508,7 +1491,7 @@ msgstr "粘贴"
 msgid "Paste compatibility"
 msgstr "粘贴兼容性"
 
-#: src/features/settings/data/settings-data.ts:409
+#: src/features/settings/data/settings-data.ts:436
 msgid "Paste into app"
 msgstr "粘贴到应用"
 
@@ -1525,7 +1508,7 @@ msgstr "性能或速度"
 msgid "Phrase"
 msgstr "短语"
 
-#: src/features/settings/settings-page.tsx:75
+#: src/features/settings/settings-page.tsx:73
 msgid "Pill"
 msgstr "指示器"
 
@@ -1655,7 +1638,11 @@ msgstr "录音模式"
 msgid "Refresh few-shot examples"
 msgstr "刷新少样本示例"
 
-#: src/features/settings/sections/transcription-section.tsx:68
+#: src/features/settings/components/asr-engine-cards.tsx:171
+msgid "Remote"
+msgstr "远程"
+
+#: src/features/settings/sections/transcription-section.tsx:54
 msgid "Remote services are turned off, so dictation cannot start with this engine. Turn on Allow remote services in General, or switch to an on-device engine."
 msgstr "远程服务已关闭，因此无法使用此引擎开始听写。请在“通用”中开启“允许远程服务”，或切换到设备端引擎。"
 
@@ -1707,7 +1694,7 @@ msgstr "重置位置"
 msgid "Restart Lune Voice to start using your GPU."
 msgstr "重启 Lune Voice 即可开始使用 GPU。"
 
-#: src/features/settings/components/gpu-backend-card.tsx:131
+#: src/features/settings/components/gpu-backend-card.tsx:106
 msgid "Restart needed"
 msgstr "需要重启"
 
@@ -1727,7 +1714,7 @@ msgstr "以选定的风格改写每份转录文本。关闭时，原始转录文
 msgid "Rounded"
 msgstr "圆角"
 
-#: src/features/settings/components/gpu-backend-card.tsx:138
+#: src/features/settings/components/gpu-backend-card.tsx:111
 msgid "Running on CPU"
 msgstr "正在使用 CPU"
 
@@ -1802,9 +1789,13 @@ msgstr "发送"
 msgid "Send method"
 msgstr "发送方式"
 
-#: src/features/settings/data/settings-data.ts:410
+#: src/features/settings/data/settings-data.ts:437
 msgid "Sends a paste shortcut into the focused app. Fastest for long dictations."
 msgstr "向当前应用发送粘贴快捷键。长篇听写最快。"
+
+#: src/features/settings/components/asr-engine-cards.tsx:240
+msgid "Sends audio to an endpoint you set up"
+msgstr "将音频发送到你配置的端点"
 
 #: src/features/settings/data/settings-data.ts:155
 msgid "Sends audio to an OpenAI-compatible endpoint you configure — a server on your own machine, or a hosted API."
@@ -1834,7 +1825,7 @@ msgstr "会议"
 msgid "Set hotkey"
 msgstr "设置热键"
 
-#: src/features/settings/sections/transcription-section.tsx:76
+#: src/features/settings/sections/transcription-section.tsx:62
 msgid "Set the language you speak. Auto uses detection from speech."
 msgstr "设置您所说的语言。 Auto 使用语音检测。"
 
@@ -1846,7 +1837,7 @@ msgstr "设置 GPU 加速"
 msgid "Setting up your GPU"
 msgstr "正在设置你的 GPU"
 
-#: src/features/settings/settings-page.tsx:106
+#: src/features/settings/settings-page.tsx:100
 msgid "Settings sections"
 msgstr "设置部分"
 
@@ -1869,7 +1860,7 @@ msgstr "显示 {totalSessions} 条中的 {0} 条"
 msgid "Showing {start}–{end} of {visibleCount} sessions"
 msgstr "显示第 {start}–{end} 条，共 {visibleCount} 条会话"
 
-#: src/features/settings/data/settings-data.ts:416
+#: src/features/settings/data/settings-data.ts:443
 msgid "Simulates keystrokes one character at a time. Works where paste is blocked."
 msgstr "逐个字符模拟按键。在禁止粘贴的地方也能用。"
 
@@ -1928,10 +1919,6 @@ msgstr "说话时长"
 #: src/features/welcome/components/engine-step.tsx:100
 msgid "Speech engine"
 msgstr "语音引擎"
-
-#: src/features/settings/sections/models-section.tsx:74
-msgid "Speech-to-text"
-msgstr "语音转文字"
 
 #: src/features/dictionary/components/dictionary-table.tsx:78
 msgid "Spoken phrase"
@@ -1996,7 +1983,7 @@ msgstr "存储在此设备上"
 msgid "Style"
 msgstr "风格"
 
-#: src/features/settings/settings-page.tsx:77
+#: src/features/settings/settings-page.tsx:75
 msgid "Styling"
 msgstr "润色"
 
@@ -2044,7 +2031,7 @@ msgstr "谢谢，你的反馈已发送。"
 msgid "The floating status pill you see while dictating."
 msgstr "听写时显示的浮动状态指示器。"
 
-#: src/features/settings/sections/transcription-section.tsx:75
+#: src/features/settings/sections/transcription-section.tsx:61
 msgid "The language you speak. Parakeet needs it set."
 msgstr "您所说的语言。使用 Parakeet 时必须设置。"
 
@@ -2060,11 +2047,11 @@ msgstr "用于语音输入的主要快捷方式。单击绑定以更改它。"
 msgid "The microphone is in use"
 msgstr "麦克风正在使用中"
 
-#: src/features/settings/data/settings-data.ts:552
+#: src/features/settings/data/settings-data.ts:579
 msgid "The model stays in memory. Every dictation starts instantly."
 msgstr "模型常驻内存。每次听写都能立即开始。"
 
-#: src/features/settings/sections/transcription-section.tsx:149
+#: src/features/settings/sections/transcription-section.tsx:136
 msgid "The words the recognizer is least sure about are checked against your dictionary and vocabulary. Higher checks more words; lower trusts the raw transcription."
 msgstr "识别器最不确定的词语会与您的词典和词汇进行核对。数值越高核对的词越多；越低则越信任原始转录。"
 
@@ -2072,7 +2059,7 @@ msgstr "识别器最不确定的词语会与您的词典和词汇进行核对。
 msgid "This copy can't update itself. Download the new version from {RELEASES_URL} and replace this one. Your settings, history and models are kept."
 msgstr "此副本无法自行更新。请从 {RELEASES_URL} 下载新版本并替换此副本。你的设置、历史记录和模型都会保留。"
 
-#: src/features/settings/sections/models-section.tsx:310
+#: src/features/settings/components/asr-engine-cards.tsx:391
 msgid "This model is in use by your current configuration. Dictation may not work until you reinstall it or pick another."
 msgstr "此模型正被您当前的配置使用。在您重新安装它或选择其他模型之前，听写可能无法正常工作。"
 
@@ -2155,8 +2142,8 @@ msgstr "正在转写…"
 msgid "Transcript"
 msgstr "转写结果"
 
-#: src/features/settings/sections/transcription-section.tsx:45
-#: src/features/settings/settings-page.tsx:76
+#: src/features/settings/sections/transcription-section.tsx:42
+#: src/features/settings/settings-page.tsx:74
 msgid "Transcription"
 msgstr "转录"
 
@@ -2165,19 +2152,19 @@ msgid "Transcription accuracy"
 msgstr "转录准确度"
 
 #. placeholder {0}: status.devices.join(', ')
-#: src/features/settings/components/gpu-backend-card.tsx:146
+#: src/features/settings/components/gpu-backend-card.tsx:119
 msgid "Transcription is running on {0}."
 msgstr "转录正在 {0} 上运行。"
 
-#: src/features/settings/components/gpu-backend-card.tsx:147
+#: src/features/settings/components/gpu-backend-card.tsx:120
 msgid "Transcription is running on your GPU."
 msgstr "转录正在你的 GPU 上运行。"
 
-#: src/features/settings/components/gpu-backend-card.tsx:170
+#: src/features/settings/components/gpu-backend-card.tsx:143
 msgid "Transcription runs on the CPU. An optional download moves it to your NVIDIA GPU for noticeably lower latency — most of it is NVIDIA's CUDA maths libraries, which cannot be redistributed in a smaller form."
 msgstr "转录在 CPU 上运行。可选下载会把它转到你的 NVIDIA GPU 上，延迟明显更低 — 其中大部分是 NVIDIA 的 CUDA 数学库，无法以更小的形式再分发。"
 
-#: src/features/settings/components/gpu-backend-card.tsx:171
+#: src/features/settings/components/gpu-backend-card.tsx:144
 msgid "Transcription runs on the CPU. No GPU download has been published for this build yet."
 msgstr "转录在 CPU 上运行。此版本尚未发布 GPU 下载。"
 
@@ -2194,7 +2181,7 @@ msgstr "触发短语"
 msgid "Try again"
 msgstr "重试"
 
-#: src/features/settings/data/settings-data.ts:601
+#: src/features/settings/data/settings-data.ts:628
 msgid "Type"
 msgstr "输入"
 
@@ -2202,7 +2189,7 @@ msgstr "输入"
 msgid "Type a phrase, or tap the mic to capture it exactly as Lune Voice hears it."
 msgstr "输入一个短语，或点按麦克风，按 Lune Voice 听到的原样录制。"
 
-#: src/features/settings/data/settings-data.ts:415
+#: src/features/settings/data/settings-data.ts:442
 msgid "Type into app"
 msgstr "输入到应用"
 
@@ -2235,8 +2222,8 @@ msgstr "更新"
 msgid "Use GPU acceleration"
 msgstr "使用 GPU 加速"
 
-#: src/features/settings/sections/transcription-section.tsx:96
-#: src/features/settings/sections/transcription-section.tsx:104
+#: src/features/settings/sections/transcription-section.tsx:82
+#: src/features/settings/sections/transcription-section.tsx:90
 msgid "Use hardware acceleration"
 msgstr "使用硬件加速"
 
@@ -2244,6 +2231,10 @@ msgstr "使用硬件加速"
 #: src/features/styles/components/style-preset-card.tsx:45
 msgid "Use the {0} style"
 msgstr "使用 {0} 样式"
+
+#: src/features/settings/components/asr-engine-cards.tsx:135
+msgid "Use the remote API"
+msgstr "使用远程 API"
 
 #: src/features/welcome/components/ready-checks.tsx:100
 msgid "Using {activeDevice}. Change it in Settings › Dictation."
@@ -2274,7 +2265,8 @@ msgstr "查看样式"
 msgid "Visibility"
 msgstr "显示"
 
-#: src/features/settings/sections/transcription-section.tsx:50
+#: src/features/settings/components/asr-engine-cards.tsx:176
+#: src/features/settings/sections/transcription-section.tsx:47
 msgid "Voice model"
 msgstr "语音模型"
 
@@ -2304,11 +2296,15 @@ msgstr "发生了什么，或者你希望看到什么？"
 msgid "What is this about?"
 msgstr "这是关于什么的？"
 
+#: src/features/settings/sections/transcription-section.tsx:48
+msgid "What turns your speech into text. The local engines run on your machine."
+msgstr "将语音转为文字的引擎。本地引擎在你的电脑上运行。"
+
 #: src/features/updates/update-dialog.tsx:263
 msgid "What's new"
 msgstr "更新内容"
 
-#: src/features/settings/sections/transcription-section.tsx:97
+#: src/features/settings/sections/transcription-section.tsx:83
 msgid "When available, this can make transcription finish faster."
 msgstr "如果可用，这可以使转录更快完成。"
 
@@ -2336,7 +2332,8 @@ msgstr "发送哪个粘贴快捷键。「自动」会检测终端；如果粘贴
 msgid "Which screen the pill appears on."
 msgstr "指示器显示在哪个屏幕上。"
 
-#: src/features/settings/data/settings-data.ts:594
+#: src/features/settings/components/asr-engine-cards.tsx:169
+#: src/features/settings/data/settings-data.ts:621
 #: src/features/welcome/components/engine-step.tsx:77
 msgid "Whisper"
 msgstr "Whisper"
@@ -2344,10 +2341,6 @@ msgstr "Whisper"
 #: src/features/settings/data/settings-data.ts:140
 msgid "Whisper (local)"
 msgstr "Whisper（本地）"
-
-#: src/features/settings/components/asr-engine-cards.tsx:175
-msgid "Whisper model size"
-msgstr "Whisper 模型大小"
 
 #: src/features/welcome/components/engine-step.tsx:79
 msgid "whisper.cpp running on-device. Choose a size to trade speed for accuracy."
@@ -2367,7 +2360,7 @@ msgstr "字"
 msgid "WPM"
 msgstr "WPM"
 
-#: src/features/settings/sections/transcription-section.tsx:135
+#: src/features/settings/sections/transcription-section.tsx:122
 msgid "Write names like GitHub and iPhone the way their owners do. Turn this off to keep the recognizer's own capitals. A style can override this."
 msgstr "按所有者的写法书写 GitHub、iPhone 等名称。关闭后保留识别器自带的大小写。样式可以覆盖此设置。"
 

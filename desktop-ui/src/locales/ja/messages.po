@@ -103,29 +103,29 @@ msgstr "## 会議 — {date}\n"
 "出席者:\n"
 "- "
 
-#: src/features/settings/data/settings-data.ts:523
+#: src/features/settings/data/settings-data.ts:550
 msgid "1 year"
 msgstr "1 年"
 
-#: src/features/settings/data/settings-data.ts:521
+#: src/features/settings/components/asr-engine-cards.tsx:230
+msgid "25 European languages"
+msgstr "ヨーロッパの 25 言語"
+
+#: src/features/settings/data/settings-data.ts:548
 msgid "30 days"
 msgstr "30 日"
 
-#: src/features/settings/data/settings-data.ts:520
+#: src/features/settings/data/settings-data.ts:547
 msgid "7 days"
 msgstr "7 日"
 
-#: src/features/settings/data/settings-data.ts:522
+#: src/features/settings/data/settings-data.ts:549
 msgid "90 days"
 msgstr "90 日"
 
 #: src/features/settings/sections/pill-section.tsx:221
 msgid "A vertical pill hugs the side of the screen."
 msgstr "縦向きのインジケーターが画面の端に沿って表示されます。"
-
-#: src/features/settings/components/gpu-backend-card.tsx:49
-msgid "Acceleration"
-msgstr "アクセラレーション"
 
 #: src/features/settings/components/uinput-rule-row.tsx:66
 #: src/features/welcome/components/ready-checks.tsx:59
@@ -136,7 +136,7 @@ msgstr "まだアクセスできません。反映するには再起動が必要
 msgid "Action"
 msgstr "操作"
 
-#: src/features/settings/components/gpu-backend-card.tsx:128
+#: src/features/settings/components/gpu-backend-card.tsx:101
 #: src/features/styles/components/style-preset-card.tsx:74
 msgid "Active"
 msgstr "アクティブ"
@@ -166,29 +166,25 @@ msgstr "修正を追加すると、音声入力のたびに Lune Voice が適用
 msgid "Add snippet"
 msgstr "スニペットを追加"
 
-#: src/features/settings/data/settings-data.ts:557
+#: src/features/settings/data/settings-data.ts:584
 msgid "After 1 hour"
 msgstr "1 時間後"
 
-#: src/features/settings/data/settings-data.ts:555
+#: src/features/settings/data/settings-data.ts:582
 msgid "After 15 minutes"
 msgstr "15 分後"
 
-#: src/features/settings/data/settings-data.ts:558
+#: src/features/settings/data/settings-data.ts:585
 msgid "After 2 hours"
 msgstr "2 時間後"
 
-#: src/features/settings/data/settings-data.ts:556
+#: src/features/settings/data/settings-data.ts:583
 msgid "After 30 minutes"
 msgstr "30 分後"
 
-#: src/features/settings/data/settings-data.ts:554
+#: src/features/settings/data/settings-data.ts:581
 msgid "After 5 minutes"
 msgstr "5 分後"
-
-#: src/features/settings/sections/models-section.tsx:103
-msgid "AI models stored on your device."
-msgstr "AI モデルはデバイスに保存されます。"
 
 #: src/features/welcome/welcome-page.tsx:225
 msgid "All required models are already installed. Continue when you're ready."
@@ -212,11 +208,11 @@ msgstr "リモートサービスを許可"
 msgid "Always"
 msgstr "常に表示"
 
-#: src/features/settings/data/settings-data.ts:509
+#: src/features/settings/data/settings-data.ts:536
 msgid "Always Ctrl+Shift+V"
 msgstr "常に Ctrl+Shift+V"
 
-#: src/features/settings/data/settings-data.ts:504
+#: src/features/settings/data/settings-data.ts:531
 msgid "Always Ctrl+V"
 msgstr "常に Ctrl+V"
 
@@ -229,7 +225,7 @@ msgid "API key"
 msgstr "APIキー"
 
 #: src/features/settings/sections/appearance-section.tsx:16
-#: src/features/settings/settings-page.tsx:73
+#: src/features/settings/settings-page.tsx:71
 msgid "Appearance"
 msgstr "外観"
 
@@ -274,11 +270,11 @@ msgstr "音声入力の開始・完了・エラー時に再生される音声フ
 msgid "Auto-capitalize sentences"
 msgstr "文頭を自動的に大文字にする"
 
-#: src/features/settings/data/settings-data.ts:461
+#: src/features/settings/data/settings-data.ts:488
 msgid "Auto-detect"
 msgstr "自動検出"
 
-#: src/features/settings/data/settings-data.ts:499
+#: src/features/settings/data/settings-data.ts:526
 #: src/features/settings/sections/pill-section.tsx:55
 msgid "Automatic"
 msgstr "自動"
@@ -302,6 +298,10 @@ msgstr "始める前に"
 #: src/features/settings/data/settings-data.ts:214
 msgid "Best accuracy; turbo decoder keeps it fast."
 msgstr "最高精度。ターボデコーダーで速度も保ちます。"
+
+#: src/features/settings/components/asr-engine-cards.tsx:223
+msgid "Bigger is more accurate, but slower"
+msgstr "大きいほど正確ですが、遅くなります"
 
 #: src/features/settings/data/settings-data.ts:116
 msgid "Bottom center"
@@ -342,7 +342,7 @@ msgstr "組み込み"
 
 #: src/components/feedback/confirm-dialog.tsx:61
 #: src/features/dictionary/components/dictionary-table.tsx:112
-#: src/features/settings/sections/models-section.tsx:315
+#: src/features/settings/components/asr-engine-cards.tsx:396
 #: src/features/snippets/snippets-page.tsx:248
 #: src/features/styles/components/style-editor-modal.tsx:247
 msgid "Cancel"
@@ -356,8 +356,8 @@ msgstr "現在の録音をキャンセル"
 msgid "Cancel download"
 msgstr "ダウンロードを中止"
 
-#: src/features/settings/sections/transcription-section.tsx:134
-#: src/features/settings/sections/transcription-section.tsx:142
+#: src/features/settings/sections/transcription-section.tsx:121
+#: src/features/settings/sections/transcription-section.tsx:129
 msgid "Capitalize known names"
 msgstr "既知の名前を大文字化"
 
@@ -404,7 +404,7 @@ msgstr "更新を確認中"
 msgid "Checking installed models…"
 msgstr "インストールされているモデルを確認しています…"
 
-#: src/features/settings/components/asr-engine-cards.tsx:246
+#: src/features/settings/components/asr-engine-cards.tsx:314
 #: src/features/settings/sections/general-section.tsx:159
 #: src/features/welcome/components/ready-checks.tsx:113
 msgid "Checking…"
@@ -427,11 +427,7 @@ msgstr "文字起こしの整形方法を選びます — 設定した OpenAI �
 msgid "Choose the AI models to install. Everything runs offline — no cloud, no accounts."
 msgstr "インストールする AI モデルを選択します。すべてがオフラインで実行されます。クラウドもアカウントもありません。"
 
-#: src/features/settings/sections/transcription-section.tsx:51
-msgid "Choose the engine that turns your speech into text. Local engines run fully on-device: Whisper covers the most languages with selectable model sizes, Parakeet is the fastest for 25 European languages."
-msgstr "音声をテキストに変換するエンジンを選択します。ローカルエンジンは完全にオンデバイスで実行されます。Whisper は最も多くの言語に対応しモデルサイズを選択でき、Parakeet はヨーロッパの 25 言語で最も高速です。"
-
-#: src/features/settings/components/asr-engine-cards.tsx:397
+#: src/features/settings/components/asr-engine-cards.tsx:422
 msgid "Choose your dictation language below. Parakeet cannot tell Lune which language it heard, so until one is set every dictation is formatted as English."
 msgstr "下で音声入力の言語を選んでください。Parakeet は聞き取った言語を Lune に伝えられないため、言語を設定するまではすべて英語として整形されます。"
 
@@ -453,7 +449,7 @@ msgstr "閉じる"
 
 #: src/components/feedback/help-feedback-dialog.tsx:281
 #: src/features/history/components/session-detail-modal.tsx:206
-#: src/features/settings/sections/models-section.tsx:327
+#: src/features/settings/components/asr-engine-cards.tsx:406
 #: src/features/styles/components/style-editor-modal.tsx:238
 #: src/features/updates/update-dialog.tsx:326
 #: src/features/updates/update-dialog.tsx:338
@@ -496,7 +492,7 @@ msgstr "起動の少し後にリリースサーバーへ接続し、新しいバ
 msgid "Continue"
 msgstr "続行"
 
-#: src/features/settings/sections/transcription-section.tsx:46
+#: src/features/settings/sections/transcription-section.tsx:43
 msgid "Control how your speech is turned into text."
 msgstr "音声をテキストに変換する方法を制御します。"
 
@@ -525,12 +521,12 @@ msgstr "インジケーターバーの角の丸み。"
 msgid "Corners"
 msgstr "角"
 
-#: src/features/settings/sections/transcription-section.tsx:129
+#: src/features/settings/sections/transcription-section.tsx:116
 msgid "Correction"
 msgstr "修正"
 
-#: src/features/settings/sections/transcription-section.tsx:148
-#: src/features/settings/sections/transcription-section.tsx:163
+#: src/features/settings/sections/transcription-section.tsx:135
+#: src/features/settings/sections/transcription-section.tsx:150
 msgid "Correction sensitivity"
 msgstr "修正の感度"
 
@@ -598,7 +594,8 @@ msgstr "ダーク"
 #: src/components/feedback/confirm-dialog.tsx:72
 #: src/features/history/components/history-table.tsx:500
 #: src/features/history/components/session-detail-modal.tsx:199
-#: src/features/settings/sections/models-section.tsx:263
+#: src/features/settings/components/asr-engine-cards.tsx:330
+#: src/features/settings/components/asr-engine-cards.tsx:331
 msgid "Delete"
 msgstr "削除"
 
@@ -612,7 +609,7 @@ msgid "Delete {0}"
 msgstr "{0}を削除"
 
 #. placeholder {0}: model.name
-#: src/features/settings/sections/models-section.tsx:300
+#: src/features/settings/components/asr-engine-cards.tsx:387
 msgid "Delete {0}?"
 msgstr "{0} を削除しますか?"
 
@@ -620,7 +617,7 @@ msgstr "{0} を削除しますか?"
 msgid "Delete {count, plural, one {# session} other {# sessions}}?"
 msgstr "{count, plural, other {# 件のセッション}}を削除しますか？"
 
-#: src/features/settings/sections/models-section.tsx:318
+#: src/features/settings/components/asr-engine-cards.tsx:399
 msgid "Delete model"
 msgstr "モデルの削除"
 
@@ -657,11 +654,15 @@ msgstr "説明"
 msgid "Description is too long."
 msgstr "説明が長すぎます。"
 
-#: src/features/settings/data/settings-data.ts:500
+#: src/features/settings/data/settings-data.ts:527
 msgid "Detects terminals and picks the matching paste shortcut. Works on most compositors."
 msgstr "端末を検出して適切な貼り付けショートカットを選びます。ほとんどのコンポジターで動作します。"
 
-#: src/features/settings/data/settings-data.ts:462
+#: src/features/settings/components/asr-engine-cards.tsx:222
+msgid "Detects the language you speak"
+msgstr "話している言語を検出します"
+
+#: src/features/settings/data/settings-data.ts:489
 msgid "Detects the spoken language each session."
 msgstr "セッションごとに話した言語を検出します。"
 
@@ -669,20 +670,16 @@ msgstr "セッションごとに話した言語を検出します。"
 msgid "Deterministic fixes applied before any AI styling."
 msgstr "AI によるスタイル調整の前に、決定的な修正を適用します。"
 
-#: src/features/settings/settings-page.tsx:74
+#: src/features/settings/settings-page.tsx:72
 msgid "Dictation"
 msgstr "音声入力"
 
-#: src/features/settings/sections/transcription-section.tsx:72
-#: src/features/settings/sections/transcription-section.tsx:85
+#: src/features/settings/sections/transcription-section.tsx:58
+#: src/features/settings/sections/transcription-section.tsx:71
 #: src/features/welcome/components/engine-step.tsx:286
 #: src/features/welcome/components/engine-step.tsx:294
 msgid "Dictation language"
 msgstr "音声入力の言語"
-
-#: src/features/settings/components/asr-engine-cards.tsx:386
-msgid "Dictation language set to {languageName}. Parakeet cannot tell Lune which language it heard, so it has no Auto-detect — change the language below whenever you dictate in another one."
-msgstr "音声入力の言語を {languageName} に設定しました。Parakeet は聞き取った言語を Lune に伝えられないため「自動検出」はありません。別の言語で話すときは下で言語を変更してください。"
 
 #: src/features/settings/sections/pill-section.tsx:73
 msgid "Dictation pill"
@@ -708,7 +705,7 @@ msgstr "現在のドラフトを破棄し、アイドル状態に戻ります。
 msgid "Disconnected"
 msgstr "切断されました"
 
-#: src/features/settings/sections/models-section.tsx:137
+#: src/features/settings/components/asr-engine-cards.tsx:143
 msgid "Disk usage"
 msgstr "ディスク使用量"
 
@@ -716,19 +713,15 @@ msgstr "ディスク使用量"
 msgid "Dismiss error"
 msgstr "エラーを無視する"
 
-#: src/features/settings/data/settings-data.ts:519
+#: src/features/settings/data/settings-data.ts:546
 msgid "Don't save history"
 msgstr "履歴を保存しない"
 
 #: src/features/history/components/history-table.tsx:494
-#: src/features/settings/components/gpu-backend-card.tsx:114
-#: src/features/settings/sections/models-section.tsx:277
+#: src/features/settings/components/asr-engine-cards.tsx:344
+#: src/features/settings/components/gpu-backend-card.tsx:42
 msgid "Download"
 msgstr "ダウンロード"
-
-#: src/features/settings/components/asr-engine-cards.tsx:312
-msgid "Download {label}"
-msgstr "{label} をダウンロード"
 
 #: src/features/welcome/welcome-page.tsx:466
 msgid "Download {pendingCount} models"
@@ -747,8 +740,7 @@ msgid "Download interrupted"
 msgstr "ダウンロードが中断されました"
 
 #: src/components/ui/byte-progress.tsx:37
-#: src/features/settings/components/asr-engine-cards.tsx:297
-#: src/features/settings/sections/models-section.tsx:236
+#: src/features/settings/components/asr-engine-cards.tsx:356
 #: src/features/welcome/components/model-card.tsx:105
 msgid "Download progress"
 msgstr "ダウンロード進行状況"
@@ -769,9 +761,8 @@ msgstr "NVIDIA の CUDA ランタイムをダウンロードしています。"
 msgid "Downloading update"
 msgstr "更新をダウンロード中"
 
-#: src/features/settings/components/asr-engine-cards.tsx:300
-#: src/features/settings/components/gpu-backend-card.tsx:114
-#: src/features/settings/sections/models-section.tsx:277
+#: src/features/settings/components/asr-engine-cards.tsx:318
+#: src/features/settings/components/gpu-backend-card.tsx:31
 #: src/features/welcome/welcome-page.tsx:410
 msgid "Downloading…"
 msgstr "ダウンロード中…"
@@ -851,6 +842,10 @@ msgstr "サンプルはスタイル調整エンジンにあなたのスタイル
 msgid "Expand sidebar"
 msgstr "サイドバーを展開する"
 
+#: src/features/settings/components/asr-engine-cards.tsx:236
+msgid "Fast on a CPU"
+msgstr "CPU でも高速"
+
 #: src/features/settings/data/settings-data.ts:200
 msgid "Fast; less accurate than Medium."
 msgstr "高速ですが、「中」より精度は低くなります。"
@@ -895,7 +890,7 @@ msgstr "スニペットを絞り込む"
 msgid "Filter snippets…"
 msgstr "スニペットを絞り込む…"
 
-#: src/features/settings/sections/transcription-section.tsx:130
+#: src/features/settings/sections/transcription-section.tsx:117
 msgid "Fix recognizer errors with your dictionary and known vocabulary, on your device. It uses per-word confidence and statistical patterns — no AI model, and it never rewrites what you said."
 msgstr "認識エラーを、お使いのデバイス上で辞書と既知の語彙を使って修正します。単語ごとの信頼度と統計的パターンを利用します — AI モデルは使わず、あなたが話した内容を書き換えることは決してありません。"
 
@@ -903,11 +898,11 @@ msgstr "認識エラーを、お使いのデバイス上で辞書と既知の語
 msgid "Follow Settings"
 msgstr "設定に従う"
 
-#: src/features/settings/data/settings-data.ts:505
+#: src/features/settings/data/settings-data.ts:532
 msgid "Force the standard paste shortcut for every app."
 msgstr "すべてのアプリで標準の貼り付けショートカットを使います。"
 
-#: src/features/settings/data/settings-data.ts:510
+#: src/features/settings/data/settings-data.ts:537
 msgid "Force the terminal paste shortcut. Use on COSMIC if you mostly dictate into terminals."
 msgstr "端末用の貼り付けショートカットを強制します。主に端末へ音声入力する場合、COSMIC で使用してください。"
 
@@ -920,8 +915,8 @@ msgstr "インジケーターをドラッグした位置を破棄し、既定の
 msgid "Formatting"
 msgstr "書式設定"
 
-#: src/features/settings/sections/transcription-section.tsx:109
-#: src/features/settings/sections/transcription-section.tsx:115
+#: src/features/settings/sections/transcription-section.tsx:96
+#: src/features/settings/sections/transcription-section.tsx:102
 msgid "Free the model when idle"
 msgstr "アイドル時にモデルを解放"
 
@@ -938,7 +933,7 @@ msgid "Gap between the pill and the screen edge, so it clears a taskbar or dock.
 msgstr "インジケーターと画面端との間隔です。タスクバーやドックを避けるために使います。"
 
 #: src/features/settings/sections/general-section.tsx:62
-#: src/features/settings/settings-page.tsx:72
+#: src/features/settings/settings-page.tsx:70
 msgid "General"
 msgstr "一般"
 
@@ -959,7 +954,7 @@ msgstr "github"
 msgid "GitHub"
 msgstr "GitHub"
 
-#: src/features/settings/sections/transcription-section.tsx:110
+#: src/features/settings/sections/transcription-section.tsx:97
 msgid "Give the memory back after a quiet spell. The next dictation reloads the model, which adds up to a second before it starts listening — your speech is recorded during the wait, so nothing is lost."
 msgstr "しばらく使わないとメモリを解放します。次の音声入力ではモデルを読み込み直すため、聞き取り開始までに最大 1 秒かかります。その待ち時間も録音されるので、内容は失われません。"
 
@@ -975,13 +970,13 @@ msgstr "こんばんは。"
 msgid "Good morning."
 msgstr "おはようございます。"
 
-#: src/features/settings/components/gpu-backend-card.tsx:68
+#: src/features/settings/components/gpu-backend-card.tsx:59
 #: src/features/welcome/components/engine-step.tsx:350
 #: src/features/welcome/welcome-page.tsx:309
 msgid "GPU acceleration"
 msgstr "GPU アクセラレーション"
 
-#: src/features/settings/components/gpu-backend-card.tsx:176
+#: src/features/settings/components/gpu-backend-card.tsx:149
 msgid "GPU support is installed but not working."
 msgstr "GPU サポートはインストールされていますが、動作していません。"
 
@@ -1054,7 +1049,9 @@ msgstr "音声入力の使い方"
 msgid "Idle · mic ready"
 msgstr "待機中 · マイク準備完了"
 
-#: src/features/settings/sections/models-section.tsx:220
+#: src/features/settings/components/asr-engine-cards.tsx:196
+#: src/features/settings/components/asr-engine-cards.tsx:197
+#: src/features/settings/components/asr-engine-cards.tsx:307
 msgid "In use"
 msgstr "使用中"
 
@@ -1070,14 +1067,13 @@ msgstr "プレースホルダーを挿入"
 msgid "Install and restart"
 msgstr "インストールして再起動"
 
-#: src/features/settings/components/asr-engine-cards.tsx:250
-#: src/features/settings/sections/models-section.tsx:223
+#: src/features/settings/components/asr-engine-cards.tsx:324
 #: src/features/welcome/components/model-card.tsx:88
 #: src/features/welcome/welcome-page.tsx:311
 msgid "Installed"
 msgstr "インストール済み"
 
-#: src/features/settings/components/gpu-backend-card.tsx:154
+#: src/features/settings/components/gpu-backend-card.tsx:127
 #: src/features/welcome/components/engine-step.tsx:340
 msgid "Installed. Restart Lune Voice to start using your GPU."
 msgstr "インストールしました。GPU の使用を開始するには Lune Voice を再起動してください。"
@@ -1102,11 +1098,11 @@ msgstr "ディスカッションに参加"
 msgid "Just now"
 msgstr "たった今"
 
-#: src/features/settings/data/settings-data.ts:524
+#: src/features/settings/data/settings-data.ts:551
 msgid "Keep forever"
 msgstr "ずっと保存"
 
-#: src/features/settings/data/settings-data.ts:551
+#: src/features/settings/data/settings-data.ts:578
 msgid "Keep loaded"
 msgstr "読み込んだままにする"
 
@@ -1135,10 +1131,6 @@ msgstr "キーボードショートカット（「Super H」→「Super+H」）"
 #: src/features/settings/sections/general-section.tsx:72
 msgid "Language"
 msgstr "言語"
-
-#: src/features/settings/components/asr-engine-cards.tsx:379
-msgid "Languages: {languages}"
-msgstr "対応言語: {languages}"
 
 #: src/features/settings/data/settings-data.ts:123
 msgid "Large"
@@ -1233,10 +1225,6 @@ msgstr "Lune Voice が他のアプリに入力し、ホットキーを検出す�
 msgid "Lune Voice writes"
 msgstr "Lune Voice の出力"
 
-#: src/features/settings/components/asr-engine-cards.tsx:320
-msgid "Manage in Models"
-msgstr "「モデル」で管理"
-
 #: src/features/settings/data/settings-data.ts:206
 msgid "Medium"
 msgstr "中"
@@ -1269,11 +1257,6 @@ msgstr "モード"
 msgid "Model size"
 msgstr "モデルサイズ"
 
-#: src/features/settings/sections/models-section.tsx:102
-#: src/features/settings/settings-page.tsx:79
-msgid "Models"
-msgstr "モデル"
-
 #: src/features/welcome/welcome-page.tsx:534
 msgid "Models are stored locally. No telemetry, no accounts."
 msgstr "モデルはローカルに保存されます。テレメトリもアカウントもありません。"
@@ -1301,6 +1284,10 @@ msgstr "名前"
 msgid "Name is too long."
 msgstr "名前が長すぎます。"
 
+#: src/features/settings/components/asr-engine-cards.tsx:221
+msgid "Nearly 100 languages"
+msgstr "約 100 言語"
+
 #: src/features/settings/data/settings-data.ts:108
 msgid "Never"
 msgstr "表示しない"
@@ -1323,11 +1310,15 @@ msgstr "次のページ"
 msgid "No"
 msgstr "いいえ"
 
+#: src/features/settings/components/asr-engine-cards.tsx:237
+msgid "No auto-detect: set your language below"
+msgstr "自動検出なし: 下で言語を設定してください"
+
 #: src/features/welcome/components/ready-checks.tsx:103
 msgid "No microphone found. Plug one in, then pick it in Settings › Dictation."
 msgstr "マイクが見つかりません。接続してから 設定 › 音声入力 で選択してください。"
 
-#: src/features/settings/components/gpu-backend-card.tsx:163
+#: src/features/settings/components/gpu-backend-card.tsx:136
 msgid "No NVIDIA driver was found. Install the driver for your GPU and the download will appear here."
 msgstr "NVIDIA ドライバーが見つかりません。GPU のドライバーをインストールすると、ここにダウンロードが表示されます。"
 
@@ -1386,12 +1377,11 @@ msgstr "音声検出前にマイクレベルを正規化します。小さい音
 msgid "not connected"
 msgstr "未接続"
 
-#: src/features/settings/components/gpu-backend-card.tsx:135
-#: src/features/settings/sections/models-section.tsx:226
+#: src/features/settings/components/gpu-backend-card.tsx:109
 msgid "Not installed"
 msgstr "インストールされていません"
 
-#: src/features/settings/sections/models-section.tsx:139
+#: src/features/settings/components/asr-engine-cards.tsx:145
 msgid "Nothing installed"
 msgstr "何もインストールされていません"
 
@@ -1437,7 +1427,7 @@ msgstr "リリースページを開く"
 msgid "Open session from {time}"
 msgstr "{time} のセッションを開く"
 
-#: src/features/settings/data/settings-data.ts:596
+#: src/features/settings/data/settings-data.ts:623
 msgid "OpenAI-compatible"
 msgstr "OpenAI 互換"
 
@@ -1458,7 +1448,7 @@ msgstr "または直接送る"
 msgid "Orientation"
 msgstr "向き"
 
-#: src/features/settings/settings-page.tsx:78
+#: src/features/settings/settings-page.tsx:76
 msgid "Output"
 msgstr "出力"
 
@@ -1474,7 +1464,8 @@ msgstr "全体の進捗"
 msgid "Pagination"
 msgstr "ページネーション"
 
-#: src/features/settings/data/settings-data.ts:595
+#: src/features/settings/components/asr-engine-cards.tsx:170
+#: src/features/settings/data/settings-data.ts:622
 #: src/features/welcome/components/engine-step.tsx:84
 msgid "Parakeet"
 msgstr "Parakeet"
@@ -1483,23 +1474,15 @@ msgstr "Parakeet"
 msgid "Parakeet (local)"
 msgstr "Parakeet（ローカル）"
 
-#: src/features/settings/components/asr-engine-cards.tsx:387
-msgid "Parakeet cannot tell Lune which language it heard, so it has no Auto-detect. Set the dictation language below to the one you speak, and change it when you switch languages."
-msgstr "Parakeet は聞き取った言語を Lune に伝えられないため「自動検出」はありません。下で話す言語を音声入力の言語に設定し、言語を切り替えるときは変更してください。"
-
 #: src/features/welcome/components/engine-step.tsx:288
 msgid "Parakeet cannot tell Lune which language it heard, so set the one you speak. You can change it later in Settings."
 msgstr "Parakeet は聞き取った言語を Lune に伝えられないため、話す言語を設定してください。後から設定で変更できます。"
 
-#: src/features/settings/components/asr-engine-cards.tsx:398
+#: src/features/settings/components/asr-engine-cards.tsx:423
 msgid "Parakeet cannot transcribe {languageName}, so dictation will not start. Choose a language it covers below, or use Whisper."
 msgstr "Parakeet は {languageName} を文字起こしできないため、音声入力は開始されません。下で対応する言語を選ぶか、Whisper を使用してください。"
 
-#: src/features/settings/components/asr-engine-cards.tsx:363
-msgid "Parakeet model size"
-msgstr "Parakeet モデルサイズ"
-
-#: src/features/settings/data/settings-data.ts:600
+#: src/features/settings/data/settings-data.ts:627
 msgid "Paste"
 msgstr "貼り付け"
 
@@ -1508,7 +1491,7 @@ msgstr "貼り付け"
 msgid "Paste compatibility"
 msgstr "貼り付けの互換性"
 
-#: src/features/settings/data/settings-data.ts:409
+#: src/features/settings/data/settings-data.ts:436
 msgid "Paste into app"
 msgstr "アプリに貼り付け"
 
@@ -1525,7 +1508,7 @@ msgstr "パフォーマンスや速度"
 msgid "Phrase"
 msgstr "フレーズ"
 
-#: src/features/settings/settings-page.tsx:75
+#: src/features/settings/settings-page.tsx:73
 msgid "Pill"
 msgstr "インジケーター"
 
@@ -1655,7 +1638,11 @@ msgstr "録音モード"
 msgid "Refresh few-shot examples"
 msgstr "Few-shot サンプルを更新"
 
-#: src/features/settings/sections/transcription-section.tsx:68
+#: src/features/settings/components/asr-engine-cards.tsx:171
+msgid "Remote"
+msgstr "リモート"
+
+#: src/features/settings/sections/transcription-section.tsx:54
 msgid "Remote services are turned off, so dictation cannot start with this engine. Turn on Allow remote services in General, or switch to an on-device engine."
 msgstr "リモートサービスがオフのため、このエンジンでは音声入力を開始できません。「一般」で「リモートサービスを許可」をオンにするか、オンデバイスのエンジンに切り替えてください。"
 
@@ -1707,7 +1694,7 @@ msgstr "位置をリセット"
 msgid "Restart Lune Voice to start using your GPU."
 msgstr "GPU を使うには Lune Voice を再起動してください。"
 
-#: src/features/settings/components/gpu-backend-card.tsx:131
+#: src/features/settings/components/gpu-backend-card.tsx:106
 msgid "Restart needed"
 msgstr "再起動が必要"
 
@@ -1727,7 +1714,7 @@ msgstr "各文字起こしを選択したスタイルで書き換えます。オ
 msgid "Rounded"
 msgstr "角丸"
 
-#: src/features/settings/components/gpu-backend-card.tsx:138
+#: src/features/settings/components/gpu-backend-card.tsx:111
 msgid "Running on CPU"
 msgstr "CPU で実行中"
 
@@ -1802,9 +1789,13 @@ msgstr "送信"
 msgid "Send method"
 msgstr "送信方法"
 
-#: src/features/settings/data/settings-data.ts:410
+#: src/features/settings/data/settings-data.ts:437
 msgid "Sends a paste shortcut into the focused app. Fastest for long dictations."
 msgstr "アクティブなアプリに貼り付けショートカットを送ります。長い音声入力に最速です。"
+
+#: src/features/settings/components/asr-engine-cards.tsx:240
+msgid "Sends audio to an endpoint you set up"
+msgstr "設定したエンドポイントに音声を送信します"
 
 #: src/features/settings/data/settings-data.ts:155
 msgid "Sends audio to an OpenAI-compatible endpoint you configure — a server on your own machine, or a hosted API."
@@ -1834,7 +1825,7 @@ msgstr "セッション"
 msgid "Set hotkey"
 msgstr "ホットキーを設定する"
 
-#: src/features/settings/sections/transcription-section.tsx:76
+#: src/features/settings/sections/transcription-section.tsx:62
 msgid "Set the language you speak. Auto uses detection from speech."
 msgstr "話す言語を設定します。自動では音声からの検出を使用します。"
 
@@ -1846,7 +1837,7 @@ msgstr "GPU アクセラレーションを設定"
 msgid "Setting up your GPU"
 msgstr "GPU をセットアップしています"
 
-#: src/features/settings/settings-page.tsx:106
+#: src/features/settings/settings-page.tsx:100
 msgid "Settings sections"
 msgstr "設定セクション"
 
@@ -1869,7 +1860,7 @@ msgstr "{totalSessions} 件中 {0} 件を表示"
 msgid "Showing {start}–{end} of {visibleCount} sessions"
 msgstr "{visibleCount} 件中 {start}–{end} 件を表示"
 
-#: src/features/settings/data/settings-data.ts:416
+#: src/features/settings/data/settings-data.ts:443
 msgid "Simulates keystrokes one character at a time. Works where paste is blocked."
 msgstr "1 文字ずつキー入力を再現します。貼り付けが禁止されている場所でも動作します。"
 
@@ -1928,10 +1919,6 @@ msgstr "発話時間"
 #: src/features/welcome/components/engine-step.tsx:100
 msgid "Speech engine"
 msgstr "音声認識エンジン"
-
-#: src/features/settings/sections/models-section.tsx:74
-msgid "Speech-to-text"
-msgstr "音声認識"
 
 #: src/features/dictionary/components/dictionary-table.tsx:78
 msgid "Spoken phrase"
@@ -1996,7 +1983,7 @@ msgstr "このデバイスに保存"
 msgid "Style"
 msgstr "スタイル"
 
-#: src/features/settings/settings-page.tsx:77
+#: src/features/settings/settings-page.tsx:75
 msgid "Styling"
 msgstr "スタイル調整"
 
@@ -2044,7 +2031,7 @@ msgstr "ありがとうございます。フィードバックを送信しまし
 msgid "The floating status pill you see while dictating."
 msgstr "ディクテーション中に表示されるフローティングのステータスインジケーター。"
 
-#: src/features/settings/sections/transcription-section.tsx:75
+#: src/features/settings/sections/transcription-section.tsx:61
 msgid "The language you speak. Parakeet needs it set."
 msgstr "話す言語です。Parakeet では設定が必要です。"
 
@@ -2060,11 +2047,11 @@ msgstr "音声入力に使用される主なショートカット。バインデ
 msgid "The microphone is in use"
 msgstr "マイクは使用中です"
 
-#: src/features/settings/data/settings-data.ts:552
+#: src/features/settings/data/settings-data.ts:579
 msgid "The model stays in memory. Every dictation starts instantly."
 msgstr "モデルはメモリに残ります。毎回すぐに音声入力を始められます。"
 
-#: src/features/settings/sections/transcription-section.tsx:149
+#: src/features/settings/sections/transcription-section.tsx:136
 msgid "The words the recognizer is least sure about are checked against your dictionary and vocabulary. Higher checks more words; lower trusts the raw transcription."
 msgstr "認識エンジンが最も自信のない単語を、辞書と語彙と照合します。高くするとより多くの単語をチェックし、低くすると生の文字起こしを信頼します。"
 
@@ -2072,7 +2059,7 @@ msgstr "認識エンジンが最も自信のない単語を、辞書と語彙と
 msgid "This copy can't update itself. Download the new version from {RELEASES_URL} and replace this one. Your settings, history and models are kept."
 msgstr "このコピーは自動で更新できません。{RELEASES_URL} から新しいバージョンをダウンロードして、このコピーと置き換えてください。設定、履歴、モデルはそのまま残ります。"
 
-#: src/features/settings/sections/models-section.tsx:310
+#: src/features/settings/components/asr-engine-cards.tsx:391
 msgid "This model is in use by your current configuration. Dictation may not work until you reinstall it or pick another."
 msgstr "このモデルは現在の設定で使用中です。再インストールするか別のモデルを選択するまで、音声入力が機能しない場合があります。"
 
@@ -2155,8 +2142,8 @@ msgstr "文字起こし中…"
 msgid "Transcript"
 msgstr "文字起こし"
 
-#: src/features/settings/sections/transcription-section.tsx:45
-#: src/features/settings/settings-page.tsx:76
+#: src/features/settings/sections/transcription-section.tsx:42
+#: src/features/settings/settings-page.tsx:74
 msgid "Transcription"
 msgstr "文字起こし"
 
@@ -2165,19 +2152,19 @@ msgid "Transcription accuracy"
 msgstr "文字起こしの精度"
 
 #. placeholder {0}: status.devices.join(', ')
-#: src/features/settings/components/gpu-backend-card.tsx:146
+#: src/features/settings/components/gpu-backend-card.tsx:119
 msgid "Transcription is running on {0}."
 msgstr "文字起こしは {0} で実行されています。"
 
-#: src/features/settings/components/gpu-backend-card.tsx:147
+#: src/features/settings/components/gpu-backend-card.tsx:120
 msgid "Transcription is running on your GPU."
 msgstr "文字起こしは GPU で実行されています。"
 
-#: src/features/settings/components/gpu-backend-card.tsx:170
+#: src/features/settings/components/gpu-backend-card.tsx:143
 msgid "Transcription runs on the CPU. An optional download moves it to your NVIDIA GPU for noticeably lower latency — most of it is NVIDIA's CUDA maths libraries, which cannot be redistributed in a smaller form."
 msgstr "文字起こしは CPU で実行されます。任意のダウンロードで NVIDIA GPU に移すと、遅延が目に見えて小さくなります — その大半は NVIDIA の CUDA 数学ライブラリで、これ以上小さな形では再配布できません。"
 
-#: src/features/settings/components/gpu-backend-card.tsx:171
+#: src/features/settings/components/gpu-backend-card.tsx:144
 msgid "Transcription runs on the CPU. No GPU download has been published for this build yet."
 msgstr "文字起こしは CPU で実行されます。このビルド向けの GPU ダウンロードはまだ公開されていません。"
 
@@ -2194,7 +2181,7 @@ msgstr "トリガーフレーズ"
 msgid "Try again"
 msgstr "再試行"
 
-#: src/features/settings/data/settings-data.ts:601
+#: src/features/settings/data/settings-data.ts:628
 msgid "Type"
 msgstr "入力"
 
@@ -2202,7 +2189,7 @@ msgstr "入力"
 msgid "Type a phrase, or tap the mic to capture it exactly as Lune Voice hears it."
 msgstr "フレーズを入力するか、マイクをタップして Lune Voice が聞き取ったとおりに登録してください。"
 
-#: src/features/settings/data/settings-data.ts:415
+#: src/features/settings/data/settings-data.ts:442
 msgid "Type into app"
 msgstr "アプリに入力"
 
@@ -2235,8 +2222,8 @@ msgstr "更新"
 msgid "Use GPU acceleration"
 msgstr "GPU アクセラレーションを使用する"
 
-#: src/features/settings/sections/transcription-section.tsx:96
-#: src/features/settings/sections/transcription-section.tsx:104
+#: src/features/settings/sections/transcription-section.tsx:82
+#: src/features/settings/sections/transcription-section.tsx:90
 msgid "Use hardware acceleration"
 msgstr "ハードウェアアクセラレーションを使用"
 
@@ -2244,6 +2231,10 @@ msgstr "ハードウェアアクセラレーションを使用"
 #: src/features/styles/components/style-preset-card.tsx:45
 msgid "Use the {0} style"
 msgstr "{0} スタイルを使用する"
+
+#: src/features/settings/components/asr-engine-cards.tsx:135
+msgid "Use the remote API"
+msgstr "リモート API を使用"
 
 #: src/features/welcome/components/ready-checks.tsx:100
 msgid "Using {activeDevice}. Change it in Settings › Dictation."
@@ -2274,7 +2265,8 @@ msgstr "スタイルを表示"
 msgid "Visibility"
 msgstr "表示"
 
-#: src/features/settings/sections/transcription-section.tsx:50
+#: src/features/settings/components/asr-engine-cards.tsx:176
+#: src/features/settings/sections/transcription-section.tsx:47
 msgid "Voice model"
 msgstr "音声モデル"
 
@@ -2304,11 +2296,15 @@ msgstr "何が起きましたか。あるいは、どんな機能が欲しいで
 msgid "What is this about?"
 msgstr "内容の種類"
 
+#: src/features/settings/sections/transcription-section.tsx:48
+msgid "What turns your speech into text. The local engines run on your machine."
+msgstr "音声をテキストに変換するエンジンです。ローカルエンジンはお使いのマシン上で動作します。"
+
 #: src/features/updates/update-dialog.tsx:263
 msgid "What's new"
 msgstr "変更点"
 
-#: src/features/settings/sections/transcription-section.tsx:97
+#: src/features/settings/sections/transcription-section.tsx:83
 msgid "When available, this can make transcription finish faster."
 msgstr "利用可能な場合、これにより文字起こしがより速く完了します。"
 
@@ -2336,7 +2332,8 @@ msgstr "送信する貼り付けショートカット。「自動」はターミ
 msgid "Which screen the pill appears on."
 msgstr "インジケーターを表示するモニター。"
 
-#: src/features/settings/data/settings-data.ts:594
+#: src/features/settings/components/asr-engine-cards.tsx:169
+#: src/features/settings/data/settings-data.ts:621
 #: src/features/welcome/components/engine-step.tsx:77
 msgid "Whisper"
 msgstr "Whisper"
@@ -2344,10 +2341,6 @@ msgstr "Whisper"
 #: src/features/settings/data/settings-data.ts:140
 msgid "Whisper (local)"
 msgstr "Whisper（ローカル）"
-
-#: src/features/settings/components/asr-engine-cards.tsx:175
-msgid "Whisper model size"
-msgstr "Whisper モデルサイズ"
 
 #: src/features/welcome/components/engine-step.tsx:79
 msgid "whisper.cpp running on-device. Choose a size to trade speed for accuracy."
@@ -2367,7 +2360,7 @@ msgstr "言葉"
 msgid "WPM"
 msgstr "WPM"
 
-#: src/features/settings/sections/transcription-section.tsx:135
+#: src/features/settings/sections/transcription-section.tsx:122
 msgid "Write names like GitHub and iPhone the way their owners do. Turn this off to keep the recognizer's own capitals. A style can override this."
 msgstr "GitHub や iPhone などの名前を、提供元の表記どおりに書きます。オフにすると、音声認識の大文字小文字をそのまま使います。スタイルごとに上書きできます。"
 

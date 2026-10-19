@@ -256,7 +256,7 @@ device = "auto"
 | `"cuda"` | Ask for CUDA. If no CUDA device is available, it still falls back to CPU. |
 | `"cpu"` | Always use the CPU. |
 
-**GPU support is decided at runtime.** The CUDA backend is a plugin the app downloads when you ask, so `device = "cuda"` can work on a binary that was never built with CUDA. What you do need is an NVIDIA driver, which can't be bundled, so you install it yourself. You can see the current state in Settings → Models, which is also where you download the plugin (or with the `gpu_backend_status` command). The GPU card during setup only appears when accepting it would change something: the state is `ready`, `needs-restart`, or `not-installed` with a published plugin for this build. If you accept it while the state is `not-installed`, setup downloads the plugin.
+**GPU support is decided at runtime.** The CUDA backend is a plugin the app downloads when you ask, so `device = "cuda"` can work on a binary that was never built with CUDA. What you do need is an NVIDIA driver, which can't be bundled, so you install it yourself. You can see the current state in Settings → Transcription, under Use hardware acceleration, which is also where you download the plugin (or with the `gpu_backend_status` command). The GPU card during setup only appears when accepting it would change something: the state is `ready`, `needs-restart`, or `not-installed` with a published plugin for this build. If you accept it while the state is `not-installed`, setup downloads the plugin.
 
 The plugin installs into `~/.local/share/lune-voice/backends/`. Delete that folder to go back to CPU. ggml builds its device list once per run, so a newly installed plugin only works after a restart, and the app tells you so.
 

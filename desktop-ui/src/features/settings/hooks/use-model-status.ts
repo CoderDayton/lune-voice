@@ -42,10 +42,6 @@ export interface ModelStatusApi {
 }
 
 /**
- * Shared model lifecycle: lists on-device model status, streams download
- * progress, and downloads/deletes by `local_name`. Used by the Models tab and
- * the Transcription engine cards so the two never drift on download wiring.
- *
  * `check_model_status` reports the full installable library (every Whisper
  * size), each flagged with `inUse` for the active config. Call
  * `refresh` when the backend or selected model changes to keep `inUse` current.

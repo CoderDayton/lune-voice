@@ -17,6 +17,7 @@ import {
   labelFor,
   languageForEngine,
   localizeText,
+  modelChoiceSettings,
   modelDownloadSizes,
   parakeetLanguages,
   parakeetModels,
@@ -125,6 +126,21 @@ describe("settings data", () => {
     // Whisper takes anything, so it never moves the language.
     expect(languageForEngine("WhisperCpp", "auto", ["de"])).toBe("auto");
     expect(languageForEngine("WhisperCpp", "pl", [])).toBe("pl");
+  });
+
+  test("picking a model saves its engine, the model and a language the engine takes", () => {
+    expect(modelChoiceSettings({ engine: "WhisperCpp", model: "Small" }, "auto", ["de"])).toEqual({
+      asrBackend: "WhisperCpp",
+      whisperModel: "Small",
+      dictationLanguage: "auto",
+    });
+    expect(
+      modelChoiceSettings({ engine: "ParakeetCpp", model: "TdtV3Q8" }, "auto", ["de-AT"]),
+    ).toEqual({ asrBackend: "ParakeetCpp", parakeetModel: "TdtV3Q8", dictationLanguage: "de" });
+    expect(modelChoiceSettings({ engine: "OpenAiCompatible" }, "pl", [])).toEqual({
+      asrBackend: "OpenAiCompatible",
+      dictationLanguage: "pl",
+    });
   });
 
   test("the dictation languages Parakeet cannot do are exactly the East Asian ones", () => {
