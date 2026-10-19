@@ -6,9 +6,7 @@
 
 **Open source dictation for Linux and Windows that runs on your own hardware.**
 
-[![Release](https://img.shields.io/github/v/release/CoderDayton/lune-voice?style=flat&label=release)](https://github.com/CoderDayton/lune-voice/releases/latest)
 [![CI](https://img.shields.io/github/actions/workflow/status/CoderDayton/lune-voice/ci.yml?branch=main&style=flat&label=CI)](https://github.com/CoderDayton/lune-voice/actions/workflows/ci.yml)
-[![Downloads](https://img.shields.io/github/downloads/CoderDayton/lune-voice/total?style=flat&label=downloads)](https://github.com/CoderDayton/lune-voice/releases)
 [![License](https://img.shields.io/badge/license-GPLv3-blue?style=flat)](LICENSE)
 
 </div>
@@ -53,12 +51,12 @@ There is no telemetry and no analytics. The source is public, so you can check t
 
 ## Install
 
-Grab the build for your platform from the [releases page](https://github.com/CoderDayton/lune-voice/releases).
+Builds go on the [releases page](https://github.com/CoderDayton/lune-voice/releases). Until the first release is out, [build from source](#building-from-source).
 
 **Linux:** `.deb`, `.rpm`, or `.AppImage`:
 
 ```bash
-sudo apt install ./lune-voice_*_amd64.deb
+sudo apt install ./LuneVoice_*_amd64.deb
 ```
 
 **Windows:** run the `-setup.exe` installer. The built-in updater keeps it
@@ -67,7 +65,7 @@ current after that.
 ### Uninstall
 
 Uninstalling leaves your data behind, including the downloaded models (up to
-~1.6 GB). Delete these folders to remove that too:
+~2.8 GB). Delete these folders to remove that too:
 
 - **Linux**: `~/.local/share/lune-voice/` (models, history) and `~/.config/lune-voice/` (settings)
 - **Windows**: `%APPDATA%\lune-voice\`
@@ -104,8 +102,8 @@ cgs package  # build the .deb / .rpm / .AppImage / .tar.gz installers
 | **OS** | Linux (X11 or Wayland) or Windows 10/11 |
 | **Typing** | **Linux**: IBus when it is your input method, otherwise `/dev/uinput`. The .deb and .rpm install the udev rule for typing and the hotkey; the AppImage and portable archive ask for a polkit password once to install it. `wl-copy` or `xclip` for the paste path. **Windows**: the clipboard plus a synthetic paste, with per-key typing as the fallback. Either way the text goes to the window you were in when you started speaking. |
 | **Hotkey** | Toggle or push-to-talk on both platforms. Linux grabs the keyboard through evdev; Windows uses a low-level keyboard hook. |
-| **GPU** | Optional, Linux only for now. If you have an NVIDIA card, the app offers a one-time download that moves transcription onto it. CPU-only works everywhere, just slower. |
-| **Disk** | ~540 MB for the default model, ~1.6 GB for all three |
+| **GPU** | Optional, on Linux and Windows. If you have an NVIDIA card, the app offers a one-time download that moves transcription onto it. CPU-only works everywhere, just slower. |
+| **Disk** | ~540 MB for the default Whisper model, ~1.7 GB for all four Whisper sizes, 416 or 669 MB for Parakeet |
 | **Internet** | Once, for the model download |
 
 ### GPU acceleration
