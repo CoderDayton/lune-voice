@@ -47,6 +47,7 @@ confusion_bank.json
 /fixtures/audio/live_recording.txt
 /fixtures/audio/custom_recording*.wav
 /fixtures/audio/custom_recording*.txt
+/datasets/
 
 # Sound-cue preview files (not the real assets under crates/lune-voice/assets/)
 /sound-previews/

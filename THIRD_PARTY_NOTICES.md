@@ -180,6 +180,15 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ```
 
+## Speech test clips (`fixtures/audio/`)
+
+Source repository only; not bundled with the binary. The `librispeech_*.wav`
+clips are from LibriSpeech (Panayotov et al., https://www.openslr.org/12) and
+the `mls_*.wav` clips from Multilingual LibriSpeech (Pratap et al.,
+https://www.openslr.org/94), both licensed under Creative Commons Attribution
+4.0 (https://creativecommons.org/licenses/by/4.0/). The `*_noise_snr*.wav`
+files are those clips with added noise.
+
 ## NVIDIA CUDA runtime libraries
 
 The optional GPU plugin archive
