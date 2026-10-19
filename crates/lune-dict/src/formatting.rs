@@ -13,8 +13,7 @@
 //!
 //! * **Tier 1 — deterministic, no LLM:** capitalize the first letter; append a
 //!   terminal period when the segment is a single resolved declarative; append
-//!   a `?` when it is a subject-auxiliary inversion question ("did we ship it");
-//!   and demote a pause-driven over-split (`. But` → `, but`) back to a comma.
+//!   a `?` when it is a subject-auxiliary inversion question ("did we ship it").
 //!   These fixes are unambiguous, so they never need the model.
 //! * **Tier 2 — ambiguous, trips the LLM gate:** comma-less run-ons and
 //!   bare wh-leading segments with no end mark. The right fix here
@@ -119,13 +118,25 @@ pub fn normalize_with(text: &str, fmt: &FormatToggles) -> PunctuationOutcome {
     let trimmed = hotkeyed.as_str();
 
     let words: Vec<&str> = trimmed.split_whitespace().collect();
+    let last_start = words[..words.len().saturating_sub(1)]
+        .iter()
+        .rposition(|w| token_boundary(w) == Boundary::Sentence)
+        .map_or(0, |i| i + 1);
+    let last_sentence = &words[last_start..];
     let ends_terminal = ends_with_terminal(trimmed);
     // A colon, or a comma or semicolon left after the drop above, ends a short
     // opener (ignoring trailing closing quotes/brackets). It is the ASR's own
     // mark; keep it verbatim and never force a period on top of it — see the
     // terminal block below.
     let ends_open = trimmed.trim_end_matches(CLOSING).ends_with([':', ',', ';']);
-    let interrogative = is_interrogative_lead(&words);
+    let interrogative = if last_start == 0 {
+        is_interrogative_lead(last_sentence)
+    } else {
+        is_aux_inversion_question(last_sentence)
+    };
+    let cut_off = words
+        .last()
+        .is_some_and(|w| DANGLING_ENDS.contains(&word_core(w).to_lowercase().as_str()));
 
     // Run-on: long stretch with no internal separator or sentence break. Such a
     // segment likely needs internal commas or a split — the deterministic pass
@@ -138,7 +149,7 @@ pub fn normalize_with(text: &str, fmt: &FormatToggles) -> PunctuationOutcome {
     // on it for punctuation. A bare wh-lead ("what a mess" vs "what time is it")
     // stays ambiguous and is still deferred.
     let confident_question =
-        interrogative && !ends_terminal && !ends_open && is_aux_inversion_question(&words);
+        interrogative && !ends_terminal && !ends_open && is_aux_inversion_question(last_sentence);
 
     // A remaining interrogative lead without an end mark is ambiguous
     // (`?` vs `.` vs `!`), so let the LLM decide rather than guessing.
@@ -163,7 +174,7 @@ pub fn normalize_with(text: &str, fmt: &FormatToggles) -> PunctuationOutcome {
     // ASR produced it: no period is appended, so we never emit a double mark
     // such as ":." or ",." and never force a period where the true terminator
     // might be a question mark.
-    if words.len() > 1 && !ends_terminal && !ends_open {
+    if words.len() > 1 && !ends_terminal && !ends_open && !cut_off {
         if confident_question {
             out.push('?');
         } else if !interrogative {
@@ -171,11 +182,6 @@ pub fn normalize_with(text: &str, fmt: &FormatToggles) -> PunctuationOutcome {
         }
         // An ambiguous interrogative lead gets no mark here — `needs_llm` owns it.
     }
-
-    // Undo pause-driven over-splitting: a thinking pause the ASR read as a
-    // sentence break before a coordinating conjunction ("…so far. But I…")
-    // becomes a comma ("…so far, but I…"). Always applied — gate-independent.
-    let out = demote_oversplit_conjunctions(&out);
 
     PunctuationOutcome {
         text: out,
@@ -462,14 +468,14 @@ fn has_internal_separator(text: &str) -> bool {
 
 /// Trailing-`.` tokens that mark an abbreviation, not a sentence end. `Mr.`,
 /// `Mrs.`, `Dr.` are produced by [`abbreviate_titles`] above; the rest are
-/// common in dictated text. Dotted abbreviations (`e.g.`, `U.S.`) need no
-/// listing — any interior dot already disqualifies a token.
+/// common in dictated text. Dotted abbreviations (`e.g.`, `U.S.`, `Ph.D.`)
+/// need no listing — [`token_ends_sentence`] recognizes them by shape.
 const NON_TERMINAL_ABBREVIATIONS: &[&str] = &["mr", "mrs", "dr", "st", "etc", "vs", "prof"];
 
 /// Capitalize the first word of every sentence: the segment start plus every
-/// word following a sentence terminator (`.` `!` `?` `…`), skipping periods
+/// word following a sentence terminator (`.` `!` `?`), skipping periods
 /// that belong to abbreviations (`Mr.`, `e.g.`, `U.S.`) or single-letter
-/// initials (`J.`). Tokens that already carry any uppercase (`iPhone`,
+/// initials (`J.`), and pauses (`…`, `...`). Tokens that already carry any uppercase (`iPhone`,
 /// `GitHub`, mid-name caps) are never altered. Whitespace is preserved
 /// byte-for-byte; non-Latin text passes through untouched.
 pub fn capitalize_sentence_starts(text: &str) -> String {
@@ -496,7 +502,7 @@ pub fn capitalize_sentence_starts(text: &str) -> String {
         } else {
             out.push_str(token);
         }
-        at_sentence_start = token_ends_sentence(token);
+        at_sentence_start = token_boundary(token) == Boundary::Sentence;
         rest = &rest[tok_end..];
     }
     out
@@ -520,10 +526,23 @@ pub fn strip_fillers(text: &str) -> String {
     if !is_latin(text) {
         return text.to_owned();
     }
-    let kept: Vec<&str> = text
-        .split_whitespace()
-        .filter(|tok| !FILLERS.contains(&word_core(tok).to_ascii_lowercase().as_str()))
-        .collect();
+    let mut kept: Vec<std::borrow::Cow<str>> = Vec::new();
+    for tok in text.split_whitespace() {
+        let core = word_core(tok);
+        if !FILLERS.contains(&core.to_ascii_lowercase().as_str()) {
+            kept.push(tok.into());
+            continue;
+        }
+        let mark = tok.rsplit(core).next().unwrap_or_default();
+        if let Some(prev) = kept.last_mut()
+            && mark.contains(TERMINATORS)
+            && !ends_with_terminal(prev)
+        {
+            let prev = prev.to_mut();
+            prev.truncate(prev.trim_end_matches([',', ';']).len());
+            prev.push_str(mark);
+        }
+    }
     if kept.is_empty() {
         return text.to_owned();
     }
@@ -556,8 +575,8 @@ pub fn strip_wrapping_quotes(text: &str) -> String {
 }
 
 /// Lowercase the leading capital of a mid-sentence word the lexicon knows to be
-/// a common word (low capitalization rate). Fixes ASR/heuristic over-caps like
-/// "Make Sure" → "Make sure" and "So Make" → "So make" while leaving sentence
+/// a common word (low capitalization rate) that is a function word or appears
+/// lowercase elsewhere in the text ("like, If the" → "like, if the"), leaving sentence
 /// starts, proper nouns ("John"), brands ("GitHub"), and acronyms ("NASA")
 /// untouched. English only — the caller gates on language. This runs on the
 /// always-on (fast-path + LLM-input) text so casing is normalized once,
@@ -585,16 +604,19 @@ pub fn decase_common_words(text: &str) -> String {
         rest = &rest[tok_end..];
     }
 
-    // Sentence-start flag per token: a sentence-initial capital is legitimate
-    // (owned by capitalize_sentence_starts) and is never a proper-noun-run cue.
-    let mut starts = vec![false; segs.len()];
-    let mut at_start = true;
+    let mut after_mark = vec![false; segs.len()];
+    let mut marked = true;
     for (i, (_, token)) in segs.iter().enumerate() {
-        starts[i] = at_start;
+        after_mark[i] = marked;
         if !token.is_empty() {
-            at_start = token_ends_sentence(token);
+            marked = ends_with_terminal(token);
         }
     }
+    let lower_seen: std::collections::HashSet<&str> = segs
+        .iter()
+        .map(|(_, t)| word_core(t))
+        .filter(|c| c.starts_with(|ch: char| ch.is_lowercase()))
+        .collect();
 
     let mut out = String::with_capacity(text.len());
     for i in 0..segs.len() {
@@ -607,12 +629,12 @@ pub fn decase_common_words(text: &str) -> String {
         // initial) capital — "Visual Studio Code", "Lune Voice" — is almost
         // always a multi-word proper noun, so never lowercase it. Neighbours are
         // read in the original casing.
-        let prev_cap = i > 0 && !starts[i - 1] && starts_upper(segs[i - 1].1);
-        let next_cap = i + 1 < segs.len() && !starts[i + 1] && starts_upper(segs[i + 1].1);
-        if starts[i] || prev_cap || next_cap {
+        let prev_cap = i > 0 && !after_mark[i - 1] && starts_upper(segs[i - 1].1);
+        let next_cap = i + 1 < segs.len() && !after_mark[i + 1] && starts_upper(segs[i + 1].1);
+        if after_mark[i] || prev_cap || next_cap {
             out.push_str(token);
         } else {
-            out.push_str(&decase_token(token));
+            out.push_str(&decase_token(token, &lower_seen));
         }
     }
     out
@@ -632,9 +654,13 @@ fn starts_upper(token: &str) -> bool {
 /// are spared), and `en_p_cap` positively classifies the word as common (below
 /// the stricter decase threshold). Unknown words (a proper noun the table does
 /// not know) are left capitalized.
-fn decase_token(token: &str) -> String {
+fn decase_token(token: &str, lower_seen: &std::collections::HashSet<&str>) -> String {
     let core = word_core(token);
     if core.is_empty() {
+        return token.to_string();
+    }
+    let lower = core.to_lowercase();
+    if !FUNCTION_WORDS.contains(&lower.as_str()) && !lower_seen.contains(lower.as_str()) {
         return token.to_string();
     }
     let mut alphas = core.chars().filter(|c| c.is_alphabetic());
@@ -647,7 +673,7 @@ fn decase_token(token: &str) -> String {
     // A curated brand whose canonical is capitalized (React, Rust, Redux) keeps
     // its casing even though the bare word is a common English word — p_cap alone
     // cannot tell brand "React" from verb "react", so the vocab is the authority.
-    if crate::lexicon::is_capitalized_brand(&core.to_lowercase()) {
+    if crate::lexicon::is_capitalized_brand(&lower) {
         return token.to_string();
     }
     let is_common =
@@ -777,15 +803,10 @@ fn token_ends_sentence(token: &str) -> bool {
     if bare.is_empty() {
         return true;
     }
-    // An interior dot normally means an abbreviation ("U.S.", "e.g."), which
-    // does not end a sentence. An all-digit dotted token has the same shape
-    // but genuinely ends one — prices and ratings ("that's a 4.5. Overall…"),
-    // and by extension version numbers and IPs ("we shipped 1.2.3. The next…"),
-    // are common in dictation, and misreading them swallowed the break.
-    let is_dotted_number = bare
+    let is_dotted_abbreviation = bare
         .split('.')
-        .all(|p| !p.is_empty() && p.bytes().all(|b| b.is_ascii_digit()));
-    if bare.contains('.') && !is_dotted_number {
+        .all(|p| !p.is_empty() && p.chars().count() <= 2 && p.chars().all(char::is_alphabetic));
+    if bare.contains('.') && is_dotted_abbreviation {
         return false;
     }
     if NON_TERMINAL_ABBREVIATIONS.contains(&bare.to_lowercase().as_str()) {
@@ -800,6 +821,140 @@ fn token_ends_sentence(token: &str) -> bool {
     }
     true
 }
+
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum Boundary {
+    None,
+    Sentence,
+    Pause,
+}
+
+fn token_boundary(token: &str) -> Boundary {
+    let t = token.trim_end_matches(CLOSING);
+    if t.ends_with('…') || t.ends_with("..") {
+        Boundary::Pause
+    } else if token_ends_sentence(token) {
+        Boundary::Sentence
+    } else {
+        Boundary::None
+    }
+}
+
+const DANGLING_ENDS: &[&str] = &[
+    "a", "an", "the", "and", "or", "but", "nor", "because", "if", "than", "my", "your", "our",
+    "their", "its", "whose", "whether",
+];
+
+const FUNCTION_WORDS: &[&str] = &[
+    "a",
+    "an",
+    "the",
+    "this",
+    "that",
+    "these",
+    "those",
+    "it",
+    "its",
+    "you",
+    "your",
+    "we",
+    "our",
+    "they",
+    "their",
+    "them",
+    "he",
+    "him",
+    "his",
+    "she",
+    "her",
+    "me",
+    "my",
+    "us",
+    "and",
+    "but",
+    "or",
+    "so",
+    "because",
+    "if",
+    "when",
+    "while",
+    "though",
+    "although",
+    "unless",
+    "since",
+    "until",
+    "than",
+    "whether",
+    "of",
+    "to",
+    "in",
+    "on",
+    "at",
+    "by",
+    "for",
+    "with",
+    "from",
+    "into",
+    "about",
+    "is",
+    "are",
+    "was",
+    "were",
+    "be",
+    "been",
+    "am",
+    "do",
+    "does",
+    "did",
+    "have",
+    "has",
+    "had",
+    "can",
+    "could",
+    "would",
+    "should",
+    "might",
+    "must",
+    "well",
+    "actually",
+    "just",
+    "also",
+    "then",
+    "maybe",
+    "okay",
+    "yeah",
+    "yes",
+    "now",
+    "there",
+    "here",
+    "what",
+    "which",
+    "who",
+    "how",
+    "why",
+    "where",
+    "anything",
+    "something",
+    "everything",
+    "nothing",
+    "it's",
+    "that's",
+    "there's",
+    "they're",
+    "you're",
+    "we're",
+    "don't",
+    "doesn't",
+    "didn't",
+    "can't",
+    "won't",
+    "isn't",
+    "aren't",
+    "wasn't",
+    "what's",
+    "let's",
+    "let",
+];
 
 /// Whether the segment opens an interrogative: a wh-word lead, or an
 /// auxiliary lead followed by a question subject (subject-auxiliary
@@ -840,150 +995,6 @@ fn is_aux_inversion_question(words: &[&str]) -> bool {
 fn word_core(word: &str) -> &str {
     word.trim_start_matches(|c: char| !c.is_alphanumeric())
         .trim_end_matches(|c: char| !c.is_alphanumeric())
-}
-
-/// Words that, opening a pause-split fragment, continue the previous thought
-/// rather than start a new sentence — so a period the recognizer inserted before
-/// them is demoted to a comma. Two grammatically comma-joinable groups:
-///   - coordinating conjunctions: and, but, so, or, yet
-///   - concessive / contrast subordinators: though, although, whereas
-///
-/// Deliberately excluded — adding these would be *wrong*, not just cautious:
-///   - "for" / "nor": comma-joinable in theory, but "For"/"Nor" almost always
-///     open a real sentence (preposition / negative-inversion), so demoting
-///     would fuse unrelated sentences.
-///   - conjunctive adverbs (however, therefore, then, thus, hence, moreover,
-///     furthermore, nevertheless, nonetheless, meanwhile, otherwise, instead,
-///     besides, consequently, accordingly, anyway, still, also): joining two
-///     clauses with a *comma* before these is a comma splice — they require a
-///     period or semicolon — and "then"/"meanwhile" mark genuine sequences that
-///     must stay separate.
-const CONTINUATION_WORDS: &[&str] = &[
-    "and", "but", "so", "or", "yet", "though", "although", "whereas",
-];
-
-/// Upper bound on how many words one sentence may grow to via demotion. Past
-/// this, a candidate break is kept rather than spliced, so an adversarial or
-/// rambling dictation ("…. So …. So …. So …" without end) can never fuse into a
-/// single unbounded comma-spliced wall. Set well above any natural sentence
-/// (~40 words) so it never constrains real dictation — purely a safety guard.
-const MAX_CLAUSE_WORDS: usize = 48;
-
-/// Demote an over-split sentence break back to a comma when the ASR turned a
-/// thinking pause into a period right before a [`CONTINUATION_WORDS`] token that
-/// continues the thought ("…so far. But I want…" → "…so far, but I want…").
-///
-/// The acoustic pause length the model uses to choose `.` vs `,` is baked into
-/// the ASR weights — there is no threshold of ours to raise — so this corrects
-/// the over-read deterministically after the fact. Only a plain word ending in
-/// a single period qualifies as the break, so abbreviations ("etc."), dotted
-/// forms ("U.S."), initials ("J."), and acronym sentence-ends ("NASA.") are
-/// left intact; and a genuine new sentence opens on "Then"/"Finally"/a fresh
-/// subject — never a continuation word — so real breaks stay split.
-///
-/// Two linear passes over borrowed token spans (no per-token allocation): one
-/// marks the boundaries to demote while tracking the running sentence length
-/// for the [`MAX_CLAUSE_WORDS`] guard, one rebuilds the string. O(n) in input.
-fn demote_oversplit_conjunctions(text: &str) -> String {
-    if !is_latin(text) {
-        return text.to_owned();
-    }
-
-    // Borrowed (leading-whitespace, token) spans so exact spacing survives the
-    // rewrite with no String allocated per token. A trailing whitespace-only
-    // run is captured as a final span with an empty token.
-    let mut segs: Vec<(&str, &str)> = Vec::new();
-    let mut rest = text;
-    while !rest.is_empty() {
-        let ws_end = rest
-            .find(|c: char| !c.is_whitespace())
-            .unwrap_or(rest.len());
-        let ws = &rest[..ws_end];
-        rest = &rest[ws_end..];
-        if rest.is_empty() {
-            segs.push((ws, ""));
-            break;
-        }
-        let tok_end = rest.find(char::is_whitespace).unwrap_or(rest.len());
-        segs.push((ws, &rest[..tok_end]));
-        rest = &rest[tok_end..];
-    }
-
-    // Pass 1: mark each conjunction token whose preceding token's terminal
-    // period should become a comma. `clause_words` accumulates across demoted
-    // boundaries (the clause keeps growing) and resets at every kept break.
-    let mut demote = vec![false; segs.len()];
-    let mut clause_words = 0usize;
-    for i in 0..segs.len() {
-        let tok = segs[i].1;
-        if tok.is_empty() {
-            continue;
-        }
-        clause_words += 1;
-        let oversplit = is_oversplit_period_word(tok);
-        let next_is_conj = segs
-            .get(i + 1)
-            .map(|s| s.1)
-            .filter(|n| !n.is_empty())
-            .is_some_and(|n| {
-                CONTINUATION_WORDS.contains(&word_core(n).to_ascii_lowercase().as_str())
-            });
-        if oversplit && next_is_conj && clause_words < MAX_CLAUSE_WORDS {
-            demote[i + 1] = true; // splice: the clause continues, do not reset
-        } else if oversplit || token_ends_sentence(tok) {
-            clause_words = 0; // a kept sentence break starts a new clause
-        }
-    }
-
-    // Pass 2: rebuild. A token preceding a demoted conjunction loses its
-    // terminal period to a comma; a demoted conjunction is fully lowercased
-    // ("But," / "SO" → "but" / "so") with a now-redundant trailing comma dropped.
-    let mut out = String::with_capacity(text.len() + 4);
-    for (idx, (ws, tok)) in segs.iter().enumerate() {
-        out.push_str(ws);
-        if tok.is_empty() {
-            continue;
-        }
-        let demote_this = demote[idx];
-        let comma_after = demote.get(idx + 1).copied().unwrap_or(false);
-        if !demote_this && !comma_after {
-            out.push_str(tok);
-            continue;
-        }
-        let mut piece = if demote_this {
-            let lowered = tok.to_lowercase();
-            lowered
-                .strip_suffix(',')
-                .map(str::to_owned)
-                .unwrap_or(lowered)
-        } else {
-            (*tok).to_owned()
-        };
-        if comma_after && piece.ends_with('.') {
-            piece.pop();
-            piece.push(',');
-        }
-        out.push_str(&piece);
-    }
-    out
-}
-
-/// Whether `tok` is a plain word ending in exactly one sentence period — the
-/// only shape treated as an over-split break. Requires a lowercase Latin letter
-/// immediately before the `.`, no interior `.`, and not a known non-terminal
-/// abbreviation, so "U.S.", "etc.", "J.", and "NASA." never qualify.
-fn is_oversplit_period_word(tok: &str) -> bool {
-    let Some(stem) = tok.strip_suffix('.') else {
-        return false;
-    };
-    if stem.is_empty() || stem.contains('.') {
-        return false;
-    }
-    let last = stem.chars().next_back().unwrap();
-    if !(last.is_alphabetic() && last.is_lowercase()) {
-        return false;
-    }
-    !NON_TERMINAL_ABBREVIATIONS.contains(&stem.to_ascii_lowercase().as_str())
 }
 
 /// Deterministic shaping of a corrected transcript, applied in a fixed order:
@@ -1161,151 +1172,7 @@ mod tests {
     }
 
     #[test]
-    fn demotes_oversplit_coordinating_conjunction_to_comma() {
-        // A pause the ASR over-read as a sentence break leaves ". But" / ". So"
-        // where the thought continues — demote the period to a comma.
-        let out = normalize("everything looks stable so far. But I want to keep an eye on it");
-        assert!(
-            out.text.contains("so far, but I want"),
-            "expected period->comma demotion: {:?}",
-            out.text
-        );
-        assert!(!out.text.contains("so far. But"), "{:?}", out.text);
-
-        let out = normalize("we should weigh both. So we decided to wait a bit");
-        assert!(out.text.contains("both, so we decided"), "{:?}", out.text);
-    }
-
-    #[test]
-    fn demotion_leaves_genuine_sentence_breaks_intact() {
-        // "Then" is not a coordinating conjunction — a real break stays split.
-        let out = normalize("run the start script. Then open the config file");
-        assert!(
-            out.text.contains("script. Then open"),
-            "genuine break must stay split: {:?}",
-            out.text
-        );
-    }
-
-    #[test]
-    fn demotion_excludes_for_and_nor() {
-        // "for"/"nor" are too ambiguous (preposition / inversion) to splice.
-        let out = normalize("i waited a while. For the bus was running late again");
-        assert!(out.text.contains(". For the bus"), "{:?}", out.text);
-    }
-
-    #[test]
-    fn demotion_skips_abbreviations_and_acronyms() {
-        // A trailing-period abbreviation or an acronym sentence-end is not a
-        // plain-word period, so the break is left intact.
-        let out = normalize("bring pens, paper, etc. And the laptop too please");
-        assert!(out.text.contains("etc. And the"), "{:?}", out.text);
-
-        let out = normalize("i used to work at NASA. And i miss it sometimes now");
-        assert!(out.text.contains("NASA. And i"), "{:?}", out.text);
-    }
-
-    #[test]
-    fn demotion_collapses_redundant_conjunction_comma() {
-        // "…it. But, it failed" → one comma, not "…it, but, it failed".
-        let out = normalize("we shipped it. But, it failed badly in production");
-        assert!(out.text.contains("it, but it failed"), "{:?}", out.text);
-        assert!(!out.text.contains("but,"), "{:?}", out.text);
-    }
-
-    #[test]
-    fn demotion_no_op_when_already_comma_joined() {
-        // No period before the conjunction — nothing to demote.
-        let out = normalize("send it over whenever you're ready, and I'll review it later");
-        assert!(
-            out.text.contains("ready, and I'll review"),
-            "{:?}",
-            out.text
-        );
-    }
-
-    #[test]
-    fn demotes_trailing_concessive_though() {
-        // "though" trailing a clause continues the thought — "It's nice. Though."
-        // is a pause artifact, not two sentences. Demote to "It's nice, though."
-        let out = normalize("the toggle is pretty nice. Though.");
-        assert!(out.text.contains("nice, though"), "{:?}", out.text);
-        assert!(!out.text.contains("nice. Though"), "{:?}", out.text);
-    }
-
-    #[test]
-    fn demotes_concessive_subordinators() {
-        // "although"/"whereas" take a comma when the clause follows.
-        let out = normalize("the api works fine. Although it is a little slow today");
-        assert!(out.text.contains("fine, although it"), "{:?}", out.text);
-        let out = normalize("sales rose in the north. Whereas the south stayed flat");
-        assert!(out.text.contains("north, whereas the"), "{:?}", out.text);
-    }
-
-    #[test]
-    fn demotion_excludes_conjunctive_adverbs() {
-        // A comma before a conjunctive adverb is a comma splice, and "then"
-        // marks a real sequence — these breaks must survive untouched.
-        assert!(
-            normalize("it failed. However we recovered quickly")
-                .text
-                .contains(". However"),
-        );
-        assert!(
-            normalize("do this first. Then run the install script")
-                .text
-                .contains(". Then"),
-        );
-        assert!(
-            normalize("it is getting late. Therefore we should stop now")
-                .text
-                .contains(". Therefore"),
-        );
-        assert!(
-            normalize("we tried really hard. Anyway it did not work out")
-                .text
-                .contains(". Anyway"),
-        );
-    }
-
-    #[test]
-    fn demotion_allows_multiple_within_one_normal_sentence() {
-        // Two over-splits in one ordinary-length sentence both demote.
-        let out = normalize("we shipped it. But it broke. So we rolled back quickly");
-        assert!(
-            out.text.contains("it, but it broke, so we rolled back"),
-            "{:?}",
-            out.text
-        );
-    }
-
-    #[test]
-    fn demotion_lowercases_all_caps_conjunction() {
-        // An all-caps conjunction must fully lowercase ("SO" → "so"), not "sO".
-        let out = normalize("we waited a while. SO we left without them");
-        assert!(out.text.contains("while, so we left"), "{:?}", out.text);
-        assert!(!out.text.contains("sO"), "{:?}", out.text);
-    }
-
-    #[test]
-    fn demotion_bounds_pathological_chaining() {
-        // Adversarial: dozens of clauses each ending ". So <x>". The clause-length
-        // guard must keep some breaks rather than fuse everything into one
-        // unbounded comma-spliced wall.
-        let mut s = String::from("alpha beta gamma");
-        for _ in 0..40 {
-            s.push_str(". So delta epsilon");
-        }
-        let out = normalize(&s).text;
-        assert!(
-            out.contains(". So"),
-            "clause-length cap must keep some sentence breaks"
-        );
-    }
-
-    #[test]
-    fn demotion_handles_adversarial_inputs_without_panicking() {
-        // None of these may panic (slicing, UTF-8 boundaries, empty stems).
+    fn normalize_handles_adversarial_inputs_without_panicking() {
         for s in [
             "",
             "   ",
@@ -1322,17 +1189,6 @@ mod tests {
         ] {
             let _ = normalize(s);
         }
-        // Acronym/abbreviation period is never spliced; unicode stems survive.
-        assert!(
-            normalize("i used to work at U.S. And the rest of it now")
-                .text
-                .contains("U.S. And"),
-        );
-        assert!(
-            normalize("café looks good so far. But déjà vu sets in now")
-                .text
-                .contains("far, but déjà"),
-        );
     }
 
     #[test]
@@ -1365,11 +1221,14 @@ mod tests {
     }
 
     #[test]
-    fn decase_lowercases_isolated_midsentence_common_word() {
-        // An isolated over-capitalized common word is still reverted.
+    fn decase_needs_lowercase_evidence_for_a_content_word() {
         assert_eq!(
             decase_common_words("I want to Make dinner"),
-            "I want to make dinner"
+            "I want to Make dinner"
+        );
+        assert_eq!(
+            decase_common_words("I want to Make dinner and make lunch"),
+            "I want to make dinner and make lunch"
         );
     }
 
@@ -1401,12 +1260,7 @@ mod tests {
             decase_common_words("we use React and Rust here"),
             "we use React and Rust here"
         );
-        // The brand spare is targeted, not blanket: an ordinary over-capitalized
-        // common word is still reverted.
-        assert_eq!(
-            decase_common_words("I want to Make dinner"),
-            "I want to make dinner"
-        );
+        assert_eq!(decase_common_words("I know It works"), "I know it works");
     }
 
     #[test]
@@ -1626,8 +1480,8 @@ mod tests {
     #[test]
     fn decase_handles_trailing_punctuation() {
         assert_eq!(
-            decase_common_words("we should, Make sure."),
-            "we should, make sure."
+            decase_common_words("we should, If possible."),
+            "we should, if possible."
         );
     }
 
@@ -1897,5 +1751,156 @@ mod tests {
         let out = normalize("how about that.");
         assert_eq!(out.text, "How about that.");
         assert!(!out.needs_llm);
+    }
+
+    fn shaped(raw: &str) -> String {
+        shape(raw, "English", &FormatToggles::default())
+    }
+
+    #[test]
+    fn an_ellipsis_mid_sentence_keeps_the_next_word_as_spoken() {
+        for (raw, want) in [
+            (
+                "we could probably increase the... the feel of that, maybe",
+                "We could probably increase the... the feel of that, maybe.",
+            ),
+            (
+                "Because obviously, it... needs different values based on the length.",
+                "Because obviously, it... needs different values based on the length.",
+            ),
+            (
+                "or we could draw like a... Kind of like how it points",
+                "Or we could draw like a... Kind of like how it points.",
+            ),
+        ] {
+            assert_eq!(shaped(raw), want, "{raw}");
+        }
+    }
+
+    #[test]
+    fn a_capitalized_name_mid_sentence_is_kept() {
+        for raw in [
+            "I keep getting logged out of Discord every time I quit.",
+            "Alright, continue to Step 5.",
+            "It needs to be cleaned up because even Whisper is not perfect.",
+            "Since Google is AI, Google search is AI.",
+            "I'd like to replace Lantern with Flame.",
+            "I want to upload it on the Marketplace or anything like that.",
+        ] {
+            assert_eq!(shaped(raw), raw);
+        }
+    }
+
+    #[test]
+    fn a_function_word_capitalized_mid_sentence_is_lowercased() {
+        for (raw, want) in [
+            (
+                "and if they match up, like, If the word is basically the same,",
+                "And if they match up, like, if the word is basically the same.",
+            ),
+            (
+                "the lights are too bright, The intensity is too much.",
+                "The lights are too bright, the intensity is too much.",
+            ),
+        ] {
+            assert_eq!(shaped(raw), want, "{raw}");
+        }
+    }
+
+    #[test]
+    fn a_capital_after_an_abbreviation_period_is_kept() {
+        let raw = "Things you find on websites, etc. And you can just look at it.";
+        assert_eq!(shaped(raw), raw);
+    }
+
+    #[test]
+    fn a_short_file_name_still_ends_the_sentence() {
+        for (raw, want) in [
+            ("open app.js. then run it", "Open app.js. Then run it."),
+            ("go to x.com. then sign in", "Go to x.com. Then sign in."),
+            ("see e.g. the docs", "See e.g. the docs."),
+        ] {
+            assert_eq!(shaped(raw), want, "{raw}");
+        }
+    }
+
+    #[test]
+    fn a_glued_ellipsis_word_still_ends_the_sentence() {
+        let raw = "I'm going to drop the puzzle and...okay. A redesign is a redesign.";
+        assert_eq!(shaped(raw), raw);
+    }
+
+    #[test]
+    fn a_sentence_starting_with_a_conjunction_is_left_alone() {
+        for raw in [
+            "I don't know. But I know it's bad anyway.",
+            "And look how it does it. And then do it like that.",
+            "Thank you. Or if you could review it.",
+        ] {
+            assert_eq!(shaped(raw), raw);
+        }
+    }
+
+    #[test]
+    fn the_end_mark_follows_the_last_sentence() {
+        for (raw, want) in [
+            (
+                "Do you think it would even get better? By the way,",
+                "Do you think it would even get better? By the way.",
+            ),
+            (
+                "Is there time? I think we should ship it",
+                "Is there time? I think we should ship it.",
+            ),
+            (
+                "That works. can you check the logs",
+                "That works. Can you check the logs?",
+            ),
+            (
+                "Make it thinner. When I say thin, I mean like a halo,",
+                "Make it thinner. When I say thin, I mean like a halo.",
+            ),
+        ] {
+            assert_eq!(shaped(raw), want, "{raw}");
+        }
+    }
+
+    #[test]
+    fn a_cut_off_dictation_gets_no_period() {
+        for (raw, want) in [
+            ("I want to prompt a", "I want to prompt a"),
+            ("start implementing or", "Start implementing or"),
+            (
+                "take a look at the project and, uh,",
+                "Take a look at the project and",
+            ),
+            ("me to review the", "Me to review the"),
+        ] {
+            assert_eq!(shaped(raw), want, "{raw}");
+        }
+    }
+
+    #[test]
+    fn a_stripped_filler_hands_its_end_mark_to_the_word_before() {
+        for (raw, want) in [
+            (
+                "increase the difficulty, maybe, hmm. Add a different mechanic.",
+                "Increase the difficulty, maybe. Add a different mechanic.",
+            ),
+            (
+                "flash memory, stuff like that Um... We need some sort of synthesis.",
+                "Flash memory, stuff like that... We need some sort of synthesis.",
+            ),
+            (
+                "my point was whether it could beat, um...",
+                "My point was whether it could beat...",
+            ),
+            (
+                "Okay, and so, um, the coffins are fine.",
+                "Okay, and so, the coffins are fine.",
+            ),
+        ] {
+            assert_eq!(shaped(raw), want, "{raw}");
+        }
     }
 }

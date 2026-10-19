@@ -410,6 +410,7 @@ impl LexicalGate {
         let approx_cap = text.len() + words.len() * 2 + 8;
         let mut corrected_text = String::with_capacity(approx_cap);
         let mut unresolved = Vec::new();
+        let no_dict = HashMap::new();
 
         let mut i = 0;
         while i < words.len() {
@@ -493,7 +494,10 @@ impl LexicalGate {
             let mean_risk = 1.0 - mean_confidence;
             let effective_risk = risk_score.min(mean_risk);
             corrected_text.push_str(leading);
-            for (span, glue) in &spans {
+            let last = spans.len() - 1;
+            for (k, (span, glue)) in spans.iter().enumerate() {
+                let path_part = (k < last && is_path_join(glue, spans[k + 1].0))
+                    || (k > 0 && is_path_join(spans[k - 1].1, span));
                 let lexicon_info = lexicon.lookup(span);
                 let processed = process_single_word(
                     span,
@@ -502,8 +506,8 @@ impl LexicalGate {
                     &lexicon_info,
                     effective_risk,
                     flag_threshold,
-                    &dict_lookup,
-                    brand_casing,
+                    if path_part { &no_dict } else { &dict_lookup },
+                    brand_casing && !path_part,
                 );
                 corrected_text.push_str(&processed.corrected_word);
                 corrected_text.push_str(glue);
@@ -585,6 +589,14 @@ pub(crate) fn split_internal_punctuation(word: &str) -> (&str, Vec<(&str, &str)>
         spans.push((&word[span_start..span_end], &word[glue_start..glue_end]));
     }
     (leading, spans)
+}
+
+fn is_path_join(glue: &str, next: &str) -> bool {
+    match glue {
+        "/" | "\\" | "_" | "@" => true,
+        "." | ":" => next.starts_with(|c: char| c.is_lowercase() || c.is_ascii_digit()),
+        _ => false,
+    }
 }
 
 /// Trim edge punctuation so the bare word can be used as a dictionary/vocab
@@ -888,6 +900,42 @@ mod tests {
         }];
         let result = c.correct("i use github daily", NO_RISKS, &dict, "en");
         assert_eq!(result.corrected_text, "i use GitHub daily");
+    }
+
+    #[test]
+    fn a_file_name_keeps_its_own_casing() {
+        let c = LexicalGate::new();
+        for (text, want) in [
+            (
+                "if you look at the claw.json file",
+                "if you look at the claw.json file",
+            ),
+            (
+                "open the marketplace.json and lune.db files",
+                "open the marketplace.json and lune.db files",
+            ),
+            ("it is a json file", "it is a JSON file"),
+        ] {
+            let result = c.correct(text, NO_RISKS, &[], "en");
+            assert_eq!(result.corrected_text, want, "{text}");
+        }
+    }
+
+    #[test]
+    fn a_sentence_break_without_a_space_still_gets_dictionary_fixes() {
+        let c = LexicalGate::new();
+        let dict = vec![crate::DictMatch {
+            matched: "tayton".into(),
+            replacement: "Clayton".into(),
+            fuzzy: false,
+        }];
+        for (text, want) in [
+            ("the name is.Tayton here", "the name is.Clayton here"),
+            ("note:Tayton said", "note:Clayton said"),
+        ] {
+            let result = c.correct(text, NO_RISKS, &dict, "en");
+            assert_eq!(result.corrected_text, want, "{text}");
+        }
     }
 
     #[test]
