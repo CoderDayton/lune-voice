@@ -113,6 +113,17 @@ fn plugin_dirs(backend_dl: bool, bundled: Option<PathBuf>, downloaded: PathBuf) 
         .collect()
 }
 
+#[cfg_attr(not(feature = "whisper-cpp"), allow(dead_code))]
+fn cuda_devices(registered: &[String]) -> Vec<String> {
+    let mut cuda: Vec<String> = Vec::new();
+    for name in registered.iter().filter(|d| d.starts_with("CUDA")) {
+        if !cuda.contains(name) {
+            cuda.push(name.clone());
+        }
+    }
+    cuda
+}
+
 /// Plugin directory the GPU download installs into.
 pub fn downloaded_plugin_dir(data_dir: &Path) -> PathBuf {
     data_dir.join(DIR_GPU_BACKEND)
@@ -564,12 +575,7 @@ mod imp {
         // which has no plugin file on disk yet needs no download either. The
         // bundled CPU backends are always registered, so presence of *a* device
         // proves nothing — the "CUDA0", "CUDA1", … prefix is what matters.
-        let cuda: Vec<String> = loaded
-            .devices
-            .iter()
-            .filter(|d| d.starts_with("CUDA"))
-            .cloned()
-            .collect();
+        let cuda = super::cuda_devices(&loaded.devices);
         if !cuda.is_empty() {
             return GpuPluginState::Ready { devices: cuda };
         }
@@ -636,6 +642,12 @@ pub fn cuda_available(data_dir: &Path) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn cuda_devices_are_listed_once_each_without_the_cpu() {
+        let registered = ["CPU", "CUDA0", "CUDA0", "CUDA1"].map(String::from);
+        assert_eq!(cuda_devices(&registered), ["CUDA0", "CUDA1"]);
+    }
 
     #[test]
     fn download_dir_is_under_the_data_dir() {
