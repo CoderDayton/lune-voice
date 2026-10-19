@@ -307,7 +307,7 @@ jobs:
           # race: grep exits on the first hit, dpkg-deb dies of SIGPIPE, and the
           # pipeline reports failure for a rule that is present.
           listing=$(dpkg-deb -c "$deb")
-          if ! grep -F '99-lune-voice-uinput.rules' <<<"$listing" > /dev/null; then
+          if ! grep -F '70-lune-voice-input.rules' <<<"$listing" > /dev/null; then
             echo "::error::udev rule missing from $deb"
             printf '%s\n' "$listing"
             exit 1
