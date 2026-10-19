@@ -11,8 +11,6 @@ Local dictation for Linux and Windows.
 
 </div>
 
-Press `Ctrl+Space`, talk, press it again. The text gets typed into whatever window you were in. Hold-to-talk works too.
-
 Speech-to-text runs on your machine with Whisper or Parakeet. A dictionary fixes names and jargon, and a formatter handles punctuation, capitals and filler words. You can also have an LLM restyle the text. That's off by default, and it works with a local model too.
 
 ```
