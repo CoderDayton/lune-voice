@@ -2,11 +2,5 @@
 
 /**
  * What GPU acceleration can do on this machine right now.
- *
- * Deliberately a *runtime* question. GPU support used to be reported as a
- * build-time fact ("was the `whisper-cuda` feature compiled in"), which the
- * downloadable CUDA plugin made wrong: the same binary reports different
- * answers on different machines — no driver, driver but no plugin, or a
- * working GPU. Each variant maps to exactly one thing the setup UI can offer.
  */
-export type GpuBackendStateDto = "unsupported" | "driver-missing" | "not-installed" | "ready" | "needs-restart" | "failed";
+export type GpuBackendStateDto = "unsupported" | "driver-missing" | "driver-outdated" | "not-installed" | "ready" | "needs-restart" | "failed";

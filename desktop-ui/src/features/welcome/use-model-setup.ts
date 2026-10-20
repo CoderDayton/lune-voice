@@ -44,15 +44,7 @@ export interface DownloadProgress {
   done: boolean;
 }
 
-export type SetupPhase =
-  | 'loading'
-  | 'engine'
-  | 'choose'
-  | 'downloading'
-  /** Fetching the CUDA plugin, after the models and before finishing. */
-  | 'gpu'
-  | 'error'
-  | 'done';
+export type SetupPhase = 'loading' | 'engine' | 'choose' | 'downloading' | 'gpu' | 'error' | 'done';
 
 const STORAGE_KEY = 'lune-setup-complete';
 
@@ -80,7 +72,6 @@ interface SavedQueue {
   pending: string[];
   /** How many the run started with, so the progress bar keeps its scale. */
   total: number;
-  /** Whether the CUDA plugin is still owed at the end of the run. */
   wantsGpu: boolean;
 }
 
@@ -211,11 +202,8 @@ interface ModelSetup {
   useGpu: boolean;
   /** Accept/decline GPU acceleration; persists via the shared settings path. */
   setUseGpu: (next: boolean) => void;
-  /** Whether finishing setup will also download the CUDA plugin. */
   willInstallGpu: boolean;
-  /** Byte progress of the CUDA plugin download, while the `gpu` phase runs. */
   gpuProgress: GpuInstallProgressDto | null;
-  /** Published size of the CUDA plugin archive, for the download prompt. */
   gpuDownloadBytes: number;
   /** The plugin was fetched during this run, so the GPU needs a restart. */
   gpuInstalled: boolean;
@@ -371,10 +359,6 @@ export function useModelSetup({ onFinish }: { onFinish: () => void }): ModelSetu
     };
   }, [onFinish]);
 
-  // Fetch the CUDA plugin as the last setup step. Deliberately after the
-  // models: those are what dictation cannot start without, and this download
-  // is the largest of the lot.
-  //
   // A failure here never fails setup. The app transcribes on the CPU without
   // the plugin, so the honest outcome is a finished setup that says the GPU
   // part did not happen — not a dead end in front of a first-run user.

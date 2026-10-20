@@ -796,15 +796,10 @@ pub async fn delete_model_cmd(window: WebviewWindow, local_name: String) -> Resu
 }
 
 /// Runtime GPU status: driver present, plugin installed, device registered.
-///
-/// This can change on the same binary — the CUDA backend is a downloadable
-/// plugin, so the answer depends on what the user has installed rather than on
-/// how the app was compiled. Both the onboarding acceleration card and the
-/// Settings GPU section read it.
 #[tauri::command]
-pub fn gpu_backend_status(window: WebviewWindow) -> Result<GpuBackendStatusDto, String> {
+pub async fn gpu_backend_status(window: WebviewWindow) -> Result<GpuBackendStatusDto, String> {
     require_window_access(&window, &["main"])?;
-    current_gpu_status()
+    run_persist("gpu status", current_gpu_status).await
 }
 
 /// Whether this session can already type into other applications.
@@ -959,6 +954,9 @@ fn current_gpu_status() -> Result<GpuBackendStatusDto, String> {
         lune_asr::gpu_backend::GpuPluginState::DriverMissing => {
             (GpuBackendStateDto::DriverMissing, Vec::new(), None)
         }
+        lune_asr::gpu_backend::GpuPluginState::DriverOutdated => {
+            (GpuBackendStateDto::DriverOutdated, Vec::new(), None)
+        }
         lune_asr::gpu_backend::GpuPluginState::NotInstalled => {
             (GpuBackendStateDto::NotInstalled, Vec::new(), None)
         }
@@ -991,21 +989,16 @@ fn archive_bytes() -> u32 {
     u32::try_from(bytes).unwrap_or(u32::MAX)
 }
 
-/// Download and install the CUDA backend plugin.
-///
-/// Refuses when no NVIDIA driver is present: the driver is not redistributable,
-/// so the download would install libraries that cannot load. Progress is
-/// reported to the caller's channel as the archive streams.
 #[tauri::command]
 pub async fn install_gpu_backend(
     window: WebviewWindow,
     on_progress: Channel<GpuInstallProgressDto>,
 ) -> Result<GpuBackendStatusDto, String> {
     require_window_access(&window, &["main"])?;
-    if !lune_asr::gpu_backend::nvidia_driver_present() {
+    if !lune_asr::gpu_backend::gpu_driver_present() {
         return Err(
-            "No NVIDIA driver was found. Install the driver for your GPU first — it is not \
-             something Lune Voice can download for you."
+            "No GPU driver was found. Install the driver for your graphics card first — it is \
+             not something Lune Voice can download for you."
                 .to_owned(),
         );
     }

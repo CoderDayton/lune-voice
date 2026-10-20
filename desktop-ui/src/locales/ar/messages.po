@@ -13,7 +13,7 @@ msgstr ""
 "Language-Team: \n"
 "Plural-Forms: \n"
 
-#: src/features/welcome/welcome-page.tsx:521
+#: src/features/welcome/welcome-page.tsx:515
 msgid "— change it any time in Settings › Dictation."
 msgstr "— يمكنك تغييره في أي وقت من الإعدادات › الإملاء."
 
@@ -352,7 +352,7 @@ msgstr "إلغاء"
 msgid "Cancel current recording"
 msgstr "إلغاء التسجيل الحالي"
 
-#: src/features/welcome/welcome-page.tsx:418
+#: src/features/welcome/welcome-page.tsx:412
 msgid "Cancel download"
 msgstr "إلغاء التنزيل"
 
@@ -374,7 +374,7 @@ msgstr "التقاط بالصوت"
 msgid "Capture device and how recording detects when you speak."
 msgstr "جهاز الالتقاط وكيفية اكتشاف التسجيل لبدء حديثك."
 
-#: src/features/welcome/welcome-page.tsx:480
+#: src/features/welcome/welcome-page.tsx:474
 msgid "Change engine"
 msgstr "تغيير المحرك"
 
@@ -487,8 +487,8 @@ msgstr "الاتصال"
 msgid "Contact the release server shortly after startup and tell you only when a newer version exists. Off by default — dictation itself never needs the network."
 msgstr "الاتصال بخادم الإصدارات بُعيد بدء التشغيل وإخبارك فقط عند وجود إصدار أحدث. مُعطَّل افتراضيًا — فالإملاء نفسه لا يحتاج إلى الشبكة أبدًا."
 
-#: src/features/welcome/welcome-page.tsx:395
-#: src/features/welcome/welcome-page.tsx:474
+#: src/features/welcome/welcome-page.tsx:389
+#: src/features/welcome/welcome-page.tsx:468
 msgid "Continue"
 msgstr "متابعة"
 
@@ -530,7 +530,7 @@ msgstr "التصحيح"
 msgid "Correction sensitivity"
 msgstr "حساسية التصحيح"
 
-#: src/features/welcome/welcome-page.tsx:327
+#: src/features/welcome/welcome-page.tsx:322
 msgid "Could not download GPU support — transcription will run on the CPU. You can retry under Settings › Models."
 msgstr "تعذّر تنزيل دعم GPU — سيجري النسخ على المعالج. يمكنك إعادة المحاولة من الإعدادات › نماذج."
 
@@ -554,7 +554,7 @@ msgstr "تعذّر الوصول إلى خدمة الملاحظات. استخدم
 msgid "Couldn't save that snippet. Try again."
 msgstr "تعذّر حفظ هذا المقتطف. حاول مرة أخرى."
 
-#: src/features/welcome/components/engine-step.tsx:282
+#: src/features/welcome/components/engine-step.tsx:281
 msgid "Covers {languages}. For any other language, choose Whisper."
 msgstr "يدعم: {languages}. لأي لغة أخرى، اختر Whisper."
 
@@ -574,7 +574,7 @@ msgstr "إنشاء نمط جديد"
 msgid "Create style"
 msgstr "إنشاء النمط"
 
-#: src/features/welcome/welcome-page.tsx:520
+#: src/features/welcome/welcome-page.tsx:514
 msgid "Ctrl+Space"
 msgstr "Ctrl+Space"
 
@@ -676,8 +676,8 @@ msgstr "الإملاء"
 
 #: src/features/settings/sections/transcription-section.tsx:58
 #: src/features/settings/sections/transcription-section.tsx:71
-#: src/features/welcome/components/engine-step.tsx:286
-#: src/features/welcome/components/engine-step.tsx:294
+#: src/features/welcome/components/engine-step.tsx:285
+#: src/features/welcome/components/engine-step.tsx:293
 msgid "Dictation language"
 msgstr "لغة الإملاء"
 
@@ -723,11 +723,11 @@ msgstr "عدم حفظ السجل"
 msgid "Download"
 msgstr "تحميل"
 
-#: src/features/welcome/welcome-page.tsx:466
+#: src/features/welcome/welcome-page.tsx:460
 msgid "Download {pendingCount} models"
 msgstr "تنزيل نماذج {pendingCount}"
 
-#: src/features/welcome/welcome-page.tsx:465
+#: src/features/welcome/welcome-page.tsx:459
 msgid "Download 1 model"
 msgstr "تنزيل نموذج واحد"
 
@@ -749,13 +749,13 @@ msgstr "تقدم التنزيل"
 msgid "Download transcript"
 msgstr "تحميل النص"
 
+#: src/features/welcome/welcome-page.tsx:313
+msgid "Downloading GPU support."
+msgstr "جارٍ تنزيل دعم GPU."
+
 #: src/features/welcome/welcome-page.tsx:212
 msgid "Downloading models"
 msgstr "تنزيل النماذج"
-
-#: src/features/welcome/welcome-page.tsx:318
-msgid "Downloading NVIDIA's CUDA runtime."
-msgstr "جارٍ تنزيل بيئة تشغيل CUDA من NVIDIA."
 
 #: src/features/updates/update-dialog.tsx:112
 msgid "Downloading update"
@@ -763,7 +763,7 @@ msgstr "جارٍ تنزيل التحديث"
 
 #: src/features/settings/components/asr-engine-cards.tsx:318
 #: src/features/settings/components/gpu-backend-card.tsx:31
-#: src/features/welcome/welcome-page.tsx:410
+#: src/features/welcome/welcome-page.tsx:404
 msgid "Downloading…"
 msgstr "جارٍ التنزيل…"
 
@@ -826,7 +826,7 @@ msgstr "تفعيل التنسيق"
 msgid "Engine"
 msgstr "محرك"
 
-#: src/features/welcome/welcome-page.tsx:447
+#: src/features/welcome/welcome-page.tsx:441
 msgid "Enter Lune Voice"
 msgstr "الدخول إلى Lune Voice"
 
@@ -850,7 +850,7 @@ msgstr "سريع على المعالج المركزي"
 msgid "Fast; less accurate than Medium."
 msgstr "سريع؛ أقل دقة من المتوسط."
 
-#: src/features/welcome/components/engine-step.tsx:85
+#: src/features/welcome/components/engine-step.tsx:84
 msgid "Fastest on CPU · 25 European languages"
 msgstr "الأسرع على المعالج · 25 لغة أوروبية"
 
@@ -862,13 +862,13 @@ msgstr "الأسرع، والأقل دقة. للأجهزة القديمة أو �
 msgid "Feature request"
 msgstr "طلب ميزة"
 
+#: src/features/welcome/welcome-page.tsx:216
+msgid "Fetching GPU support. This is the last step, and it only happens once."
+msgstr "جارٍ جلب دعم GPU. هذه هي الخطوة الأخيرة وتحدث مرة واحدة فقط."
+
 #: src/features/updates/update-dialog.tsx:169
 msgid "Fetching Lune Voice {version}. Keep the app open until it finishes."
 msgstr "جارٍ تنزيل Lune Voice {version}. أبقِ التطبيق مفتوحًا حتى ينتهي."
-
-#: src/features/welcome/welcome-page.tsx:216
-msgid "Fetching the NVIDIA runtime. This is the last step, and it only happens once."
-msgstr "جارٍ جلب بيئة تشغيل NVIDIA. هذه هي الخطوة الأخيرة وتحدث مرة واحدة فقط."
 
 #: src/features/styles/components/style-editor-modal.tsx:199
 msgid "Few-shot examples"
@@ -971,12 +971,12 @@ msgid "Good morning."
 msgstr "صباح الخير."
 
 #: src/features/settings/components/gpu-backend-card.tsx:59
-#: src/features/welcome/components/engine-step.tsx:350
-#: src/features/welcome/welcome-page.tsx:309
+#: src/features/welcome/components/engine-step.tsx:349
+#: src/features/welcome/welcome-page.tsx:304
 msgid "GPU acceleration"
 msgstr "تسريع GPU"
 
-#: src/features/settings/components/gpu-backend-card.tsx:149
+#: src/features/settings/components/gpu-backend-card.tsx:157
 msgid "GPU support is installed but not working."
 msgstr "دعم وحدة معالجة الرسوميات مثبَّت لكنه لا يعمل."
 
@@ -1021,7 +1021,7 @@ msgstr "استمر في الضغط على الاختصار أثناء الكلا
 msgid "Hold while speaking"
 msgstr "الاستمرار بالضغط أثناء الكلام"
 
-#: src/features/welcome/welcome-page.tsx:516
+#: src/features/welcome/welcome-page.tsx:510
 msgid "Hold your hotkey, speak, then let go. The text is typed into whatever app you were using."
 msgstr "اضغط مع الاستمرار على اختصارك، وتحدّث، ثم اترك المفتاح. يُكتب النص في التطبيق الذي كنت تستخدمه."
 
@@ -1041,7 +1041,7 @@ msgstr "مدى ارتفاع صوت تنبيهات الإملاء."
 msgid "How the pill bar looks. Changes apply immediately."
 msgstr "شكل شريط المؤشر. تُطبَّق التغييرات فورًا."
 
-#: src/features/welcome/welcome-page.tsx:513
+#: src/features/welcome/welcome-page.tsx:507
 msgid "How to dictate"
 msgstr "كيفية الإملاء"
 
@@ -1069,12 +1069,12 @@ msgstr "التثبيت وإعادة التشغيل"
 
 #: src/features/settings/components/asr-engine-cards.tsx:324
 #: src/features/welcome/components/model-card.tsx:88
-#: src/features/welcome/welcome-page.tsx:311
+#: src/features/welcome/welcome-page.tsx:306
 msgid "Installed"
 msgstr "تم التثبيت"
 
 #: src/features/settings/components/gpu-backend-card.tsx:127
-#: src/features/welcome/components/engine-step.tsx:340
+#: src/features/welcome/components/engine-step.tsx:339
 msgid "Installed. Restart Lune Voice to start using your GPU."
 msgstr "تم التثبيت. أعد تشغيل Lune Voice لبدء استخدام وحدة معالجة الرسوميات."
 
@@ -1252,12 +1252,12 @@ msgstr "دقيقة"
 msgid "Mode"
 msgstr "وضع"
 
-#: src/features/welcome/components/engine-step.tsx:167
-#: src/features/welcome/components/engine-step.tsx:267
+#: src/features/welcome/components/engine-step.tsx:166
+#: src/features/welcome/components/engine-step.tsx:266
 msgid "Model size"
 msgstr "حجم النموذج"
 
-#: src/features/welcome/welcome-page.tsx:534
+#: src/features/welcome/welcome-page.tsx:528
 msgid "Models are stored locally. No telemetry, no accounts."
 msgstr "تُخزن النماذج محليًا. لا قياسات عن بُعد ولا حسابات."
 
@@ -1272,7 +1272,7 @@ msgstr "الشاشة"
 msgid "More"
 msgstr "المزيد"
 
-#: src/features/welcome/components/engine-step.tsx:78
+#: src/features/welcome/components/engine-step.tsx:77
 msgid "Multilingual · runs on-device"
 msgstr "متعدد اللغات · يعمل على الجهاز"
 
@@ -1314,13 +1314,13 @@ msgstr "لا"
 msgid "No auto-detect: set your language below"
 msgstr "لا اكتشاف تلقائي: اضبط لغتك أدناه"
 
+#: src/features/settings/components/gpu-backend-card.tsx:136
+msgid "No GPU driver was found. Install the driver for your graphics card and the download will appear here."
+msgstr "لم يُعثر على برنامج تشغيل للرسوميات. ثبّت برنامج التشغيل الخاص ببطاقة الرسوميات وسيظهر التنزيل هنا."
+
 #: src/features/welcome/components/ready-checks.tsx:103
 msgid "No microphone found. Plug one in, then pick it in Settings › Dictation."
 msgstr "لم يُعثر على ميكروفون. وصّل واحدًا، ثم اختره من الإعدادات › الإملاء."
-
-#: src/features/settings/components/gpu-backend-card.tsx:136
-msgid "No NVIDIA driver was found. Install the driver for your GPU and the download will appear here."
-msgstr "لم يُعثر على برنامج تشغيل NVIDIA. ثبّت برنامج التشغيل الخاص ببطاقتك وسيظهر التنزيل هنا."
 
 #: src/features/dictionary/components/dictionary-table.tsx:260
 msgid "No rules match “{query}”."
@@ -1389,7 +1389,7 @@ msgstr "لا شيء مثبَّت"
 msgid "NVIDIA Parakeet on-device. Much faster than Whisper on a CPU, for 25 European languages."
 msgstr "NVIDIA Parakeet على الجهاز. أسرع بكثير من Whisper على المعالج، لـ 25 لغة أوروبية."
 
-#: src/features/welcome/components/engine-step.tsx:86
+#: src/features/welcome/components/engine-step.tsx:85
 msgid "NVIDIA Parakeet running on-device. Punctuates by itself and detects which of its languages you speak."
 msgstr "NVIDIA Parakeet يعمل على جهازك. يضع علامات الترقيم بنفسه ويكتشف أيّ لغة من لغاته تتحدث."
 
@@ -1456,7 +1456,7 @@ msgstr "الإخراج"
 msgid "Overall footprint of the pill bar."
 msgstr "الحجم الإجمالي لشريط المؤشر."
 
-#: src/features/welcome/welcome-page.tsx:353
+#: src/features/welcome/welcome-page.tsx:348
 msgid "Overall progress"
 msgstr "التقدم الشامل"
 
@@ -1466,7 +1466,7 @@ msgstr "ترقيم الصفحات"
 
 #: src/features/settings/components/asr-engine-cards.tsx:170
 #: src/features/settings/data/settings-data.ts:622
-#: src/features/welcome/components/engine-step.tsx:84
+#: src/features/welcome/components/engine-step.tsx:83
 msgid "Parakeet"
 msgstr "Parakeet"
 
@@ -1474,7 +1474,7 @@ msgstr "Parakeet"
 msgid "Parakeet (local)"
 msgstr "Parakeet (محلي)"
 
-#: src/features/welcome/components/engine-step.tsx:288
+#: src/features/welcome/components/engine-step.tsx:287
 msgid "Parakeet cannot tell Lune which language it heard, so set the one you speak. You can change it later in Settings."
 msgstr "لا يستطيع Parakeet إخبار Lune باللغة التي سمعها، لذا اضبط اللغة التي تتحدثها. يمكنك تغييرها لاحقًا من الإعدادات."
 
@@ -1540,7 +1540,7 @@ msgstr "التموضع"
 msgid "Play a short sound when dictation starts, finishes, or runs into an error."
 msgstr "تشغيل صوت قصير عند بدء الإملاء أو انتهائه أو حدوث خطأ."
 
-#: src/features/welcome/welcome-page.tsx:422
+#: src/features/welcome/welcome-page.tsx:416
 msgid "Please keep the app open until downloads finish"
 msgstr "يرجى إبقاء التطبيق مفتوحًا حتى تنتهي التنزيلات"
 
@@ -1576,7 +1576,7 @@ msgstr "اضغط الاختصار للبدء واضغطه ثانية للتوق�
 msgid "Press your combo — hold Esc or click away to cancel"
 msgstr "اضغط تركيبك — استمر بالضغط على Esc أو انقر خارجًا للإلغاء"
 
-#: src/features/welcome/welcome-page.tsx:517
+#: src/features/welcome/welcome-page.tsx:511
 msgid "Press your hotkey, speak, then press it again. The text is typed into whatever app you were using."
 msgstr "اضغط اختصارك، وتحدّث، ثم اضغطه مرة أخرى. يُكتب النص في التطبيق الذي كنت تستخدمه."
 
@@ -1690,7 +1690,7 @@ msgstr "إعادة تعيين"
 msgid "Reset position"
 msgstr "إعادة تعيين الموضع"
 
-#: src/features/welcome/welcome-page.tsx:322
+#: src/features/welcome/welcome-page.tsx:317
 msgid "Restart Lune Voice to start using your GPU."
 msgstr "أعد تشغيل Lune Voice لبدء استخدام بطاقتك الرسومية."
 
@@ -1702,7 +1702,7 @@ msgstr "يلزم إعادة التشغيل"
 msgid "Retry"
 msgstr "إعادة المحاولة"
 
-#: src/features/welcome/welcome-page.tsx:434
+#: src/features/welcome/welcome-page.tsx:428
 msgid "Retry download"
 msgstr "أعد محاولة التنزيل"
 
@@ -1772,7 +1772,7 @@ msgstr "بحث في النصوص..."
 msgid "Select all sessions on this page"
 msgstr "تحديد كل الجلسات في هذه الصفحة"
 
-#: src/features/welcome/welcome-page.tsx:470
+#: src/features/welcome/welcome-page.tsx:464
 msgid "Select required models"
 msgstr "حدد النماذج المطلوبة"
 
@@ -1829,7 +1829,7 @@ msgstr "تعيين مفتاح التشغيل السريع"
 msgid "Set the language you speak. Auto uses detection from speech."
 msgstr "حدد اللغة التي تتحدثها. يستخدم الوضع التلقائي اكتشاف اللغة من الكلام."
 
-#: src/features/welcome/welcome-page.tsx:463
+#: src/features/welcome/welcome-page.tsx:457
 msgid "Set up GPU acceleration"
 msgstr "إعداد تسريع GPU"
 
@@ -1876,9 +1876,9 @@ msgstr "الحجم"
 msgid "Size & shape"
 msgstr "الحجم والشكل"
 
-#: src/features/welcome/welcome-page.tsx:399
-#: src/features/welcome/welcome-page.tsx:437
-#: src/features/welcome/welcome-page.tsx:483
+#: src/features/welcome/welcome-page.tsx:393
+#: src/features/welcome/welcome-page.tsx:431
+#: src/features/welcome/welcome-page.tsx:477
 msgid "Skip for now"
 msgstr "تخطي الآن"
 
@@ -1916,7 +1916,7 @@ msgstr "التنبيهات الصوتية"
 msgid "Speaking time"
 msgstr "مدة التحدث"
 
-#: src/features/welcome/components/engine-step.tsx:100
+#: src/features/welcome/components/engine-step.tsx:99
 msgid "Speech engine"
 msgstr "محرك التعرف على الكلام"
 
@@ -2160,11 +2160,11 @@ msgstr "يجري النسخ على {0}."
 msgid "Transcription is running on your GPU."
 msgstr "يجري النسخ على وحدة معالجة الرسوميات لديك."
 
-#: src/features/settings/components/gpu-backend-card.tsx:143
-msgid "Transcription runs on the CPU. An optional download moves it to your NVIDIA GPU for noticeably lower latency — most of it is NVIDIA's CUDA maths libraries, which cannot be redistributed in a smaller form."
-msgstr "يجري النسخ على المعالج. تنزيل اختياري ينقله إلى بطاقة NVIDIA لديك ويقلّل زمن الاستجابة بوضوح — معظمه مكتبات CUDA الرياضية من NVIDIA، ولا يمكن إعادة توزيعها بحجم أصغر."
+#: src/features/settings/components/gpu-backend-card.tsx:154
+msgid "Transcription runs on the CPU. An optional download moves it to your GPU for noticeably lower latency."
+msgstr "يجري النسخ على المعالج. تنزيل اختياري ينقله إلى بطاقة الرسوميات لديك ويقلّل زمن الاستجابة بوضوح."
 
-#: src/features/settings/components/gpu-backend-card.tsx:144
+#: src/features/settings/components/gpu-backend-card.tsx:152
 msgid "Transcription runs on the CPU. No GPU download has been published for this build yet."
 msgstr "يجري النسخ على المعالج. لم يُنشر بعد أي تنزيل لوحدة معالجة الرسوميات لهذه النسخة."
 
@@ -2218,7 +2218,7 @@ msgstr "فشل التحديث"
 msgid "Updates"
 msgstr "التحديثات"
 
-#: src/features/welcome/components/engine-step.tsx:368
+#: src/features/welcome/components/engine-step.tsx:367
 msgid "Use GPU acceleration"
 msgstr "استخدام تسريع GPU"
 
@@ -2334,7 +2334,7 @@ msgstr "الشاشة التي يظهر عليها المؤشر."
 
 #: src/features/settings/components/asr-engine-cards.tsx:169
 #: src/features/settings/data/settings-data.ts:621
-#: src/features/welcome/components/engine-step.tsx:77
+#: src/features/welcome/components/engine-step.tsx:76
 msgid "Whisper"
 msgstr "Whisper"
 
@@ -2342,7 +2342,7 @@ msgstr "Whisper"
 msgid "Whisper (local)"
 msgstr "Whisper (محلي)"
 
-#: src/features/welcome/components/engine-step.tsx:79
+#: src/features/welcome/components/engine-step.tsx:78
 msgid "whisper.cpp running on-device. Choose a size to trade speed for accuracy."
 msgstr "whisper.cpp يعمل على جهازك. اختر حجمًا للمفاضلة بين السرعة والدقة."
 
@@ -2392,13 +2392,17 @@ msgstr "مفتاح واجهة برمجة التطبيقات الخاص بك. ا�
 msgid "Your feedback"
 msgstr "ملاحظاتك"
 
-#: src/features/welcome/components/engine-step.tsx:338
+#: src/features/welcome/components/engine-step.tsx:337
 msgid "Your GPU is ready — use it for faster transcription."
 msgstr "وحدة معالجة الرسوميات لديك جاهزة — استخدمها لنسخ أسرع."
 
-#: src/features/welcome/components/engine-step.tsx:341
-msgid "Your GPU qualifies. Setup downloads the NVIDIA runtime, then a restart turns it on."
-msgstr "بطاقتك مؤهَّلة. سيُنزّل الإعداد بيئة تشغيل NVIDIA، وتفعّلها إعادة التشغيل."
+#: src/features/welcome/components/engine-step.tsx:340
+msgid "Your GPU qualifies. Setup downloads GPU support, then a restart turns it on."
+msgstr "بطاقتك مؤهَّلة. سيُنزّل الإعداد دعم GPU، وتفعّله إعادة التشغيل."
+
+#: src/features/settings/components/gpu-backend-card.tsx:145
+msgid "Your graphics driver is too old for GPU transcription. Update it and the download will appear here."
+msgstr "برنامج تشغيل الرسومات قديم جدًا للتفريغ عبر وحدة GPU. حدّثه وسيظهر التنزيل هنا."
 
 #: src/features/overview/overview-page.tsx:211
 msgid "your hotkey"

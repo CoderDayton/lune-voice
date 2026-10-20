@@ -160,6 +160,7 @@ describe('gpuAccelerationOffer', () => {
   test('hides the card when no download could make the GPU work', () => {
     expect(gpuAccelerationOffer('unsupported', true)).toBeNull();
     expect(gpuAccelerationOffer('driver-missing', true)).toBeNull();
+    expect(gpuAccelerationOffer('driver-outdated', true)).toBeNull();
     // `failed` is a driver too old for the runtime; re-downloading the plugin
     // does not fix it, and promising setup that cannot finish is worse than
     // saying nothing.
@@ -193,6 +194,7 @@ describe('shouldInstallGpuDuringSetup', () => {
     expect(shouldInstallGpuDuringSetup('failed', true, true)).toBe(false);
     expect(shouldInstallGpuDuringSetup('ready', true, true)).toBe(false);
     expect(shouldInstallGpuDuringSetup('driver-missing', true, true)).toBe(false);
+    expect(shouldInstallGpuDuringSetup('driver-outdated', true, true)).toBe(false);
     expect(shouldInstallGpuDuringSetup('unsupported', true, true)).toBe(false);
   });
 });

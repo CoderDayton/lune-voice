@@ -1,19 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-//! Downloading and installing the optional CUDA compute backend.
-//!
-//! The app ships without any NVIDIA code: the executable has no `DT_NEEDED` on
-//! the CUDA runtime, and the CPU backends bundled beside it are enough to run.
-//! GPU acceleration is this archive, fetched on request and unpacked into
-//! `<data dir>/backends/`, where `lune_asr::gpu_backend` picks it up on the
-//! next launch.
-//!
-//! What the archive may contain is constrained by licensing, not convenience.
-//! `libcudart`/`libcublas`/`libcublasLt` are redistributable under NVIDIA's
-//! CUDA EULA; `libcuda.so.1` ships with the driver and is not redistributable,
-//! so a machine without a driver cannot be fixed by downloading. That is why
-//! the caller checks `nvidia_driver_present()` before offering this.
-//!
 //! Integrity is not optional here: this unpacks shared objects that the app
 //! will later `dlopen`. A tampered archive is arbitrary code execution, so the
 //! download is rejected unless its SHA-256 matches the pinned digest exactly.
@@ -36,8 +22,6 @@ pub struct GpuPluginRelease {
     /// Compressed size of the `.tar.gz`, for the progress bar and as the
     /// fallback total when the server sends no `Content-Length`.
     pub download_bytes: u64,
-    /// CUDA runtime major version the plugin links against, for display.
-    pub cuda_major: u32,
 }
 
 impl GpuPluginRelease {
@@ -49,18 +33,13 @@ impl GpuPluginRelease {
     }
 }
 
-/// File name of the CUDA compute backend. Mirrors
-/// `lune_asr::gpu_backend::CUDA_PLUGIN_FILE` — this crate cannot depend on
-/// `lune-asr`, and it is the file whose presence means "installed", so the
-/// install publishes it last.
-///
 /// ggml derives this name itself (`backend_filename_prefix` /
 /// `backend_filename_extension` in `ggml-backend-reg.cpp`), which is why the
 /// `lib` prefix is absent on Windows rather than merely conventional.
 #[cfg(target_os = "windows")]
-const CUDA_PLUGIN_FILE: &str = "ggml-cuda.dll";
+const PLUGIN_FILE: &str = "ggml-vulkan.dll";
 #[cfg(not(target_os = "windows"))]
-const CUDA_PLUGIN_FILE: &str = "libggml-cuda.so";
+const PLUGIN_FILE: &str = "libggml-vulkan.so";
 
 /// Text file in the archive naming the ggml version the plugin was compiled
 /// against. Mirrors `lune_asr::gpu_backend::GGML_VERSION_FILE`, which refuses
@@ -72,72 +51,29 @@ const GGML_VERSION_FILE: &str = "ggml-version";
 /// instead of downloading something it cannot verify.
 pub const UNPUBLISHED: &str = "UNPUBLISHED";
 
-/// Digest of the `gpu-cuda13-v1` Linux archive, measured from the local build
-/// artifact via the generated `.sha256` file.
-///
-/// Parked rather than pinned: the release lives on a private repo, where
-/// GitHub answers anonymous asset requests with a 404 and [`install`] sends no
-/// credentials, so a download offered here could never succeed. Once the
-/// assets are anonymously reachable — the repo goes public, or the archives
-/// move to a host that serves them — set `CUDA_LINUX_X86_64.sha256` back to
-/// this and restore `download_bytes`.
-///
-/// That archive has no `ggml-version` stamp, so the app would refuse to load
-/// it. Pin a digest from a `cgs gpu-plugin` build instead.
-pub const CUDA_LINUX_X86_64_SHA256: &str =
-    "c4fd2a60bd392a5d08a9f92fcf011880609bc40bf1ffd1654b60255036d57883";
-
-/// Compressed size of that same archive, parked alongside its digest.
-pub const CUDA_LINUX_X86_64_BYTES: u64 = 493_568_081;
-
-/// The CUDA backend for Linux x86-64.
-///
-/// Unpublished while the release assets are unreachable — see
-/// [`CUDA_LINUX_X86_64_SHA256`] for the pin to restore and why it is parked.
-/// The digest is what makes a download safe on an untrusted host, so it is
-/// kept intact rather than deleted.
-pub const CUDA_LINUX_X86_64: GpuPluginRelease = GpuPluginRelease {
-    url: "https://github.com/CoderDayton/lune-voice/releases/download/gpu-cuda13-v1/\
-          lune-voice-gpu-cuda13-linux-x86_64.tar.gz",
+pub const VULKAN_LINUX_X86_64: GpuPluginRelease = GpuPluginRelease {
+    url: "https://github.com/CoderDayton/lune-voice/releases/download/gpu-v1/\
+          lune-voice-gpu-vulkan-linux-x86_64.tar.gz",
     sha256: UNPUBLISHED,
-    // Measured from `cgs gpu-plugin` on CUDA 13.1, covering sm_75/86/89/120a
-    // with compute_75 PTX. Unpacked it is 664 MB, three quarters of which is
-    // NVIDIA's cuBLASLt, and that part is irreducible: ggml calls no cuBLASLt symbol
-    // directly, but libcublas declares it as DT_NEEDED and imports 76 symbols
-    // from it, so it cannot be dropped or stubbed. `nvprune` only rewrites
-    // relocatable device code, and static linking with --gc-sections was
-    // measured at 541 MB for the ten cuBLAS entry points ggml uses — the
-    // dispatcher reaches every kernel object, so nothing is prunable.
     download_bytes: 0,
-    cuda_major: 13,
 };
 
-/// The CUDA backend for Windows x86-64.
-///
-/// Same archive shape as Linux — a `.tar.gz` holding the plugin beside the
-/// redistributable CUDA runtime — because the extractor and its allowlist are
-/// shared. Only the member *names* differ (`ggml-cuda.dll`, `cudart64_13.dll`,
-/// …), which is what [`is_permitted_member`] switches on.
-pub const CUDA_WINDOWS_X86_64: GpuPluginRelease = GpuPluginRelease {
-    url: "https://github.com/CoderDayton/lune-voice/releases/download/gpu-cuda13-v1/\
-          lune-voice-gpu-cuda13-windows-x86_64.tar.gz",
+pub const VULKAN_WINDOWS_X86_64: GpuPluginRelease = GpuPluginRelease {
+    url: "https://github.com/CoderDayton/lune-voice/releases/download/gpu-v1/\
+          lune-voice-gpu-vulkan-windows-x86_64.tar.gz",
     sha256: UNPUBLISHED,
     download_bytes: 0,
-    cuda_major: 13,
 };
 
 /// The release this build can install, if the platform has one.
-///
-/// `None` on macOS: there is no CUDA there and never will be, so the UI hides
-/// the download rather than offering one that cannot resolve.
 pub const CURRENT: Option<&GpuPluginRelease> = {
     #[cfg(target_os = "linux")]
     {
-        Some(&CUDA_LINUX_X86_64)
+        Some(&VULKAN_LINUX_X86_64)
     }
     #[cfg(target_os = "windows")]
     {
-        Some(&CUDA_WINDOWS_X86_64)
+        Some(&VULKAN_WINDOWS_X86_64)
     }
     #[cfg(not(any(target_os = "linux", target_os = "windows")))]
     {
@@ -177,70 +113,8 @@ fn is_permitted_member(name: &Path) -> bool {
     permitted_file_name(file)
 }
 
-/// The per-platform half of the allowlist.
-///
-/// Only the dispatch is `cfg`-gated; both matchers are compiled everywhere so
-/// each is unit-tested on whichever host runs CI.
 fn permitted_file_name(file: &str) -> bool {
-    if file == GGML_VERSION_FILE {
-        return true;
-    }
-    #[cfg(target_os = "windows")]
-    {
-        file == CUDA_PLUGIN_FILE
-            || is_cuda_dll(file, "cudart")
-            || is_cuda_dll(file, "cublas")
-            || is_cuda_dll(file, "cublasLt")
-    }
-    #[cfg(not(target_os = "windows"))]
-    {
-        is_versioned_soname(file, CUDA_PLUGIN_FILE)
-            || is_versioned_soname(file, "libcudart.so")
-            || is_versioned_soname(file, "libcublas.so")
-            || is_versioned_soname(file, "libcublasLt.so")
-    }
-}
-
-/// Whether `file` is NVIDIA's Windows DLL for `stem`: `cudart64_13.dll`.
-///
-/// Windows CUDA carries the version *inside* the file name rather than as a
-/// dotted suffix, so the `.so` matcher cannot be reused. The `64_` is the
-/// architecture tag NVIDIA ships on every x64 redistributable, and requiring
-/// it is what stops `cublas` from also matching `cublasLt64_13.dll`.
-#[cfg_attr(not(target_os = "windows"), allow(dead_code))]
-fn is_cuda_dll(file: &str, stem: &str) -> bool {
-    let Some(rest) = file.strip_prefix(stem) else {
-        return false;
-    };
-    let Some(rest) = rest.strip_prefix("64_") else {
-        return false;
-    };
-    let Some(version) = rest.strip_suffix(".dll") else {
-        return false;
-    };
-    !version.is_empty() && version.chars().all(|c| c.is_ascii_digit())
-}
-
-/// Whether `file` is exactly `soname`, or `soname` followed by nothing but a
-/// numeric version suffix (`libcublas.so.13`, `libcublas.so.13.1.0`).
-///
-/// A plain `starts_with` would also admit `libcublas.so.evil`, and every
-/// permitted member is written executable into a directory the app `dlopen`s.
-/// The SHA-256 pin already gates the archive's contents, so this is the second
-/// lock rather than the first — but the cost of holding the shape exactly is a
-/// dozen lines.
-#[cfg_attr(target_os = "windows", allow(dead_code))]
-fn is_versioned_soname(file: &str, soname: &str) -> bool {
-    let Some(rest) = file.strip_prefix(soname) else {
-        return false;
-    };
-    if rest.is_empty() {
-        return true;
-    }
-    let Some(version) = rest.strip_prefix('.') else {
-        return false;
-    };
-    !version.is_empty() && version.chars().all(|c| c.is_ascii_digit() || c == '.')
+    file == GGML_VERSION_FILE || file == PLUGIN_FILE
 }
 
 /// Set while an [`install`] runs. Every install writes the same
@@ -323,10 +197,6 @@ where
         ));
     }
 
-    // Decompressing ~660 MB of shared objects is seconds of pure CPU and
-    // blocking file I/O. Run it off the async runtime: `install` is awaited
-    // straight from a Tauri command, so doing it inline would freeze the IPC
-    // worker — and the window with it — for the whole unpack.
     let archive_path = archive.clone();
     let dest = dest_dir.to_path_buf();
     let written = tokio::task::spawn_blocking(move || unpack(&archive_path, &dest))
@@ -519,15 +389,6 @@ where
 const PART_SUFFIX: &str = ".lune-part";
 
 /// Unpack the verified archive, writing only permitted members.
-///
-/// Two-phase on purpose. A half-extracted set is worse than none: the presence
-/// of `libggml-cuda.so` alone is what [`plugin_installed`] reads as "installed",
-/// so an install interrupted after that member would report itself installed,
-/// fail to `dlopen` for want of the CUDA runtime beside it, and leave the UI
-/// showing a permanent failure with no download button to retry. So every
-/// member lands under a `.lune-part` name first and is renamed into place only
-/// once the whole archive has been extracted — with the plugin itself last, so
-/// the "installed" marker is the final step rather than the first.
 fn unpack(archive: &Path, dest_dir: &Path) -> PersistResult<Vec<PathBuf>> {
     let mut staged: Vec<(PathBuf, PathBuf)> = Vec::new();
     if let Err(e) = extract_members(archive, dest_dir, &mut staged) {
@@ -563,7 +424,7 @@ fn unpack(archive: &Path, dest_dir: &Path) -> PersistResult<Vec<PathBuf>> {
     write_plugin_manifest(dest_dir, &manifest)?;
 
     // The plugin file is the installation marker, so publish it last.
-    staged.sort_by_key(|(_, out)| out.file_name().is_some_and(|n| n == CUDA_PLUGIN_FILE));
+    staged.sort_by_key(|(_, out)| out.file_name().is_some_and(|n| n == PLUGIN_FILE));
 
     let mut written = Vec::with_capacity(staged.len());
     for (part, out) in staged {
@@ -633,8 +494,6 @@ fn extract_members(
         part_name.push(PART_SUFFIX);
         let part = dest_dir.join(part_name);
 
-        // Streamed rather than buffered: cuBLASLt alone unpacks to ~479 MB, and
-        // reading it into a `Vec` first would double the peak memory for no gain.
         let mut out_file = std::fs::File::create(&part)?;
         staged.push((part.clone(), out));
         std::io::copy(&mut entry, &mut out_file)?;
@@ -662,39 +521,124 @@ fn hex(bytes: &[u8]) -> String {
     bytes.iter().map(|b| format!("{b:02x}")).collect()
 }
 
+pub fn remove_legacy_plugin(backends_dir: &Path) -> Vec<PathBuf> {
+    let Ok(entries) = std::fs::read_dir(backends_dir) else {
+        return Vec::new();
+    };
+    let mut removed = Vec::new();
+    for entry in entries.flatten() {
+        let Ok(kind) = entry.file_type() else {
+            continue;
+        };
+        if !(kind.is_file() || kind.is_symlink()) {
+            continue;
+        }
+        let name = entry.file_name();
+        let Some(name) = name.to_str() else {
+            continue;
+        };
+        let name = name.strip_suffix(PART_SUFFIX).unwrap_or(name);
+        if is_legacy_member(name) && std::fs::remove_file(entry.path()).is_ok() {
+            removed.push(entry.path());
+        }
+    }
+    removed
+}
+
+fn is_legacy_member(name: &str) -> bool {
+    if [
+        GGML_VERSION_FILE,
+        PLUGIN_MANIFEST,
+        "libggml-cuda.so",
+        "ggml-cuda.dll",
+        ".gpu-plugin.tar.gz.part",
+    ]
+    .contains(&name)
+    {
+        return true;
+    }
+    let soname = |stem: &str| {
+        name.strip_prefix(stem).is_some_and(|rest| {
+            rest.is_empty()
+                || rest.strip_prefix('.').is_some_and(|v| {
+                    !v.is_empty() && v.chars().all(|c| c.is_ascii_digit() || c == '.')
+                })
+        })
+    };
+    let dll = |stem: &str| {
+        name.strip_prefix(stem)
+            .and_then(|rest| rest.strip_prefix("64_"))
+            .and_then(|rest| rest.strip_suffix(".dll"))
+            .is_some_and(|v| !v.is_empty() && v.chars().all(|c| c.is_ascii_digit()))
+    };
+    ["libcudart.so", "libcublas.so", "libcublasLt.so"]
+        .into_iter()
+        .any(soname)
+        || ["cudart", "cublas", "cublasLt"].into_iter().any(dll)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
 
-    /// Name of a CUDA runtime member this platform's allowlist actually
-    /// permits, so archive fixtures build a shape valid on both OSes instead
-    /// of assuming Linux `.so` names.
-    #[cfg(target_os = "windows")]
-    const CUDA_RUNTIME_MEMBER: &str = "cudart64_13.dll";
-    #[cfg(not(target_os = "windows"))]
-    const CUDA_RUNTIME_MEMBER: &str = "libcudart.so.13";
+    const STAMP_MEMBER: &str = "./ggml-version";
 
     #[test]
-    fn permitted_members_are_the_cuda_libraries_only() {
-        #[cfg(not(target_os = "windows"))]
-        let names = [
+    fn the_old_cuda_install_is_removed_and_nothing_else() {
+        let tmp = tempfile::tempdir().expect("tempdir");
+        let backends = tmp.path();
+        let legacy = [
             "libggml-cuda.so",
-            // How GNU tar names members of an archive built with `-C dir .`.
-            "./libggml-cuda.so",
-            "./libcublasLt.so.13",
             "libcudart.so.13",
             "libcublas.so.13",
-            "libcublasLt.so.13",
-        ];
-        #[cfg(target_os = "windows")]
-        let names = [
+            "libcublasLt.so.13.1.0",
             "ggml-cuda.dll",
-            "./ggml-cuda.dll",
-            "./cublasLt64_13.dll",
             "cudart64_13.dll",
             "cublas64_13.dll",
             "cublasLt64_13.dll",
+            "ggml-version",
+            ".integrity.json",
+            "libcublasLt.so.13.lune-part",
+            "libcudart.so",
+            ".gpu-plugin.tar.gz.part",
         ];
+        for name in legacy {
+            std::fs::write(backends.join(name), b"x").expect("write legacy file");
+        }
+        let kept = ["notes.txt", "libggml-cpu-haswell.so", "libcudart.so.evil"];
+        for name in kept {
+            std::fs::write(backends.join(name), b"x").expect("write kept file");
+        }
+        std::fs::create_dir_all(backends.join("vulkan")).expect("create vulkan dir");
+        std::fs::write(backends.join("vulkan").join("ggml-version"), b"0.23.0\n")
+            .expect("write vulkan stamp");
+
+        let mut removed = remove_legacy_plugin(backends);
+        removed.sort();
+        let mut expected: Vec<PathBuf> = legacy.iter().map(|n| backends.join(n)).collect();
+        expected.sort();
+        assert_eq!(removed, expected);
+        for name in legacy {
+            assert!(!backends.join(name).exists(), "{name} should be gone");
+        }
+        for name in kept {
+            assert!(backends.join(name).is_file(), "{name} should stay");
+        }
+        assert!(backends.join("vulkan").join("ggml-version").is_file());
+    }
+
+    #[test]
+    fn a_missing_backends_dir_is_nothing_to_clean() {
+        let tmp = tempfile::tempdir().expect("tempdir");
+        assert!(remove_legacy_plugin(&tmp.path().join("absent")).is_empty());
+    }
+
+    #[test]
+    fn permitted_members_are_the_vulkan_plugin_only() {
+        #[cfg(not(target_os = "windows"))]
+        let names = ["libggml-vulkan.so", "./libggml-vulkan.so"];
+        #[cfg(target_os = "windows")]
+        let names = ["ggml-vulkan.dll", "./ggml-vulkan.dll"];
         for ok in names {
             assert!(is_permitted_member(Path::new(ok)), "{ok} should be allowed");
         }
@@ -714,31 +658,6 @@ mod tests {
         }
     }
 
-    /// The Windows matcher, exercised on every platform so a Linux CI run
-    /// still covers it.
-    #[test]
-    fn windows_cuda_dlls_match_only_their_exact_versioned_shape() {
-        for ok in ["cudart64_13.dll", "cublas64_13.dll", "cublasLt64_12.dll"] {
-            assert!(
-                is_cuda_dll(ok, ok.split("64_").next().unwrap()),
-                "{ok} should match"
-            );
-        }
-        // `cublas` must not swallow `cublasLt`: the `64_` tag is what separates
-        // them, and matching the wrong one would admit an unlisted library.
-        assert!(!is_cuda_dll("cublasLt64_13.dll", "cublas"));
-        for bad in [
-            "cudart64_.dll",
-            "cudart64_13.dll.evil",
-            "cudart64_13a.dll",
-            "cudart_13.dll",
-            "cudart64_13.so",
-            "nvcuda64_13.dll",
-        ] {
-            assert!(!is_cuda_dll(bad, "cudart"), "{bad} should be refused");
-        }
-    }
-
     #[test]
     fn unrelated_or_nested_members_are_refused() {
         // Shape violations are platform-independent: a nested or escaping
@@ -748,31 +667,28 @@ mod tests {
         let names = [
             "evil.so",
             "run.sh",
-            "nested/libggml-cuda.so",
-            "./nested/libggml-cuda.so",
-            "../libggml-cuda.so",
-            "/libggml-cuda.so",
-            "libcuda.so.1",
-            // A permitted name with anything appended is a different file, and
-            // every member that gets through is written executable.
-            "libggml-cuda.soevil",
-            "libcublas.so.evil",
-            "libcublas.so.",
-            "libcublas.so-13",
+            "nested/libggml-vulkan.so",
+            "./nested/libggml-vulkan.so",
+            "../libggml-vulkan.so",
+            "/libggml-vulkan.so",
+            "libvulkan.so.1",
+            "libggml-vulkan.soevil",
+            "libggml-vulkan.so.1",
+            "libggml-cuda.so",
+            "libcudart.so.13",
         ];
         #[cfg(target_os = "windows")]
         let names = [
             "evil.dll",
             "run.bat",
-            "nested/ggml-cuda.dll",
-            "./nested/ggml-cuda.dll",
-            "../ggml-cuda.dll",
-            "/ggml-cuda.dll",
-            // The driver library: present on the machine, never in the archive.
-            "nvcuda.dll",
-            "ggml-cuda.dllevil",
-            "cublas64_.dll",
-            "cublas64_13.dll.bak",
+            "nested/ggml-vulkan.dll",
+            "./nested/ggml-vulkan.dll",
+            "../ggml-vulkan.dll",
+            "/ggml-vulkan.dll",
+            "vulkan-1.dll",
+            "ggml-vulkan.dllevil",
+            "ggml-cuda.dll",
+            "cudart64_13.dll",
         ];
         for bad in names {
             assert!(
@@ -788,7 +704,6 @@ mod tests {
             url: "https://example.invalid/plugin.tar.gz",
             sha256: UNPUBLISHED,
             download_bytes: 1,
-            cuda_major: 13,
         };
         assert!(!release.is_published());
         release.sha256 = "0000000000000000000000000000000000000000000000000000000000000000";
@@ -825,13 +740,12 @@ mod tests {
         // that cannot load — and the UI offers no way back from that state.
         let tmp = tempfile::tempdir().expect("tempdir");
         let archive = tmp.path().join("gpu.tar.gz");
-        let plugin_name = format!("./{CUDA_PLUGIN_FILE}");
-        let runtime_name = format!("./{CUDA_RUNTIME_MEMBER}");
+        let plugin_name = format!("./{PLUGIN_FILE}");
         write_archive(
             &archive,
             &[
                 (plugin_name.as_str(), b"plugin" as &[u8]),
-                (runtime_name.as_str(), b"runtime"),
+                (STAMP_MEMBER, b"0.23.0\n"),
                 ("./evil.so", b"nope"),
             ],
         );
@@ -855,12 +769,11 @@ mod tests {
     fn a_clean_archive_publishes_every_member() {
         let tmp = tempfile::tempdir().expect("tempdir");
         let archive = tmp.path().join("gpu.tar.gz");
-        let runtime_name = format!("./{CUDA_RUNTIME_MEMBER}");
-        let plugin_name = format!("./{CUDA_PLUGIN_FILE}");
+        let plugin_name = format!("./{PLUGIN_FILE}");
         write_archive(
             &archive,
             &[
-                (runtime_name.as_str(), b"runtime" as &[u8]),
+                (STAMP_MEMBER, b"0.23.0\n" as &[u8]),
                 (plugin_name.as_str(), b"plugin"),
             ],
         );
@@ -868,13 +781,14 @@ mod tests {
         let written = unpack(&archive, tmp.path()).expect("unpack");
         assert_eq!(written.len(), 2);
         assert!(plugin_installed_at(tmp.path()));
-        assert!(tmp.path().join(CUDA_RUNTIME_MEMBER).is_file());
+        assert!(tmp.path().join(GGML_VERSION_FILE).is_file());
+        assert!(tmp.path().join(PLUGIN_MANIFEST).is_file());
     }
 
     /// `plugin_installed` resolves `<data dir>/backends`; these tests unpack
     /// straight into a directory, so check the marker file directly.
     fn plugin_installed_at(dir: &Path) -> bool {
-        dir.join(CUDA_PLUGIN_FILE).is_file()
+        dir.join(PLUGIN_FILE).is_file()
     }
 
     #[test]
@@ -883,7 +797,6 @@ mod tests {
             url: "https://example.invalid/plugin.tar.gz",
             sha256: UNPUBLISHED,
             download_bytes: 1_000_000,
-            cuda_major: 13,
         };
         let max = max_download_bytes(&release);
         // A little over the pinned size is fine — servers and recompression
@@ -899,7 +812,6 @@ mod tests {
             url: "https://example.invalid/plugin.tar.gz",
             sha256: UNPUBLISHED,
             download_bytes: u64::MAX,
-            cuda_major: 13,
         };
         // Saturating rather than wrapping: a wrapped ceiling would be tiny and
         // would reject every legitimate byte.
@@ -913,7 +825,6 @@ mod tests {
             url: "https://example.invalid/unpublished.tar.gz",
             sha256: UNPUBLISHED,
             download_bytes: 1,
-            cuda_major: 13,
         };
         let err = install(&release, tmp.path(), |_| {})
             .await
@@ -946,7 +857,6 @@ mod tests {
             url,
             sha256: "00",
             download_bytes: 1,
-            cuda_major: 13,
         }));
         let tmp = tempfile::tempdir().expect("tempdir");
         let dest = tmp.path().to_path_buf();
@@ -974,52 +884,13 @@ mod tests {
         server.abort();
     }
 
-    /// No release is downloadable while the repo is private: GitHub serves a
-    /// 404 for release assets to anonymous requests, and [`install`] sends no
-    /// credentials. Offering the download would be a button that always fails,
-    /// so both platforms stay [`UNPUBLISHED`] until the assets are reachable.
-    ///
-    /// When they are, flip the digests back on and this test with them.
-    #[test]
-    fn no_release_is_published_while_the_assets_are_unreachable() {
-        assert!(
-            !CUDA_LINUX_X86_64.is_published(),
-            "the release assets are not anonymously downloadable yet"
-        );
-        assert!(!CUDA_WINDOWS_X86_64.is_published());
-    }
-
-    /// The digest parked for republication must stay a well-formed SHA-256, so
-    /// restoring it is a one-line edit rather than a re-measurement.
-    // Pinning constants is the whole point: this test is what fails, with the
-    // reason attached, if a parked value is emptied instead of restored.
-    #[allow(clippy::assertions_on_constants)]
-    #[test]
-    fn the_parked_linux_digest_is_still_well_formed() {
-        assert_eq!(
-            CUDA_LINUX_X86_64_SHA256.len(),
-            64,
-            "expected a 64-char lowercase hex SHA-256"
-        );
-        assert!(
-            CUDA_LINUX_X86_64_SHA256
-                .chars()
-                .all(|c| c.is_ascii_hexdigit()),
-            "digest must be lowercase hex"
-        );
-        assert!(
-            CUDA_LINUX_X86_64_BYTES > 0,
-            "the parked size is half of what republishing restores"
-        );
-    }
-
     /// Restoring a digest without its byte size is a silent footgun:
     /// [`max_download_bytes`] scales `download_bytes`, so a published release
     /// left at `0` caps the transfer at zero and refuses every legitimate byte
     /// with a size complaint. Both halves go back together or neither does.
     #[test]
     fn a_published_release_must_declare_its_size() {
-        for release in [CUDA_LINUX_X86_64, CUDA_WINDOWS_X86_64] {
+        for release in [VULKAN_LINUX_X86_64, VULKAN_WINDOWS_X86_64] {
             if release.is_published() {
                 assert!(
                     release.download_bytes > 0,
@@ -1028,19 +899,6 @@ mod tests {
                 );
             }
         }
-    }
-
-    /// The Windows archive is not built yet, and the app must keep saying so
-    /// rather than offering a download it cannot verify. When it is published,
-    /// this test is what fails and tells you to flip the expectation.
-    #[test]
-    fn the_cuda_windows_release_is_still_unpublished() {
-        assert!(
-            !CUDA_WINDOWS_X86_64.is_published(),
-            "pin the digest and byte size from `cgs gpu-plugin-windows`, then \
-             update this test"
-        );
-        assert_eq!(CUDA_WINDOWS_X86_64.download_bytes, 0);
     }
 
     /// The platform selector must agree with the platform this test runs on;
@@ -1056,13 +914,13 @@ mod tests {
         };
         match (CURRENT, want) {
             (Some(r), Some(os)) => assert!(
-                r.url.contains(os),
+                r.url.contains(os) && r.url.contains("vulkan"),
                 "selected a {os} build but got {}",
                 r.url
             ),
             (None, None) => {}
-            (Some(r), None) => panic!("no CUDA plugin exists here, yet {} was offered", r.url),
-            (None, Some(os)) => panic!("{os} has a CUDA plugin but none was selected"),
+            (Some(r), None) => panic!("no GPU plugin exists here, yet {} was offered", r.url),
+            (None, Some(os)) => panic!("{os} has a GPU plugin but none was selected"),
         }
     }
 

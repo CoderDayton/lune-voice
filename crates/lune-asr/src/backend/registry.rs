@@ -129,18 +129,13 @@ impl AsrBackend for AsrRegistry {
 impl AsrRegistry {
     /// Build the appropriate ASR backend from user configuration.
     ///
-    /// `cuda_available` must be the *runtime* answer — see
-    /// [`crate::gpu_backend::cuda_available`]. Passing a compile-time feature
-    /// flag here would make the downloadable CUDA plugin unreachable in the
-    /// builds it exists for.
-    ///
     /// Cold path: called once at startup.
     #[cold]
     pub fn from_config(
         config: &AsrBackendConfig,
         device: DevicePolicy,
         models_dir: &Path,
-        cuda_available: bool,
+        gpu_available: bool,
     ) -> Result<Self> {
         // Per-backend GPU decision is computed inline below; the remote backend
         // ignores it.
@@ -163,7 +158,7 @@ impl AsrRegistry {
             AsrBackendConfig::WhisperCpp { model } => {
                 let backend = WhisperCppBackend::new(WhisperCppConfig {
                     model_path: models_dir.join(model.dir()).join(model.ggml_file()),
-                    use_gpu: device.use_gpu(cuda_available),
+                    use_gpu: device.use_gpu(gpu_available),
                     vad_model_path: Some(
                         models_dir
                             .join(lune_core::models::DIR_WHISPER_VAD)
@@ -177,7 +172,7 @@ impl AsrRegistry {
                 let backend = ParakeetCppBackend::new(ParakeetCppConfig {
                     model: *model,
                     model_path: models_dir.join(model.dir()).join(model.ggml_file()),
-                    use_gpu: device.use_gpu(cuda_available),
+                    use_gpu: device.use_gpu(gpu_available),
                     vad_model_path: Some(
                         models_dir
                             .join(lune_core::models::DIR_WHISPER_VAD)

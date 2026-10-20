@@ -263,10 +263,15 @@ mod imp {
 
             // whisper.cpp falls back to the CPU when asked for a GPU it cannot
             // find, so the profile follows the device it will actually use.
-            let on_gpu = config.use_gpu && crate::gpu_backend::gpu_device_registered();
+            let gpu_device = config
+                .use_gpu
+                .then(crate::gpu_backend::gpu_decode_device)
+                .flatten();
+            let on_gpu = gpu_device.is_some();
             let profile = DecodeProfile::for_device(on_gpu);
             let mut params = WhisperContextParameters::default();
-            params.use_gpu(config.use_gpu);
+            params.use_gpu(on_gpu);
+            params.gpu_device(gpu_device.unwrap_or(0));
             // whisper-rs defaults this off, overriding whisper.cpp's own default.
             params.flash_attn(profile.flash_attn);
             let ctx = WhisperContext::new_with_params(&config.model_path, params).map_err(|e| {

@@ -19,9 +19,6 @@ export interface GpuBackendState {
 }
 
 /**
- * GPU backend lifecycle: reports what acceleration can do on this machine and
- * downloads the CUDA plugin when the user opts in.
- *
  * A finished install reports `needs-restart` rather than `ready` — ggml builds
  * its backend registry once at startup and has no unload — so the status the
  * install resolves with is the whole answer, and nothing here has to remember

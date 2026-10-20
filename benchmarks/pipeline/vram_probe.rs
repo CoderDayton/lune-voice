@@ -72,7 +72,7 @@ async fn one_toggle(asr: &AsrRegistry, audio: &[f32]) {
 #[tokio::main(flavor = "multi_thread")]
 async fn main() {
     let root = workspace_root();
-    let cuda = lune_asr::gpu_backend::cuda_available(
+    let cuda = lune_asr::gpu_backend::gpu_available(
         lune_persist::AppPaths::resolve()
             .expect("resolve XDG paths")
             .data_dir(),

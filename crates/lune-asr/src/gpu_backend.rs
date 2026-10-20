@@ -2,39 +2,6 @@
 
 //! dlopen-able ggml compute backends.
 //!
-//! The shipped binary is built with `GGML_BACKEND_DL=ON`, so ggml's compute
-//! backends are plugins rather than libraries linked into the executable. Two
-//! directories hold them, and both are scanned at startup:
-//!
-//! - **Bundled** (`<exe dir>/backends/`): the CPU backends, shipped with the
-//!   app. Without these there is no compute backend at all, so they are not
-//!   optional and never downloaded.
-//! - **Downloaded** (`<data dir>/backends/`): the CUDA plugin and the NVIDIA
-//!   runtime libraries it needs. Absent until the user opts in.
-//!
-//! The practical win is that the executable carries no `DT_NEEDED` on
-//! `libcudart`/`libcublas`, so it starts on a machine with no NVIDIA driver at
-//! all and GPU support becomes an optional download rather than a separate
-//! build of the whole application.
-//!
-//! Each platform resolves a plugin's own CUDA runtime differently, and neither
-//! answer is the obvious one:
-//!
-//! - **Linux**: setting `LD_LIBRARY_PATH` from inside the process does not
-//!   work. glibc's loader reads it once at startup into a cached search list,
-//!   so a later `setenv` changes nothing for subsequent `dlopen` calls. Each
-//!   plugin instead carries `RUNPATH=$ORIGIN`, applied when it is built or
-//!   packaged, so it resolves its dependencies from its own directory.
-//! - **Windows**: there is no `$ORIGIN`. ggml loads plugins with a plain
-//!   `LoadLibraryW` (`ggml-backend-reg.cpp`), and a DLL loaded by full path
-//!   resolves *its* imports from the executable's directory, System32 and
-//!   `PATH` — never from its own folder. So [`preload_sibling_libraries`]
-//!   loads the CUDA runtime by full path first: a module already in the
-//!   process satisfies the import by name, and nothing about the global search
-//!   order has to change. Widening it with `SetDefaultDllDirectories` would
-//!   have reached every other `LoadLibrary` in the process, WebView2's
-//!   included.
-//!
 //! Ordering matters: [`load_plugins`] must run before the first
 //! [`whisper_rs::WhisperContext`] is created, because ggml selects a device
 //! from whatever is in the backend registry at context-creation time.
@@ -43,28 +10,12 @@ use std::path::{Path, PathBuf};
 
 use lune_core::models::DIR_GPU_BACKEND;
 
-/// File name of the CUDA compute backend, as emitted by ggml's build. Used to
-/// detect an installed plugin and to validate a downloaded archive.
-///
 /// ggml derives the name itself (`backend_filename_prefix` /
 /// `backend_filename_extension`), which is why Windows drops the `lib` prefix.
-/// Mirrored by `lune_persist::gpu_plugin::CUDA_PLUGIN_FILE`.
 #[cfg(target_os = "windows")]
-pub const CUDA_PLUGIN_FILE: &str = "ggml-cuda.dll";
+pub const PLUGIN_FILE: &str = "ggml-vulkan.dll";
 #[cfg(not(target_os = "windows"))]
-pub const CUDA_PLUGIN_FILE: &str = "libggml-cuda.so";
-
-/// The NVIDIA driver library. Ships with the driver, not the CUDA toolkit, and
-/// is deliberately not redistributable — so its presence is the one
-/// precondition a download cannot satisfy on the user's behalf.
-///
-/// One name per platform, each looked up by the loader's own search rules.
-#[cfg(unix)]
-const NVIDIA_DRIVER_SONAME: &str = "libcuda.so.1";
-/// The Windows driver library. Installed into System32 by the NVIDIA driver
-/// package, so a bare name is the right thing to hand `LoadLibraryW`.
-#[cfg(target_os = "windows")]
-const NVIDIA_DRIVER_DLL: &str = "nvcuda.dll";
+pub const PLUGIN_FILE: &str = "libggml-vulkan.so";
 
 /// Tauri's resource directory name on Linux: the `productName` in
 /// `desktop-ui/src-tauri/tauri.conf.json`. Installed bundles keep the ggml
@@ -113,38 +64,44 @@ fn plugin_dirs(backend_dl: bool, bundled: Option<PathBuf>, downloaded: PathBuf) 
         .collect()
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum DeviceKind {
+    Cpu,
+    Gpu,
+    Igpu,
+    Other,
+}
+
 #[cfg_attr(not(feature = "whisper-cpp"), allow(dead_code))]
-fn cuda_devices(registered: &[String]) -> Vec<String> {
-    let mut cuda: Vec<String> = Vec::new();
-    for name in registered.iter().filter(|d| d.starts_with("CUDA")) {
-        if !cuda.contains(name) {
-            cuda.push(name.clone());
+fn discrete_gpus(registered: &[(String, DeviceKind)]) -> Vec<String> {
+    let mut gpus: Vec<String> = Vec::new();
+    for (name, _) in registered.iter().filter(|(_, k)| *k == DeviceKind::Gpu) {
+        if !gpus.contains(name) {
+            gpus.push(name.clone());
         }
     }
-    cuda
+    gpus
+}
+
+#[cfg_attr(not(feature = "whisper-cpp"), allow(dead_code))]
+fn decode_device_index(kinds: &[DeviceKind]) -> Option<i32> {
+    kinds
+        .iter()
+        .filter(|k| matches!(k, DeviceKind::Gpu | DeviceKind::Igpu))
+        .position(|k| *k == DeviceKind::Gpu)
+        .and_then(|i| i32::try_from(i).ok())
 }
 
 /// Plugin directory the GPU download installs into.
 pub fn downloaded_plugin_dir(data_dir: &Path) -> PathBuf {
-    data_dir.join(DIR_GPU_BACKEND)
+    data_dir.join(DIR_GPU_BACKEND).join("vulkan")
 }
 
-/// Whether the downloadable CUDA plugin is present *and* intact.
-///
-/// Presence alone is not enough: an interrupted download can leave a zero-byte
-/// `libggml-cuda.so` behind, which then reports as installed, fails to load,
-/// and gets misdiagnosed as an out-of-date driver. A failed check reads as "not
-/// installed", which is the state that offers the download again.
 pub fn plugin_installed(data_dir: &Path) -> bool {
     let dir = downloaded_plugin_dir(data_dir);
-    dir.join(CUDA_PLUGIN_FILE).is_file() && installed_plugin_is_intact(&dir)
+    dir.join(PLUGIN_FILE).is_file() && installed_plugin_is_intact(&dir)
 }
 
-/// Latched once the downloaded plugin has verified. Verification re-hashes
-/// every installed library — hundreds of megabytes — and [`state`] is answered
-/// on every status poll and every pipeline build, so paying it per call turns
-/// opening the Models screen after an install into a multi-second stall.
-///
 /// Latching only the `true` answer is what makes this sound: within one process
 /// an installed plugin cannot become uninstalled by anything but the user
 /// deleting the directory, and even then the reported state is already
@@ -247,153 +204,35 @@ fn installed_plugin_is_intact(dir: &Path) -> bool {
 pub enum GpuPluginState {
     /// This build has no plugin support compiled in (stub ASR backend).
     Unsupported,
-    /// No NVIDIA driver here. Downloading would not help: the driver is not
-    /// ours to redistribute, so the user has to install it themselves.
     DriverMissing,
+    DriverOutdated,
     /// Driver present, plugin not downloaded yet. This is the offer state.
     NotInstalled,
     /// Plugin loaded, carrying the compute devices ggml registered so the UI
     /// can name the GPU instead of claiming success generically.
-    Ready { devices: Vec<String> },
+    Ready {
+        devices: Vec<String>,
+    },
     /// Plugin installed after this process built its backend registry. ggml has
     /// no unload, so the device can only appear on the next launch. Nothing is
     /// wrong — kept apart from [`Self::Failed`] so the UI can say "restart" in
     /// the user's own language instead of surfacing a failure they don't have.
     NeedsRestart,
-    /// Plugin present at startup but no usable device appeared — in practice a
-    /// driver older than the plugin's CUDA runtime. `reason` explains it.
-    Failed { reason: String },
+    Failed {
+        reason: String,
+    },
 }
 
-/// Whether an NVIDIA driver is installed, tested the way the loader will test
-/// it: `dlopen` the soname and let the dynamic linker search its normal paths.
-/// Scanning `/usr/local/cuda` and friends would both miss distro packages that
-/// put the driver elsewhere and find a *toolkit* that has no driver behind it.
-#[cfg(unix)]
-pub fn nvidia_driver_present() -> bool {
-    use std::ffi::CString;
-
-    let Ok(name) = CString::new(NVIDIA_DRIVER_SONAME) else {
-        return false;
-    };
-    // SAFETY: `name` is a valid NUL-terminated C string that outlives the call.
-    // `dlopen`/`dlclose` are thread-safe, and the handle is closed on success.
-    unsafe {
-        let handle = libc::dlopen(name.as_ptr(), libc::RTLD_LAZY | libc::RTLD_LOCAL);
-        if handle.is_null() {
-            return false;
-        }
-        libc::dlclose(handle);
-        true
-    }
+pub fn gpu_driver_present() -> bool {
+    crate::vulkan_probe::probe() == crate::vulkan_probe::Probe::Ready
 }
-
-/// Whether an NVIDIA driver is installed, tested the way the loader will test
-/// it: ask for the driver DLL by bare name and let the standard search order
-/// find it in System32. Probing the file system directly would miss a driver
-/// installed outside the usual directory.
-#[cfg(target_os = "windows")]
-pub fn nvidia_driver_present() -> bool {
-    use windows_sys::Win32::Foundation::FreeLibrary;
-    use windows_sys::Win32::System::LibraryLoader::LoadLibraryW;
-
-    let name: Vec<u16> = NVIDIA_DRIVER_DLL
-        .encode_utf16()
-        .chain(std::iter::once(0))
-        .collect();
-    // SAFETY: `name` is a NUL-terminated wide string that outlives the call,
-    // and the handle is released on success.
-    unsafe {
-        let handle = LoadLibraryW(name.as_ptr());
-        if handle.is_null() {
-            return false;
-        }
-        FreeLibrary(handle);
-        true
-    }
-}
-
-#[cfg(not(any(unix, target_os = "windows")))]
-pub fn nvidia_driver_present() -> bool {
-    false
-}
-
-/// The CUDA runtime a plugin in `dir` imports, in dependency order.
-///
-/// `cublas` links against `cublasLt`, so loading it first means the second load
-/// is already satisfied and the order is not merely cosmetic. The plugin itself
-/// is absent: ggml loads that, and doing it here would register nothing.
-#[cfg(target_os = "windows")]
-const SIBLING_LIBRARY_STEMS: [&str; 3] = ["cudart", "cublasLt", "cublas"];
-
-/// Load a plugin's CUDA runtime by full path, so its imports resolve.
-///
-/// See the module docs: on Windows a plugin cannot find libraries sitting
-/// beside it, and pre-loading them is the fix that touches no global state. A
-/// failure here is not reported as an error — the directory may hold only CPU
-/// backends, which import nothing extra, and ggml reports a plugin it cannot
-/// load either way.
-#[cfg(target_os = "windows")]
-#[cfg_attr(not(feature = "whisper-cpp"), allow(dead_code))]
-fn preload_sibling_libraries(dir: &Path) {
-    use std::os::windows::ffi::OsStrExt;
-
-    use windows_sys::Win32::System::LibraryLoader::LoadLibraryW;
-
-    let Ok(entries) = std::fs::read_dir(dir) else {
-        return;
-    };
-    // One pass over the directory: the file names carry a version this code
-    // does not know (`cudart64_13.dll`), so they are matched by stem.
-    let mut found: Vec<(usize, PathBuf)> = Vec::new();
-    for entry in entries.flatten() {
-        let name = entry.file_name();
-        let Some(name) = name.to_str() else { continue };
-        if !name.ends_with(".dll") {
-            continue;
-        }
-        // Matched without allocating: this runs once per file in the plugin
-        // directory, and `format!` per stem per file buys nothing.
-        if let Some(rank) = SIBLING_LIBRARY_STEMS.iter().position(|stem| {
-            name.strip_prefix(stem)
-                .is_some_and(|rest| rest.starts_with("64_"))
-        }) {
-            found.push((rank, entry.path()));
-        }
-    }
-    found.sort_by_key(|(rank, _)| *rank);
-
-    for (_, path) in found {
-        let wide: Vec<u16> = path
-            .as_os_str()
-            .encode_wide()
-            .chain(std::iter::once(0))
-            .collect();
-        // SAFETY: `wide` is a NUL-terminated wide string that outlives the
-        // call. The handle is deliberately leaked — the module must stay
-        // resident for the plugin that imports it, which lives for the
-        // process.
-        let handle = unsafe { LoadLibraryW(wide.as_ptr()) };
-        if handle.is_null() {
-            tracing::warn!(path = %path.display(), "could not preload a CUDA runtime library");
-        } else {
-            tracing::debug!(path = %path.display(), "preloaded CUDA runtime library");
-        }
-    }
-}
-
-/// No-op off Windows: every other platform's plugin resolves its own
-/// dependencies through `RUNPATH=$ORIGIN`.
-#[cfg(not(target_os = "windows"))]
-#[cfg_attr(not(feature = "whisper-cpp"), allow(dead_code))]
-fn preload_sibling_libraries(_dir: &Path) {}
 
 #[cfg(feature = "whisper-cpp")]
 mod imp {
     use super::{
-        CUDA_PLUGIN_FILE, GpuPluginState, bundled_plugin_dir, downloaded_plugin_dir,
-        nvidia_driver_present,
+        DeviceKind, GpuPluginState, PLUGIN_FILE, bundled_plugin_dir, downloaded_plugin_dir,
     };
+    use crate::vulkan_probe::Probe;
 
     use std::ffi::{CStr, CString};
     use std::path::Path;
@@ -408,7 +247,7 @@ mod imp {
         /// Every compute device in ggml's registry after the load. Not just the
         /// ones the load added: a statically linked CUDA build registers its
         /// device before we run, and it is just as real.
-        devices: Vec<String>,
+        devices: Vec<(String, DeviceKind)>,
         /// Whether the downloaded plugin was on disk when the registry was
         /// built. A plugin that arrived later cannot register until restart,
         /// which is what separates "restart me" from "this is broken".
@@ -424,14 +263,15 @@ mod imp {
     /// A directory that does not exist is skipped, which is exactly the
     /// CPU-only and GPU-not-installed cases.
     pub fn load_plugins(data_dir: &Path) -> Vec<String> {
-        loaded(data_dir).devices.clone()
+        loaded(data_dir)
+            .devices
+            .iter()
+            .map(|(name, _)| name.clone())
+            .collect()
     }
 
     fn loaded(data_dir: &Path) -> &'static Loaded {
         LOADED.get_or_init(|| {
-            // Verifying the downloaded plugin re-hashes every installed
-            // library — hundreds of megabytes. Do it once and share the answer
-            // with the load below, which asks the same question.
             let plugin_at_load = super::plugin_installed_cached(data_dir);
             Loaded {
                 plugin_at_load,
@@ -440,7 +280,7 @@ mod imp {
         })
     }
 
-    fn load_once(data_dir: &Path, downloaded_is_intact: bool) -> Vec<String> {
+    fn load_once(data_dir: &Path, downloaded_is_intact: bool) -> Vec<(String, DeviceKind)> {
         let downloaded = downloaded_plugin_dir(data_dir);
         let backend_dl = whisper_rs::whisper_rs_sys::GGML_BACKEND_DL;
         if !backend_dl {
@@ -473,7 +313,6 @@ mod imp {
                 }
                 continue;
             }
-            super::preload_sibling_libraries(&dir);
             let Ok(path) = CString::new(dir.as_os_str().as_encoded_bytes()) else {
                 warn!(dir = %dir.display(), "plugin path is not representable as a C string");
                 continue;
@@ -485,7 +324,7 @@ mod imp {
             debug!(dir = %dir.display(), "scanned for ggml backend plugins");
         }
 
-        let devices = device_names();
+        let devices = registered();
         info!(?devices, "ggml compute devices available");
         devices
     }
@@ -499,47 +338,40 @@ mod imp {
             .into_owned()
     }
 
-    /// Names of every device currently in ggml's backend registry.
-    fn device_names() -> Vec<String> {
+    fn registered() -> Vec<(String, DeviceKind)> {
+        use whisper_rs::whisper_rs_sys as sys;
         // SAFETY: the registry accessors take no arguments and return either a
         // count or a valid device handle for an index below that count. The
         // returned name is a static C string owned by the backend.
         unsafe {
-            let count = whisper_rs::whisper_rs_sys::ggml_backend_dev_count();
+            let count = sys::ggml_backend_dev_count();
             (0..count)
                 .filter_map(|i| {
-                    let dev = whisper_rs::whisper_rs_sys::ggml_backend_dev_get(i);
+                    let dev = sys::ggml_backend_dev_get(i);
                     if dev.is_null() {
                         return None;
                     }
-                    let name = whisper_rs::whisper_rs_sys::ggml_backend_dev_name(dev);
+                    let name = sys::ggml_backend_dev_name(dev);
                     if name.is_null() {
                         return None;
                     }
-                    Some(CStr::from_ptr(name).to_string_lossy().into_owned())
+                    let kind = match sys::ggml_backend_dev_type(dev) {
+                        sys::ggml_backend_dev_type_GGML_BACKEND_DEVICE_TYPE_CPU => DeviceKind::Cpu,
+                        sys::ggml_backend_dev_type_GGML_BACKEND_DEVICE_TYPE_GPU => DeviceKind::Gpu,
+                        sys::ggml_backend_dev_type_GGML_BACKEND_DEVICE_TYPE_IGPU => {
+                            DeviceKind::Igpu
+                        }
+                        _ => DeviceKind::Other,
+                    };
+                    Some((CStr::from_ptr(name).to_string_lossy().into_owned(), kind))
                 })
                 .collect()
         }
     }
 
-    /// Whether ggml's registry holds a device whisper.cpp would decode on when
-    /// asked to use the GPU: a discrete or integrated GPU, the same test as
-    /// `whisper_backend_init_gpu`. Only meaningful after [`load_plugins`].
-    pub fn gpu_device_registered() -> bool {
-        use whisper_rs::whisper_rs_sys as sys;
-        // SAFETY: as in `device_names`: a count, then handles for indices
-        // below it.
-        unsafe {
-            (0..sys::ggml_backend_dev_count()).any(|i| {
-                let dev = sys::ggml_backend_dev_get(i);
-                !dev.is_null()
-                    && matches!(
-                        sys::ggml_backend_dev_type(dev),
-                        sys::ggml_backend_dev_type_GGML_BACKEND_DEVICE_TYPE_GPU
-                            | sys::ggml_backend_dev_type_GGML_BACKEND_DEVICE_TYPE_IGPU
-                    )
-            })
-        }
+    pub fn gpu_decode_device() -> Option<i32> {
+        let kinds: Vec<DeviceKind> = registered().into_iter().map(|(_, k)| k).collect();
+        super::decode_device_index(&kinds)
     }
 
     /// Whether ggml's registry holds a CPU device.
@@ -569,15 +401,9 @@ mod imp {
     pub fn state(data_dir: &Path) -> GpuPluginState {
         let loaded = loaded(data_dir);
 
-        // A registered CUDA device is the only proof acceleration actually
-        // works, and it is the right test for both shapes of build: the
-        // downloaded plugin *and* a statically linked `whisper-cuda` binary,
-        // which has no plugin file on disk yet needs no download either. The
-        // bundled CPU backends are always registered, so presence of *a* device
-        // proves nothing — the "CUDA0", "CUDA1", … prefix is what matters.
-        let cuda = super::cuda_devices(&loaded.devices);
-        if !cuda.is_empty() {
-            return GpuPluginState::Ready { devices: cuda };
+        let gpus = super::discrete_gpus(&loaded.devices);
+        if !gpus.is_empty() {
+            return GpuPluginState::Ready { devices: gpus };
         }
         // A static ggml never loads the plugin, so there is nothing to offer.
         if !whisper_rs::whisper_rs_sys::GGML_BACKEND_DL {
@@ -585,24 +411,29 @@ mod imp {
         }
 
         if !super::plugin_installed_cached(data_dir) {
-            return if nvidia_driver_present() {
-                GpuPluginState::NotInstalled
-            } else {
-                GpuPluginState::DriverMissing
+            return match crate::vulkan_probe::probe() {
+                Probe::Ready => GpuPluginState::NotInstalled,
+                Probe::NoDiscreteGpu => GpuPluginState::Unsupported,
+                Probe::NoDriver => GpuPluginState::DriverMissing,
+                Probe::OutdatedDriver => GpuPluginState::DriverOutdated,
             };
         }
 
-        // Installed, but no CUDA device. If the plugin was not there when the
-        // registry was built, that is expected and temporary — ggml has no
-        // unload, so it can only appear on the next launch. Reporting the
-        // driver-too-old guess here would be a false alarm.
         if !loaded.plugin_at_load {
             return GpuPluginState::NeedsRestart;
         }
+        if loaded.devices.iter().any(|(_, k)| *k == DeviceKind::Igpu) {
+            return GpuPluginState::Failed {
+                reason: format!(
+                    "{PLUGIN_FILE} found only an integrated GPU, so transcription stays on the \
+                     CPU, which is usually faster."
+                ),
+            };
+        }
         GpuPluginState::Failed {
             reason: format!(
-                "{CUDA_PLUGIN_FILE} is installed but registered no CUDA device. Your NVIDIA \
-                 driver is most likely older than the CUDA runtime it needs."
+                "{PLUGIN_FILE} is installed but registered no Vulkan device. Your graphics \
+                 driver most likely lacks Vulkan 1.2 support."
             ),
         }
     }
@@ -625,17 +456,9 @@ mod imp {
 pub use imp::{load_plugins, state};
 
 #[cfg(feature = "whisper-cpp")]
-pub(crate) use imp::{cpu_device_registered, gpu_device_registered};
+pub(crate) use imp::{cpu_device_registered, gpu_decode_device};
 
-/// Whether CUDA can actually be used for a decode right now.
-///
-/// This is a *runtime* question, and it has to stay one: the CUDA backend ships
-/// as a downloadable ggml plugin, so a binary built with only `whisper-cpp` can
-/// still acquire a working GPU after the user installs it. Gating on
-/// `cfg!(feature = "whisper-cuda")` instead would make the plugin unreachable
-/// in exactly the builds it exists for. [`state`] answers from ggml's registered
-/// device list, which covers both the plugin and a static `whisper-cuda` build.
-pub fn cuda_available(data_dir: &Path) -> bool {
+pub fn gpu_available(data_dir: &Path) -> bool {
     matches!(state(data_dir), GpuPluginState::Ready { .. })
 }
 
@@ -643,18 +466,46 @@ pub fn cuda_available(data_dir: &Path) -> bool {
 mod tests {
     use super::*;
 
-    #[test]
-    fn cuda_devices_are_listed_once_each_without_the_cpu() {
-        let registered = ["CPU", "CUDA0", "CUDA0", "CUDA1"].map(String::from);
-        assert_eq!(cuda_devices(&registered), ["CUDA0", "CUDA1"]);
+    fn dev(name: &str, kind: DeviceKind) -> (String, DeviceKind) {
+        (name.to_owned(), kind)
     }
 
     #[test]
-    fn download_dir_is_under_the_data_dir() {
+    fn only_discrete_gpus_are_listed_once_each() {
+        let registered = [
+            dev("CPU", DeviceKind::Cpu),
+            dev("Vulkan0", DeviceKind::Igpu),
+            dev("Vulkan1", DeviceKind::Gpu),
+            dev("Vulkan1", DeviceKind::Gpu),
+            dev("CUDA0", DeviceKind::Gpu),
+        ];
+        assert_eq!(discrete_gpus(&registered), ["Vulkan1", "CUDA0"]);
+    }
+
+    #[test]
+    fn decoding_uses_the_first_discrete_gpu_counted_the_way_whisper_counts() {
+        use DeviceKind::{Cpu, Gpu, Igpu, Other};
+        assert_eq!(decode_device_index(&[Cpu, Gpu]), Some(0));
+        assert_eq!(decode_device_index(&[Cpu, Igpu, Gpu]), Some(1));
+        assert_eq!(decode_device_index(&[Igpu, Other, Igpu, Gpu, Gpu]), Some(2));
+        assert_eq!(decode_device_index(&[Cpu, Igpu]), None);
+        assert_eq!(decode_device_index(&[]), None);
+    }
+
+    #[test]
+    fn download_dir_is_its_own_folder_under_the_data_dir() {
         assert_eq!(
             downloaded_plugin_dir(Path::new("/data")),
-            Path::new("/data").join(DIR_GPU_BACKEND)
+            Path::new("/data").join(DIR_GPU_BACKEND).join("vulkan")
         );
+    }
+
+    #[test]
+    fn the_plugin_is_ggmls_vulkan_backend() {
+        #[cfg(target_os = "windows")]
+        assert_eq!(PLUGIN_FILE, "ggml-vulkan.dll");
+        #[cfg(not(target_os = "windows"))]
+        assert_eq!(PLUGIN_FILE, "libggml-vulkan.so");
     }
 
     #[test]
@@ -692,13 +543,10 @@ mod tests {
     }
 
     #[test]
-    fn cuda_is_available_only_when_a_device_actually_registered() {
-        // `cuda_available` is the input to `AsrRegistry::from_config`'s GPU
-        // decision, so it must agree with `state` and nothing else — in
-        // particular it must never be answered by a build feature.
+    fn gpu_is_available_only_when_a_device_actually_registered() {
         let dir = std::env::temp_dir().join("lune-gpu-availability-probe");
         let expected = matches!(state(&dir), GpuPluginState::Ready { .. });
-        assert_eq!(cuda_available(&dir), expected);
+        assert_eq!(gpu_available(&dir), expected);
     }
 
     #[test]
@@ -717,12 +565,11 @@ mod tests {
     fn a_modified_plugin_file_fails_verification() {
         let dir = std::env::temp_dir().join("lune-plugin-tampered");
         std::fs::create_dir_all(&dir).expect("create temp plugin dir");
-        std::fs::write(dir.join("libggml-cuda.so"), b"not what was installed")
-            .expect("write library");
+        std::fs::write(dir.join(PLUGIN_FILE), b"not what was installed").expect("write library");
         // A digest that cannot match anything.
         std::fs::write(
             dir.join(PLUGIN_MANIFEST),
-            br#"{"libggml-cuda.so":"0000000000000000000000000000000000000000000000000000000000000000"}"#,
+            format!(r#"{{"{PLUGIN_FILE}":"{}"}}"#, "0".repeat(64)),
         )
         .expect("write manifest");
         assert!(!installed_plugin_is_intact(&dir));
@@ -735,11 +582,11 @@ mod tests {
         let dir = std::env::temp_dir().join("lune-plugin-intact");
         std::fs::create_dir_all(&dir).expect("create temp plugin dir");
         let body = b"pretend shared object";
-        std::fs::write(dir.join("libggml-cuda.so"), body).expect("write library");
+        std::fs::write(dir.join(PLUGIN_FILE), body).expect("write library");
         let digest = hex::encode(Sha256::digest(body));
         std::fs::write(
             dir.join(PLUGIN_MANIFEST),
-            format!(r#"{{"libggml-cuda.so":"{digest}"}}"#),
+            format!(r#"{{"{PLUGIN_FILE}":"{digest}"}}"#),
         )
         .expect("write manifest");
         assert!(installed_plugin_is_intact(&dir));
@@ -818,7 +665,7 @@ mod tests {
         // A zero-byte file is what an interrupted download leaves behind. It
         // used to read as installed, which turned into a bogus "your driver is
         // too old" once the load inevitably failed.
-        std::fs::write(dir.join(CUDA_PLUGIN_FILE), b"").expect("write plugin");
+        std::fs::write(dir.join(PLUGIN_FILE), b"").expect("write plugin");
         assert!(
             !plugin_installed(tmp.path()),
             "a truncated download is not an installation"
@@ -826,11 +673,11 @@ mod tests {
 
         // With the installer's manifest beside it, the same file is installed.
         let body = b"pretend shared object";
-        std::fs::write(dir.join(CUDA_PLUGIN_FILE), body).expect("write plugin");
+        std::fs::write(dir.join(PLUGIN_FILE), body).expect("write plugin");
         let digest = hex::encode(Sha256::digest(body));
         std::fs::write(
             dir.join(PLUGIN_MANIFEST),
-            format!(r#"{{"{CUDA_PLUGIN_FILE}":"{digest}"}}"#),
+            format!(r#"{{"{PLUGIN_FILE}":"{digest}"}}"#),
         )
         .expect("write manifest");
         assert!(plugin_installed(tmp.path()));

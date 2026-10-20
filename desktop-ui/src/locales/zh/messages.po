@@ -13,7 +13,7 @@ msgstr ""
 "Language-Team: \n"
 "Plural-Forms: \n"
 
-#: src/features/welcome/welcome-page.tsx:521
+#: src/features/welcome/welcome-page.tsx:515
 msgid "— change it any time in Settings › Dictation."
 msgstr "— 可随时在“设置 › 听写”中更改。"
 
@@ -352,7 +352,7 @@ msgstr "取消"
 msgid "Cancel current recording"
 msgstr "取消当前录音"
 
-#: src/features/welcome/welcome-page.tsx:418
+#: src/features/welcome/welcome-page.tsx:412
 msgid "Cancel download"
 msgstr "取消下载"
 
@@ -374,7 +374,7 @@ msgstr "用语音录制"
 msgid "Capture device and how recording detects when you speak."
 msgstr "采集设备以及录音如何检测您何时说话。"
 
-#: src/features/welcome/welcome-page.tsx:480
+#: src/features/welcome/welcome-page.tsx:474
 msgid "Change engine"
 msgstr "更换引擎"
 
@@ -487,8 +487,8 @@ msgstr "正在连接"
 msgid "Contact the release server shortly after startup and tell you only when a newer version exists. Off by default — dictation itself never needs the network."
 msgstr "启动后不久联系发布服务器，仅在存在更新版本时才提示你。默认关闭 — 听写本身从不需要联网。"
 
-#: src/features/welcome/welcome-page.tsx:395
-#: src/features/welcome/welcome-page.tsx:474
+#: src/features/welcome/welcome-page.tsx:389
+#: src/features/welcome/welcome-page.tsx:468
 msgid "Continue"
 msgstr "继续"
 
@@ -530,7 +530,7 @@ msgstr "校正"
 msgid "Correction sensitivity"
 msgstr "校正灵敏度"
 
-#: src/features/welcome/welcome-page.tsx:327
+#: src/features/welcome/welcome-page.tsx:322
 msgid "Could not download GPU support — transcription will run on the CPU. You can retry under Settings › Models."
 msgstr "无法下载 GPU 支持 — 转录将在 CPU 上运行。你可以在“设置 › 型号”中重试。"
 
@@ -554,7 +554,7 @@ msgstr "无法连接反馈服务。请使用上方的链接，或重新打开此
 msgid "Couldn't save that snippet. Try again."
 msgstr "无法保存该片段。请重试。"
 
-#: src/features/welcome/components/engine-step.tsx:282
+#: src/features/welcome/components/engine-step.tsx:281
 msgid "Covers {languages}. For any other language, choose Whisper."
 msgstr "支持 {languages}。其他语言请选择 Whisper。"
 
@@ -574,7 +574,7 @@ msgstr "创造新风格"
 msgid "Create style"
 msgstr "创造风格"
 
-#: src/features/welcome/welcome-page.tsx:520
+#: src/features/welcome/welcome-page.tsx:514
 msgid "Ctrl+Space"
 msgstr "Ctrl+Space"
 
@@ -676,8 +676,8 @@ msgstr "听写"
 
 #: src/features/settings/sections/transcription-section.tsx:58
 #: src/features/settings/sections/transcription-section.tsx:71
-#: src/features/welcome/components/engine-step.tsx:286
-#: src/features/welcome/components/engine-step.tsx:294
+#: src/features/welcome/components/engine-step.tsx:285
+#: src/features/welcome/components/engine-step.tsx:293
 msgid "Dictation language"
 msgstr "听写语言"
 
@@ -723,11 +723,11 @@ msgstr "不保存历史"
 msgid "Download"
 msgstr "下载"
 
-#: src/features/welcome/welcome-page.tsx:466
+#: src/features/welcome/welcome-page.tsx:460
 msgid "Download {pendingCount} models"
 msgstr "下载 {pendingCount} 模型"
 
-#: src/features/welcome/welcome-page.tsx:465
+#: src/features/welcome/welcome-page.tsx:459
 msgid "Download 1 model"
 msgstr "下载 1 个模型"
 
@@ -749,13 +749,13 @@ msgstr "下载进度"
 msgid "Download transcript"
 msgstr "下载转写结果"
 
+#: src/features/welcome/welcome-page.tsx:313
+msgid "Downloading GPU support."
+msgstr "正在下载 GPU 支持。"
+
 #: src/features/welcome/welcome-page.tsx:212
 msgid "Downloading models"
 msgstr "下载模型"
-
-#: src/features/welcome/welcome-page.tsx:318
-msgid "Downloading NVIDIA's CUDA runtime."
-msgstr "正在下载 NVIDIA 的 CUDA 运行时。"
 
 #: src/features/updates/update-dialog.tsx:112
 msgid "Downloading update"
@@ -763,7 +763,7 @@ msgstr "正在下载更新"
 
 #: src/features/settings/components/asr-engine-cards.tsx:318
 #: src/features/settings/components/gpu-backend-card.tsx:31
-#: src/features/welcome/welcome-page.tsx:410
+#: src/features/welcome/welcome-page.tsx:404
 msgid "Downloading…"
 msgstr "正在下载..."
 
@@ -826,7 +826,7 @@ msgstr "启用润色"
 msgid "Engine"
 msgstr "引擎"
 
-#: src/features/welcome/welcome-page.tsx:447
+#: src/features/welcome/welcome-page.tsx:441
 msgid "Enter Lune Voice"
 msgstr "输入 Lune 语音"
 
@@ -850,7 +850,7 @@ msgstr "在 CPU 上也很快"
 msgid "Fast; less accurate than Medium."
 msgstr "速度快，但准确度低于“中”。"
 
-#: src/features/welcome/components/engine-step.tsx:85
+#: src/features/welcome/components/engine-step.tsx:84
 msgid "Fastest on CPU · 25 European languages"
 msgstr "CPU 上最快 · 25 种欧洲语言"
 
@@ -862,13 +862,13 @@ msgstr "最快，但准确度最低。适用于较旧或低性能的电脑。"
 msgid "Feature request"
 msgstr "功能建议"
 
+#: src/features/welcome/welcome-page.tsx:216
+msgid "Fetching GPU support. This is the last step, and it only happens once."
+msgstr "正在获取 GPU 支持。这是最后一步，且只会进行一次。"
+
 #: src/features/updates/update-dialog.tsx:169
 msgid "Fetching Lune Voice {version}. Keep the app open until it finishes."
 msgstr "正在下载 Lune Voice {version}。请在完成前保持应用打开。"
-
-#: src/features/welcome/welcome-page.tsx:216
-msgid "Fetching the NVIDIA runtime. This is the last step, and it only happens once."
-msgstr "正在获取 NVIDIA 运行时。这是最后一步，且只会进行一次。"
 
 #: src/features/styles/components/style-editor-modal.tsx:199
 msgid "Few-shot examples"
@@ -971,12 +971,12 @@ msgid "Good morning."
 msgstr "早上好。"
 
 #: src/features/settings/components/gpu-backend-card.tsx:59
-#: src/features/welcome/components/engine-step.tsx:350
-#: src/features/welcome/welcome-page.tsx:309
+#: src/features/welcome/components/engine-step.tsx:349
+#: src/features/welcome/welcome-page.tsx:304
 msgid "GPU acceleration"
 msgstr "GPU 加速"
 
-#: src/features/settings/components/gpu-backend-card.tsx:149
+#: src/features/settings/components/gpu-backend-card.tsx:157
 msgid "GPU support is installed but not working."
 msgstr "GPU 支持已安装，但无法正常工作。"
 
@@ -1021,7 +1021,7 @@ msgstr "说话时按住快捷键，松开即停止。适合简短的语句。"
 msgid "Hold while speaking"
 msgstr "说话时按住"
 
-#: src/features/welcome/welcome-page.tsx:516
+#: src/features/welcome/welcome-page.tsx:510
 msgid "Hold your hotkey, speak, then let go. The text is typed into whatever app you were using."
 msgstr "按住快捷键说话，然后松开。文字会输入到你当时使用的应用中。"
 
@@ -1041,7 +1041,7 @@ msgstr "听写提示音的播放音量。"
 msgid "How the pill bar looks. Changes apply immediately."
 msgstr "指示器条的外观。更改会立即生效。"
 
-#: src/features/welcome/welcome-page.tsx:513
+#: src/features/welcome/welcome-page.tsx:507
 msgid "How to dictate"
 msgstr "如何听写"
 
@@ -1069,12 +1069,12 @@ msgstr "安装并重启"
 
 #: src/features/settings/components/asr-engine-cards.tsx:324
 #: src/features/welcome/components/model-card.tsx:88
-#: src/features/welcome/welcome-page.tsx:311
+#: src/features/welcome/welcome-page.tsx:306
 msgid "Installed"
 msgstr "已安装"
 
 #: src/features/settings/components/gpu-backend-card.tsx:127
-#: src/features/welcome/components/engine-step.tsx:340
+#: src/features/welcome/components/engine-step.tsx:339
 msgid "Installed. Restart Lune Voice to start using your GPU."
 msgstr "已安装。重启 Lune Voice 即可开始使用你的 GPU。"
 
@@ -1252,12 +1252,12 @@ msgstr "分钟"
 msgid "Mode"
 msgstr "模式"
 
-#: src/features/welcome/components/engine-step.tsx:167
-#: src/features/welcome/components/engine-step.tsx:267
+#: src/features/welcome/components/engine-step.tsx:166
+#: src/features/welcome/components/engine-step.tsx:266
 msgid "Model size"
 msgstr "模型大小"
 
-#: src/features/welcome/welcome-page.tsx:534
+#: src/features/welcome/welcome-page.tsx:528
 msgid "Models are stored locally. No telemetry, no accounts."
 msgstr "模型存储在本地。没有遥测，没有账户。"
 
@@ -1272,7 +1272,7 @@ msgstr "显示器"
 msgid "More"
 msgstr "更多"
 
-#: src/features/welcome/components/engine-step.tsx:78
+#: src/features/welcome/components/engine-step.tsx:77
 msgid "Multilingual · runs on-device"
 msgstr "多语言 · 在本机运行"
 
@@ -1314,13 +1314,13 @@ msgstr "否"
 msgid "No auto-detect: set your language below"
 msgstr "不支持自动检测：请在下方设置语言"
 
+#: src/features/settings/components/gpu-backend-card.tsx:136
+msgid "No GPU driver was found. Install the driver for your graphics card and the download will appear here."
+msgstr "未找到 GPU 驱动。安装你的显卡驱动后，下载会出现在这里。"
+
 #: src/features/welcome/components/ready-checks.tsx:103
 msgid "No microphone found. Plug one in, then pick it in Settings › Dictation."
 msgstr "未找到麦克风。请接入一个，然后在“设置 › 听写”中选择。"
-
-#: src/features/settings/components/gpu-backend-card.tsx:136
-msgid "No NVIDIA driver was found. Install the driver for your GPU and the download will appear here."
-msgstr "未找到 NVIDIA 驱动。安装你的 GPU 驱动后，下载会出现在这里。"
 
 #: src/features/dictionary/components/dictionary-table.tsx:260
 msgid "No rules match “{query}”."
@@ -1389,7 +1389,7 @@ msgstr "未安装任何内容"
 msgid "NVIDIA Parakeet on-device. Much faster than Whisper on a CPU, for 25 European languages."
 msgstr "在本机运行 NVIDIA Parakeet。在 CPU 上比 Whisper 快得多，支持 25 种欧洲语言。"
 
-#: src/features/welcome/components/engine-step.tsx:86
+#: src/features/welcome/components/engine-step.tsx:85
 msgid "NVIDIA Parakeet running on-device. Punctuates by itself and detects which of its languages you speak."
 msgstr "NVIDIA Parakeet 在设备端运行。自动添加标点，并识别您说的是它支持的哪种语言。"
 
@@ -1456,7 +1456,7 @@ msgstr "输出"
 msgid "Overall footprint of the pill bar."
 msgstr "指示器条的整体尺寸。"
 
-#: src/features/welcome/welcome-page.tsx:353
+#: src/features/welcome/welcome-page.tsx:348
 msgid "Overall progress"
 msgstr "总体进展"
 
@@ -1466,7 +1466,7 @@ msgstr "分页"
 
 #: src/features/settings/components/asr-engine-cards.tsx:170
 #: src/features/settings/data/settings-data.ts:622
-#: src/features/welcome/components/engine-step.tsx:84
+#: src/features/welcome/components/engine-step.tsx:83
 msgid "Parakeet"
 msgstr "Parakeet"
 
@@ -1474,7 +1474,7 @@ msgstr "Parakeet"
 msgid "Parakeet (local)"
 msgstr "Parakeet（本地）"
 
-#: src/features/welcome/components/engine-step.tsx:288
+#: src/features/welcome/components/engine-step.tsx:287
 msgid "Parakeet cannot tell Lune which language it heard, so set the one you speak. You can change it later in Settings."
 msgstr "Parakeet 无法告诉 Lune 它听到的是哪种语言，请设置您所说的语言。之后可以在设置中更改。"
 
@@ -1540,7 +1540,7 @@ msgstr "放置"
 msgid "Play a short sound when dictation starts, finishes, or runs into an error."
 msgstr "听写开始、完成或遇到错误时播放一小段声音。"
 
-#: src/features/welcome/welcome-page.tsx:422
+#: src/features/welcome/welcome-page.tsx:416
 msgid "Please keep the app open until downloads finish"
 msgstr "请保持应用程序打开直至下载完成"
 
@@ -1576,7 +1576,7 @@ msgstr "按快捷键开始，再按一次停止。长篇听写最省事。"
 msgid "Press your combo — hold Esc or click away to cancel"
 msgstr "按下你的组合键——长按 Esc 或点击别处取消"
 
-#: src/features/welcome/welcome-page.tsx:517
+#: src/features/welcome/welcome-page.tsx:511
 msgid "Press your hotkey, speak, then press it again. The text is typed into whatever app you were using."
 msgstr "按下快捷键说话，然后再按一次。文字会输入到你当时使用的应用中。"
 
@@ -1690,7 +1690,7 @@ msgstr "重置"
 msgid "Reset position"
 msgstr "重置位置"
 
-#: src/features/welcome/welcome-page.tsx:322
+#: src/features/welcome/welcome-page.tsx:317
 msgid "Restart Lune Voice to start using your GPU."
 msgstr "重启 Lune Voice 即可开始使用 GPU。"
 
@@ -1702,7 +1702,7 @@ msgstr "需要重启"
 msgid "Retry"
 msgstr "重试"
 
-#: src/features/welcome/welcome-page.tsx:434
+#: src/features/welcome/welcome-page.tsx:428
 msgid "Retry download"
 msgstr "重试下载"
 
@@ -1772,7 +1772,7 @@ msgstr "搜索转写结果…"
 msgid "Select all sessions on this page"
 msgstr "选择本页所有会话"
 
-#: src/features/welcome/welcome-page.tsx:470
+#: src/features/welcome/welcome-page.tsx:464
 msgid "Select required models"
 msgstr "选择需要的型号"
 
@@ -1829,7 +1829,7 @@ msgstr "设置热键"
 msgid "Set the language you speak. Auto uses detection from speech."
 msgstr "设置您所说的语言。 Auto 使用语音检测。"
 
-#: src/features/welcome/welcome-page.tsx:463
+#: src/features/welcome/welcome-page.tsx:457
 msgid "Set up GPU acceleration"
 msgstr "设置 GPU 加速"
 
@@ -1876,9 +1876,9 @@ msgstr "大小"
 msgid "Size & shape"
 msgstr "大小与形状"
 
-#: src/features/welcome/welcome-page.tsx:399
-#: src/features/welcome/welcome-page.tsx:437
-#: src/features/welcome/welcome-page.tsx:483
+#: src/features/welcome/welcome-page.tsx:393
+#: src/features/welcome/welcome-page.tsx:431
+#: src/features/welcome/welcome-page.tsx:477
 msgid "Skip for now"
 msgstr "暂时跳过"
 
@@ -1916,7 +1916,7 @@ msgstr "提示音"
 msgid "Speaking time"
 msgstr "说话时长"
 
-#: src/features/welcome/components/engine-step.tsx:100
+#: src/features/welcome/components/engine-step.tsx:99
 msgid "Speech engine"
 msgstr "语音引擎"
 
@@ -2160,11 +2160,11 @@ msgstr "转录正在 {0} 上运行。"
 msgid "Transcription is running on your GPU."
 msgstr "转录正在你的 GPU 上运行。"
 
-#: src/features/settings/components/gpu-backend-card.tsx:143
-msgid "Transcription runs on the CPU. An optional download moves it to your NVIDIA GPU for noticeably lower latency — most of it is NVIDIA's CUDA maths libraries, which cannot be redistributed in a smaller form."
-msgstr "转录在 CPU 上运行。可选下载会把它转到你的 NVIDIA GPU 上，延迟明显更低 — 其中大部分是 NVIDIA 的 CUDA 数学库，无法以更小的形式再分发。"
+#: src/features/settings/components/gpu-backend-card.tsx:154
+msgid "Transcription runs on the CPU. An optional download moves it to your GPU for noticeably lower latency."
+msgstr "转录在 CPU 上运行。可选下载会把它转到你的 GPU 上，延迟明显更低。"
 
-#: src/features/settings/components/gpu-backend-card.tsx:144
+#: src/features/settings/components/gpu-backend-card.tsx:152
 msgid "Transcription runs on the CPU. No GPU download has been published for this build yet."
 msgstr "转录在 CPU 上运行。此版本尚未发布 GPU 下载。"
 
@@ -2218,7 +2218,7 @@ msgstr "更新失败"
 msgid "Updates"
 msgstr "更新"
 
-#: src/features/welcome/components/engine-step.tsx:368
+#: src/features/welcome/components/engine-step.tsx:367
 msgid "Use GPU acceleration"
 msgstr "使用 GPU 加速"
 
@@ -2334,7 +2334,7 @@ msgstr "指示器显示在哪个屏幕上。"
 
 #: src/features/settings/components/asr-engine-cards.tsx:169
 #: src/features/settings/data/settings-data.ts:621
-#: src/features/welcome/components/engine-step.tsx:77
+#: src/features/welcome/components/engine-step.tsx:76
 msgid "Whisper"
 msgstr "Whisper"
 
@@ -2342,7 +2342,7 @@ msgstr "Whisper"
 msgid "Whisper (local)"
 msgstr "Whisper（本地）"
 
-#: src/features/welcome/components/engine-step.tsx:79
+#: src/features/welcome/components/engine-step.tsx:78
 msgid "whisper.cpp running on-device. Choose a size to trade speed for accuracy."
 msgstr "whisper.cpp 在设备端运行。选择一个大小以在速度与准确性之间权衡。"
 
@@ -2392,13 +2392,17 @@ msgstr "你的 API 密钥。留空可沿用已保存的密钥 — 或者当端�
 msgid "Your feedback"
 msgstr "你的反馈"
 
-#: src/features/welcome/components/engine-step.tsx:338
+#: src/features/welcome/components/engine-step.tsx:337
 msgid "Your GPU is ready — use it for faster transcription."
 msgstr "你的 GPU 已就绪 — 用它来更快地转写。"
 
-#: src/features/welcome/components/engine-step.tsx:341
-msgid "Your GPU qualifies. Setup downloads the NVIDIA runtime, then a restart turns it on."
-msgstr "你的 GPU 符合条件。安装程序会下载 NVIDIA 运行时，重启后即可启用。"
+#: src/features/welcome/components/engine-step.tsx:340
+msgid "Your GPU qualifies. Setup downloads GPU support, then a restart turns it on."
+msgstr "你的 GPU 符合条件。安装程序会下载 GPU 支持，重启后即可启用。"
+
+#: src/features/settings/components/gpu-backend-card.tsx:145
+msgid "Your graphics driver is too old for GPU transcription. Update it and the download will appear here."
+msgstr "显卡驱动版本过旧，无法使用 GPU 转写。更新驱动后，下载选项会显示在这里。"
 
 #: src/features/overview/overview-page.tsx:211
 msgid "your hotkey"

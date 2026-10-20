@@ -141,7 +141,7 @@ model = "Medium"
 | `Medium` | `ggml-medium-q5_0.bin` | ~539 MB | Balanced (recommended) |
 | `LargeV3Turbo` | `ggml-large-v3-turbo-q8_0.bin` | ~874 MB | Best accuracy; turbo decoder keeps it fast |
 
-CPU or GPU is set by the top-level `device` field. Running on the GPU needs a CUDA device, which on Linux means the downloadable GPU plugin (or a build compiled with `whisper-cuda`). See [GPU / Device Settings](#gpu--device-settings).
+CPU or GPU is set by the top-level `device` field. Running on the GPU needs the downloadable Vulkan plugin (or a dev build compiled with `whisper-cuda`). See [GPU / Device Settings](#gpu--device-settings).
 
 **VAD:** Silero runs as its own pass *before* decoding. It trims silence from the start and end and keeps the pauses inside your speech, because whisper uses them to place punctuation. whisper.cpp's built-in `enable_vad` is not used on purpose: it glues the speech together and removes those pauses, which gives run-on sentences. The VAD model (`ggml-silero-v5.1.2.bin`, in `models/whisper-vad-silero/`) loads automatically when it is there and always runs on the CPU. If it is missing, decoding runs without it and a warning is logged.
 
@@ -252,11 +252,13 @@ device = "auto"
 
 | Value | Behavior |
 |-------|----------|
-| `"auto"` | Use CUDA when a CUDA device is registered; fall back to CPU otherwise. **(default)** |
-| `"cuda"` | Ask for CUDA. If no CUDA device is available, it still falls back to CPU. |
+| `"auto"` | Use the GPU when a GPU device is registered; fall back to CPU otherwise. **(default)** |
+| `"cuda"` | Ask for the GPU (any vendor, despite the name). If none is available, it still falls back to CPU. |
 | `"cpu"` | Always use the CPU. |
 
-**GPU support is decided at runtime.** The CUDA backend is a plugin the app downloads when you ask, so `device = "cuda"` can work on a binary that was never built with CUDA. What you do need is an NVIDIA driver, which can't be bundled, so you install it yourself. You can see the current state in Settings → Transcription, under Use hardware acceleration, which is also where you download the plugin (or with the `gpu_backend_status` command). The GPU card during setup only appears when accepting it would change something: the state is `ready`, `needs-restart`, or `not-installed` with a published plugin for this build. If you accept it while the state is `not-installed`, setup downloads the plugin.
+Only a discrete GPU counts. On a machine with just integrated graphics, transcription stays on the CPU, which is usually faster there.
+
+**GPU support is decided at runtime.** The GPU backend is a Vulkan plugin the app downloads when you ask, so a CPU-only binary can still use the GPU. You need a graphics driver with Vulkan 1.2, which you install yourself. You can see the current state in Settings → Transcription, under Use hardware acceleration, which is also where you download the plugin (or with the `gpu_backend_status` command). The GPU card during setup only appears when accepting it would change something: the state is `ready`, `needs-restart`, or `not-installed` with a published plugin for this build. If you accept it while the state is `not-installed`, setup downloads the plugin.
 
 The plugin installs into `~/.local/share/lune-voice/backends/`. Delete that folder to go back to CPU. ggml builds its device list once per run, so a newly installed plugin only works after a restart, and the app tells you so.
 

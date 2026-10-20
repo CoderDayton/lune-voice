@@ -19,6 +19,7 @@ whisper-cpp = ["dep:whisper-rs"]
 # GPU whisper.cpp: source-compiles the CUDA kernels, so it additionally needs
 # the CUDA toolkit (nvcc) on the build host.
 whisper-cuda = ["whisper-cpp", "whisper-rs/cuda"]
+whisper-vulkan = ["whisper-cpp", "whisper-rs/vulkan"]
 
 [dependencies]
 async-trait.workspace = true
@@ -47,7 +48,6 @@ futures-util.workspace = true
 reqwest.workspace = true
 url.workspace = true
 
-# Driver probe + CUDA runtime preload for the GPU plugin (src/gpu_backend.rs).
 [target.'cfg(target_os = "windows")'.dependencies]
 windows-sys = { workspace = true, features = [
   "Win32_Foundation",

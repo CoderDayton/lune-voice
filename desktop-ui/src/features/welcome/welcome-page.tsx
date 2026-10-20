@@ -213,7 +213,7 @@ function Header({ phase, requiredOk, pendingCount, error: _error }: HeaderProps)
     subtitle = t`This only happens once. You can keep using your computer in the meantime.`;
   } else if (phase === 'gpu') {
     title = t`Setting up your GPU`;
-    subtitle = t`Fetching the NVIDIA runtime. This is the last step, and it only happens once.`;
+    subtitle = t`Fetching GPU support. This is the last step, and it only happens once.`;
   } else if (phase === 'error') {
     title = t`Download interrupted`;
     subtitle = t`Check your network and we'll pick up where we left off.`;
@@ -271,11 +271,6 @@ interface GpuSetupCardProps {
   error: string | null;
 }
 
-/**
- * The CUDA plugin step: its own card rather than a row in the model list,
- * because it is not a model and — unlike every model here — finishing it does
- * not make the GPU usable until the app restarts.
- */
 function GpuSetupCard({ installing, progress, totalBytes, installed, error }: GpuSetupCardProps) {
   const { t } = useLingui();
 
@@ -315,7 +310,7 @@ function GpuSetupCard({ installing, progress, totalBytes, installed, error }: Gp
               string, and the shell is `select-none`. */}
           <p className="mt-0.5 text-xs leading-snug text-content-subtle select-text">
             {installing
-              ? t`Downloading NVIDIA's CUDA runtime.`
+              ? t`Downloading GPU support.`
               : installed
                 ? // The badge beside the title already says "Installed", so
                   // the sentence only has to carry the part the badge cannot.
@@ -364,7 +359,6 @@ interface ActionsProps {
   phase: SetupPhase;
   requiredOk: boolean;
   pendingCount: number;
-  /** Whether starting the download step also fetches the CUDA plugin. */
   willInstallGpu: boolean;
   onStart: () => void;
   onCancel: () => void;

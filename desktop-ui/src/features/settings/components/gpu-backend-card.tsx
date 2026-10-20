@@ -133,18 +133,26 @@ function StatusLine({ status }: { status: GpuBackendStatusDto }): React.ReactNod
     return (
       <span className="flex items-start gap-1.5">
         <Cpu className="mt-0.5 size-3.5 shrink-0" />
-        {t`No NVIDIA driver was found. Install the driver for your GPU and the download will appear here.`}
+        {t`No GPU driver was found. Install the driver for your graphics card and the download will appear here.`}
+      </span>
+    );
+  }
+
+  if (status.state === 'driver-outdated') {
+    return (
+      <span className="flex items-start gap-1.5">
+        <Cpu className="mt-0.5 size-3.5 shrink-0" />
+        {t`Your graphics driver is too old for GPU transcription. Update it and the download will appear here.`}
       </span>
     );
   }
 
   if (status.state === 'not-installed') {
-    return status.downloadAvailable
-      ? t`Transcription runs on the CPU. An optional download moves it to your NVIDIA GPU for noticeably lower latency — most of it is NVIDIA's CUDA maths libraries, which cannot be redistributed in a smaller form.`
-      : t`Transcription runs on the CPU. No GPU download has been published for this build yet.`;
+    if (!status.downloadAvailable) {
+      return t`Transcription runs on the CPU. No GPU download has been published for this build yet.`;
+    }
+    return t`Transcription runs on the CPU. An optional download moves it to your GPU for noticeably lower latency.`;
   }
 
-  // `failed` — in practice a driver older than the plugin's CUDA runtime. The
-  // backend attaches the specifics, which are worth more than a generic line.
   return status.reason ?? t`GPU support is installed but not working.`;
 }

@@ -512,30 +512,21 @@ pub struct DictionaryItemDto {
 }
 
 /// What GPU acceleration can do on this machine right now.
-///
-/// Deliberately a *runtime* question. GPU support used to be reported as a
-/// build-time fact ("was the `whisper-cuda` feature compiled in"), which the
-/// downloadable CUDA plugin made wrong: the same binary reports different
-/// answers on different machines — no driver, driver but no plugin, or a
-/// working GPU. Each variant maps to exactly one thing the setup UI can offer.
 #[derive(Debug, Clone, Copy, Serialize, TS)]
 #[ts(export, export_to = "../../src/lib/backend/generated/")]
 #[serde(rename_all = "kebab-case")]
 pub enum GpuBackendStateDto {
     /// Built without the native ASR backend; there is nothing to accelerate.
     Unsupported,
-    /// No NVIDIA driver here. A download cannot fix this — the driver is not
-    /// redistributable, so the user has to install it themselves.
     DriverMissing,
+    DriverOutdated,
     /// Driver present, plugin not downloaded yet. The offer state.
     NotInstalled,
-    /// Plugin loaded and a CUDA device registered.
     Ready,
     /// Plugin installed, waiting for the next launch to register its device.
     /// Not a failure, and told apart from one so the UI can ask for a restart
     /// in the user's own language rather than relaying an English `reason`.
     NeedsRestart,
-    /// Plugin installed but no CUDA device appeared.
     Failed,
 }
 

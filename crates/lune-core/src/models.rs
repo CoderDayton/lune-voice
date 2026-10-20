@@ -25,8 +25,5 @@ pub const DIR_PARAKEET_TDT_V3_Q4K: &str = "parakeet-tdt-0.6b-v3-q4_k";
 // pauses whisper uses as its punctuation cue.
 pub const DIR_WHISPER_VAD: &str = "whisper-vad-silero";
 
-/// Directory under the data dir holding dlopen-able ggml compute backends: the
-/// CPU variants shipped with the app, plus the CUDA plugin the user can add
-/// after install. See `lune_asr::gpu_backend`.
 pub const DIR_GPU_BACKEND: &str = "backends";
 pub const WHISPER_VAD_GGML: &str = "ggml-silero-v5.1.2.bin";

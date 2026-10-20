@@ -274,17 +274,18 @@ pub fn run() {
         );
     }
 
-    // Register ggml's compute backends before anything can build a
-    // WhisperContext: ggml picks a device from whatever is in the registry at
-    // context-creation time, so a late load would silently leave the app on
-    // the CPU. Bundled CPU plugins and the optional downloaded CUDA plugin are
-    // both picked up here.
     // Before the load, not after: ggml reports a failed plugin `dlopen` through
     // its own log callback, and until this is installed that goes to raw
     // stderr — invisible on a GUI launch, and unrecoverable even with
     // `RUST_LOG=info`.
     lune_asr::install_logging_hooks();
     if let Some(paths) = lune_persist::AppPaths::resolve() {
+        let legacy = lune_persist::gpu_plugin::remove_legacy_plugin(
+            &paths.data_dir().join(lune_core::models::DIR_GPU_BACKEND),
+        );
+        if !legacy.is_empty() {
+            tracing::info!(files = legacy.len(), "removed the old CUDA GPU plugin");
+        }
         let devices = lune_asr::gpu_backend::load_plugins(paths.data_dir());
         tracing::info!(?devices, "ggml compute backends available");
     } else {

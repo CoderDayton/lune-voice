@@ -1718,12 +1718,9 @@ async fn build_pipeline(
         let backend_config = settings.asr_backend.clone();
         let device = settings.device;
         let models_dir = paths.models_dir();
-        // Runtime, not `cfg!`: the CUDA backend is a downloadable ggml plugin,
-        // so a `whisper-cpp` build can still have a usable GPU by the time this
-        // runs. `lib.rs` loads the plugins before the first pipeline build.
-        let cuda_available = lune_asr::gpu_backend::cuda_available(paths.data_dir());
+        let gpu_available = lune_asr::gpu_backend::gpu_available(paths.data_dir());
         let built = tokio::task::spawn_blocking(move || {
-            AsrRegistry::from_config(&backend_config, device, &models_dir, cuda_available)
+            AsrRegistry::from_config(&backend_config, device, &models_dir, gpu_available)
         })
         .await
         .map_err(|e| format!("asr build task: {e}"))?

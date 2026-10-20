@@ -923,7 +923,7 @@ impl HarnessBuilder {
 
         let models_dir = models_dir();
         let cuda_available = AppPaths::resolve()
-            .map(|p| lune_asr::gpu_backend::cuda_available(p.data_dir()))
+            .map(|p| lune_asr::gpu_backend::gpu_available(p.data_dir()))
             .unwrap_or(false);
 
         // ASR — whisper.cpp.

@@ -29,9 +29,9 @@ To upgrade whisper.cpp, copy the same subset of upstream over
 Releases ship as finished Tauri bundles (`.deb`, `.rpm`, `.AppImage`, and a
 Windows `-setup.exe`), so **users never compile** anything.
 
-GPU support is **not** a separate download of the app. The CUDA backend is a
-`dlopen`-able plugin the user downloads from inside the app, so one CPU bundle
-serves everyone, and a machine with an NVIDIA driver opts in at runtime. See
+GPU support is **not** a separate download of the app. ggml's Vulkan backend is
+a `dlopen`-able plugin the user downloads from inside the app, so one CPU bundle
+serves everyone, and any machine with a Vulkan 1.2 GPU opts in at runtime. See
 [GPU_PLUGIN.md](GPU_PLUGIN.md) for how that works and how to publish the archive.
 
 Linux and Windows are both built and tested. There is no macOS build. Each
@@ -50,9 +50,9 @@ downloaded at runtime into the models directory
 | Target | OS / arch | Backend | Cargo features | Status |
 |---|---|---|---|---|
 | Linux | Linux x86_64 | CPU (any x86-64-v2; best CPU variant picked at runtime) | `whisper-cpp` | **Supported** |
-| Linux GPU plugin | Linux x86_64 + NVIDIA | CUDA, downloaded at runtime | none (built by `cgs gpu-plugin`) | **Built; archive not published yet** |
+| Linux GPU plugin | Linux x86_64, Vulkan 1.2 GPU | Vulkan, downloaded at runtime | none (built by `cgs gpu-plugin`) | **Built; archive not published yet** |
 | Windows CPU | Windows x86_64 | CPU (any x86-64-v2; best CPU variant picked at runtime) | `whisper-cpp` | **Supported** (NSIS installer) |
-| Windows GPU plugin | Windows x86_64 + NVIDIA | CUDA, downloaded at runtime | none (built by `cgs gpu-plugin-windows`) | **Built; archive not published yet** |
+| Windows GPU plugin | Windows x86_64, Vulkan 1.2 GPU | Vulkan, downloaded at runtime | none (built by `cgs gpu-plugin` on Windows) | **Built; archive not published yet** |
 
 The `whisper-cuda` feature passes through to `whisper-rs/cuda`. The CPU feature
 compiles the library with no GPU backend. The same `--features` flags work on
@@ -116,7 +116,7 @@ uses it: `cgs build`, `cgs package`, CI and the release workflow.
   `sse42` for CPUs without AVX2. At startup ggml loads the best one the CPU
   supports. ggml can't build only some variants, so `GGML_CPU_ALL_VARIANTS=ON`
   compiles all of them and the script keeps those two (`CPU_VARIANTS`). This
-  same layout is what lets the downloaded CUDA plugin load (docs/GPU_PLUGIN.md).
+  same layout is what lets the downloaded Vulkan plugin load (docs/GPU_PLUGIN.md).
 - The Rust code has one baseline, `RUSTFLAGS=-C target-cpu=x86-64-v2`
   (SSE4.2 + POPCNT), set by the script. That is the oldest CPU a release runs
   on.
@@ -168,7 +168,7 @@ It **only checks**. Linking for `x86_64-pc-windows-gnu` would also need MinGW
 `.rpm` and a portable `.tar.gz` into `release-artifacts/`, in a single
 `ubuntu:22.04` container (it respects `$CONTAINER_ENGINE`). It builds the CPU
 backend (`--features whisper-cpp`). GPU support reaches these bundles as the
-downloadable CUDA plugin, not as a second build.
+downloadable Vulkan plugin, not as a second build.
 
 One image covers all three package formats because tauri writes RPMs with the
 pure-Rust `rpm` crate, so there is no `rpmbuild` and no Fedora. Ubuntu 22.04 has
@@ -219,7 +219,7 @@ updater](#in-app-updater) below. The updater can't see a release published
 without `latest.json`.
 
 > Status: both **Linux CPU** and **Windows CPU** builds are made. GPU support
-> reaches users as the downloadable CUDA plugin (see [GPU_PLUGIN.md](GPU_PLUGIN.md)),
+> reaches users as the downloadable Vulkan plugin (see [GPU_PLUGIN.md](GPU_PLUGIN.md)),
 > built by its own workflow. Neither plugin archive is published yet.
 
 ## GPU plugin
@@ -227,15 +227,14 @@ without `latest.json`.
 Built and packaged separately from the application bundle:
 
 ```bash
-cgs gpu-plugin        # -> release-artifacts/lune-voice-gpu-cuda13-linux-x86_64.tar.gz + .sha256
+cgs gpu-plugin        # -> release-artifacts/lune-voice-gpu-vulkan-<os>-x86_64.tar.gz + .sha256
 cgs stage-runtime     # copy ggml shared objects + backend plugins next to a built binary
 ```
 
-Upload both files to the GitHub release, then record the digest and byte size in
-`CUDA_LINUX_X86_64` (`crates/lune-persist/src/gpu_plugin.rs`). Until that digest
-is filled in, the in-app install refuses instead of downloading something it
-can't verify. The Windows plugin and the CI workflow are covered in
-[GPU_PLUGIN.md](GPU_PLUGIN.md).
+The `gpu-plugin.yml` workflow builds both OSes into a draft release. Then pin
+each digest and byte size in `VULKAN_LINUX_X86_64` / `VULKAN_WINDOWS_X86_64`
+(`crates/lune-persist/src/gpu_plugin.rs`). Until then the in-app install
+refuses. Details: [GPU_PLUGIN.md](GPU_PLUGIN.md).
 
 ## In-app updater
 
@@ -249,8 +248,7 @@ can't verify. The Windows plugin and the CI workflow are covered in
 >
 > The rest of this section describes how updates work and how to publish them.
 > Once the release files can be downloaded without logging in, checks work with
-> no code change. The GPU plugin pin waits on the same thing
-> ([GPU_PLUGIN.md](GPU_PLUGIN.md)). Signature checking doesn't depend on any of
+> no code change. Signature checking doesn't depend on any of
 > this and is still tested (`cargo test -p lune-ui --lib updater`).
 
 The tray's **Check for Updates…** fetches `latest.json` from the latest GitHub
@@ -387,12 +385,12 @@ run the `cgs updater-test` build against the local endpoint.
 `whisper.cpp` and `ggml` are MIT-licensed. They are statically linked into the
 default (native) `cgs build`, and shipped as separate shared libraries in every
 release bundle and anywhere else `GGML_BACKEND_DL` is on. The GPU plugin
-archive also contains NVIDIA's redistributable CUDA runtime libraries. Update
+archive is ggml's own Vulkan backend and redistributes nothing else. Update
 `THIRD_PARTY_NOTICES.md` whenever the bundled upstream version changes.
 
 Every bundle ships two files:
 
-- `THIRD_PARTY_NOTICES.md`, written by hand: native libraries, the CUDA runtime,
+- `THIRD_PARTY_NOTICES.md`, written by hand: native libraries,
   models, fonts, the compiled-in data files and the vendored `whisper-rs-sys`
   fork.
 - `THIRD_PARTY_LICENSES.md`, generated: the licence text of every Rust crate in

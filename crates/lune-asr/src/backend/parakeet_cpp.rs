@@ -2,13 +2,6 @@
 
 //! Local NVIDIA Parakeet TDT ASR backend.
 //!
-//! Runs whisper.cpp's `parakeet` library — the Parakeet TDT runtime that ships
-//! in the same whisper.cpp tree as whisper itself and links the same ggml — so
-//! it inherits the downloadable CUDA plugin, the CPU backend variants and the
-//! log routing with no second native stack. `whisper-rs` does not wrap it, so
-//! this module calls the raw bindings (`whisper_rs::whisper_rs_sys`) and keeps
-//! every `unsafe` block behind a small owned-handle type.
-//!
 //! With the `whisper-cpp` feature off, a stub with the same public surface
 //! keeps the registry compiling; its constructor returns a clear "rebuild with
 //! the feature" error.
@@ -196,7 +189,7 @@ mod imp {
     unsafe impl Send for Engine {}
 
     impl Engine {
-        fn load(path: &std::path::Path, use_gpu: bool) -> Result<Self> {
+        fn load(path: &std::path::Path, gpu_device: Option<i32>) -> Result<Self> {
             let c_path = CString::new(path.to_string_lossy().as_bytes()).map_err(|_| {
                 Error::asr(format!(
                     "the Parakeet model path {} contains a NUL byte",
@@ -205,8 +198,8 @@ mod imp {
             })?;
             // SAFETY: returns a plain struct by value.
             let mut params = unsafe { sys::parakeet_context_default_params() };
-            params.use_gpu = use_gpu;
-            params.gpu_device = 0;
+            params.use_gpu = gpu_device.is_some();
+            params.gpu_device = gpu_device.unwrap_or(0);
             // SAFETY: `c_path` is a valid NUL-terminated string for the call's
             // duration. The loader catches its own C++ exceptions and returns
             // null on any failure; `check_ggml_file` has already rejected the
@@ -383,8 +376,12 @@ mod imp {
             check_ggml_file(&config.model_path)?;
             ensure_cpu_backend()?;
 
-            let on_gpu = config.use_gpu && crate::gpu_backend::gpu_device_registered();
-            let engine = Engine::load(&config.model_path, on_gpu)?;
+            let gpu_device = config
+                .use_gpu
+                .then(crate::gpu_backend::gpu_decode_device)
+                .flatten();
+            let on_gpu = gpu_device.is_some();
+            let engine = Engine::load(&config.model_path, gpu_device)?;
             let piece_limit = piece_limit(engine.n_audio_ctx());
             let n_threads = decode_threads();
             let vad = config

@@ -10,9 +10,6 @@ set -euo pipefail
 # between at startup:
 #   haswell  AVX2 + FMA + F16C + BMI2 — Intel since 2013, AMD since 2015
 #   sse42    no AVX — every CPU the x86-64-v2 Rust baseline runs on
-# ggml has no switch for a chosen subset, so GGML_CPU_ALL_VARIANTS builds every
-# x86 variant and only these two are staged. One build therefore runs on any
-# x86-64-v2 CPU and can load the downloadable CUDA plugin (docs/GPU_PLUGIN.md).
 #
 # Two passes, because the bundle carries files the first pass produces:
 #   1. `tauri build --no-bundle` compiles whisper.cpp and the app.

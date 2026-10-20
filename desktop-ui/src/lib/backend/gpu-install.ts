@@ -5,8 +5,6 @@ import type { GpuBackendStatusDto } from './generated/GpuBackendStatusDto';
 import type { GpuInstallProgressDto } from './generated/GpuInstallProgressDto';
 
 /**
- * Download and unpack the CUDA plugin, reporting byte progress as it goes.
- *
  * The one place the install is invoked from, so the Models settings card and
  * the onboarding setup step cannot drift into two different ideas of what
  * installing means.

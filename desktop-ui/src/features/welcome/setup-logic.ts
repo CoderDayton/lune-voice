@@ -111,17 +111,10 @@ export function buildInitialSelection(asrLocalName: string, models: ModelStatus[
  * not meaningful is claiming the machine is accelerated when it is not, so the
  * two cases are told apart:
  *
- * - `active` — a CUDA device is registered right now.
  * - `needs-restart` — the plugin is installed and only the next launch is
  *   missing. Nothing to download, nothing to fix.
  * - `after-download` — the hardware qualifies but the plugin still has to be
  *   fetched, which the setup download step does once the user accepts.
- *
- * Hidden entirely when no download could help: no native backend (`unsupported`),
- * no driver (`driver-missing`, and the driver is not redistributable), a driver
- * too old for the runtime (`failed`), or a build whose plugin archive has not
- * been published yet — offering setup the user cannot complete is worse than
- * staying quiet.
  */
 export type GpuAccelerationOffer = 'active' | 'needs-restart' | 'after-download';
 
@@ -135,13 +128,6 @@ export function gpuAccelerationOffer(
   return downloadAvailable ? 'after-download' : null;
 }
 
-/**
- * Whether the setup download step should fetch the CUDA plugin.
- *
- * Only `not-installed` is worth a download: a plugin that is already on disk
- * is not made to work by fetching several hundred megabytes of it again,
- * whether it is waiting for a restart or refusing an out-of-date driver.
- */
 export function shouldInstallGpuDuringSetup(
   state: GpuBackendStateDto,
   downloadAvailable: boolean,

@@ -32,7 +32,6 @@ interface EngineStepProps {
   gpuOffer: GpuAccelerationOffer | null;
   /** Whether GPU acceleration is currently accepted (mirrors `useGpu`). */
   useGpu: boolean;
-  /** Size of the CUDA plugin download setup will make, when it will make one. */
   gpuDownloadBytes: number;
   onSelectEngine: (backend: AsrBackendValue) => void;
   onSelectWhisper: (model: WhisperModelValue) => void;
@@ -338,7 +337,7 @@ function GpuOfferCard({ offer, useGpu, downloadBytes, onToggle }: GpuOfferCardPr
       ? t`Your GPU is ready — use it for faster transcription.`
       : offer === 'needs-restart'
         ? t`Installed. Restart Lune Voice to start using your GPU.`
-        : t`Your GPU qualifies. Setup downloads the NVIDIA runtime, then a restart turns it on.`;
+        : t`Your GPU qualifies. Setup downloads GPU support, then a restart turns it on.`;
 
   return (
     <label className="setup-card flex cursor-pointer items-start gap-3 p-4">

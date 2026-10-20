@@ -192,7 +192,7 @@ fn main() {
     let entry = benchmark_asr_entry().unwrap_or_else(|msg| panic!("lead_in_ab: {msg}"));
     let models = models_dir();
     let use_gpu = lune_persist::AppPaths::resolve()
-        .map(|p| lune_asr::gpu_backend::cuda_available(p.data_dir()))
+        .map(|p| lune_asr::gpu_backend::gpu_available(p.data_dir()))
         .unwrap_or(false);
 
     let own_dir = std::env::var("LUNE_BENCH_DIR").ok();

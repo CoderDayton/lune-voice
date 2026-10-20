@@ -54,7 +54,7 @@ First release, for Linux and Windows.
 
 ### Performance
 
-- GPU acceleration on Linux as an optional download rather than a separate build: the CUDA backend is a `dlopen`-able ggml plugin, verified against a pinned SHA-256 and installed beside your settings. It is offered during onboarding and in Settings → Models. One Linux build serves every machine, including those with no NVIDIA driver at all
+- GPU acceleration on Linux and Windows as an optional download rather than a separate build: ggml's Vulkan backend as a `dlopen`-able plugin (about 17 MB) that runs on NVIDIA, AMD and Intel GPUs, verified against a pinned SHA-256 and installed beside your settings. It is offered during onboarding and in Settings → Transcription. One build serves every machine, GPU or not
 - mimalloc as the global allocator; thin LTO release builds
 - Steady-state recording allocates nothing on the audio path, and the whisper model is loaded once and shared across sessions
 - History statistics read a maintained word count, so the overview does not slow down as history grows

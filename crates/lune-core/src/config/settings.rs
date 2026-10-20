@@ -783,16 +783,12 @@ pub enum StreamingMode {
 /// Compute device policy for local model inference.
 ///
 /// Serializes as lowercase TOML strings: `"auto"`, `"cuda"`, `"cpu"`.
-/// The default is `"auto"`, which tries CUDA at runtime and falls back to CPU.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
 #[serde(rename_all = "lowercase")]
 pub enum DevicePolicy {
     /// Force CPU-only inference.
     Cpu,
-    /// Prefer CUDA GPU inference. Falls back to CPU if CUDA is not available
-    /// at runtime or the `cuda` feature was not compiled in.
     Cuda,
-    /// Try CUDA when compiled with the `cuda` feature; fall back to CPU.
     /// This is the recommended setting: zero-config on GPU machines, safe on CPU-only.
     #[default]
     Auto,
@@ -800,11 +796,6 @@ pub enum DevicePolicy {
 
 impl DevicePolicy {
     /// Resolve to a boolean for backend `use_gpu` fields.
-    ///
-    /// - `Cpu` → always `false`
-    /// - `Cuda` → always `true` (runtime init still falls back if CUDA unavailable)
-    /// - `Auto` → `true` when `cuda` feature is compiled in (`cuda_available`),
-    ///   otherwise `false`. The `cuda` feature is enabled by default.
     pub fn use_gpu(self, cuda_available: bool) -> bool {
         match self {
             Self::Cpu => false,
@@ -1046,9 +1037,6 @@ model = "LargeV4"
 
     #[test]
     fn auto_device_follows_the_runtime_cuda_answer() {
-        // `Auto` is the default, and the argument it defers to must stay a
-        // runtime fact. Wiring a compile-time feature flag in here is what made
-        // the downloadable CUDA plugin unreachable in `whisper-cpp` builds.
         assert!(DevicePolicy::Auto.use_gpu(true));
         assert!(!DevicePolicy::Auto.use_gpu(false));
         // The explicit choices ignore it in both directions.

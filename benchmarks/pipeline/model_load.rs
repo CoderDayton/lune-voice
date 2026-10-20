@@ -244,7 +244,7 @@ fn probe(model: WhisperModel, target: Target, repeats: usize) -> Timing {
 }
 
 fn main() {
-    let cuda = lune_asr::gpu_backend::cuda_available(
+    let cuda = lune_asr::gpu_backend::gpu_available(
         lune_persist::AppPaths::resolve()
             .expect("resolve XDG paths")
             .data_dir(),

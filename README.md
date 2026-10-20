@@ -45,7 +45,7 @@ The full requirements and build matrix are in [docs/RELEASE.md](docs/RELEASE.md)
 
 - [Architecture](docs/ARCHITECTURE.md): how the pipeline fits together
 - [Configuration](docs/CONFIGURATION.md): every setting
-- [GPU plugin](docs/GPU_PLUGIN.md): optional NVIDIA acceleration
+- [GPU plugin](docs/GPU_PLUGIN.md): optional GPU acceleration (Vulkan: NVIDIA, AMD, Intel)
 - [Performance](docs/PERFORMANCE.md): benchmarks
 - [Runbook](docs/RUNBOOK.md): when something breaks, and where your data lives
 - [Release](docs/RELEASE.md): packaging and releases

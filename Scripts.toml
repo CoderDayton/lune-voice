@@ -14,32 +14,25 @@ info = "List all available scripts"
 
 [scripts.dev]
 interpreter = "bash"
-# Dev app needs the native whisper.cpp backend compiled in, otherwise the ASR
-# stub returns "backend not compiled in" and dictation fails. `default = []`
-# keeps routine `cargo check` toolchain-light, so the features are passed here
-# explicitly (mirroring `cgs build`). BACKEND auto-detects: if unset, a CUDA
-# build is used when both nvcc and nvidia-smi are present, else CPU. Force
-# either with `--env BACKEND=cpu|cuda`. Unlike release builds GGML_NATIVE is
-# left on so the dev build tunes for THIS machine's CPU.
 command = '''
 cd desktop-ui
 BACKEND="${BACKEND:-}"
 if [ -z "$BACKEND" ]; then
-  if command -v nvcc >/dev/null 2>&1 && command -v nvidia-smi >/dev/null 2>&1 && nvidia-smi >/dev/null 2>&1; then
+  if command -v glslc >/dev/null 2>&1 && pkg-config --exists vulkan 2>/dev/null; then
+    BACKEND=vulkan
+  elif command -v nvcc >/dev/null 2>&1 && command -v nvidia-smi >/dev/null 2>&1 && nvidia-smi >/dev/null 2>&1; then
     BACKEND=cuda
   else
     BACKEND=cpu
   fi
 fi
 case "$BACKEND" in
-  cpu)  FEATURES="whisper-cpp" ;;
-  cuda) FEATURES="whisper-cuda" ;;
-  *)    echo "BACKEND must be cpu|cuda"; exit 1 ;;
+  cpu)    FEATURES="whisper-cpp" ;;
+  cuda)   FEATURES="whisper-cuda" ;;
+  vulkan) FEATURES="whisper-vulkan" ;;
+  *)      echo "BACKEND must be cpu|cuda|vulkan"; exit 1 ;;
 esac
-# ggml compute backends are dlopen-ed plugins, so the CUDA backend can ship as
-# an optional download instead of a load-time dependency. GGML_NATIVE is
-# incompatible with it (ggml needs ARCH_DEFINITIONS for the feature check), so
-# CPU dispatch comes from the per-microarchitecture variants instead.
+echo "GPU backend: $BACKEND (override with --env BACKEND=cpu|cuda|vulkan)"
 GGML_FLAGS="GGML_BACKEND_DL=ON GGML_NATIVE=OFF GGML_CPU_ALL_VARIANTS=ON"
 # Host-tuned Rust codegen for the dev build. Opt-in here rather than pinned in
 # `.cargo/config.toml`, so a plain `cargo build` stays portable.
@@ -47,7 +40,7 @@ export RUSTFLAGS="${RUSTFLAGS:--C target-cpu=native}"
 echo "Dev ($BACKEND): --features \"$FEATURES\" ($GGML_FLAGS)"
 env $GGML_FLAGS bun tauri dev --features "$FEATURES"
 '''
-info = "Launch Tauri app in dev mode (hot-reload; CUDA auto-detected, --env BACKEND=cpu|cuda to force)"
+info = "Launch Tauri app in dev mode (hot-reload; GPU auto-detected: Vulkan when glslc and the Vulkan headers are found, else CUDA; --env BACKEND=cpu|cuda|vulkan to force)"
 requires = ["bun"]
 
 # ── Quick iteration ──────────────────────────────────────────────────────────
@@ -172,18 +165,6 @@ interpreter = "bash"
 #     machine's CPU and, for CUDA, only the build host's GPU arch (e.g. sm_89).
 #     The CUDA compile is ~8x smaller and won't exhaust RAM. The binary runs
 #     great here but is NOT portable to other CPUs/GPUs. The right local build.
-#   • PORTABLE (`--env PORTABLE=1`): the distributable build release and CI use,
-#     via scripts/release/build-bundles.sh. CPU only: ggml as shared libraries
-#     with two CPU backend plugins, AVX2 and SSE4.2, picked at runtime, so it
-#     runs on any x86-64-v2 CPU; GPU arrives as the downloadable CUDA plugin
-#     (docs/GPU_PLUGIN.md). Run it from the build tree with
-#     `cgs stage-runtime --env PROFILE=release`.
-#
-# Backend AUTO-DETECTS for NATIVE: if `BACKEND` is unset and both nvcc and a
-# working nvidia-smi are present, CUDA is built; otherwise CPU. Force with
-# `--env BACKEND=cpu|cuda`. macOS Metal and the full release matrix: docs/RELEASE.md.
-# Build host needs: cmake, a C++ toolchain, and libclang (for bindgen); plus the
-# CUDA toolkit for a `cuda` build.
 command = '''
 # Compile only. The shippable installers are `cgs package`, which builds them in
 # containers against an old glibc so they install on other distros — a bundle
@@ -196,7 +177,7 @@ else
 fi
 if [ -n "${PORTABLE:-}" ]; then
   if [ "${BACKEND:-cpu}" != "cpu" ]; then
-    echo "PORTABLE builds are CPU only; GPU ships as the CUDA plugin (cgs gpu-plugin)"; exit 1
+    echo "PORTABLE builds are CPU only; GPU ships as the Vulkan plugin (cgs gpu-plugin)"; exit 1
   fi
   APPIMAGE_EXTRACT_AND_RUN=1 bash scripts/release/build-bundles.sh $BUNDLE_ARGS
   exit $?
@@ -204,17 +185,21 @@ fi
 cd desktop-ui
 BACKEND="${BACKEND:-}"
 if [ -z "$BACKEND" ]; then
-  if command -v nvcc >/dev/null 2>&1 && command -v nvidia-smi >/dev/null 2>&1 && nvidia-smi >/dev/null 2>&1; then
+  if command -v glslc >/dev/null 2>&1 && pkg-config --exists vulkan 2>/dev/null; then
+    BACKEND=vulkan
+  elif command -v nvcc >/dev/null 2>&1 && command -v nvidia-smi >/dev/null 2>&1 && nvidia-smi >/dev/null 2>&1; then
     BACKEND=cuda
   else
     BACKEND=cpu
   fi
 fi
 case "$BACKEND" in
-  cpu)  FEATURES="whisper-cpp" ;;
-  cuda) FEATURES="whisper-cuda" ;;
-  *)    echo "BACKEND must be cpu|cuda (macOS Metal: see docs/RELEASE.md)"; exit 1 ;;
+  cpu)    FEATURES="whisper-cpp" ;;
+  cuda)   FEATURES="whisper-cuda" ;;
+  vulkan) FEATURES="whisper-vulkan" ;;
+  *)      echo "BACKEND must be cpu|cuda|vulkan (macOS Metal: see docs/RELEASE.md)"; exit 1 ;;
 esac
+echo "GPU backend: $BACKEND (override with --env BACKEND=cpu|cuda|vulkan)"
 GGML_FLAGS="GGML_NATIVE=ON"
 # Host-tuned Rust codegen to match GGML_NATIVE. This is opt-in per build
 # rather than pinned in `.cargo/config.toml`, so a plain `cargo build
@@ -223,7 +208,7 @@ export RUSTFLAGS="${RUSTFLAGS:--C target-cpu=native}"
 echo "Building NATIVE $BACKEND build (this machine only): --features \"$FEATURES\" RUSTFLAGS=\"$RUSTFLAGS\""
 env $GGML_FLAGS APPIMAGE_EXTRACT_AND_RUN=1 bun tauri build --features "$FEATURES" $BUNDLE_ARGS
 '''
-info = "Compile the desktop app, no installers — native to this machine (CUDA auto-detected). --env PORTABLE=1 for the distributable CPU build; --env BACKEND=cpu|cuda to force; --env BUNDLE=1 to also bundle locally. Installers: cgs package. See docs/RELEASE.md"
+info = "Compile the desktop app, no installers — native to this machine (GPU auto-detected: Vulkan when glslc and the Vulkan headers are found, else CUDA). --env PORTABLE=1 for the distributable CPU build; --env BACKEND=cpu|cuda|vulkan to force; --env BUNDLE=1 to also bundle locally. Installers: cgs package. See docs/RELEASE.md"
 requires = ["bun"]
 
 [scripts.stage-runtime]
@@ -264,37 +249,32 @@ for dest in "$BIN_DIR" "$BIN_DIR/deps"; do
   cp -a "$SRC_DIR"/out/lib/libwhisper.so* "$SRC_DIR"/out/lib/libparakeet.so* \
     "$SRC_DIR"/out/lib/libggml*.so* "$dest/"
   cp -a "$SRC_DIR"/out/bin/libggml-cpu-*.so "$dest/backends/"
-  # A `whisper-cuda` build emits the CUDA backend as a plugin as well, and ggml
-  # only ever dlopen-s it from a backends dir — without this, `cgs dev --env
-  # BACKEND=cuda` compiles CUDA and then silently runs on the CPU. A CPU build
-  # has no such file, so this stays optional.
-  if [ -e "$SRC_DIR/out/bin/libggml-cuda.so" ]; then
-    cp -a "$SRC_DIR"/out/bin/libggml-cuda.so "$dest/backends/"
-  fi
+  for gpu in libggml-cuda.so libggml-vulkan.so; do
+    if [ -e "$SRC_DIR/out/bin/$gpu" ]; then
+      cp -a "$SRC_DIR/out/bin/$gpu" "$dest/backends/"
+    fi
+  done
 done
 
 COUNT=$(ls "$BIN_DIR"/backends | wc -l)
-if [ -e "$BIN_DIR/backends/libggml-cuda.so" ]; then
-  echo "staged $COUNT backend plugins into $BIN_DIR/backends (CPU + CUDA)"
+GPUS=""
+for gpu in cuda vulkan; do
+  if [ -e "$BIN_DIR/backends/libggml-$gpu.so" ]; then GPUS="$GPUS + $gpu"; fi
+done
+if [ -n "$GPUS" ]; then
+  echo "staged $COUNT backend plugins into $BIN_DIR/backends (CPU$GPUS)"
 else
-  echo "staged $COUNT backend plugins into $BIN_DIR/backends (CPU only — build with the whisper-cuda feature for GPU)"
+  echo "staged $COUNT backend plugins into $BIN_DIR/backends (CPU only — build with whisper-vulkan or whisper-cuda for GPU)"
 fi
 '''
-info = "Copy the ggml shared libraries and backend plugins (CPU, plus CUDA when built) next to the built binary (--env PROFILE=release)"
+info = "Copy the ggml shared libraries and backend plugins (CPU, plus Vulkan/CUDA when built) next to the built binary (--env PROFILE=release)"
 
 [scripts.gpu-plugin]
 interpreter = "bash"
 command = '''
-bash scripts/release/gpu-plugin-linux.sh
+bash scripts/release/gpu-plugin-vulkan.sh
 '''
-info = "Build + package the downloadable CUDA backend plugin for GitHub Releases (--env CUDA_ARCHS=... to narrow)"
-
-[scripts.gpu-plugin-windows]
-interpreter = "bash"
-command = '''
-bash scripts/release/gpu-plugin-windows.sh
-'''
-info = "Build + package the downloadable CUDA backend plugin for Windows (run on Windows; --env CUDA_ARCHS=... to narrow)"
+info = "Build + package the downloadable Vulkan backend plugin for this OS (needs VULKAN_SDK; on Windows run from Git Bash)"
 
 # ── Tools ────────────────────────────────────────────────────────────────────
 

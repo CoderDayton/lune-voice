@@ -2,6 +2,7 @@
 
 pub mod backend;
 pub mod gpu_backend;
+mod vulkan_probe;
 
 pub use backend::{
     AsrRegistry, AsrSessionHandle, LeadIn, OpenAiAsrConfig, OpenAiCompatibleAsrBackend,
