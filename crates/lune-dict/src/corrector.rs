@@ -38,8 +38,6 @@ const ALWAYS_REPLACE: &[(&str, &str)] = &[
     ("lune voice", "Lune Voice"),
     ("loon voice", "Lune Voice"),
     ("lune", "Lune"),
-    ("dayton", "Dayton"),
-    ("tayton", "Dayton"),
 ];
 
 /// Maximum risk at which a known high-frequency word is allowed to pass
@@ -1056,17 +1054,18 @@ mod tests {
         let recase = c.correct("i love lune", NO_RISKS, &[], "en");
         assert_eq!(recase.corrected_text, "i love Lune");
         // Single-word built-in applies even at HIGH risk (exact, never gated).
-        let scores = vec![("Tayton", 0.95, 0.05)];
-        let single = c.correct("hello Tayton", &scores, &[], "en");
-        assert_eq!(single.corrected_text, "hello Dayton");
-        // A user-dictionary entry for the same word overrides the built-in.
+        let scores = vec![("lune", 0.95, 0.05)];
+        let single = c.correct("hello lune", &scores, &[], "en");
+        assert_eq!(single.corrected_text, "hello Lune");
         let dict = vec![crate::DictMatch {
-            matched: "tayton".into(),
-            replacement: "Clayton".into(),
+            matched: "lune".into(),
+            replacement: "LUNE".into(),
             fuzzy: false,
         }];
-        let overridden = c.correct("hello Tayton", NO_RISKS, &dict, "en");
-        assert_eq!(overridden.corrected_text, "hello Clayton");
+        let overridden = c.correct("hello lune", NO_RISKS, &dict, "en");
+        assert_eq!(overridden.corrected_text, "hello LUNE");
+        let personal = c.correct("hello tayton", NO_RISKS, &[], "en");
+        assert_eq!(personal.corrected_text, "hello tayton");
     }
 
     #[test]
