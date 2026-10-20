@@ -43,9 +43,6 @@ pub struct PillOverlayConfig {
     pub monitor: Option<String>,
     /// Dragging disabled.
     pub locked: bool,
-    /// Show on every workspace (X11 `_NET_WM_STATE_STICKY` / macOS spaces).
-    /// Windows has no equivalent — its virtual desktops are not addressable
-    /// this way — so the flag is ignored there.
     pub all_workspaces: bool,
 }
 

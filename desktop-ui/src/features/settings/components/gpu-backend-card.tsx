@@ -17,10 +17,6 @@ export function GpuBackendCard() {
   if (!status || status.state === 'unsupported') return null;
 
   const active = status.state === 'ready';
-  // `downloadAvailable` is false on a build whose plugin archive has not been
-  // published yet, where the install refuses outright. Offering a
-  // several-hundred-megabyte download that can only end in a developer-facing
-  // error is worse than offering nothing.
   const offerDownload = status.state === 'not-installed' && status.downloadAvailable;
 
   let side: ReactNode = null;

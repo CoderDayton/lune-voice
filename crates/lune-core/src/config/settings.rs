@@ -195,9 +195,6 @@ pub struct UserSettings {
     /// `None` = automatic (current/primary monitor).
     #[serde(default)]
     pub pill_monitor: Option<String>,
-    /// Show the pill on every workspace instead of only the one it was opened
-    /// on. Linux and macOS; Windows virtual desktops cannot be addressed
-    /// per-window, so the flag is ignored there.
     #[serde(default = "default_true")]
     pub pill_all_workspaces: bool,
     /// Footprint of the pill bar.
