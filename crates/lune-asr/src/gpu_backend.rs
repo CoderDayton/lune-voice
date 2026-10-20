@@ -84,6 +84,15 @@ fn discrete_gpus(registered: &[(String, DeviceKind)]) -> Vec<String> {
 }
 
 #[cfg_attr(not(feature = "whisper-cpp"), allow(dead_code))]
+fn display_name(name: &str, description: Option<&str>) -> String {
+    description
+        .map(str::trim)
+        .filter(|d| !d.is_empty())
+        .unwrap_or(name)
+        .to_owned()
+}
+
+#[cfg_attr(not(feature = "whisper-cpp"), allow(dead_code))]
 fn decode_device_index(kinds: &[DeviceKind]) -> Option<i32> {
     kinds
         .iter()
@@ -363,7 +372,11 @@ mod imp {
                         }
                         _ => DeviceKind::Other,
                     };
-                    Some((CStr::from_ptr(name).to_string_lossy().into_owned(), kind))
+                    let description = sys::ggml_backend_dev_description(dev);
+                    let description = (!description.is_null())
+                        .then(|| CStr::from_ptr(description).to_string_lossy());
+                    let name = CStr::from_ptr(name).to_string_lossy();
+                    Some((super::display_name(&name, description.as_deref()), kind))
                 })
                 .collect()
         }
@@ -480,6 +493,16 @@ mod tests {
             dev("CUDA0", DeviceKind::Gpu),
         ];
         assert_eq!(discrete_gpus(&registered), ["Vulkan1", "CUDA0"]);
+    }
+
+    #[test]
+    fn a_device_is_shown_by_its_product_name_when_the_backend_gives_one() {
+        assert_eq!(
+            display_name("Vulkan0", Some("NVIDIA GeForce RTX 4090")),
+            "NVIDIA GeForce RTX 4090"
+        );
+        assert_eq!(display_name("CUDA0", Some("  ")), "CUDA0");
+        assert_eq!(display_name("CPU", None), "CPU");
     }
 
     #[test]
