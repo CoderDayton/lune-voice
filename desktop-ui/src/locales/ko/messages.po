@@ -1536,7 +1536,7 @@ msgstr "방향"
 
 #: src/features/settings/settings-page.tsx:76
 msgid "Output"
-msgstr "산출"
+msgstr "출력"
 
 #: src/features/settings/sections/pill-section.tsx:207
 msgid "Overall footprint of the pill bar."
