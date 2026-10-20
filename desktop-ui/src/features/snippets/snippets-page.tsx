@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
+import { plural } from '@lingui/core/macro';
 import { Trans, useLingui } from '@lingui/react/macro';
 import { useStore } from '@tanstack/react-store';
 import { CheckCheck, Mic, Pencil, Plus, ScrollText, Trash2, X } from 'lucide-react';
@@ -405,7 +406,9 @@ function SnippetList({
         placeholder={t`Filter snippets…`}
         label={t`Filter snippets`}
         count={
-          query.trim() ? t`${filtered.length} / ${snippets.length}` : t`${snippets.length} snippets`
+          query.trim()
+            ? t`${filtered.length} / ${snippets.length}`
+            : plural(snippets.length, { one: '# snippet', other: '# snippets' })
         }
       />
 

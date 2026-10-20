@@ -12,7 +12,7 @@ interface Props {
   baseUrlKey: StringKeys<WorkspaceSettings>;
   apiKeyKey: StringKeys<WorkspaceSettings>;
   modelKey: StringKeys<WorkspaceSettings>;
-  apiDescription: string;
+  endpointDescription: string;
   modelDescription: string;
   modelPlaceholder: string;
 }
@@ -22,7 +22,7 @@ export function OpenAiFields({
   baseUrlKey,
   apiKeyKey,
   modelKey,
-  apiDescription,
+  endpointDescription,
   modelDescription,
   modelPlaceholder,
 }: Props) {
@@ -35,7 +35,7 @@ export function OpenAiFields({
     <>
       <SettingsRow
         label={t`API endpoint`}
-        description={`Base URL for the OpenAI-compatible ${apiDescription}.`}
+        description={endpointDescription}
         control={
           <input
             className="input w-full sm:w-auto sm:min-w-64"
@@ -60,7 +60,7 @@ export function OpenAiFields({
         }
       />
       <SettingsRow
-        label="Model"
+        label={t`Model`}
         description={modelDescription}
         control={
           <input

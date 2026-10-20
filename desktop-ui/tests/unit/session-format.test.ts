@@ -1,7 +1,23 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
+import { setupI18n } from "@lingui/core";
 import { describe, expect, test } from "bun:test";
-import { formatDuration, transcriptFileName } from "../../src/lib/session-format";
+import { formatDuration, sessionStatusLabel, transcriptFileName } from "../../src/lib/session-format";
+
+describe("sessionStatusLabel", () => {
+  const i18n = setupI18n({ locale: "en", messages: { en: {} } });
+  i18n.activate("en");
+
+  test("known states come from the catalog and a failure keeps its reason", () => {
+    expect(sessionStatusLabel(i18n, "Completed")).toBe("Completed");
+    expect(sessionStatusLabel(i18n, "Cancelled")).toBe("Cancelled");
+    expect(sessionStatusLabel(i18n, "Active")).toBe("In progress");
+    expect(sessionStatusLabel(i18n, "Failed: microphone is in use")).toBe(
+      "Failed: microphone is in use",
+    );
+    expect(sessionStatusLabel(i18n, "Something new")).toBe("Something new");
+  });
+});
 
 describe("formatDuration", () => {
   test("renders m:ss with a zero-padded seconds field", () => {

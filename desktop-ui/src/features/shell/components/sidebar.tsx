@@ -19,7 +19,7 @@ import { SidebarQuickActions } from './sidebar-quick-actions';
 import { SidebarQuickStart } from './sidebar-widgets';
 
 export function SidebarContent() {
-  const { t } = useLingui();
+  const { t, i18n } = useLingui();
   const pathname = useRouterState({ select: (state) => state.location.pathname });
   const { isActive, dotClass } = useServiceStatus();
 
@@ -81,7 +81,7 @@ export function SidebarContent() {
                 className="mx-6 my-2 border-t border-surface-border is-drawer-close:mx-auto is-drawer-close:w-7"
               />
             ) : null}
-            <ul aria-label={group.label} className="flex flex-col gap-0.5">
+            <ul aria-label={i18n._(group.name)} className="flex flex-col gap-0.5">
               {group.items.map((item) => (
                 <NavRow key={item.to} item={item} pathname={pathname} />
               ))}
@@ -102,7 +102,9 @@ export function SidebarContent() {
 }
 
 function NavRow({ item, pathname }: { item: NavigationItem; pathname: string }) {
-  const { to, label, shortcut, icon: Icon } = item;
+  const { i18n } = useLingui();
+  const { to, shortcut, icon: Icon } = item;
+  const label = i18n._(item.label);
   const active = to === '/' ? pathname === '/' : pathname.startsWith(to);
   const hint = formatForDisplay(shortcut);
 

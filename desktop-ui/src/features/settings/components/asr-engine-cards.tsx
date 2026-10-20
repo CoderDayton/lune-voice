@@ -122,8 +122,8 @@ export function AsrEngineCards({ settings }: { settings: WorkspaceSettings }) {
             baseUrlKey="openaiAsrBaseUrl"
             apiKeyKey="openaiAsrApiKey"
             modelKey="openaiAsrModel"
-            apiDescription="transcription API"
-            modelDescription="Transcription model name, e.g. whisper-1."
+            endpointDescription={t`Base URL for the OpenAI-compatible transcription API.`}
+            modelDescription={t`Transcription model name, e.g. whisper-1.`}
             modelPlaceholder="whisper-1"
           />
           {settings.asrBackend !== 'OpenAiCompatible' && (

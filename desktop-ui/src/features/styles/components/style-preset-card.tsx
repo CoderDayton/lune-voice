@@ -3,6 +3,7 @@
 import { useLingui } from '@lingui/react/macro';
 import { Check, Lock, Pencil, Trash2 } from 'lucide-react';
 import type { StylePreset } from '../../../store/workspace-types';
+import { presetDescription, presetName } from '../builtin-styles';
 import { styleIcon } from '../style-icons';
 
 interface StylePresetCardProps {
@@ -28,7 +29,8 @@ export function StylePresetCard({
   onCancelDelete,
   onConfirmDelete,
 }: StylePresetCardProps) {
-  const { t } = useLingui();
+  const { t, i18n } = useLingui();
+  const name = presetName(i18n, preset);
   const Icon = styleIcon(preset);
 
   return (
@@ -42,7 +44,7 @@ export function StylePresetCard({
       <button
         type="button"
         className="absolute inset-0 z-0 cursor-pointer rounded-box focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
-        aria-label={t`Use the ${preset.name} style`}
+        aria-label={t`Use the ${name} style`}
         onClick={() => !isConfirmingDelete && onSelect()}
       />
 
@@ -58,7 +60,7 @@ export function StylePresetCard({
         </div>
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-            <span className="truncate font-semibold text-content-strong">{preset.name}</span>
+            <span className="truncate font-semibold text-content-strong">{name}</span>
             {preset.isBuiltin && (
               <span className="badge badge-soft badge-xs shrink-0 gap-1">
                 <Lock size={9} />
@@ -66,7 +68,9 @@ export function StylePresetCard({
               </span>
             )}
           </div>
-          <p className="mt-1 line-clamp-2 text-sm text-content-muted">{preset.description}</p>
+          <p className="mt-1 line-clamp-2 text-sm text-content-muted">
+            {presetDescription(i18n, preset)}
+          </p>
         </div>
         {isActive && (
           <span className="relative z-10 inline-flex shrink-0 items-center gap-1 rounded-full bg-primary/15 px-2 py-0.5 text-[0.6875rem] font-medium text-primary">

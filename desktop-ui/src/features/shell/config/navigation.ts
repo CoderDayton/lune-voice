@@ -1,5 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
+import type { MessageDescriptor } from '@lingui/core';
+import { msg } from '@lingui/core/macro';
 import type { RegisterableHotkey } from '@tanstack/react-hotkeys';
 import type { LucideIcon } from 'lucide-react';
 import { BookText, Clock, House, Paintbrush, ScrollText, Settings } from 'lucide-react';
@@ -36,9 +38,9 @@ export const quickActionShortcuts = {
 
 export interface NavigationItem {
   to: NavigationRoute;
-  label: string;
+  label: MessageDescriptor;
   /** Short subtitle shown under the page title in the desktop command bar. */
-  description: string;
+  description: MessageDescriptor;
   /** Sidebar grouping — renders as an unlabelled hairline between blocks. */
   group: NavigationGroupLabel;
   shortcut: RegisterableHotkey;
@@ -52,8 +54,8 @@ export interface NavigationItem {
 export const navigationItems: NavigationItem[] = [
   {
     to: '/',
-    label: 'Home',
-    description: 'Your dictation at a glance',
+    label: msg`Home`,
+    description: msg`Your dictation at a glance`,
     group: 'Workspace',
     shortcut: navigationShortcuts['/'],
     icon: House,
@@ -61,8 +63,8 @@ export const navigationItems: NavigationItem[] = [
   },
   {
     to: '/history',
-    label: 'Sessions',
-    description: 'Browse and search past dictations',
+    label: msg`Sessions`,
+    description: msg`Browse and search past dictations`,
     group: 'Workspace',
     shortcut: navigationShortcuts['/history'],
     icon: Clock,
@@ -70,8 +72,8 @@ export const navigationItems: NavigationItem[] = [
   },
   {
     to: '/dictionary',
-    label: 'Vocabulary',
-    description: 'Corrections Lune Voice applies every time you dictate',
+    label: msg`Vocabulary`,
+    description: msg`Corrections Lune Voice applies every time you dictate`,
     group: 'Workspace',
     shortcut: navigationShortcuts['/dictionary'],
     icon: BookText,
@@ -79,8 +81,8 @@ export const navigationItems: NavigationItem[] = [
   },
   {
     to: '/snippets',
-    label: 'Snippets',
-    description: 'Blocks of text Lune Voice types when you speak their trigger phrase',
+    label: msg`Snippets`,
+    description: msg`Blocks of text Lune Voice types when you speak their trigger phrase`,
     group: 'Workspace',
     shortcut: navigationShortcuts['/snippets'],
     icon: ScrollText,
@@ -88,16 +90,16 @@ export const navigationItems: NavigationItem[] = [
   },
   {
     to: '/styles',
-    label: 'Styles',
-    description: 'Formatting presets for your text',
+    label: msg`Styles`,
+    description: msg`Formatting presets for your text`,
     group: 'Workspace',
     shortcut: navigationShortcuts['/styles'],
     icon: Paintbrush,
   },
   {
     to: '/settings',
-    label: 'Settings',
-    description: 'Input, output, models, and shortcuts',
+    label: msg`Settings`,
+    description: msg`Input, output, models, and shortcuts`,
     group: 'System',
     shortcut: navigationShortcuts['/settings'],
     icon: Settings,
@@ -106,13 +108,20 @@ export const navigationItems: NavigationItem[] = [
 
 export interface NavigationGroup {
   label: NavigationGroupLabel;
+  name: MessageDescriptor;
   items: NavigationItem[];
 }
+
+const groupNames: Record<NavigationGroupLabel, MessageDescriptor> = {
+  Workspace: msg`Workspace`,
+  System: msg`System`,
+};
 
 /** Ordered nav groups for the sidebar. Order here is the render order. */
 export const navigationGroups: NavigationGroup[] = (['Workspace', 'System'] as const).map(
   (label) => ({
     label,
+    name: groupNames[label],
     items: navigationItems.filter((item) => item.group === label),
   }),
 );

@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
+import { plural } from '@lingui/core/macro';
 import { Trans, useLingui } from '@lingui/react/macro';
 import { useStore } from '@tanstack/react-store';
 import { ArrowRight, Check, CheckCheck, Pencil, Sparkles, Trash2, X } from 'lucide-react';
@@ -249,7 +250,9 @@ export function VocabularyList() {
         placeholder={t`Filter rules…`}
         label={t`Filter rules`}
         count={
-          query.trim() ? t`${filtered.length} / ${entries.length}` : t`${entries.length} rules`
+          query.trim()
+            ? t`${filtered.length} / ${entries.length}`
+            : plural(entries.length, { one: '# rule', other: '# rules' })
         }
       />
 

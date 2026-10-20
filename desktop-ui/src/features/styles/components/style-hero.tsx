@@ -6,6 +6,7 @@ import { Lock, Pencil } from 'lucide-react';
 import { PanelHeader } from '../../../components/ui/panel-header';
 import { workspaceStore } from '../../../store/workspace-store';
 import type { StylePreset } from '../../../store/workspace-types';
+import { presetDescription, presetName } from '../builtin-styles';
 import { styleIcon } from '../style-icons';
 
 interface StyleHeroProps {
@@ -15,7 +16,7 @@ interface StyleHeroProps {
 }
 
 export function StyleHero({ preset, onEdit, onView }: StyleHeroProps) {
-  const { t } = useLingui();
+  const { t, i18n } = useLingui();
   const Icon = styleIcon(preset);
   const fmt = preset.formatting;
   const globalBrandCasing = useStore(workspaceStore, (s) => s.settings.brandCasing);
@@ -40,8 +41,8 @@ export function StyleHero({ preset, onEdit, onView }: StyleHeroProps) {
             )}
           </>
         }
-        title={preset.name}
-        description={preset.description}
+        title={presetName(i18n, preset)}
+        description={presetDescription(i18n, preset)}
         actions={
           preset.isBuiltin ? (
             <button type="button" className="btn btn-soft btn-sm gap-2" onClick={onView}>

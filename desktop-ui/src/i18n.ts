@@ -23,6 +23,13 @@ export const locales = {
 export type LocaleKey = keyof typeof locales;
 export const defaultLocale: LocaleKey = 'en';
 
+export function dateLocale(
+  uiLocale: string,
+  systemLocales: readonly string[] = typeof navigator === 'undefined' ? [] : navigator.languages,
+): string {
+  return systemLocales.find((tag) => tag.split('-')[0] === uiLocale) ?? uiLocale;
+}
+
 export async function activateLocale(locale: string) {
   const { messages } = await import(`./locales/${locale}/messages.po`);
   i18n.load(locale, messages);

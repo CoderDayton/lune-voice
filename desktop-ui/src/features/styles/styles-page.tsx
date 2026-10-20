@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 import type { MessageDescriptor } from '@lingui/core';
+import { plural } from '@lingui/core/macro';
 import { useLingui } from '@lingui/react/macro';
 import { useStore } from '@tanstack/react-store';
 import { Plus } from 'lucide-react';
@@ -16,6 +17,7 @@ import {
   workspaceStore,
 } from '../../store/workspace-store';
 import type { StylePreset } from '../../store/workspace-types';
+import { presetDescription, presetName } from './builtin-styles';
 import { StyleEditorModal } from './components/style-editor-modal';
 import { StyleHero } from './components/style-hero';
 import { StylePresetCard } from './components/style-preset-card';
@@ -62,7 +64,7 @@ const CLOSED_MODAL: ModalState = {
 };
 
 export function StylesPage() {
-  const { t } = useLingui();
+  const { t, i18n } = useLingui();
   const activePreset = useStore(workspaceStore, (s) => s.settings.stylePreset);
   const presets = useStore(workspaceStore, (s) => s.stylePresets);
   const loading = useStore(workspaceStore, (s) => s.runtime.loading);
@@ -89,8 +91,8 @@ export function StylesPage() {
       open: true,
       mode,
       preset: preset ?? null,
-      name: preset?.name ?? '',
-      description: preset?.description ?? '',
+      name: preset ? presetName(i18n, preset) : '',
+      description: preset ? presetDescription(i18n, preset) : '',
       instructions: preset?.instructions ?? '',
       formatting: preset?.formatting ?? DEFAULT_FORMATTING,
       fewShotDirty: preset?.fewShotDirty ?? false,
@@ -271,7 +273,9 @@ export function StylesPage() {
             className={`flex items-center justify-between pt-1 transition-opacity ${stylingEnabled ? '' : 'opacity-40'}`}
           >
             <span className="section-label">{t`Switch style`}</span>
-            <span className="text-xs text-content-subtle">{t`${presets.length} presets`}</span>
+            <span className="text-xs text-content-subtle">
+              {plural(presets.length, { one: '# preset', other: '# presets' })}
+            </span>
           </div>
 
           <div

@@ -1,18 +1,24 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
+import type { MessageDescriptor } from '@lingui/core';
+import { msg } from '@lingui/core/macro';
 import { useLingui } from '@lingui/react/macro';
 
 interface Level {
   value: number;
-  label: string;
+  label: MessageDescriptor;
   /** Dot color — escalates neutral → info → warning to read as low/med/high. */
   dot: string;
 }
 
 const PRIORITY_LEVELS: readonly Level[] = [
-  { value: 1, label: 'Low', dot: 'bg-content-subtle' },
-  { value: 5, label: 'Med', dot: 'bg-info' },
-  { value: 9, label: 'High', dot: 'bg-warning' },
+  { value: 1, label: msg`Low`, dot: 'bg-content-subtle' },
+  {
+    value: 5,
+    label: msg({ message: 'Med', comment: 'Short for medium priority' }),
+    dot: 'bg-info',
+  },
+  { value: 9, label: msg`High`, dot: 'bg-warning' },
 ] as const;
 
 function closestLevel(value: number): Level {
@@ -23,11 +29,12 @@ function closestLevel(value: number): Level {
 
 /** Static read-only indicator: a colored dot plus the level label. */
 export function PriorityBadge({ value }: { value: number }) {
+  const { i18n } = useLingui();
   const level = closestLevel(value);
   return (
     <span className="inline-flex select-none items-center gap-1.5 text-xs font-medium text-content-muted">
       <span className={`size-2 shrink-0 rounded-full ${level.dot}`} aria-hidden="true" />
-      {level.label}
+      {i18n._(level.label)}
     </span>
   );
 }
@@ -47,7 +54,7 @@ export function PriorityPicker({
   onChange: (v: number) => void;
   size?: 'sm' | 'md';
 }) {
-  const { t } = useLingui();
+  const { t, i18n } = useLingui();
   const current = closestLevel(value);
 
   return (
@@ -72,7 +79,7 @@ export function PriorityPicker({
             }`}
             onClick={() => onChange(level.value)}
           >
-            {level.label}
+            {i18n._(level.label)}
           </button>
         );
       })}

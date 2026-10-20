@@ -2,6 +2,7 @@
 
 import { plural } from '@lingui/core/macro';
 import { useLingui } from '@lingui/react/macro';
+import { useStore } from '@tanstack/react-store';
 import { invoke } from '@tauri-apps/api/core';
 import {
   Check,
@@ -16,9 +17,19 @@ import {
 } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { ConfirmDialog } from '../../../components/feedback/confirm-dialog';
-import { formatDuration, transcriptFileName } from '../../../lib/session-format';
+import { dateLocale } from '../../../i18n';
+import {
+  formatDuration,
+  sessionStatusLabel,
+  transcriptFileName,
+} from '../../../lib/session-format';
 import { formatBackend } from '../../../store/workspace-mappers';
-import { type HistorySession, removeHistorySession } from '../../../store/workspace-store';
+import {
+  type HistorySession,
+  removeHistorySession,
+  workspaceStore,
+} from '../../../store/workspace-store';
+import { styleLabel } from '../../styles/builtin-styles';
 
 interface SessionDetailModalProps {
   session: HistorySession;
@@ -32,17 +43,19 @@ interface SessionDetailModalProps {
  * its own root so it works in either host.
  */
 export function SessionDetailContent({ session }: { session: HistorySession }) {
-  const { t } = useLingui();
+  const { t, i18n } = useLingui();
+  const presets = useStore(workspaceStore, (s) => s.stylePresets);
   const [copied, setCopied] = useState(false);
   const rootRef = useRef<HTMLDivElement | null>(null);
 
   const startDate = new Date(session.startedAt);
-  const date = startDate.toLocaleDateString(undefined, {
+  const locale = dateLocale(i18n.locale);
+  const date = startDate.toLocaleDateString(locale, {
     weekday: 'short',
     month: 'short',
     day: 'numeric',
   });
-  const time = startDate.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+  const time = startDate.toLocaleTimeString(locale, { hour: 'numeric', minute: '2-digit' });
   const relative = relativeTime(startDate);
 
   const isCompleted = session.status === 'Completed';
@@ -157,7 +170,11 @@ export function SessionDetailContent({ session }: { session: HistorySession }) {
           <MetaItem icon={Hash} label={t`Words`} value={String(session.words)} />
           <MetaItem icon={Clock} label={t`Duration`} value={formatDuration(session.seconds)} />
           <MetaItem icon={Mic} label={t`Engine`} value={formatBackend(session.backend)} />
-          <MetaItem icon={Palette} label={t`Style`} value={session.style || t`None`} />
+          <MetaItem
+            icon={Palette}
+            label={t`Style`}
+            value={session.style ? styleLabel(i18n, session.style, presets) : t`None`}
+          />
         </div>
         <div className="mt-3 flex items-center gap-3 text-sm text-content-subtle">
           {isCompleted ? (
@@ -168,10 +185,10 @@ export function SessionDetailContent({ session }: { session: HistorySession }) {
           ) : isFailed ? (
             <>
               <CircleX size={13} strokeWidth={2} className="text-error/60" />{' '}
-              <span>{session.status}</span>
+              <span>{sessionStatusLabel(i18n, session.status)}</span>
             </>
           ) : (
-            <span>{session.status}</span>
+            <span>{sessionStatusLabel(i18n, session.status)}</span>
           )}
         </div>
       </div>

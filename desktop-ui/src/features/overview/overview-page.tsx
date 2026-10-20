@@ -14,6 +14,7 @@ import {
   PlugZap,
   Search,
 } from 'lucide-react';
+import { dateLocale } from '../../i18n';
 import { LIMITS } from '../../lib/backend/generated/limits';
 import { formatDuration } from '../../lib/session-format';
 import {
@@ -165,8 +166,8 @@ function StatStrip({ isActive, isConnected, stale }: StatStripProps) {
 
 /** One tabular session row; opens the shared detail modal on click. */
 function SessionRow({ session }: { session: HistorySession }) {
-  const { t } = useLingui();
-  const time = new Date(session.startedAt).toLocaleTimeString([], {
+  const { t, i18n } = useLingui();
+  const time = new Date(session.startedAt).toLocaleTimeString(dateLocale(i18n.locale), {
     hour: 'numeric',
     minute: '2-digit',
   });

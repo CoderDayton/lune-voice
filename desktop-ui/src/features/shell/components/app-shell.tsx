@@ -19,12 +19,17 @@ import { startWorkspaceBridge } from '../workspace-bridge';
 import { SidebarContent } from './sidebar';
 
 export function AppShell() {
-  const { t } = useLingui();
+  const { t, i18n } = useLingui();
   useAppShortcuts();
   const pathname = useRouterState({
     select: (state) => state.location.pathname,
   });
-  const page = findNavigationItem(pathname);
+  const navItem = findNavigationItem(pathname);
+  const page = {
+    ...navItem,
+    label: i18n._(navItem.label),
+    description: i18n._(navItem.description),
+  };
   const firstRun = useFirstRunGate();
 
   const onSessionEvent = useEffectEvent((event: SessionStreamEvent) => {

@@ -63,8 +63,8 @@ export function StylingEngineSection({ settings }: SettingsProps) {
             baseUrlKey="openaiLlmBaseUrl"
             apiKeyKey="openaiLlmApiKey"
             modelKey="openaiLlmModel"
-            apiDescription="styling API"
-            modelDescription="Styling model name, e.g. gpt-4o-mini."
+            endpointDescription={t`Base URL for the OpenAI-compatible styling API.`}
+            modelDescription={t`Styling model name, e.g. gpt-4o-mini.`}
             modelPlaceholder="gpt-4o-mini"
           />
         )}

@@ -25,8 +25,13 @@ import {
   ListSearchRail,
   useListFilterHotkey,
 } from '../../../components/ui/list-card';
+import { dateLocale } from '../../../i18n';
 import { LIMITS } from '../../../lib/backend/generated/limits';
-import { formatDuration, transcriptFileName } from '../../../lib/session-format';
+import {
+  formatDuration,
+  sessionStatusLabel,
+  transcriptFileName,
+} from '../../../lib/session-format';
 import { formatBackend } from '../../../store/workspace-mappers';
 import {
   fetchHistoryPage,
@@ -37,6 +42,7 @@ import {
   workspaceActions,
   workspaceStore,
 } from '../../../store/workspace-store';
+import { styleLabel } from '../../styles/builtin-styles';
 
 /**
  * Sessions table — the whole history surface in one card: integrated search,
@@ -124,7 +130,11 @@ export function HistoryTable() {
         onValueChange={(v) => workspaceActions.setHistorySearch(v)}
         placeholder={t`Search transcripts…`}
         label={t`Search transcripts`}
-        count={hasSearch ? t`${visibleCount} / ${totalCount}` : t`${totalCount} sessions`}
+        count={
+          hasSearch
+            ? t`${visibleCount} / ${totalCount}`
+            : plural(totalCount, { one: '# session', other: '# sessions' })
+        }
       />
 
       {selected.size > 0 && (
@@ -304,7 +314,8 @@ interface SessionRowsProps {
 }
 
 function SessionRows({ session, expanded, selected, onSelect, onToggle }: SessionRowsProps) {
-  const { t } = useLingui();
+  const { t, i18n } = useLingui();
+  const presets = useStore(workspaceStore, (s) => s.stylePresets);
   const [copied, setCopied] = useState(false);
   // Keeps the detail row mounted through the fold-up animation, so closing can
   // finish animating before the row leaves the DOM.
@@ -380,8 +391,9 @@ function SessionRows({ session, expanded, selected, onSelect, onToggle }: Sessio
   }, [expanded, shown]);
 
   const startDate = new Date(session.startedAt);
-  const time = startDate.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
-  const date = startDate.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+  const locale = dateLocale(i18n.locale);
+  const time = startDate.toLocaleTimeString(locale, { hour: 'numeric', minute: '2-digit' });
+  const date = startDate.toLocaleDateString(locale, { month: 'short', day: 'numeric' });
 
   function copy() {
     if (!session.transcript) return;
@@ -481,9 +493,9 @@ function SessionRows({ session, expanded, selected, onSelect, onToggle }: Sessio
                   <span aria-hidden="true">·</span>
                   <span>{formatBackend(session.backend)}</span>
                   <span aria-hidden="true">·</span>
-                  <span className="capitalize">{session.style || t`None`}</span>
+                  <span>{session.style ? styleLabel(i18n, session.style, presets) : t`None`}</span>
                   <span aria-hidden="true">·</span>
-                  <span>{session.status}</span>
+                  <span>{sessionStatusLabel(i18n, session.status)}</span>
                 </div>
                 <div className="mt-3 flex flex-wrap items-center gap-2">
                   <button type="button" onClick={copy} className="btn btn-soft btn-sm gap-1.5">

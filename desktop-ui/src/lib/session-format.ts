@@ -1,5 +1,21 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
+import type { I18n } from '@lingui/core';
+import { msg } from '@lingui/core/macro';
+
+const FAILED_PREFIX = 'Failed: ';
+
+export function sessionStatusLabel(i18n: I18n, status: string): string {
+  if (status === 'Completed') return i18n._(msg`Completed`);
+  if (status === 'Cancelled') return i18n._(msg`Cancelled`);
+  if (status === 'Active') return i18n._(msg`In progress`);
+  if (status.startsWith(FAILED_PREFIX)) {
+    const reason = status.slice(FAILED_PREFIX.length);
+    return i18n._(msg`Failed: ${reason}`);
+  }
+  return status;
+}
+
 /**
  * Session length as `m:ss`. Minutes are not folded into hours, so a long
  * session reads `61:01` rather than looking like a one-minute one.
