@@ -49,7 +49,7 @@ export function SidebarQuickStart() {
         disabled={isConnecting}
         title={isActive ? t`Stop dictating` : t`Start dictating`}
         aria-label={isActive ? t`Stop dictating` : t`Start dictating`}
-        className="flex min-w-0 flex-1 cursor-pointer items-center gap-3 rounded-full py-2 pr-3 pl-2 text-left transition-colors hover:bg-surface-hover focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-primary disabled:cursor-not-allowed disabled:opacity-60 is-drawer-close:flex-none is-drawer-close:justify-center is-drawer-close:px-2"
+        className="flex min-w-0 flex-1 cursor-pointer items-center gap-3 rounded-full py-2 pe-3 ps-2 text-start transition-colors hover:bg-surface-hover focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-primary disabled:cursor-not-allowed disabled:opacity-60 is-drawer-close:flex-none is-drawer-close:justify-center is-drawer-close:px-2"
       >
         <span
           className={`relative flex size-10 shrink-0 items-center justify-center rounded-full ${
@@ -84,7 +84,7 @@ export function SidebarQuickStart() {
           ) : null}
         </span>
         {isActive || !hotkey ? null : (
-          <kbd className="kbd kbd-sm ml-auto shrink-0 font-mono text-xs is-drawer-close:hidden">
+          <kbd className="kbd kbd-sm ms-auto shrink-0 font-mono text-xs is-drawer-close:hidden">
             {hotkey}
           </kbd>
         )}
@@ -93,7 +93,7 @@ export function SidebarQuickStart() {
         <Link
           to="/settings"
           search={{ tab: 'dictation' }}
-          className="mr-2 shrink-0 rounded-full px-2.5 py-1 text-xs text-primary transition-colors hover:bg-surface-hover is-drawer-close:hidden"
+          className="me-2 shrink-0 rounded-full px-2.5 py-1 text-xs text-primary transition-colors hover:bg-surface-hover is-drawer-close:hidden"
         >
           {t`Set hotkey`}
         </Link>

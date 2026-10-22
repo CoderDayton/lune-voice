@@ -71,7 +71,7 @@ export function QuickAddRule() {
           className="hidden shrink-0 items-center justify-center pb-2.5 text-content-subtle sm:flex"
           aria-hidden="true"
         >
-          <ArrowRight size={15} strokeWidth={2.2} />
+          <ArrowRight size={15} strokeWidth={2.2} className="rtl:-scale-x-100" />
         </span>
 
         <div className="flex flex-1 flex-col gap-1.5">

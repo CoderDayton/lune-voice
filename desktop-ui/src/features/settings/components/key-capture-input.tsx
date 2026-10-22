@@ -161,7 +161,7 @@ export function KeyCaptureInput({
       )}
 
       {validationError && (
-        <p id="key-capture-error" className="text-sm text-error max-w-52 sm:max-w-64 text-right">
+        <p id="key-capture-error" className="text-sm text-error max-w-52 sm:max-w-64 text-end">
           {i18n._(validationError)}
         </p>
       )}

@@ -155,7 +155,10 @@ export function SessionDetailContent({ session }: { session: HistorySession }) {
       <div className="px-4 py-4 sm:px-5">
         {session.transcript ? (
           <div className="rounded-2xl border border-surface-border bg-surface-inset p-4">
-            <p className="whitespace-pre-wrap break-words text-[1rem] leading-7 text-content">
+            <p
+              dir="auto"
+              className="whitespace-pre-wrap break-words text-[1rem] leading-7 text-content"
+            >
               {session.transcript}
             </p>
           </div>

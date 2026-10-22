@@ -278,8 +278,8 @@ function ModelRow({
 
   return (
     <div
-      className={`flex flex-col gap-3 border-l-2 px-5 py-4 transition-colors duration-fast ${
-        inUse ? 'border-l-primary bg-primary/12' : 'border-l-transparent hover:bg-surface-hover'
+      className={`flex flex-col gap-3 border-s-2 px-5 py-4 transition-colors duration-fast ${
+        inUse ? 'border-s-primary bg-primary/12' : 'border-s-transparent hover:bg-surface-hover'
       }`}
     >
       <div className="flex items-center gap-4">
@@ -287,7 +287,7 @@ function ModelRow({
           type="button"
           aria-pressed={inUse}
           onClick={onSelect}
-          className="flex min-w-0 flex-1 items-center gap-4 text-left"
+          className="flex min-w-0 flex-1 items-center gap-4 text-start"
         >
           <span
             className={`flex size-[18px] shrink-0 items-center justify-center rounded-full border-[1.5px] ${
@@ -348,7 +348,7 @@ function ModelRow({
       </div>
 
       {downloading && (
-        <div className="flex flex-col gap-1 pl-[34px]">
+        <div className="flex flex-col gap-1 ps-[34px]">
           <progress
             className="progress progress-primary h-1.5 w-full"
             value={progress ? progress.fileIndex + 1 : undefined}

@@ -108,7 +108,7 @@ export function OutputSection({ settings }: SettingsProps) {
                   onChange={(e) => setCueVolume(Number(e.target.value))}
                   aria-label={t`Cue volume`}
                 />
-                <span className="text-sm tabular-nums text-content-muted w-12 text-right">
+                <span className="text-sm tabular-nums text-content-muted w-12 text-end">
                   {Math.round(cueVolume * 100)}%
                 </span>
               </div>

@@ -70,7 +70,7 @@ export function ListSearchRail({
 
   return (
     <div className="flex shrink-0 items-center gap-3 border-b border-surface-border px-3 py-2.5 sm:px-4">
-      <label className="input min-w-0 grow gap-2.5 pr-2">
+      <label className="input min-w-0 grow gap-2.5 pe-2">
         <Search size={16} strokeWidth={2} className="shrink-0 text-content-subtle" />
         <input
           ref={inputRef}
@@ -137,7 +137,7 @@ export function ListFooter({ children }: { children: ReactNode }) {
  * rows scroll beneath it.
  */
 export const LIST_HEAD_CELL =
-  'sticky top-0 z-10 border-b border-surface-border bg-surface-shell py-2 text-left text-xs font-semibold uppercase tracking-wider text-content-subtle';
+  'sticky top-0 z-10 border-b border-surface-border bg-surface-shell py-2 text-start text-xs font-semibold uppercase tracking-wider text-content-subtle';
 
 /** A body row: hairline rule below, hover tint, no jumping on hover. */
 export const LIST_ROW =

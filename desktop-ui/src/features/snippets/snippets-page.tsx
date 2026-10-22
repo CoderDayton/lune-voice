@@ -445,9 +445,14 @@ function SnippetList({
                     className="shrink-0 text-content-subtle"
                     aria-hidden="true"
                   />
-                  <span className="truncate">{snippet.triggerPhrase}</span>
+                  <span dir="auto" className="truncate">
+                    {snippet.triggerPhrase}
+                  </span>
                 </p>
-                <p className="line-clamp-2 min-w-0 flex-1 whitespace-pre-line font-mono text-sm text-content-muted">
+                <p
+                  dir="auto"
+                  className="line-clamp-2 min-w-0 flex-1 whitespace-pre-line font-mono text-sm text-content-muted"
+                >
                   {snippet.body}
                 </p>
                 <div className="flex shrink-0 items-center gap-1">

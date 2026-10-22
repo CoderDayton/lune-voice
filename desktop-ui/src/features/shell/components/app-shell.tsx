@@ -99,7 +99,7 @@ export function AppShell() {
       <div className="drawer-content relative z-10 flex flex-col min-h-0">
         <a
           href="#main-content"
-          className="sr-only focus:not-sr-only focus:fixed focus:top-2 focus:left-2 sm:focus:top-4 sm:focus:left-4 focus:z-50 focus:btn focus:btn-primary focus:btn-sm"
+          className="sr-only focus:not-sr-only focus:fixed focus:top-2 focus:start-2 sm:focus:top-4 sm:focus:start-4 focus:z-50 focus:btn focus:btn-primary focus:btn-sm"
         >
           {t`Skip to main content`}
         </a>
@@ -123,7 +123,7 @@ export function AppShell() {
           <span className="font-display tracking-heading text-base font-medium text-content-default select-none">
             {page.label}
           </span>
-          <div className="ml-auto">
+          <div className="ms-auto">
             <ShellStatusChip />
           </div>
         </div>

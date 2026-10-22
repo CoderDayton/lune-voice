@@ -27,7 +27,7 @@ function ExternalLinkButton({ label, onOpen }: { label: string; onOpen: () => vo
   return (
     <button type="button" className="btn btn-soft justify-start gap-3" onClick={onOpen}>
       <ExternalLink size={16} strokeWidth={1.8} />
-      <span className="flex-1 text-left">{label}</span>
+      <span className="flex-1 text-start">{label}</span>
     </button>
   );
 }

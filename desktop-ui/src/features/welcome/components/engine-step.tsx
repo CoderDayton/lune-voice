@@ -385,7 +385,7 @@ function EngineCard({
       type="button"
       aria-pressed={active}
       onClick={onSelect}
-      className={`group flex flex-col gap-3 rounded-box border p-4 text-left transition-all duration-150 ${
+      className={`group flex flex-col gap-3 rounded-box border p-4 text-start transition-all duration-150 ${
         active
           ? 'border-primary/50 bg-primary/8 shadow-sm'
           : 'border-surface-border bg-surface-panel hover:border-primary/45 hover:bg-primary/8'

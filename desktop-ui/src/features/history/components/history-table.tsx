@@ -164,7 +164,7 @@ export function HistoryTable() {
           <table className="w-full border-collapse text-sm">
             <thead>
               <tr>
-                <th className={`${LIST_HEAD_CELL} w-px pl-3`}>
+                <th className={`${LIST_HEAD_CELL} w-px ps-3`}>
                   <input
                     type="checkbox"
                     className="checkbox checkbox-sm align-middle"
@@ -177,17 +177,17 @@ export function HistoryTable() {
                     aria-label={t`Select all sessions on this page`}
                   />
                 </th>
-                <th className={`${LIST_HEAD_CELL} w-px pl-2 pr-1`} />
+                <th className={`${LIST_HEAD_CELL} w-px ps-2 pe-1`} />
                 <th className={`${LIST_HEAD_CELL} px-2`}>{t`Time`}</th>
                 <th className={`${LIST_HEAD_CELL} px-2`}>{t`Transcript`}</th>
-                <th className={`${LIST_HEAD_CELL} hidden px-2 text-right sm:table-cell`}>
+                <th className={`${LIST_HEAD_CELL} hidden px-2 text-end sm:table-cell`}>
                   {t`Words`}
                 </th>
-                <th className={`${LIST_HEAD_CELL} hidden px-2 text-right sm:table-cell`}>
+                <th className={`${LIST_HEAD_CELL} hidden px-2 text-end sm:table-cell`}>
                   {t`Length`}
                 </th>
                 <th className={`${LIST_HEAD_CELL} hidden px-2 lg:table-cell`}>{t`Engine`}</th>
-                <th className={`${LIST_HEAD_CELL} w-px pr-3`} />
+                <th className={`${LIST_HEAD_CELL} w-px pe-3`} />
               </tr>
             </thead>
             <tbody>
@@ -237,7 +237,7 @@ export function HistoryTable() {
             {t`Stored on this device`}
           </span>
           {totalPages > 1 && (
-            <nav aria-label={t`Pagination`} className="ml-auto join">
+            <nav aria-label={t`Pagination`} className="ms-auto join">
               <button
                 type="button"
                 className="btn btn-soft btn-sm join-item gap-1"
@@ -245,7 +245,7 @@ export function HistoryTable() {
                 onClick={() => workspaceActions.setHistoryPage(page - 1)}
                 aria-label={t`Previous page`}
               >
-                <ChevronLeft size={14} /> {t`Prev`}
+                <ChevronLeft size={14} className="rtl:-scale-x-100" /> {t`Prev`}
               </button>
               <span
                 className="btn btn-soft btn-sm join-item pointer-events-none no-animation tabular-nums"
@@ -260,7 +260,7 @@ export function HistoryTable() {
                 onClick={() => workspaceActions.setHistoryPage(page + 1)}
                 aria-label={t`Next page`}
               >
-                {t`Next`} <ChevronRight size={14} />
+                {t`Next`} <ChevronRight size={14} className="rtl:-scale-x-100" />
               </button>
             </nav>
           )}
@@ -289,7 +289,7 @@ function SelectionBar({
   return (
     <div className="flex shrink-0 items-center gap-3 border-b border-surface-border bg-surface-nav-active px-3 py-2 sm:px-4">
       <span className="text-sm tabular-nums text-content">{t`${count} selected`}</span>
-      <div className="ml-auto flex items-center gap-2">
+      <div className="ms-auto flex items-center gap-2">
         <button type="button" className="btn btn-ghost btn-sm" onClick={onClear}>
           {t`Clear selection`}
         </button>
@@ -430,7 +430,7 @@ function SessionRows({ session, expanded, selected, onSelect, onToggle }: Sessio
           expanded || selected ? 'bg-surface-nav-active' : ''
         }`}
       >
-        <td className="py-3 pl-3">
+        <td className="py-3 ps-3">
           {/* `h-5` is the first text line's line-height, so both controls centre
               on the time rather than hanging off the top of an `align-top` cell. */}
           <div className="flex h-5 items-center">
@@ -446,7 +446,7 @@ function SessionRows({ session, expanded, selected, onSelect, onToggle }: Sessio
             />
           </div>
         </td>
-        <td className="py-3 pl-2 pr-1">
+        <td className="py-3 ps-2 pe-1">
           <div className="flex h-5 items-center">
             <ChevronDown
               size={15}
@@ -459,20 +459,20 @@ function SessionRows({ session, expanded, selected, onSelect, onToggle }: Sessio
           <div className="text-xs text-content-subtle">{date}</div>
         </td>
         <td className="px-2 py-3 text-content">
-          <p className={expanded ? '' : 'line-clamp-1 sm:line-clamp-2'}>
+          <p dir="auto" className={expanded ? '' : 'line-clamp-1 sm:line-clamp-2'}>
             {session.transcript || t`Empty session`}
           </p>
         </td>
-        <td className="hidden px-2 py-3 text-right tabular-nums text-content-muted sm:table-cell">
+        <td className="hidden px-2 py-3 text-end tabular-nums text-content-muted sm:table-cell">
           {session.words}
         </td>
-        <td className="hidden px-2 py-3 text-right tabular-nums text-content-muted sm:table-cell">
+        <td className="hidden px-2 py-3 text-end tabular-nums text-content-muted sm:table-cell">
           {formatDuration(session.seconds)}
         </td>
         <td className="hidden px-2 py-3 text-content-muted lg:table-cell">
           {formatBackend(session.backend)}
         </td>
-        <td className="py-3 pr-3" />
+        <td className="py-3 pe-3" />
       </tr>
       {shown && (
         <tr ref={detailRef} className="border-b border-surface-border bg-surface-inset/40">
@@ -480,7 +480,10 @@ function SessionRows({ session, expanded, selected, onSelect, onToggle }: Sessio
             <div ref={foldRef} className="overflow-hidden">
               <div className="px-4 py-4 sm:px-6">
                 <div className="rounded-2xl border border-surface-border bg-surface-inset p-4">
-                  <p className="max-h-60 overflow-y-auto whitespace-pre-wrap break-words text-[0.95rem] leading-7 text-content">
+                  <p
+                    dir="auto"
+                    className="max-h-60 overflow-y-auto whitespace-pre-wrap break-words text-[0.95rem] leading-7 text-content"
+                  >
                     {session.transcript || t`No transcript`}
                   </p>
                 </div>
@@ -505,7 +508,7 @@ function SessionRows({ session, expanded, selected, onSelect, onToggle }: Sessio
                   <button type="button" onClick={download} className="btn btn-soft btn-sm gap-1.5">
                     <Download size={14} /> {t`Download`}
                   </button>
-                  <div className="ml-auto">
+                  <div className="ms-auto">
                     <ConfirmDialog
                       title={t`Delete session?`}
                       description={t`This will permanently remove this dictation session and its transcript.`}

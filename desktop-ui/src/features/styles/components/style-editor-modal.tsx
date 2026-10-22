@@ -101,7 +101,7 @@ export function StyleEditorModal({
         </h3>
         <div
           tabIndex={-1}
-          className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto pr-1 focus:outline-none"
+          className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto pe-1 focus:outline-none"
         >
           <label className="flex flex-col gap-1.5">
             <span className="text-sm font-medium text-content-default">{t`Name`}</span>

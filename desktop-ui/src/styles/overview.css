@@ -132,7 +132,7 @@
 }
 
 @utility ov-row {
-  @apply grid w-full items-center gap-2 px-5 text-left;
+  @apply grid w-full items-center gap-2 px-5 text-start;
   grid-template-columns: var(--ov-cols);
 }
 

@@ -45,10 +45,10 @@ export function SidebarContent() {
             aria-hidden="true"
             className="absolute inset-0 hidden items-center justify-center text-content opacity-0 transition-opacity duration-fast is-drawer-close:flex is-drawer-close:group-hover/logo:opacity-100"
           >
-            <PanelLeftOpen size={20} strokeWidth={2} />
+            <PanelLeftOpen size={20} strokeWidth={2} className="rtl:-scale-x-100" />
           </span>
           <span
-            className={`absolute -right-px -bottom-px block size-2.5 rounded-full ring-2 ring-surface-ground ${dotClass} ${isActive ? 'status-pulse' : ''}`}
+            className={`absolute -end-px -bottom-px block size-2.5 rounded-full ring-2 ring-surface-ground ${dotClass} ${isActive ? 'status-pulse' : ''}`}
             aria-hidden="true"
           />
         </label>
@@ -61,7 +61,7 @@ export function SidebarContent() {
           className="cursor-pointer rounded-full p-2 text-content-subtle transition-colors hover:bg-surface-hover hover:text-content is-drawer-close:hidden"
           aria-label={t`Collapse sidebar`}
         >
-          <PanelLeftClose size={20} strokeWidth={1.8} />
+          <PanelLeftClose size={20} strokeWidth={1.8} className="rtl:-scale-x-100" />
         </label>
       </div>
 
@@ -116,7 +116,7 @@ function NavRow({ item, pathname }: { item: NavigationItem; pathname: string }) 
           aria-current={active ? 'page' : undefined}
           // The label is hidden when collapsed; this keeps the link named.
           aria-label={label}
-          className={`${NAV_ITEM_BASE} mx-3 h-12 pr-4 pl-2 ${navItemState(active)} is-drawer-close:justify-center is-drawer-close:gap-0 is-drawer-close:px-0`}
+          className={`${NAV_ITEM_BASE} mx-3 h-12 pe-4 ps-2 ${navItemState(active)} is-drawer-close:justify-center is-drawer-close:gap-0 is-drawer-close:px-0`}
         >
           <NavBead active={active}>
             <Icon size={17} strokeWidth={active ? 2 : 1.7} className={navIconClass(active)} />
@@ -125,7 +125,7 @@ function NavRow({ item, pathname }: { item: NavigationItem; pathname: string }) 
           {/* Shortcut hint: out of the way until the row is hovered or focused. */}
           <span
             aria-hidden="true"
-            className="ml-auto font-mono text-xs text-content-subtle opacity-0 transition-opacity group-hover:opacity-100 group-focus-visible:opacity-100 is-drawer-close:hidden"
+            className="ms-auto font-mono text-xs text-content-subtle opacity-0 transition-opacity group-hover:opacity-100 group-focus-visible:opacity-100 is-drawer-close:hidden"
           >
             {hint}
           </span>

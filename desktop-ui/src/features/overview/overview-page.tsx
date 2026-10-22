@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
+import { plural } from '@lingui/core/macro';
 import { useLingui } from '@lingui/react/macro';
 import { Link } from '@tanstack/react-router';
 import { useStore } from '@tanstack/react-store';
@@ -145,7 +146,7 @@ function StatStrip({ isActive, isConnected, stale }: StatStripProps) {
         <div className="ov-value">
           <span className="ov-metric">{today.count.toLocaleString()}</span>
         </div>
-        <p className="ov-note">{today.count === 1 ? t`session` : t`sessions`}</p>
+        <p className="ov-note">{plural(today.count, { one: 'session', other: 'sessions' })}</p>
       </div>
 
       <div className="ov-stat">
@@ -182,13 +183,13 @@ function SessionRow({ session }: { session: HistorySession }) {
           aria-label={t`Open session from ${time}`}
         >
           <span className="font-mono text-sm tabular-nums text-content-subtle">{time}</span>
-          <span className="truncate text-base text-content">
+          <span dir="auto" className="truncate text-base text-content">
             {session.transcript || t`Empty session`}
           </span>
-          <span className="ov-num text-right text-sm tabular-nums text-content-muted">
+          <span className="ov-num text-end text-sm tabular-nums text-content-muted">
             {session.words}
           </span>
-          <span className="ov-num text-right text-sm tabular-nums text-content-subtle">
+          <span className="ov-num text-end text-sm tabular-nums text-content-subtle">
             {formatDuration(session.seconds)}
           </span>
         </button>
@@ -221,8 +222,8 @@ function SessionList({ sessions }: { sessions: HistorySession[] }) {
       <div className="ov-row ov-row-head">
         <span>{t`Time`}</span>
         <span>{t`Transcript`}</span>
-        <span className="ov-num text-right">{t`Words`}</span>
-        <span className="ov-num text-right">{t`Length`}</span>
+        <span className="ov-num text-end">{t`Words`}</span>
+        <span className="ov-num text-end">{t`Length`}</span>
       </div>
       <div className="ov-list">
         {sessions.map((session) => (
@@ -342,7 +343,7 @@ export function OverviewPage() {
           {totalSessions > recentSessions.length && (
             <Link to="/history" className="ov-link text-sm">
               {t`View all`}
-              <ChevronRight size={13} strokeWidth={2} />
+              <ChevronRight size={13} strokeWidth={2} className="rtl:-scale-x-100" />
             </Link>
           )}
         </div>
@@ -370,7 +371,7 @@ export function OverviewPage() {
             <HardDrive size={13} strokeWidth={1.7} />
             {t`Stored on this device`}
           </span>
-          <Link to="/history" className="ov-link ml-auto">
+          <Link to="/history" className="ov-link ms-auto">
             <Search size={13} strokeWidth={1.8} />
             {t`Search sessions`}
           </Link>

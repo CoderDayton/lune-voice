@@ -92,7 +92,7 @@ function EditRow({ entry, onDone }: { entry: DictionaryEntry; onDone: () => void
           <PriorityPicker value={priority} onChange={setPriority} />
         </div>
       </td>
-      <td className="py-3 pr-3">
+      <td className="py-3 pe-3">
         <div className="mb-2 space-y-2 sm:hidden">
           <input
             type="text"
@@ -135,18 +135,21 @@ function ViewRow({ entry, onEdit }: { entry: DictionaryEntry; onEdit: () => void
   return (
     <tr className={`${LIST_ROW} group`}>
       <td className="px-3 py-3">
-        <div className="text-sm font-medium text-content">{entry.phrase}</div>
+        <div className="text-sm font-medium text-content">
+          <bdi>{entry.phrase}</bdi>
+        </div>
         <div className="mt-0.5 flex items-center gap-1 text-xs text-content-subtle sm:hidden">
-          <ArrowRight size={11} strokeWidth={2} /> {entry.replacement}
+          <ArrowRight size={11} strokeWidth={2} className="rtl:-scale-x-100" />{' '}
+          <bdi>{entry.replacement}</bdi>
         </div>
       </td>
       <td className="hidden px-2 py-3 font-mono text-sm text-content-muted sm:table-cell">
-        {entry.replacement}
+        <bdi>{entry.replacement}</bdi>
       </td>
       <td className="hidden px-2 py-3 sm:table-cell">
         <PriorityBadge value={entry.priority} />
       </td>
-      <td className="py-3 pr-3 text-right">
+      <td className="py-3 pe-3 text-end">
         <div className="flex items-center justify-end gap-1">
           <span className="sm:hidden">
             <PriorityBadge value={entry.priority} />
@@ -211,7 +214,11 @@ function EmptyState() {
                 ) : (
                   <span className="text-content">{preset.phrase}</span>
                 )}
-                <ArrowRight size={12} strokeWidth={2} className="text-content-subtle" />
+                <ArrowRight
+                  size={12}
+                  strokeWidth={2}
+                  className="text-content-subtle rtl:-scale-x-100"
+                />
                 <span className="font-medium text-content">{preset.replacement}</span>
               </button>
             </li>
@@ -276,7 +283,7 @@ export function VocabularyList() {
                 <th className={`${LIST_HEAD_CELL} hidden w-28 px-2 sm:table-cell`}>
                   <Trans>Priority</Trans>
                 </th>
-                <th className={`${LIST_HEAD_CELL} w-20 pr-3 sm:w-24`}>
+                <th className={`${LIST_HEAD_CELL} w-20 pe-3 sm:w-24`}>
                   <span className="sr-only">
                     <Trans>Action</Trans>
                   </span>

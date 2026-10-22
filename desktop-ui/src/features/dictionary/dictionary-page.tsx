@@ -41,7 +41,7 @@ export function DictionaryPage() {
             <div key={i} className="flex items-center gap-3 px-5 py-4">
               <div className="skeleton-shimmer h-4 w-24 sm:w-32" />
               <div className="skeleton-shimmer h-4 w-24 sm:w-32" />
-              <div className="skeleton-shimmer ml-auto h-6 w-16 rounded-field" />
+              <div className="skeleton-shimmer ms-auto h-6 w-16 rounded-field" />
             </div>
           ))}
         </div>

@@ -387,7 +387,7 @@ function Actions({
       <div className="flex flex-col items-center gap-2">
         <button type="button" className="btn btn-primary btn-wide" onClick={onConfirmEngine}>
           {t`Continue`}
-          <ArrowRight size={16} />
+          <ArrowRight size={16} className="rtl:-scale-x-100" />
         </button>
         <button type="button" className="btn btn-ghost btn-sm" onClick={onFinish}>
           {t`Skip for now`}
@@ -439,7 +439,7 @@ function Actions({
       <div className="flex flex-col items-center">
         <button type="button" className="btn btn-primary btn-wide" onClick={onFinish}>
           {t`Enter Lune Voice`}
-          <ArrowRight size={16} />
+          <ArrowRight size={16} className="rtl:-scale-x-100" />
         </button>
       </div>
     );
@@ -466,7 +466,7 @@ function Actions({
       ) : (
         <button type="button" className="btn btn-primary btn-wide" onClick={onFinish}>
           {t`Continue`}
-          <ArrowRight size={16} />
+          <ArrowRight size={16} className="rtl:-scale-x-100" />
         </button>
       )}
       <div className="flex items-center gap-2">

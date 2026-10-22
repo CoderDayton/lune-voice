@@ -131,7 +131,7 @@ function ActionMenuRow({
         type="button"
         role="menuitem"
         onClick={onActivate}
-        className={`group flex h-10 w-full shrink-0 items-center gap-3 rounded-full pr-3 pl-1.5 text-left text-sm transition-colors duration-fast focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-primary ${
+        className={`group flex h-10 w-full shrink-0 items-center gap-3 rounded-full pe-3 ps-1.5 text-start text-sm transition-colors duration-fast focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-primary ${
           item.danger
             ? 'text-error hover:bg-error/10 focus-visible:bg-error/10'
             : 'text-content hover:bg-surface-hover focus-visible:bg-surface-hover'

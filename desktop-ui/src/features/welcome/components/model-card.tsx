@@ -62,7 +62,7 @@ export function ModelCard({
       aria-disabled={!canToggle}
       disabled={!canToggle}
       onClick={canToggle ? onToggle : undefined}
-      className={`group rounded-box border w-full text-left transition-all duration-150 ${stateClass} ${
+      className={`group rounded-box border w-full text-start transition-all duration-150 ${stateClass} ${
         canToggle ? 'hover:border-primary/45 hover:bg-primary/8 cursor-pointer' : 'cursor-default'
       }`}
     >
@@ -106,7 +106,7 @@ export function ModelCard({
               />
               <div className="flex items-center justify-between text-xs text-content-subtle tabular-nums">
                 <span className="truncate font-mono">{progress.fileName}</span>
-                <span className="ml-2 shrink-0 font-medium text-primary">{pct}%</span>
+                <span className="ms-2 shrink-0 font-medium text-primary">{pct}%</span>
               </div>
             </div>
           ) : (

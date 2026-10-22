@@ -108,7 +108,7 @@ export function SidebarQuickActions() {
         aria-expanded={open}
         title={t`More`}
         aria-label={t`More`}
-        className="group flex h-12 w-full cursor-pointer items-center gap-3 rounded-full pr-4 pl-2 text-left text-sm text-content-muted transition-colors hover:bg-surface-hover hover:text-content focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-primary is-drawer-close:justify-center is-drawer-close:px-0"
+        className="group flex h-12 w-full cursor-pointer items-center gap-3 rounded-full pe-4 ps-2 text-start text-sm text-content-muted transition-colors hover:bg-surface-hover hover:text-content focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-primary is-drawer-close:justify-center is-drawer-close:px-0"
       >
         <NavBead active={false}>
           <Ellipsis
@@ -123,7 +123,7 @@ export function SidebarQuickActions() {
         <ChevronUp
           size={16}
           strokeWidth={1.8}
-          className="ml-auto shrink-0 text-content-subtle is-drawer-close:hidden"
+          className="ms-auto shrink-0 text-content-subtle is-drawer-close:hidden"
         />
       </button>
 

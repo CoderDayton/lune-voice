@@ -33,7 +33,7 @@
 
 /* Round capture control pinned inside the field's right edge. */
 @utility capture-btn {
-  @apply absolute inset-y-0 right-2 my-auto flex size-9 items-center justify-center rounded-full border border-surface-border bg-surface-wash text-primary;
+  @apply absolute inset-y-0 end-2 my-auto flex size-9 items-center justify-center rounded-full border border-surface-border bg-surface-wash text-primary;
   transition:
     background-color var(--duration-fast) var(--ease-standard),
     border-color var(--duration-fast) var(--ease-standard),
@@ -42,7 +42,7 @@
 
 /* Compact variant for the single-row composers (Vocabulary, Snippets). */
 @utility capture-btn-sm {
-  @apply right-1.5 size-7;
+  @apply end-1.5 size-7;
 }
 
 .capture-btn:hover:not(:disabled) {

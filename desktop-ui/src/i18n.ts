@@ -30,8 +30,18 @@ export function dateLocale(
   return systemLocales.find((tag) => tag.split('-')[0] === uiLocale) ?? uiLocale;
 }
 
+const RTL_LANGUAGES = new Set(['ar']);
+
+export function textDirection(locale: string): 'ltr' | 'rtl' {
+  return RTL_LANGUAGES.has(locale.split('-')[0]) ? 'rtl' : 'ltr';
+}
+
 export async function activateLocale(locale: string) {
   const { messages } = await import(`./locales/${locale}/messages.po`);
   i18n.load(locale, messages);
   i18n.activate(locale);
+  if (typeof document !== 'undefined') {
+    document.documentElement.lang = locale;
+    document.documentElement.dir = textDirection(locale);
+  }
 }

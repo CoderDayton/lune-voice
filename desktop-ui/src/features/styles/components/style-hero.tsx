@@ -57,7 +57,7 @@ export function StyleHero({ preset, onEdit, onView }: StyleHeroProps) {
       />
 
       <div className="relative mt-5 flex flex-wrap items-center gap-2">
-        <span className="mr-1 text-xs text-content-subtle">{t`Formatting`}</span>
+        <span className="me-1 text-xs text-content-subtle">{t`Formatting`}</span>
         {chips.map((c) => (
           <span
             key={c.label}

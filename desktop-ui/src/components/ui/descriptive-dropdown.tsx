@@ -169,7 +169,7 @@ export function DescriptiveDropdown<Value extends string>({
                   role="option"
                   aria-selected={active}
                   onClick={() => pick(option.value)}
-                  className={`group flex w-full items-start gap-3 rounded-field px-2.5 py-2 text-left transition-colors duration-fast hover:bg-surface-hover ${
+                  className={`group flex w-full items-start gap-3 rounded-field px-2.5 py-2 text-start transition-colors duration-fast hover:bg-surface-hover ${
                     active ? 'bg-primary/8' : ''
                   }`}
                 >
@@ -221,7 +221,7 @@ export function DescriptiveDropdown<Value extends string>({
         aria-label={ariaLabel}
         onClick={() => setOpen((prev) => !prev)}
       >
-        <span className="flex min-w-0 items-center gap-2.5 text-left">
+        <span className="flex min-w-0 items-center gap-2.5 text-start">
           {TriggerIcon && (
             <span className="field-chip flex size-8 shrink-0 items-center justify-center rounded-md bg-primary/15 text-primary">
               <TriggerIcon size={16} strokeWidth={1.8} />

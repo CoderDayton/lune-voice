@@ -40,7 +40,7 @@ export function ByteProgress({
         <span>
           {formatBytes(downloadedBytes)} / {formatBytes(total)}
         </span>
-        <span className="ml-2 shrink-0 font-medium text-primary">{pct}%</span>
+        <span className="ms-2 shrink-0 font-medium text-primary">{pct}%</span>
       </div>
     </div>
   );

@@ -138,8 +138,12 @@
    and edge to stay readable. */
 @media (max-width: 63.999rem) {
   .sidebar-surface {
-    @apply border-r border-surface-border bg-surface-glass;
+    @apply border-e border-surface-border bg-surface-glass;
     box-shadow: inset -1px 0 0 var(--surface-border);
+  }
+
+  [dir='rtl'] .sidebar-surface {
+    box-shadow: inset 1px 0 0 var(--surface-border);
   }
 }
 

@@ -18,7 +18,7 @@ msgid "— change it any time in Settings › Dictation."
 msgstr "— cámbialo cuando quieras en Configuración › Dictado."
 
 #. placeholder {0}: snippet.triggerPhrase
-#: src/features/snippets/snippets-page.tsx:464
+#: src/features/snippets/snippets-page.tsx:467
 msgid "“{0}” will stop expanding. The template text is not recoverable."
 msgstr "«{0}» dejará de expandirse. El texto de la plantilla no se puede recuperar."
 
@@ -36,7 +36,7 @@ msgid "{0, plural, one {# preset} other {# presets}}"
 msgstr "{0, plural, one {# estilo} other {# estilos}}"
 
 #. placeholder {0}: entries.length
-#: src/features/dictionary/components/dictionary-table.tsx:255
+#: src/features/dictionary/components/dictionary-table.tsx:257
 msgid "{0, plural, one {# rule} other {# rules}}"
 msgstr "{0, plural, one {# regla} other {# reglas}}"
 
@@ -45,10 +45,15 @@ msgstr "{0, plural, one {# regla} other {# reglas}}"
 msgid "{0, plural, one {# snippet} other {# snippets}}"
 msgstr "{0, plural, one {# fragmento} other {# fragmentos}}"
 
+#. placeholder {0}: today.count
+#: src/features/overview/overview-page.tsx:149
+msgid "{0, plural, one {session} other {sessions}}"
+msgstr "{0, plural, one {sesión} other {sesiones}}"
+
 #. placeholder {0}: filtered.length
 #. placeholder {1}: entries.length
 #. placeholder {1}: snippets.length
-#: src/features/dictionary/components/dictionary-table.tsx:254
+#: src/features/dictionary/components/dictionary-table.tsx:256
 #: src/features/snippets/snippets-page.tsx:410
 msgid "{0} / {1}"
 msgstr "{0} / {1}"
@@ -77,7 +82,7 @@ msgstr "{page} / {totalPages}"
 msgid "{saved} (unavailable)"
 msgstr "{saved} (no disponible)"
 
-#: src/features/overview/overview-page.tsx:119
+#: src/features/overview/overview-page.tsx:120
 msgid "{todayMinutes} min today"
 msgstr "{todayMinutes} min hoy"
 
@@ -85,7 +90,7 @@ msgstr "{todayMinutes} min hoy"
 msgid "{totalCount, plural, one {# session} other {# sessions}}"
 msgstr "{totalCount, plural, one {# sesión} other {# sesiones}}"
 
-#: src/features/overview/overview-page.tsx:340
+#: src/features/overview/overview-page.tsx:341
 msgid "{totalSessions} total"
 msgstr "{totalSessions} en total"
 
@@ -132,7 +137,7 @@ msgstr "Un indicador vertical se ajusta al lateral de la pantalla."
 msgid "Access still isn't available. A reboot may be needed for it to take effect."
 msgstr "El acceso aún no funciona. Puede que haga falta reiniciar para que surta efecto."
 
-#: src/features/dictionary/components/dictionary-table.tsx:281
+#: src/features/dictionary/components/dictionary-table.tsx:283
 msgid "Action"
 msgstr "Acción"
 
@@ -158,7 +163,7 @@ msgstr "Añadir"
 msgid "Add a correction"
 msgstr "Añadir una corrección"
 
-#: src/features/dictionary/components/dictionary-table.tsx:189
+#: src/features/dictionary/components/dictionary-table.tsx:191
 msgid "Add a fix and Lune Voice applies it every time you dictate. Try a starter below or add your own above."
 msgstr "Añade una corrección y Lune Voice la aplicará cada vez que dictes. Prueba una de las sugerencias de abajo o añade la tuya arriba."
 
@@ -190,7 +195,7 @@ msgstr "Tras 5 minutos"
 msgid "All required models are already installed. Continue when you're ready."
 msgstr "Todos los modelos necesarios ya están instalados. Continúa cuando quieras."
 
-#: src/features/overview/overview-page.tsx:105
+#: src/features/overview/overview-page.tsx:106
 msgid "all-time · today"
 msgstr "histórico · hoy"
 
@@ -233,7 +238,7 @@ msgstr "Apariencia"
 msgid "Application behavior and startup preferences."
 msgstr "Comportamiento de la aplicación y preferencias de inicio."
 
-#: src/features/dictionary/components/dictionary-table.tsx:302
+#: src/features/dictionary/components/dictionary-table.tsx:304
 msgid "Applied on every dictation · highest priority first"
 msgstr "Se aplica en cada dictado · mayor prioridad primero"
 
@@ -254,7 +259,7 @@ msgstr "Solicitando…"
 msgid "At least {MIN_MESSAGE_CHARS} characters."
 msgstr "Al menos {MIN_MESSAGE_CHARS} caracteres."
 
-#: src/features/overview/overview-page.tsx:153
+#: src/features/overview/overview-page.tsx:154
 msgid "Audio"
 msgstr "Audio"
 
@@ -510,7 +515,7 @@ msgstr "Compacto"
 msgid "Completed"
 msgstr "Completada"
 
-#: src/features/overview/overview-page.tsx:288
+#: src/features/overview/overview-page.tsx:289
 #: src/features/shell/components/app-shell.tsx:176
 #: src/features/shell/components/sidebar-widgets.tsx:75
 msgid "Connecting"
@@ -639,8 +644,8 @@ msgstr "Eliminar"
 #. placeholder {0}: entry.phrase
 #. placeholder {0}: preset.name
 #. placeholder {0}: snippet.triggerPhrase
-#: src/features/dictionary/components/dictionary-table.tsx:165
-#: src/features/snippets/snippets-page.tsx:465
+#: src/features/dictionary/components/dictionary-table.tsx:167
+#: src/features/snippets/snippets-page.tsx:468
 #: src/features/styles/components/style-preset-card.tsx:113
 msgid "Delete {0}"
 msgstr "Eliminar {0}"
@@ -667,11 +672,11 @@ msgstr "Eliminar seleccionadas"
 msgid "Delete session?"
 msgstr "¿Eliminar sesión?"
 
-#: src/features/snippets/snippets-page.tsx:463
+#: src/features/snippets/snippets-page.tsx:466
 msgid "Delete snippet?"
 msgstr "¿Eliminar el fragmento?"
 
-#: src/features/dictionary/components/dictionary-table.tsx:163
+#: src/features/dictionary/components/dictionary-table.tsx:165
 msgid "Delete this word fix?"
 msgstr "¿Eliminar esta corrección?"
 
@@ -738,7 +743,7 @@ msgstr "Descartar dictado"
 msgid "Discard the current draft and return to idle. Click the binding to change it."
 msgstr "Descarta el borrador actual y vuelve al modo inactivo. Haz clic en la asignación para cambiarla."
 
-#: src/features/overview/overview-page.tsx:288
+#: src/features/overview/overview-page.tsx:289
 msgid "Disconnected"
 msgstr "Desconectado"
 
@@ -831,8 +836,8 @@ msgstr "Editar"
 
 #. placeholder {0}: entry.phrase
 #. placeholder {0}: snippet.triggerPhrase
-#: src/features/dictionary/components/dictionary-table.tsx:158
-#: src/features/snippets/snippets-page.tsx:458
+#: src/features/dictionary/components/dictionary-table.tsx:160
+#: src/features/snippets/snippets-page.tsx:461
 msgid "Edit {0}"
 msgstr "Editar {0}"
 
@@ -849,7 +854,7 @@ msgid "Editing “{spokenTrigger}”"
 msgstr "Editando «{spokenTrigger}»"
 
 #: src/features/history/components/history-table.tsx:463
-#: src/features/overview/overview-page.tsx:186
+#: src/features/overview/overview-page.tsx:187
 msgid "Empty session"
 msgstr "Sesión vacía"
 
@@ -915,11 +920,11 @@ msgstr "Descargando Lune Voice {version}. Mantén la aplicación abierta hasta q
 msgid "Few-shot examples"
 msgstr "Ejemplos few-shot"
 
-#: src/features/dictionary/components/dictionary-table.tsx:251
+#: src/features/dictionary/components/dictionary-table.tsx:253
 msgid "Filter rules"
 msgstr "Filtrar reglas"
 
-#: src/features/dictionary/components/dictionary-table.tsx:250
+#: src/features/dictionary/components/dictionary-table.tsx:252
 msgid "Filter rules…"
 msgstr "Filtrar reglas…"
 
@@ -1007,15 +1012,15 @@ msgstr "GitHub"
 msgid "Give the memory back after a quiet spell. The next dictation reloads the model, which adds up to a second before it starts listening — your speech is recorded during the wait, so nothing is lost."
 msgstr "Devuelve la memoria tras un rato de inactividad. El siguiente dictado recarga el modelo, lo que añade hasta un segundo antes de empezar a escuchar; tu voz se graba durante esa espera, así que no se pierde nada."
 
-#: src/features/overview/overview-page.tsx:286
+#: src/features/overview/overview-page.tsx:287
 msgid "Good afternoon."
 msgstr "Buenas tardes."
 
-#: src/features/overview/overview-page.tsx:286
+#: src/features/overview/overview-page.tsx:287
 msgid "Good evening."
 msgstr "Buenas noches."
 
-#: src/features/overview/overview-page.tsx:286
+#: src/features/overview/overview-page.tsx:287
 msgid "Good morning."
 msgstr "Buenos días."
 
@@ -1039,17 +1044,17 @@ msgid "High"
 msgstr "Alta"
 
 #: src/features/history/components/history-table.tsx:226
-#: src/features/overview/overview-page.tsx:363
+#: src/features/overview/overview-page.tsx:364
 msgid "History isn't saved"
 msgstr "El historial no se guarda"
 
 #: src/features/history/components/history-table.tsx:229
-#: src/features/overview/overview-page.tsx:366
+#: src/features/overview/overview-page.tsx:367
 msgid "History kept {historyDays} days"
 msgstr "El historial se conserva {historyDays} días"
 
 #: src/features/history/components/history-table.tsx:228
-#: src/features/overview/overview-page.tsx:365
+#: src/features/overview/overview-page.tsx:366
 msgid "History kept forever"
 msgstr "El historial se conserva para siempre"
 
@@ -1062,7 +1067,7 @@ msgstr "Retención del historial"
 msgid "Hold is unavailable right now, so the shortcut toggles recording instead. Grant keyboard access to use Hold."
 msgstr "Mantener no está disponible ahora, así que el atajo activa y desactiva la grabación. Concede acceso al teclado para usar Mantener."
 
-#: src/features/overview/overview-page.tsx:299
+#: src/features/overview/overview-page.tsx:300
 msgid "Hold the hotkey and speak, and your words land wherever your cursor is."
 msgstr "Mantén pulsado el atajo y habla: tus palabras aparecen donde esté el cursor."
 
@@ -1102,7 +1107,7 @@ msgstr "Aspecto de la barra indicadora. Los cambios se aplican de inmediato."
 msgid "How to dictate"
 msgstr "Cómo dictar"
 
-#: src/features/overview/overview-page.tsx:160
+#: src/features/overview/overview-page.tsx:161
 msgid "Idle · mic ready"
 msgstr "Inactivo · micrófono listo"
 
@@ -1215,7 +1220,7 @@ msgid "Launch into the system tray instead of opening the main window. Useful wh
 msgstr "Se abre en la bandeja del sistema en lugar de en la ventana principal. Útil cuando Lune Voice se inicia automáticamente al iniciar sesión."
 
 #: src/features/history/components/history-table.tsx:187
-#: src/features/overview/overview-page.tsx:225
+#: src/features/overview/overview-page.tsx:226
 msgid "Length"
 msgstr "Longitud"
 
@@ -1243,7 +1248,7 @@ msgstr "Escuchando: di la frase y vuelve a hacer clic para parar."
 msgid "Listening — say the phrase…"
 msgstr "Escuchando: di la frase…"
 
-#: src/features/overview/overview-page.tsx:160
+#: src/features/overview/overview-page.tsx:161
 #: src/features/shell/components/sidebar-widgets.tsx:82
 msgid "Listening…"
 msgstr "Escuchando…"
@@ -1318,11 +1323,11 @@ msgstr "encabezado de reunión"
 msgid "Microphone"
 msgstr "Micrófono"
 
-#: src/features/overview/overview-page.tsx:157
+#: src/features/overview/overview-page.tsx:158
 msgid "Microphone input level"
 msgstr "Nivel de entrada del micrófono"
 
-#: src/features/overview/overview-page.tsx:116
+#: src/features/overview/overview-page.tsx:117
 msgid "min"
 msgstr "min"
 
@@ -1376,7 +1381,7 @@ msgstr "Nunca"
 
 #: src/features/snippets/snippets-page.tsx:207
 #: src/features/snippets/snippets-page.tsx:245
-#: src/features/snippets/snippets-page.tsx:506
+#: src/features/snippets/snippets-page.tsx:509
 msgid "New snippet"
 msgstr "Nuevo fragmento"
 
@@ -1404,7 +1409,7 @@ msgstr "No se encontró ningún controlador de GPU. Instala el controlador de tu
 msgid "No microphone found. Plug one in, then pick it in Settings › Dictation."
 msgstr "No se encontró ningún micrófono. Conecta uno y selecciónalo en Configuración › Dictado."
 
-#: src/features/dictionary/components/dictionary-table.tsx:263
+#: src/features/dictionary/components/dictionary-table.tsx:265
 msgid "No rules match “{query}”."
 msgstr "Ninguna regla coincide con «{query}»."
 
@@ -1421,7 +1426,7 @@ msgstr "No se encontraron sesiones."
 msgid "No sessions match \"{0}\"."
 msgstr "Ninguna sesión coincide con «{0}»."
 
-#: src/features/overview/overview-page.tsx:210
+#: src/features/overview/overview-page.tsx:211
 msgid "No sessions yet"
 msgstr "Aún no hay sesiones"
 
@@ -1433,7 +1438,7 @@ msgstr "Aún no hay sesiones. Empieza a dictar para ver tus transcripciones aqu�
 msgid "No snippets match “{query}”."
 msgstr "Ningún fragmento coincide con «{query}»."
 
-#: src/features/snippets/snippets-page.tsx:496
+#: src/features/snippets/snippets-page.tsx:499
 msgid "No snippets yet"
 msgstr "Aún no hay fragmentos"
 
@@ -1488,7 +1493,7 @@ msgstr "Con «Desactivado» se entregan las transcripciones sin procesar. El est
 msgid "Official correspondence and documents"
 msgstr "Correspondencia y documentos oficiales"
 
-#: src/features/overview/overview-page.tsx:160
+#: src/features/overview/overview-page.tsx:161
 #: src/features/shell/components/app-shell.tsx:183
 msgid "Offline"
 msgstr "Sin conexión"
@@ -1509,7 +1514,7 @@ msgstr "Abrir menú"
 msgid "Open releases page"
 msgstr "Abrir la página de versiones"
 
-#: src/features/overview/overview-page.tsx:182
+#: src/features/overview/overview-page.tsx:183
 msgid "Open session from {time}"
 msgstr "Abrir la sesión de {time}"
 
@@ -1590,7 +1595,7 @@ msgid "Performance or speed"
 msgstr "Rendimiento o velocidad"
 
 #: src/features/dictionary/components/dictionary-table.tsx:78
-#: src/features/dictionary/components/dictionary-table.tsx:271
+#: src/features/dictionary/components/dictionary-table.tsx:273
 msgid "Phrase"
 msgstr "Frase"
 
@@ -1642,7 +1647,7 @@ msgstr "Prácticamente la precisión del modelo original. Recomendado."
 msgid "Preset corner or edge the pill starts at."
 msgstr "Esquina o borde predefinido donde aparece el indicador."
 
-#: src/features/overview/overview-page.tsx:212
+#: src/features/overview/overview-page.tsx:213
 msgid "Press"
 msgstr "Pulsa"
 
@@ -1683,7 +1688,7 @@ msgid "primary"
 msgstr "principal"
 
 #: src/features/dictionary/components/dictionary-form.tsx:100
-#: src/features/dictionary/components/dictionary-table.tsx:277
+#: src/features/dictionary/components/dictionary-table.tsx:279
 #: src/features/dictionary/components/priority-picker.tsx:63
 msgid "Priority"
 msgstr "Prioridad"
@@ -1710,12 +1715,12 @@ msgstr "Pregunta o ayuda"
 msgid "Quit Lune Voice"
 msgstr "Salir de Lune Voice"
 
-#: src/features/overview/overview-page.tsx:288
+#: src/features/overview/overview-page.tsx:289
 #: src/features/shell/components/app-shell.tsx:182
 msgid "Ready"
 msgstr "Listo"
 
-#: src/features/overview/overview-page.tsx:339
+#: src/features/overview/overview-page.tsx:340
 msgid "Recent sessions"
 msgstr "Sesiones recientes"
 
@@ -1748,7 +1753,7 @@ msgstr "Eliminar"
 
 #. placeholder {0}: entry.phrase
 #. placeholder {1}: entry.replacement
-#: src/features/dictionary/components/dictionary-table.tsx:164
+#: src/features/dictionary/components/dictionary-table.tsx:166
 msgid "Remove the saved correction for \"{0}\" → \"{1}\"."
 msgstr "Se eliminará la corrección guardada «{0}» → «{1}»."
 
@@ -1760,7 +1765,7 @@ msgstr "Eliminando…"
 #: src/features/dictionary/components/dictionary-table.tsx:90
 #: src/features/dictionary/components/dictionary-table.tsx:102
 #: src/features/dictionary/components/dictionary-table.tsx:103
-#: src/features/dictionary/components/dictionary-table.tsx:274
+#: src/features/dictionary/components/dictionary-table.tsx:276
 msgid "Replacement"
 msgstr "Reemplazo"
 
@@ -1788,7 +1793,7 @@ msgstr "Reinicia Lune Voice para empezar a usar tu GPU."
 msgid "Restart needed"
 msgstr "Requiere reinicio"
 
-#: src/features/overview/overview-page.tsx:330
+#: src/features/overview/overview-page.tsx:331
 msgid "Retry"
 msgstr "Reintentar"
 
@@ -1826,7 +1831,7 @@ msgstr "Guardar cambios"
 msgid "Save Transcript"
 msgstr "Guardar transcripción"
 
-#: src/features/snippets/snippets-page.tsx:499
+#: src/features/snippets/snippets-page.tsx:502
 msgid "Save your signature, a meeting header, or anything you type often — then speak its trigger to drop it into any app."
 msgstr "Guarda tu firma, un encabezado de reunión o cualquier cosa que escribas a menudo, y luego di su activador para insertarlo en cualquier aplicación."
 
@@ -1842,11 +1847,11 @@ msgstr "Fragmentos guardados"
 msgid "Say <0>“{spokenTrigger}”</0> as the whole utterance — or <1>“insert {spokenTrigger}”</1> — to type this snippet."
 msgstr "Di <0>«{spokenTrigger}»</0> como enunciado completo — o <1>«insert {spokenTrigger}»</1> — para escribir este fragmento."
 
-#: src/features/snippets/snippets-page.tsx:480
+#: src/features/snippets/snippets-page.tsx:483
 msgid "Say a trigger as your whole utterance to expand it"
 msgstr "Di un activador como enunciado completo para insertarlo"
 
-#: src/features/overview/overview-page.tsx:375
+#: src/features/overview/overview-page.tsx:376
 msgid "Search sessions"
 msgstr "Buscar sesiones"
 
@@ -1895,10 +1900,6 @@ msgstr "Envía el audio a un endpoint compatible con OpenAI que tú configuras: 
 msgid "Sends transcripts to an OpenAI-compatible endpoint you configure — Ollama, llama-server or LM Studio locally, or a hosted API."
 msgstr "Envía las transcripciones a un endpoint compatible con OpenAI que tú configuras: Ollama, llama-server o LM Studio en local, o una API alojada."
 
-#: src/features/overview/overview-page.tsx:148
-msgid "session"
-msgstr "sesión"
-
 #: src/features/history/components/session-detail-modal.tsx:207
 msgid "Session details"
 msgstr "Detalles de la sesión"
@@ -1906,10 +1907,6 @@ msgstr "Detalles de la sesión"
 #: src/store/workspace-store.ts:208
 msgid "Session timed out — backend may be unresponsive"
 msgstr "La sesión ha caducado; puede que el backend no responda"
-
-#: src/features/overview/overview-page.tsx:148
-msgid "sessions"
-msgstr "sesiones"
 
 #: src/features/shell/config/navigation.ts:66
 msgid "Sessions"
@@ -1950,7 +1947,7 @@ msgid "Show on all workspaces"
 msgstr "Mostrar en todos los espacios de trabajo"
 
 #. placeholder {0}: recentSessions.length
-#: src/features/overview/overview-page.tsx:356
+#: src/features/overview/overview-page.tsx:357
 msgid "Showing {0} of {totalSessions} sessions"
 msgstr "Mostrando {0} de {totalSessions} sesiones"
 
@@ -2014,7 +2011,7 @@ msgstr "Sonido"
 msgid "Sound cues"
 msgstr "Avisos de sonido"
 
-#: src/features/overview/overview-page.tsx:110
+#: src/features/overview/overview-page.tsx:111
 msgid "Speaking time"
 msgstr "Tiempo hablado"
 
@@ -2077,7 +2074,7 @@ msgid "Stop dictation"
 msgstr "Detener dictado"
 
 #: src/features/history/components/history-table.tsx:237
-#: src/features/overview/overview-page.tsx:371
+#: src/features/overview/overview-page.tsx:372
 msgid "Stored on this device"
 msgstr "Almacenado en este dispositivo"
 
@@ -2126,7 +2123,7 @@ msgstr "Sistema"
 msgid "System default"
 msgstr "Predeterminado del sistema"
 
-#: src/features/dictionary/components/dictionary-table.tsx:186
+#: src/features/dictionary/components/dictionary-table.tsx:188
 msgid "Teach Lune Voice your words"
 msgstr "Enseña a Lune Voice tus palabras"
 
@@ -2154,7 +2151,7 @@ msgstr "El indicador de estado flotante que ves mientras dictas."
 msgid "The language you speak. Parakeet needs it set."
 msgstr "El idioma que hablas. Parakeet necesita que lo elijas."
 
-#: src/features/overview/overview-page.tsx:323
+#: src/features/overview/overview-page.tsx:324
 msgid "The local runtime isn't responding. The figures below are the last known values."
 msgstr "El motor local no responde. Los datos siguientes son los últimos valores conocidos."
 
@@ -2200,7 +2197,7 @@ msgid "This will permanently remove this dictation session and its transcript."
 msgstr "Esto eliminará permanentemente esta sesión de dictado y su transcripción."
 
 #: src/features/history/components/history-table.tsx:181
-#: src/features/overview/overview-page.tsx:222
+#: src/features/overview/overview-page.tsx:223
 msgid "Time"
 msgstr "Hora"
 
@@ -2212,11 +2209,11 @@ msgstr "Abreviaturas de tratamiento (\"Señor\" → \"Sr.\")"
 msgid "Titles"
 msgstr "Tratamientos"
 
-#: src/features/overview/overview-page.tsx:213
+#: src/features/overview/overview-page.tsx:214
 msgid "to start dictating"
 msgstr "para empezar a dictar"
 
-#: src/features/overview/overview-page.tsx:142
+#: src/features/overview/overview-page.tsx:143
 msgid "Today"
 msgstr "Hoy"
 
@@ -2244,7 +2241,7 @@ msgstr "Arriba izquierda"
 msgid "Top right"
 msgstr "Arriba derecha"
 
-#: src/features/overview/overview-page.tsx:93
+#: src/features/overview/overview-page.tsx:94
 msgid "Total words"
 msgstr "Palabras totales"
 
@@ -2257,7 +2254,7 @@ msgid "Transcribing…"
 msgstr "Transcribiendo…"
 
 #: src/features/history/components/history-table.tsx:182
-#: src/features/overview/overview-page.tsx:223
+#: src/features/overview/overview-page.tsx:224
 msgid "Transcript"
 msgstr "Transcripción"
 
@@ -2371,7 +2368,7 @@ msgstr "Vertical"
 msgid "View"
 msgstr "Ver"
 
-#: src/features/overview/overview-page.tsx:344
+#: src/features/overview/overview-page.tsx:345
 msgid "View all"
 msgstr "Ver todo"
 
@@ -2396,7 +2393,7 @@ msgstr "Vocabulario"
 msgid "Voice model"
 msgstr "Modelo de voz"
 
-#: src/features/overview/overview-page.tsx:136
+#: src/features/overview/overview-page.tsx:137
 msgid "vs all-time avg"
 msgstr "vs. media histórica"
 
@@ -2478,7 +2475,7 @@ msgstr "palabras"
 
 #: src/features/history/components/history-table.tsx:184
 #: src/features/history/components/session-detail-modal.tsx:170
-#: src/features/overview/overview-page.tsx:224
+#: src/features/overview/overview-page.tsx:225
 msgid "Words"
 msgstr "Palabras"
 
@@ -2486,7 +2483,7 @@ msgstr "Palabras"
 msgid "Workspace"
 msgstr "Espacio de trabajo"
 
-#: src/features/overview/overview-page.tsx:124
+#: src/features/overview/overview-page.tsx:125
 msgid "WPM"
 msgstr "WPM"
 
@@ -2542,7 +2539,7 @@ msgstr "Tu GPU es compatible. La configuración descargará la compatibilidad co
 msgid "Your graphics driver is too old for GPU transcription. Update it and the download will appear here."
 msgstr "Tu controlador gráfico es demasiado antiguo para la transcripción por GPU. Actualízalo y la descarga aparecerá aquí."
 
-#: src/features/overview/overview-page.tsx:212
+#: src/features/overview/overview-page.tsx:213
 msgid "your hotkey"
 msgstr "tu atajo"
 

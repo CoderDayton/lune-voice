@@ -149,7 +149,7 @@ export function TranscriptionSection({ settings }: SettingsProps) {
                   onChange={(e) => setConfidence(e.target.value)}
                   aria-label={t`Correction sensitivity`}
                 />
-                <span className="text-sm tabular-nums text-content-muted w-12 text-right">
+                <span className="text-sm tabular-nums text-content-muted w-12 text-end">
                   {Number(confidence).toFixed(2)}
                 </span>
               </div>

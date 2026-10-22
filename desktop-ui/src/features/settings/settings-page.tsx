@@ -109,7 +109,7 @@ export function SettingsPage() {
                 onClick={() => setActive(id)}
                 aria-current={isActive ? 'page' : undefined}
                 title={label}
-                className={`${NAV_ITEM_BASE} h-12 shrink-0 pr-4 pl-2 text-left @3xl:w-full @3xl:min-w-0 ${navItemState(isActive)}`}
+                className={`${NAV_ITEM_BASE} h-12 shrink-0 pe-4 ps-2 text-start @3xl:w-full @3xl:min-w-0 ${navItemState(isActive)}`}
               >
                 <NavBead active={isActive}>
                   <Icon

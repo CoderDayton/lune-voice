@@ -92,7 +92,7 @@ function EngineCard({ label, description, icon: Icon, active, onSelect }: Engine
       type="button"
       aria-pressed={active}
       onClick={onSelect}
-      className={`group flex flex-col gap-2 rounded-box border p-3 text-left transition-all duration-fast ${
+      className={`group flex flex-col gap-2 rounded-box border p-3 text-start transition-all duration-fast ${
         active
           ? 'border-primary/50 bg-primary/8 shadow-sm'
           : 'border-surface-border bg-surface-inset hover:border-primary/40 hover:bg-primary/5'
