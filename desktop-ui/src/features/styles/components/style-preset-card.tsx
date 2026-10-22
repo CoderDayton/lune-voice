@@ -84,8 +84,8 @@ export function StylePresetCard({
           card mostly empty; now the text sets the height. */}
       <div className="pointer-events-none relative z-10 mt-3 flex min-h-6 items-center justify-end">
         {isConfirmingDelete ? (
-          <div className="pointer-events-auto flex items-center gap-1.5">
-            <span className="text-xs text-content-muted">{t`Delete?`}</span>
+          <div className="pointer-events-auto flex min-w-0 flex-wrap items-center justify-end gap-1.5">
+            <span className="min-w-0 break-words break-keep text-xs text-content-muted">{t`Delete?`}</span>
             <button type="button" className="btn btn-error btn-xs" onClick={onConfirmDelete}>
               {t`Yes`}
             </button>

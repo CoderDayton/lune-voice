@@ -139,11 +139,11 @@ msgstr "操作"
 #: src/features/settings/components/gpu-backend-card.tsx:97
 #: src/features/styles/components/style-preset-card.tsx:78
 msgid "Active"
-msgstr "积极的"
+msgstr "已启用"
 
 #: src/features/styles/components/style-hero.tsx:36
 msgid "Active style"
-msgstr "活跃风格"
+msgstr "当前风格"
 
 #: src/features/settings/sections/dictation-section.tsx:154
 #: src/features/settings/sections/dictation-section.tsx:162
@@ -160,7 +160,7 @@ msgstr "添加更正"
 
 #: src/features/dictionary/components/dictionary-table.tsx:189
 msgid "Add a fix and Lune Voice applies it every time you dictate. Try a starter below or add your own above."
-msgstr "添加修复后，Lune Voice 会在您每次听写时应用它。尝试下面的启动器或在上面添加您自己的启动器。"
+msgstr "添加一条更正后，Lune Voice 会在你每次听写时自动应用。可以试试下面的示例，或在上方添加你自己的更正。"
 
 #: src/features/snippets/snippets-page.tsx:357
 msgid "Add snippet"
@@ -192,7 +192,7 @@ msgstr "所有必需的模型均已安装。准备好后继续。"
 
 #: src/features/overview/overview-page.tsx:105
 msgid "all-time · today"
-msgstr "全部 · 今天"
+msgstr "累计 · 今天"
 
 #: src/features/settings/components/uinput-rule-row.tsx:115
 #: src/features/welcome/components/ready-checks.tsx:126
@@ -218,20 +218,20 @@ msgstr "始终使用 Ctrl+V"
 
 #: src/features/settings/components/openai-fields.tsx:37
 msgid "API endpoint"
-msgstr "API端点"
+msgstr "API 端点"
 
 #: src/features/settings/components/openai-fields.tsx:49
 msgid "API key"
-msgstr "API密钥"
+msgstr "API 密钥"
 
 #: src/features/settings/sections/appearance-section.tsx:16
 #: src/features/settings/settings-page.tsx:71
 msgid "Appearance"
-msgstr "外貌"
+msgstr "外观"
 
 #: src/features/settings/sections/general-section.tsx:63
 msgid "Application behavior and startup preferences."
-msgstr "应用程序行为和启动首选项。"
+msgstr "应用行为和启动选项。"
 
 #: src/features/dictionary/components/dictionary-table.tsx:302
 msgid "Applied on every dictation · highest priority first"
@@ -256,7 +256,7 @@ msgstr "至少 {MIN_MESSAGE_CHARS} 个字符。"
 
 #: src/features/overview/overview-page.tsx:153
 msgid "Audio"
-msgstr "声音的"
+msgstr "音频"
 
 #: src/features/dictation/audio-dots.tsx:14
 msgid "Audio activity"
@@ -268,7 +268,7 @@ msgstr "听写开始、完成或出错时播放的音频反馈。"
 
 #: src/features/styles/components/style-editor-modal.tsx:79
 msgid "Auto-capitalize sentences"
-msgstr "自动大写句子"
+msgstr "句首自动大写"
 
 #: src/features/settings/data/settings-data.ts:488
 msgid "Auto-detect"
@@ -293,7 +293,7 @@ msgstr "基础"
 
 #: src/features/settings/sections/styling-engine-section.tsx:66
 msgid "Base URL for the OpenAI-compatible styling API."
-msgstr "OpenAI 兼容风格 API 的基础 URL。"
+msgstr "OpenAI 兼容润色 API 的基础 URL。"
 
 #: src/features/settings/components/asr-engine-cards.tsx:125
 msgid "Base URL for the OpenAI-compatible transcription API."
@@ -383,16 +383,16 @@ msgstr "已知名称首字母大写"
 
 #: src/features/styles/components/style-hero.tsx:25
 msgid "Capitals"
-msgstr "首都"
+msgstr "大写"
 
 #: src/components/ui/voice-capture-field.tsx:155
 #: src/components/ui/voice-capture-field.tsx:161
 msgid "Capture by voice"
-msgstr "用语音录制"
+msgstr "语音录入"
 
 #: src/features/settings/sections/dictation-section.tsx:135
 msgid "Capture device and how recording detects when you speak."
-msgstr "采集设备以及录音如何检测您何时说话。"
+msgstr "采集设备，以及录音时如何检测你在说话。"
 
 #: src/features/styles/builtin-styles.ts:14
 msgid "Casual"
@@ -418,7 +418,7 @@ msgstr "检查是否已发布更新版本。"
 
 #: src/features/welcome/welcome-page.tsx:219
 msgid "Check your network and we'll pick up where we left off."
-msgstr "检查您的网络，我们将从上次中断的地方继续。"
+msgstr "请检查网络，我们会从中断处继续。"
 
 #: src/features/updates/update-dialog.tsx:108
 msgid "Checking for updates"
@@ -426,7 +426,7 @@ msgstr "正在检查更新"
 
 #: src/features/welcome/welcome-page.tsx:82
 msgid "Checking installed models…"
-msgstr "检查已安装的型号..."
+msgstr "正在检查已安装的模型…"
 
 #: src/features/settings/components/asr-engine-cards.tsx:314
 #: src/features/settings/sections/general-section.tsx:159
@@ -436,7 +436,7 @@ msgstr "检查中…"
 
 #: src/features/settings/sections/output-section.tsx:22
 msgid "Choose how finished text is inserted into the app you are currently using."
-msgstr "选择如何将完成的文本插入到您当前使用的应用程序中。"
+msgstr "选择如何将完成的文本插入到你当前使用的应用中。"
 
 #: src/features/settings/sections/appearance-section.tsx:17
 msgid "Choose how Lune Voice looks."
@@ -449,7 +449,7 @@ msgstr "选择如何润色转写结果 — 发送到你配置的 OpenAI 兼容�
 #: src/features/welcome/welcome-page.tsx:222
 #: src/features/welcome/welcome-page.tsx:228
 msgid "Choose the AI models to install. Everything runs offline — no cloud, no accounts."
-msgstr "选择要安装的 AI 模型。一切都离线运行——没有云，没有账户。"
+msgstr "选择要安装的 AI 模型。全部离线运行——无需云端，无需账户。"
 
 #: src/features/settings/components/asr-engine-cards.tsx:422
 msgid "Choose your dictation language below. Parakeet cannot tell Lune which language it heard, so until one is set every dictation is formatted as English."
@@ -457,7 +457,7 @@ msgstr "请在下方选择听写语言。Parakeet 无法告诉 Lune 它听到的
 
 #: src/features/welcome/welcome-page.tsx:207
 msgid "Choose your speech engine. Everything runs offline — no cloud, no accounts."
-msgstr "选择您的语音引擎。一切都离线运行——没有云，没有账户。"
+msgstr "选择你的语音引擎。全部离线运行——无需云端，无需账户。"
 
 #: src/components/ui/list-card.tsx:89
 msgid "Clear {label}"
@@ -508,7 +508,7 @@ msgstr "紧凑"
 #: src/features/history/components/session-detail-modal.tsx:183
 #: src/lib/session-format.ts:9
 msgid "Completed"
-msgstr "完全的"
+msgstr "已完成"
 
 #: src/features/overview/overview-page.tsx:288
 #: src/features/shell/components/app-shell.tsx:176
@@ -548,7 +548,7 @@ msgstr "复制转写结果"
 
 #: src/features/settings/sections/pill-section.tsx:238
 msgid "Corner rounding of the pill bar."
-msgstr "指示器条的圆角程度。"
+msgstr "指示器的圆角程度。"
 
 #: src/features/settings/sections/pill-section.tsx:237
 msgid "Corners"
@@ -556,12 +556,12 @@ msgstr "圆角"
 
 #: src/features/settings/sections/transcription-section.tsx:116
 msgid "Correction"
-msgstr "校正"
+msgstr "纠错"
 
 #: src/features/settings/sections/transcription-section.tsx:135
 #: src/features/settings/sections/transcription-section.tsx:150
 msgid "Correction sensitivity"
-msgstr "校正灵敏度"
+msgstr "纠错灵敏度"
 
 #: src/features/shell/config/navigation.ts:76
 msgid "Corrections Lune Voice applies every time you dictate"
@@ -569,11 +569,11 @@ msgstr "Lune Voice 每次听写时应用的更正"
 
 #: src/features/welcome/welcome-page.tsx:322
 msgid "Could not download GPU support — transcription will run on the CPU. You can retry under Settings › Models."
-msgstr "无法下载 GPU 支持 — 转录将在 CPU 上运行。你可以在“设置 › 型号”中重试。"
+msgstr "无法下载 GPU 支持 — 转写将在 CPU 上运行。你可以在“设置 › 模型”中重试。"
 
 #: src/features/dictionary/components/dictionary-form.tsx:42
 msgid "Couldn't add that rule. Try again."
-msgstr "无法添加该规则。再试一次。"
+msgstr "无法添加该规则。请重试。"
 
 #: src/features/welcome/components/ready-checks.tsx:102
 msgid "Couldn't check your input devices."
@@ -605,11 +605,11 @@ msgstr "新建片段"
 
 #: src/features/styles/styles-page.tsx:312
 msgid "Create new style"
-msgstr "创造新风格"
+msgstr "新建风格"
 
 #: src/features/styles/components/style-editor-modal.tsx:100
 msgid "Create style"
-msgstr "创造风格"
+msgstr "创建风格"
 
 #: src/features/welcome/welcome-page.tsx:514
 msgid "Ctrl+Space"
@@ -673,7 +673,7 @@ msgstr "要删除该片段吗？"
 
 #: src/features/dictionary/components/dictionary-table.tsx:163
 msgid "Delete this word fix?"
-msgstr "删除此修正？"
+msgstr "删除此更正？"
 
 #: src/features/styles/components/style-preset-card.tsx:88
 msgid "Delete?"
@@ -681,7 +681,7 @@ msgstr "删除？"
 
 #: src/features/styles/components/style-editor-modal.tsx:154
 msgid "Describe how text should be formatted. E.g., \"Use bullet points. Keep sentences short. Avoid jargon.\""
-msgstr "描述文本应如何格式化。例如，“使用要点。保持句子简短。避免行话。”"
+msgstr "描述文本应如何格式化。例如：“使用项目符号。句子保持简短。避免术语。”"
 
 #: src/features/styles/components/style-editor-modal.tsx:122
 msgid "Description"
@@ -705,7 +705,7 @@ msgstr "每次会话自动检测所说的语言。"
 
 #: src/features/styles/components/style-editor-modal.tsx:163
 msgid "Deterministic fixes applied before any AI styling."
-msgstr "在任何 AI 样式之前应用确定性修复。"
+msgstr "在 AI 润色之前应用的确定性修正。"
 
 #: src/features/settings/settings-page.tsx:72
 msgid "Dictation"
@@ -736,7 +736,7 @@ msgstr "放弃听写"
 
 #: src/features/settings/sections/dictation-section.tsx:87
 msgid "Discard the current draft and return to idle. Click the binding to change it."
-msgstr "放弃当前草稿并返回空闲状态。单击绑定以更改它。"
+msgstr "放弃当前草稿并返回空闲状态。点击按键绑定即可更改。"
 
 #: src/features/overview/overview-page.tsx:288
 msgid "Disconnected"
@@ -748,7 +748,7 @@ msgstr "磁盘使用情况"
 
 #: src/components/feedback/error-toast.tsx:26
 msgid "Dismiss error"
-msgstr "消除错误"
+msgstr "关闭错误提示"
 
 #: src/features/settings/data/settings-data.ts:546
 msgid "Don't save history"
@@ -762,7 +762,7 @@ msgstr "下载"
 
 #: src/features/welcome/welcome-page.tsx:460
 msgid "Download {pendingCount} models"
-msgstr "下载 {pendingCount} 模型"
+msgstr "下载 {pendingCount} 个模型"
 
 #: src/features/welcome/welcome-page.tsx:459
 msgid "Download 1 model"
@@ -792,7 +792,7 @@ msgstr "正在下载 GPU 支持。"
 
 #: src/features/welcome/welcome-page.tsx:212
 msgid "Downloading models"
-msgstr "下载模型"
+msgstr "正在下载模型"
 
 #: src/features/updates/update-dialog.tsx:112
 msgid "Downloading update"
@@ -802,11 +802,11 @@ msgstr "正在下载更新"
 #: src/features/settings/components/gpu-backend-card.tsx:27
 #: src/features/welcome/welcome-page.tsx:404
 msgid "Downloading…"
-msgstr "正在下载..."
+msgstr "正在下载…"
 
 #: src/features/styles/components/style-editor-modal.tsx:241
 msgid "Duplicate"
-msgstr "复制"
+msgstr "创建副本"
 
 #: src/features/history/components/session-detail-modal.tsx:171
 msgid "Duration"
@@ -814,7 +814,7 @@ msgstr "时长"
 
 #: src/features/styles/components/style-editor-modal.tsx:112
 msgid "e.g. Meeting notes"
-msgstr "例如会议记录"
+msgstr "例如：会议记录"
 
 #: src/features/settings/sections/pill-section.tsx:130
 msgid "Edge distance"
@@ -842,7 +842,7 @@ msgstr "编辑片段"
 
 #: src/features/styles/components/style-editor-modal.tsx:100
 msgid "Edit style"
-msgstr "编辑样式"
+msgstr "编辑风格"
 
 #: src/features/snippets/snippets-page.tsx:245
 msgid "Editing “{spokenTrigger}”"
@@ -865,15 +865,15 @@ msgstr "引擎"
 
 #: src/features/welcome/welcome-page.tsx:441
 msgid "Enter Lune Voice"
-msgstr "输入 Lune 语音"
+msgstr "进入 Lune Voice"
 
 #: src/features/styles/components/style-editor-modal.tsx:225
 msgid "Examples are out of date since you edited the prompt."
-msgstr "自您编辑提示词后，示例已过时。"
+msgstr "你编辑了提示词，示例已过时。"
 
 #: src/features/styles/components/style-editor-modal.tsx:202
 msgid "Examples teach the styling engine your style. Regenerate them after editing the prompt."
-msgstr "示例向润色引擎传授您的风格。编辑提示词后请重新生成它们。"
+msgstr "示例让润色引擎学会你的风格。编辑提示词后请重新生成。"
 
 #: src/features/shell/components/sidebar.tsx:33
 msgid "Expand sidebar"
@@ -917,11 +917,11 @@ msgstr "少样本示例"
 
 #: src/features/dictionary/components/dictionary-table.tsx:251
 msgid "Filter rules"
-msgstr "过滤规则"
+msgstr "筛选规则"
 
 #: src/features/dictionary/components/dictionary-table.tsx:250
 msgid "Filter rules…"
-msgstr "过滤规则..."
+msgstr "筛选规则…"
 
 #: src/features/snippets/snippets-page.tsx:407
 msgid "Filter snippets"
@@ -933,7 +933,7 @@ msgstr "筛选片段…"
 
 #: src/features/settings/sections/transcription-section.tsx:117
 msgid "Fix recognizer errors with your dictionary and known vocabulary, on your device. It uses per-word confidence and statistical patterns — no AI model, and it never rewrites what you said."
-msgstr "在您的设备上，用您的词典和已知词汇修正识别错误。它使用逐词置信度和统计模式——无 AI 模型，也绝不会改写您所说的内容。"
+msgstr "在你的设备上，用你的词典和已知词汇修正识别错误。它依据逐词置信度和统计规律——不使用 AI 模型，也绝不会改写你说的内容。"
 
 #: src/features/styles/components/style-editor-modal.tsx:190
 msgid "Follow Settings"
@@ -949,7 +949,7 @@ msgstr "强制使用终端粘贴快捷键。若主要在终端里听写，可在
 
 #: src/features/settings/sections/pill-section.tsx:183
 msgid "Forget where you dragged the pill and return it to its preset spot."
-msgstr "忘记你拖动指示器的位置，并将其恢复到预设位置。"
+msgstr "清除拖动后的位置，将指示器恢复到预设位置。"
 
 #: src/features/styles/builtin-styles.ts:16
 msgid "Formal"
@@ -958,7 +958,7 @@ msgstr "正式"
 #: src/features/styles/components/style-editor-modal.tsx:161
 #: src/features/styles/components/style-hero.tsx:60
 msgid "Formatting"
-msgstr "格式化"
+msgstr "格式"
 
 #: src/features/shell/config/navigation.ts:94
 msgid "Formatting presets for your text"
@@ -993,7 +993,7 @@ msgstr "一般反馈"
 #: src/features/styles/components/style-editor-modal.tsx:220
 #: src/features/styles/components/style-editor-modal.tsx:256
 msgid "Generating examples…"
-msgstr "生成示例..."
+msgstr "正在生成示例…"
 
 #: src/features/dictionary/components/dictionary-form.tsx:62
 msgid "github"
@@ -1056,7 +1056,7 @@ msgstr "历史记录永久保留"
 #: src/features/settings/sections/general-section.tsx:115
 #: src/features/settings/sections/general-section.tsx:121
 msgid "History retention"
-msgstr "历史记录保留"
+msgstr "历史记录保留时长"
 
 #: src/features/settings/sections/dictation-section.tsx:124
 msgid "Hold is unavailable right now, so the shortcut toggles recording instead. Grant keyboard access to use Hold."
@@ -1096,7 +1096,7 @@ msgstr "听写提示音的播放音量。"
 
 #: src/features/settings/sections/pill-section.tsx:202
 msgid "How the pill bar looks. Changes apply immediately."
-msgstr "指示器条的外观。更改会立即生效。"
+msgstr "指示器的外观。更改会立即生效。"
 
 #: src/features/welcome/welcome-page.tsx:507
 msgid "How to dictate"
@@ -1153,7 +1153,7 @@ msgstr "正在安装更新"
 
 #: src/features/styles/components/style-editor-modal.tsx:137
 msgid "Instructions"
-msgstr "指示"
+msgstr "指令"
 
 #: src/components/feedback/help-feedback-dialog.tsx:252
 msgid "Join the discussions"
@@ -1173,7 +1173,7 @@ msgstr "保持加载"
 
 #: src/features/settings/sections/output-section.tsx:57
 msgid "Keep the dictated text on the clipboard after every dictation, so you can paste it again yourself."
-msgstr "每次听写后将听写的文本保留在剪贴板中，以便您自己再次粘贴。"
+msgstr "每次听写后将文本保留在剪贴板中，方便你再次手动粘贴。"
 
 #: src/features/settings/sections/pill-section.tsx:94
 msgid "Keep the pill with you when you switch workspaces or virtual desktops."
@@ -1182,7 +1182,7 @@ msgstr "切换工作区或虚拟桌面时，指示器始终跟随显示。"
 #: src/features/settings/components/uinput-rule-row.tsx:92
 #: src/features/welcome/components/ready-checks.tsx:108
 msgid "Keyboard access"
-msgstr "键盘访问"
+msgstr "键盘访问权限"
 
 #: src/features/shell/components/sidebar-quick-actions.tsx:64
 msgid "Keyboard shortcuts"
@@ -1212,7 +1212,7 @@ msgstr "稍后"
 
 #: src/features/settings/sections/general-section.tsx:83
 msgid "Launch into the system tray instead of opening the main window. Useful when Lune Voice autostarts on login."
-msgstr "启动到系统托盘而不是打开主窗口。当 Lune Voice 在登录时自动启动时很有用。"
+msgstr "启动后最小化到系统托盘，不打开主窗口。适合 Lune Voice 随登录自动启动时使用。"
 
 #: src/features/history/components/history-table.tsx:187
 #: src/features/overview/overview-page.tsx:225
@@ -1246,7 +1246,7 @@ msgstr "正在聆听 — 请说出该短语…"
 #: src/features/overview/overview-page.tsx:160
 #: src/features/shell/components/sidebar-widgets.tsx:82
 msgid "Listening…"
-msgstr "正在听……"
+msgstr "正在聆听…"
 
 #: src/features/settings/sections/pill-section.tsx:169
 #: src/features/settings/sections/pill-section.tsx:177
@@ -1296,7 +1296,7 @@ msgstr "Lune Voice 需要权限才能在其他应用中输入文字并识别你�
 
 #: src/features/dictionary/components/dictionary-form.tsx:82
 msgid "Lune Voice writes"
-msgstr "月光之声写道"
+msgstr "Lune Voice 写成"
 
 #. Short for medium priority
 #: src/features/dictionary/components/priority-picker.tsx:18
@@ -1360,7 +1360,7 @@ msgstr "多语言 · 在本机运行"
 
 #: src/features/styles/components/style-editor-modal.tsx:107
 msgid "Name"
-msgstr "姓名"
+msgstr "名称"
 
 #: src/features/styles/components/style-editor-modal.tsx:118
 msgid "Name is too long."
@@ -1423,7 +1423,7 @@ msgstr "没有会话匹配“{0}”。"
 
 #: src/features/overview/overview-page.tsx:210
 msgid "No sessions yet"
-msgstr "还没有会议"
+msgstr "还没有会话"
 
 #: src/features/history/components/history-table.tsx:158
 msgid "No sessions yet. Start dictating to see your transcripts here."
@@ -1439,7 +1439,7 @@ msgstr "还没有片段"
 
 #: src/features/settings/data/settings-data.ts:170
 msgid "No styling — transcripts are delivered exactly as transcribed."
-msgstr "不做风格处理——转写结果原样输出。"
+msgstr "不润色——转写结果原样输出。"
 
 #: src/features/history/components/history-table.tsx:484
 #: src/features/history/components/session-detail-modal.tsx:163
@@ -1453,7 +1453,7 @@ msgstr "无"
 
 #: src/features/settings/sections/dictation-section.tsx:155
 msgid "Normalizes microphone level before voice detection. Helps quiet mics and noisy rooms. Recommended."
-msgstr "在语音检测之前标准化麦克风电平。有助于安静的麦克风和嘈杂的房间。受到推崇的。"
+msgstr "在语音检测前对麦克风电平进行归一化。适用于音量小的麦克风和嘈杂的环境。推荐开启。"
 
 #: src/features/settings/sections/pill-section.tsx:66
 msgid "not connected"
@@ -1473,7 +1473,7 @@ msgstr "在本机运行 NVIDIA Parakeet。在 CPU 上比 Whisper 快得多，支
 
 #: src/features/welcome/components/engine-step.tsx:85
 msgid "NVIDIA Parakeet running on-device. Punctuates by itself and detects which of its languages you speak."
-msgstr "NVIDIA Parakeet 在设备端运行。自动添加标点，并识别您说的是它支持的哪种语言。"
+msgstr "NVIDIA Parakeet 在本机运行。自动添加标点，并识别你说的是它支持的哪种语言。"
 
 #: src/features/settings/data/settings-data.ts:169
 #: src/features/styles/components/style-editor-modal.tsx:192
@@ -1482,7 +1482,7 @@ msgstr "关闭"
 
 #: src/features/settings/sections/styling-engine-section.tsx:45
 msgid "Off delivers raw transcripts. Which style is applied is chosen on the Styles tab."
-msgstr "关闭时传递原始转录文本。应用哪种风格在“风格”标签页中选择。"
+msgstr "关闭时输出原始转写结果。具体使用哪种风格在“风格”页面中选择。"
 
 #: src/features/styles/builtin-styles.ts:16
 msgid "Official correspondence and documents"
@@ -1499,7 +1499,7 @@ msgstr "开启"
 
 #: src/features/styles/components/style-editor-modal.tsx:126
 msgid "One-line summary shown on the card"
-msgstr "卡片上显示一行摘要"
+msgstr "显示在卡片上的一句话简介"
 
 #: src/features/shell/components/app-shell.tsx:119
 msgid "Open menu"
@@ -1511,7 +1511,7 @@ msgstr "打开发布页面"
 
 #: src/features/overview/overview-page.tsx:182
 msgid "Open session from {time}"
-msgstr "{time} 开始的会议"
+msgstr "打开 {time} 的会话"
 
 #: src/features/settings/data/settings-data.ts:623
 msgid "OpenAI-compatible"
@@ -1524,7 +1524,7 @@ msgstr "OpenAI 兼容 API"
 
 #: src/features/welcome/components/model-card.tsx:95
 msgid "Optional"
-msgstr "选修的"
+msgstr "可选"
 
 #: src/components/feedback/help-feedback-dialog.tsx:69
 msgid "or send directly"
@@ -1540,11 +1540,11 @@ msgstr "输出"
 
 #: src/features/settings/sections/pill-section.tsx:207
 msgid "Overall footprint of the pill bar."
-msgstr "指示器条的整体尺寸。"
+msgstr "指示器的整体尺寸。"
 
 #: src/features/welcome/welcome-page.tsx:348
 msgid "Overall progress"
-msgstr "总体进展"
+msgstr "总体进度"
 
 #: src/features/history/components/history-table.tsx:240
 msgid "Pagination"
@@ -1562,7 +1562,7 @@ msgstr "Parakeet（本地）"
 
 #: src/features/welcome/components/engine-step.tsx:287
 msgid "Parakeet cannot tell Lune which language it heard, so set the one you speak. You can change it later in Settings."
-msgstr "Parakeet 无法告诉 Lune 它听到的是哪种语言，请设置您所说的语言。之后可以在设置中更改。"
+msgstr "Parakeet 无法告诉 Lune 它听到的是哪种语言，请设置你所说的语言。之后可以在设置中更改。"
 
 #: src/features/settings/components/asr-engine-cards.tsx:423
 msgid "Parakeet cannot transcribe {languageName}, so dictation will not start. Choose a language it covers below, or use Whisper."
@@ -1583,7 +1583,7 @@ msgstr "粘贴到应用"
 
 #: src/features/settings/sections/output-section.tsx:27
 msgid "Paste is simplest. Typing keystrokes can work better in some apps."
-msgstr "粘贴最简单。在某些应用程序中，键入按键效果会更好。"
+msgstr "粘贴最简单。在某些应用中，模拟键入效果更好。"
 
 #: src/components/feedback/help-feedback-dialog.tsx:61
 msgid "Performance or speed"
@@ -1604,7 +1604,7 @@ msgstr "指示器圆角"
 
 #: src/features/settings/sections/pill-section.tsx:161
 msgid "Pill monitor"
-msgstr "指示器显示器"
+msgstr "指示器所在显示器"
 
 #: src/features/settings/sections/pill-section.tsx:226
 msgid "Pill orientation"
@@ -1620,7 +1620,7 @@ msgstr "指示器大小"
 
 #: src/features/settings/sections/pill-section.tsx:111
 msgid "Placement"
-msgstr "放置"
+msgstr "布局"
 
 #: src/features/settings/sections/output-section.tsx:82
 msgid "Play a short sound when dictation starts, finishes, or runs into an error."
@@ -1628,7 +1628,7 @@ msgstr "听写开始、完成或遇到错误时播放一小段声音。"
 
 #: src/features/welcome/welcome-page.tsx:416
 msgid "Please keep the app open until downloads finish"
-msgstr "请保持应用程序打开直至下载完成"
+msgstr "请保持应用打开，直至下载完成"
 
 #: src/features/settings/sections/pill-section.tsx:116
 msgid "Position"
@@ -1636,7 +1636,7 @@ msgstr "位置"
 
 #: src/features/settings/data/settings-data.ts:245
 msgid "Practically the accuracy of the original model. Recommended."
-msgstr "几乎与原始模型精度相同。推荐。"
+msgstr "精度与原始模型几乎相同。推荐。"
 
 #: src/features/settings/sections/pill-section.tsx:117
 msgid "Preset corner or edge the pill starts at."
@@ -1686,7 +1686,7 @@ msgstr "主显示器"
 #: src/features/dictionary/components/dictionary-table.tsx:277
 #: src/features/dictionary/components/priority-picker.tsx:63
 msgid "Priority"
-msgstr "优先事项"
+msgstr "优先级"
 
 #: src/features/dictation/dictation-pill.tsx:63
 #: src/features/dictation/dictation-pill.tsx:69
@@ -1696,7 +1696,7 @@ msgstr "处理中"
 
 #: src/features/shell/components/sidebar-widgets.tsx:82
 msgid "Processing…"
-msgstr "加工…"
+msgstr "正在处理…"
 
 #: src/features/styles/builtin-styles.ts:15
 msgid "Professional"
@@ -1713,7 +1713,7 @@ msgstr "退出 Lune Voice"
 #: src/features/overview/overview-page.tsx:288
 #: src/features/shell/components/app-shell.tsx:182
 msgid "Ready"
-msgstr "准备好"
+msgstr "就绪"
 
 #: src/features/overview/overview-page.tsx:339
 msgid "Recent sessions"
@@ -1750,7 +1750,7 @@ msgstr "移除"
 #. placeholder {1}: entry.replacement
 #: src/features/dictionary/components/dictionary-table.tsx:164
 msgid "Remove the saved correction for \"{0}\" → \"{1}\"."
-msgstr "删除已保存的“{0}”→“{1}”修正。"
+msgstr "删除已保存的更正：“{0}”→“{1}”。"
 
 #: src/features/settings/components/uinput-rule-row.tsx:106
 msgid "Removing…"
@@ -1770,7 +1770,7 @@ msgstr "报告问题、提出想法，或者只是聊聊使用感受。"
 
 #: src/features/welcome/components/model-card.tsx:92
 msgid "Required"
-msgstr "必需的"
+msgstr "必需"
 
 #: src/features/settings/sections/pill-section.tsx:194
 msgid "Reset"
@@ -1798,7 +1798,7 @@ msgstr "重试下载"
 
 #: src/features/styles/styles-page.tsx:248
 msgid "Rewrite each transcript in a chosen style. When off, the raw transcript is delivered as-is."
-msgstr "以选定的风格改写每份转录文本。关闭时，原始转录文本将按原样传递。"
+msgstr "按选定的风格改写每条转写结果。关闭时，原始转写结果将原样输出。"
 
 #: src/features/settings/data/settings-data.ts:133
 msgid "Rounded"
@@ -1864,7 +1864,7 @@ msgstr "选择本页所有会话"
 
 #: src/features/welcome/welcome-page.tsx:464
 msgid "Select required models"
-msgstr "选择需要的型号"
+msgstr "选择需要的模型"
 
 #: src/features/history/components/history-table.tsx:445
 msgid "Select session"
@@ -1889,15 +1889,15 @@ msgstr "将音频发送到你配置的端点"
 
 #: src/features/settings/data/settings-data.ts:155
 msgid "Sends audio to an OpenAI-compatible endpoint you configure — a server on your own machine, or a hosted API."
-msgstr "把音频发送到你配置的 OpenAI 兼容接口——可以是你自己机器上的服务，也可以是托管 API。"
+msgstr "把音频发送到你配置的 OpenAI 兼容端点——可以是你自己机器上的服务，也可以是托管 API。"
 
 #: src/features/settings/data/settings-data.ts:176
 msgid "Sends transcripts to an OpenAI-compatible endpoint you configure — Ollama, llama-server or LM Studio locally, or a hosted API."
-msgstr "把转写结果发送到你配置的 OpenAI 兼容接口——本地的 Ollama、llama-server 或 LM Studio，也可以是托管 API。"
+msgstr "把转写结果发送到你配置的 OpenAI 兼容端点——本地的 Ollama、llama-server 或 LM Studio，也可以是托管 API。"
 
 #: src/features/overview/overview-page.tsx:148
 msgid "session"
-msgstr "会议"
+msgstr "会话"
 
 #: src/features/history/components/session-detail-modal.tsx:207
 msgid "Session details"
@@ -1909,7 +1909,7 @@ msgstr "会话超时——后端可能无响应"
 
 #: src/features/overview/overview-page.tsx:148
 msgid "sessions"
-msgstr "会议"
+msgstr "会话"
 
 #: src/features/shell/config/navigation.ts:66
 msgid "Sessions"
@@ -1917,11 +1917,11 @@ msgstr "会话"
 
 #: src/features/shell/components/sidebar-widgets.tsx:98
 msgid "Set hotkey"
-msgstr "设置热键"
+msgstr "设置快捷键"
 
 #: src/features/settings/sections/transcription-section.tsx:62
 msgid "Set the language you speak. Auto uses detection from speech."
-msgstr "设置您所说的语言。 Auto 使用语音检测。"
+msgstr "设置你所说的语言。“自动检测”会根据语音识别语言。"
 
 #: src/features/welcome/welcome-page.tsx:457
 msgid "Set up GPU acceleration"
@@ -1937,12 +1937,12 @@ msgstr "设置"
 
 #: src/features/settings/settings-page.tsx:100
 msgid "Settings sections"
-msgstr "设置部分"
+msgstr "设置分区"
 
 #: src/features/settings/sections/dictation-section.tsx:71
 #: src/features/styles/components/style-hero.tsx:24
 msgid "Shortcuts"
-msgstr "快捷方式"
+msgstr "快捷键"
 
 #: src/features/settings/sections/pill-section.tsx:93
 #: src/features/settings/sections/pill-section.tsx:103
@@ -2024,7 +2024,7 @@ msgstr "语音引擎"
 
 #: src/features/dictionary/components/dictionary-table.tsx:79
 msgid "Spoken phrase"
-msgstr "口语短语"
+msgstr "说出的短语"
 
 #: src/features/settings/data/settings-data.ts:134
 msgid "Square"
@@ -2070,7 +2070,7 @@ msgstr "停止录制"
 #: src/features/shell/components/sidebar-widgets.tsx:51
 #: src/features/shell/components/sidebar-widgets.tsx:75
 msgid "Stop dictating"
-msgstr "停止口授"
+msgstr "停止听写"
 
 #: src/features/dictation/dictation-pill.tsx:64
 msgid "Stop dictation"
@@ -2099,15 +2099,15 @@ msgstr "润色引擎"
 
 #: src/lib/backend/llm.ts:24
 msgid "Styling is turned off. Enable a styling engine in Settings before generating examples."
-msgstr "风格处理已关闭。生成示例前，请先在设置中启用风格引擎。"
+msgstr "润色已关闭。生成示例前，请先在设置中启用润色引擎。"
 
 #: src/features/settings/sections/styling-engine-section.tsx:67
 msgid "Styling model name, e.g. gpt-4o-mini."
-msgstr "风格模型名称，例如 gpt-4o-mini。"
+msgstr "润色模型名称，例如 gpt-4o-mini。"
 
 #: src/features/styles/styles-page.tsx:275
 msgid "Switch style"
-msgstr "开关款式"
+msgstr "切换风格"
 
 #: src/features/shell/components/sidebar-quick-actions.tsx:58
 msgid "Switch to dark theme"
@@ -2128,7 +2128,7 @@ msgstr "系统默认"
 
 #: src/features/dictionary/components/dictionary-table.tsx:186
 msgid "Teach Lune Voice your words"
-msgstr "教 Lune 说出你的话"
+msgstr "让 Lune Voice 学会你的用词"
 
 #: src/features/styles/builtin-styles.ts:17
 msgid "Technical"
@@ -2136,7 +2136,7 @@ msgstr "技术"
 
 #: src/features/settings/sections/output-section.tsx:21
 msgid "Text delivery"
-msgstr "文本传递"
+msgstr "文本输出"
 
 #: src/features/styles/builtin-styles.ts:14
 msgid "Texting, messaging, chat"
@@ -2152,7 +2152,7 @@ msgstr "听写时显示的浮动状态指示器。"
 
 #: src/features/settings/sections/transcription-section.tsx:61
 msgid "The language you speak. Parakeet needs it set."
-msgstr "您所说的语言。使用 Parakeet 时必须设置。"
+msgstr "你所说的语言。使用 Parakeet 时必须设置。"
 
 #: src/features/overview/overview-page.tsx:323
 msgid "The local runtime isn't responding. The figures below are the last known values."
@@ -2160,7 +2160,7 @@ msgstr "本地运行时无响应。下方数据为最后已知的数值。"
 
 #: src/features/settings/sections/dictation-section.tsx:77
 msgid "The main shortcut used for voice typing. Click the binding to change it."
-msgstr "用于语音输入的主要快捷方式。单击绑定以更改它。"
+msgstr "用于语音输入的主快捷键。点击按键绑定即可更改。"
 
 #: src/components/ui/voice-capture-field.tsx:158
 msgid "The microphone is in use"
@@ -2172,7 +2172,7 @@ msgstr "模型常驻内存。每次听写都能立即开始。"
 
 #: src/features/settings/sections/transcription-section.tsx:136
 msgid "The words the recognizer is least sure about are checked against your dictionary and vocabulary. Higher checks more words; lower trusts the raw transcription."
-msgstr "识别器最不确定的词语会与您的词典和词汇进行核对。数值越高核对的词越多；越低则越信任原始转录。"
+msgstr "识别器最不确定的词语会与你的词典和词汇进行核对。数值越高核对的词越多；越低则越信任原始转写结果。"
 
 #: src/features/updates/update-dialog.tsx:160
 msgid "This copy can't update itself. Download the new version from {RELEASES_URL} and replace this one. Your settings, history and models are kept."
@@ -2180,11 +2180,11 @@ msgstr "此副本无法自行更新。请从 {RELEASES_URL} 下载新版本并�
 
 #: src/features/settings/components/asr-engine-cards.tsx:391
 msgid "This model is in use by your current configuration. Dictation may not work until you reinstall it or pick another."
-msgstr "此模型正被您当前的配置使用。在您重新安装它或选择其他模型之前，听写可能无法正常工作。"
+msgstr "当前配置正在使用此模型。在你重新安装或选择其他模型之前，听写可能无法正常工作。"
 
 #: src/features/welcome/welcome-page.tsx:213
 msgid "This only happens once. You can keep using your computer in the meantime."
-msgstr "这只会发生一次。在此期间您可以继续使用您的计算机。"
+msgstr "只需进行一次。在此期间你可以继续使用电脑。"
 
 #: src/features/updates/update-dialog.tsx:282
 msgid "This only takes a moment."
@@ -2192,12 +2192,12 @@ msgstr "只需片刻。"
 
 #: src/features/history/components/history-table.tsx:298
 msgid "This will permanently remove the selected dictation sessions and their transcripts."
-msgstr "这将永久删除所选的听写会话及其转录文本。"
+msgstr "这将永久删除所选的听写会话及其转写结果。"
 
 #: src/features/history/components/history-table.tsx:511
 #: src/features/history/components/session-detail-modal.tsx:215
 msgid "This will permanently remove this dictation session and its transcript."
-msgstr "这将永久删除该听写会话及其记录。"
+msgstr "这将永久删除该听写会话及其转写结果。"
 
 #: src/features/history/components/history-table.tsx:181
 #: src/features/overview/overview-page.tsx:222
@@ -2206,11 +2206,11 @@ msgstr "时间"
 
 #: src/features/styles/components/style-editor-modal.tsx:78
 msgid "Title abbreviations (\"Mister\" → \"Mr.\")"
-msgstr "头衔缩写（“先生”→“先生”）"
+msgstr "头衔缩写（“Mister”→“Mr.”）"
 
 #: src/features/styles/components/style-hero.tsx:26
 msgid "Titles"
-msgstr "标题"
+msgstr "头衔"
 
 #: src/features/overview/overview-page.tsx:213
 msgid "to start dictating"
@@ -2222,11 +2222,11 @@ msgstr "今天"
 
 #: src/features/settings/sections/dictation-section.tsx:114
 msgid "Toggle and cancel are bound to the same key combo. One will override the other."
-msgstr "切换和取消绑定到相同的组合键。其中一个将凌驾于另一个之上。"
+msgstr "切换和取消绑定到了同一组合键，其中一个会覆盖另一个。"
 
 #: src/features/settings/sections/dictation-section.tsx:97
 msgid "Toggle is easiest for longer dictation. Hold is better for quick bursts."
-msgstr "对于较长的听写来说，切换是最简单的。保持更适合快速爆发。"
+msgstr "较长的听写用切换模式最省事；简短语句用按住模式更合适。"
 
 #: src/features/settings/data/settings-data.ts:93
 msgid "Toggle to start and stop"
@@ -2246,7 +2246,7 @@ msgstr "右上"
 
 #: src/features/overview/overview-page.tsx:93
 msgid "Total words"
-msgstr "总词数"
+msgstr "总字数"
 
 #: src/components/ui/voice-capture-field.tsx:196
 msgid "Transcribing what you said…"
@@ -2264,20 +2264,20 @@ msgstr "转写结果"
 #: src/features/settings/sections/transcription-section.tsx:42
 #: src/features/settings/settings-page.tsx:74
 msgid "Transcription"
-msgstr "转录"
+msgstr "转写"
 
 #: src/components/feedback/help-feedback-dialog.tsx:60
 msgid "Transcription accuracy"
-msgstr "转录准确度"
+msgstr "转写准确度"
 
 #. placeholder {0}: status.devices.join(', ')
 #: src/features/settings/components/gpu-backend-card.tsx:115
 msgid "Transcription is running on {0}."
-msgstr "转录正在 {0} 上运行。"
+msgstr "转写正在 {0} 上运行。"
 
 #: src/features/settings/components/gpu-backend-card.tsx:116
 msgid "Transcription is running on your GPU."
-msgstr "转录正在你的 GPU 上运行。"
+msgstr "转写正在你的 GPU 上运行。"
 
 #: src/features/settings/components/asr-engine-cards.tsx:126
 msgid "Transcription model name, e.g. whisper-1."
@@ -2285,11 +2285,11 @@ msgstr "转写模型名称，例如 whisper-1。"
 
 #: src/features/settings/components/gpu-backend-card.tsx:150
 msgid "Transcription runs on the CPU. An optional download moves it to your GPU for noticeably lower latency."
-msgstr "转录在 CPU 上运行。可选下载会把它转到你的 GPU 上，延迟明显更低。"
+msgstr "转写在 CPU 上运行。下载可选组件后可改用 GPU，延迟明显更低。"
 
 #: src/features/settings/components/gpu-backend-card.tsx:148
 msgid "Transcription runs on the CPU. No GPU download has been published for this build yet."
-msgstr "转录在 CPU 上运行。此版本尚未发布 GPU 下载。"
+msgstr "转写在 CPU 上运行。此版本尚未发布 GPU 支持下载。"
 
 #: src/features/snippets/snippets-page.tsx:420
 msgid "Trigger"
@@ -2381,11 +2381,11 @@ msgstr "查看源代码"
 
 #: src/features/styles/components/style-editor-modal.tsx:100
 msgid "View style"
-msgstr "查看样式"
+msgstr "查看风格"
 
 #: src/features/settings/sections/pill-section.tsx:78
 msgid "Visibility"
-msgstr "显示"
+msgstr "可见性"
 
 #: src/features/shell/config/navigation.ts:75
 msgid "Vocabulary"
@@ -2412,7 +2412,7 @@ msgstr "欢迎回来"
 #: src/features/welcome/welcome-page.tsx:221
 #: src/features/welcome/welcome-page.tsx:227
 msgid "Welcome to Lune Voice"
-msgstr "欢迎来到Lune Voice"
+msgstr "欢迎使用 Lune Voice"
 
 #: src/components/feedback/help-feedback-dialog.tsx:93
 msgid "What happened, or what would you like to see?"
@@ -2432,7 +2432,7 @@ msgstr "更新内容"
 
 #: src/features/settings/sections/transcription-section.tsx:83
 msgid "When available, this can make transcription finish faster."
-msgstr "如果可用，这可以使转录更快完成。"
+msgstr "如果可用，可以让转写更快完成。"
 
 #: src/features/settings/data/settings-data.ts:107
 msgid "When dictating"
@@ -2480,7 +2480,7 @@ msgstr "字"
 #: src/features/history/components/session-detail-modal.tsx:170
 #: src/features/overview/overview-page.tsx:224
 msgid "Words"
-msgstr "字"
+msgstr "字数"
 
 #: src/features/shell/config/navigation.ts:116
 msgid "Workspace"
@@ -2492,7 +2492,7 @@ msgstr "WPM"
 
 #: src/features/settings/sections/transcription-section.tsx:122
 msgid "Write names like GitHub and iPhone the way their owners do. Turn this off to keep the recognizer's own capitals. A style can override this."
-msgstr "按所有者的写法书写 GitHub、iPhone 等名称。关闭后保留识别器自带的大小写。样式可以覆盖此设置。"
+msgstr "按官方写法书写 GitHub、iPhone 等名称。关闭后保留识别器自带的大小写。风格可以覆盖此设置。"
 
 #: src/features/styles/builtin-styles.ts:18
 msgid "Writing"
@@ -2500,7 +2500,7 @@ msgstr "写作"
 
 #: src/features/styles/components/style-preset-card.tsx:90
 msgid "Yes"
-msgstr "是的"
+msgstr "是"
 
 #: src/features/settings/sections/general-section.tsx:149
 msgid "You are running version {version}."
@@ -2512,7 +2512,7 @@ msgstr "你说"
 
 #: src/features/welcome/welcome-page.tsx:209
 msgid "You're all set"
-msgstr "你已经准备好了"
+msgstr "一切就绪"
 
 #: src/features/updates/update-dialog.tsx:109
 msgid "You're up to date"
@@ -2544,19 +2544,19 @@ msgstr "显卡驱动版本过旧，无法使用 GPU 转写。更新驱动后，�
 
 #: src/features/overview/overview-page.tsx:212
 msgid "your hotkey"
-msgstr "你的热键"
+msgstr "你的快捷键"
 
 #: src/features/welcome/welcome-page.tsx:210
 msgid "Your models are ready. Everything stays on this machine."
-msgstr "您的模型已准备就绪。一切都保留在这台机器上。"
+msgstr "你的模型已就绪。所有数据都保留在本机。"
 
 #: src/features/styles/styles-page.tsx:314
 msgid "Your own formatting preset"
-msgstr "您自己的格式预设"
+msgstr "你自己的格式预设"
 
 #: src/lib/backend/llm.ts:29
 msgid "Your styling provider isn’t fully configured. Add its API key and model in Settings before generating examples."
-msgstr "你的风格服务尚未配置完整。生成示例前，请在设置中填写 API 密钥和模型。"
+msgstr "你的润色服务尚未配置完整。生成示例前，请在设置中填写 API 密钥和模型。"
 
 #: src/features/welcome/components/ready-checks.tsx:79
 msgid "your system default mic"
