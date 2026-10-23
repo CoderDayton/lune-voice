@@ -511,7 +511,9 @@ pub fn capitalize_sentence_starts(text: &str) -> String {
 /// Disfluency fillers stripped as whole tokens. English-only: "um" is a real
 /// word in other languages (Portuguese "one/a"), so the caller language-gates
 /// this and the multilingual ASR is never touched.
-const FILLERS: &[&str] = &["um", "umm", "uhm", "uh", "uhh", "er", "erm", "hmm", "hm"];
+const FILLERS: &[&str] = &[
+    "um", "umm", "uhm", "uh", "uhh", "er", "erm", "hmm", "hm", "mm",
+];
 
 /// Remove standalone hesitation fillers ("um", "uh", …) that Qwen3-ASR
 /// transcribes verbatim, including mid-sentence ("the sidebar um, in its open
@@ -590,6 +592,11 @@ pub fn strip_false_starts(text: &str) -> String {
             } else {
                 kept.extend(run.iter().map(|&t| t.into()));
             }
+        } else if is_cut_off_word(tok, &toks[end..]) {
+            let next = toks[end];
+            if ARTICLES.contains(&next) && kept.last().is_some_and(|k| k.as_ref() == next) {
+                end += 1;
+            }
         } else if keeps_token(tok, i.checked_sub(1).map(|p| toks[p])) {
             kept.push(tok.into());
         }
@@ -604,6 +611,29 @@ pub fn strip_false_starts(text: &str) -> String {
 const KEY_WORDS: &[&str] = &[
     "ctrl", "control", "alt", "shift", "dash", "plus", "press", "key", "letter",
 ];
+
+const RARE_FRAGMENT_FREQ: u32 = 50_000;
+
+const ARTICLES: &[&str] = &["a", "an", "the"];
+
+fn is_cut_off_word(tok: &str, rest: &[&str]) -> bool {
+    if !(2..=3).contains(&tok.len()) || !tok.chars().all(|c| c.is_ascii_lowercase()) {
+        return false;
+    }
+    if crate::freq::dict_for("en")
+        .get(tok)
+        .is_some_and(|f| f >= RARE_FRAGMENT_FREQ)
+    {
+        return false;
+    }
+    let next = match rest {
+        [article, next, ..] if ARTICLES.contains(article) => next,
+        [next, ..] => next,
+        [] => return false,
+    };
+    let next = word_core(next).to_lowercase();
+    next.len() > tok.len() && next.starts_with(tok)
+}
 
 fn keeps_token(tok: &str, prev: Option<&str>) -> bool {
     let bare_lower = tok.len() == 1
@@ -695,8 +725,9 @@ pub fn decase_common_words(text: &str) -> String {
         // initial) capital — "Visual Studio Code", "Lune Voice" — is almost
         // always a multi-word proper noun, so never lowercase it. Neighbours are
         // read in the original casing.
-        let prev_cap = i > 0 && !after_mark[i - 1] && starts_upper(segs[i - 1].1);
-        let next_cap = i + 1 < segs.len() && !after_mark[i + 1] && starts_upper(segs[i + 1].1);
+        let name_like = |t: &str| starts_upper(t) && !is_pronoun_i(t);
+        let prev_cap = i > 0 && !after_mark[i - 1] && name_like(segs[i - 1].1);
+        let next_cap = i + 1 < segs.len() && !after_mark[i + 1] && name_like(segs[i + 1].1);
         if after_mark[i] || prev_cap || next_cap {
             out.push_str(token);
         } else {
@@ -704,6 +735,11 @@ pub fn decase_common_words(text: &str) -> String {
         }
     }
     out
+}
+
+fn is_pronoun_i(token: &str) -> bool {
+    let core = word_core(token);
+    core == "I" || core.starts_with("I'") || core.starts_with("I\u{2019}")
 }
 
 /// Whether `token`'s first alphabetic character is uppercase.
@@ -722,7 +758,7 @@ fn starts_upper(token: &str) -> bool {
 /// not know) are left capitalized.
 fn decase_token(token: &str, lower_seen: &std::collections::HashSet<&str>) -> String {
     let core = word_core(token);
-    if core.is_empty() {
+    if core.chars().count() < 2 {
         return token.to_string();
     }
     let lower = core.to_lowercase();
@@ -1272,6 +1308,10 @@ mod tests {
             strip_fillers("you might have to uh make a new token"),
             "you might have to make a new token"
         );
+        assert_eq!(
+            strip_fillers("Mm. Can you merge straight to main?"),
+            "Can you merge straight to main?"
+        );
     }
 
     #[test]
@@ -1302,6 +1342,40 @@ mod tests {
         );
         assert_eq!(strip_false_starts("the G P U is busy"), "the GPU is busy");
         assert_eq!(strip_false_starts("pick A, B, or C"), "pick A, B, or C");
+    }
+
+    #[test]
+    fn strip_false_starts_drops_short_cut_off_words() {
+        assert_eq!(
+            strip_false_starts("I mean the my Roblox pr program nightcap"),
+            "I mean the my Roblox program nightcap"
+        );
+        assert_eq!(
+            strip_false_starts("groove box forest or a mon monikai"),
+            "groove box forest or a monikai"
+        );
+        assert_eq!(
+            strip_false_starts("am I getting an in hu a human review"),
+            "am I getting an in a human review"
+        );
+        assert_eq!(
+            strip_false_starts("it'll pop up a mod a modal that says"),
+            "it'll pop up a modal that says"
+        );
+    }
+
+    #[test]
+    fn strip_false_starts_keeps_common_short_words() {
+        for text in [
+            "would it be better",
+            "that is what we were doing",
+            "change the theme",
+            "not add additions",
+            "that pop popular song",
+            "too far to the top",
+        ] {
+            assert_eq!(strip_false_starts(text), text);
+        }
     }
 
     #[test]
@@ -1557,6 +1631,22 @@ mod tests {
     #[test]
     fn decase_preserves_proper_noun() {
         assert_eq!(decase_common_words("I met John today"), "I met John today");
+    }
+
+    #[test]
+    fn decase_ignores_pronoun_i_as_a_proper_noun_neighbour() {
+        assert_eq!(
+            decase_common_words("it was a year. And So I don't know"),
+            "it was a year. And so I don't know"
+        );
+        assert_eq!(
+            decase_common_words("if we're thinking about A, I want"),
+            "if we're thinking about A, I want"
+        );
+        assert_eq!(
+            decase_common_words("not gonna drop Whisper, I'm gonna keep whisper"),
+            "not gonna drop Whisper, I'm gonna keep whisper"
+        );
     }
 
     #[test]

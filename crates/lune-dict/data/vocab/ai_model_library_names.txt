@@ -515,6 +515,7 @@ weaviate
 WebArena
 WebStorm
 Weights & Biases
+Whisper
 wikitext
 Wikitext-103
 WikiText-2
