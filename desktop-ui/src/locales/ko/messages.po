@@ -18,7 +18,7 @@ msgid "— change it any time in Settings › Dictation."
 msgstr "— 설정 › 받아쓰기에서 언제든지 바꿀 수 있습니다."
 
 #. placeholder {0}: snippet.triggerPhrase
-#: src/features/snippets/snippets-page.tsx:467
+#: src/features/snippets/snippets-page.tsx:469
 msgid "“{0}” will stop expanding. The template text is not recoverable."
 msgstr "“{0}”은(는) 더 이상 확장되지 않습니다. 템플릿 텍스트는 복구할 수 없습니다."
 
@@ -36,7 +36,7 @@ msgid "{0, plural, one {# preset} other {# presets}}"
 msgstr "{0, plural, other {프리셋 #개}}"
 
 #. placeholder {0}: entries.length
-#: src/features/dictionary/components/dictionary-table.tsx:257
+#: src/features/dictionary/components/dictionary-table.tsx:262
 msgid "{0, plural, one {# rule} other {# rules}}"
 msgstr "{0, plural, other {규칙 #개}}"
 
@@ -53,7 +53,7 @@ msgstr "{0, plural, other {세션}}"
 #. placeholder {0}: filtered.length
 #. placeholder {1}: entries.length
 #. placeholder {1}: snippets.length
-#: src/features/dictionary/components/dictionary-table.tsx:256
+#: src/features/dictionary/components/dictionary-table.tsx:261
 #: src/features/snippets/snippets-page.tsx:410
 msgid "{0} / {1}"
 msgstr "{0} / {1}"
@@ -137,7 +137,7 @@ msgstr "세로 표시기가 화면 가장자리에 붙습니다."
 msgid "Access still isn't available. A reboot may be needed for it to take effect."
 msgstr "아직 접근할 수 없습니다. 적용하려면 재부팅이 필요할 수 있습니다."
 
-#: src/features/dictionary/components/dictionary-table.tsx:283
+#: src/features/dictionary/components/dictionary-table.tsx:288
 msgid "Action"
 msgstr "작업"
 
@@ -163,7 +163,7 @@ msgstr "추가"
 msgid "Add a correction"
 msgstr "교정 추가"
 
-#: src/features/dictionary/components/dictionary-table.tsx:191
+#: src/features/dictionary/components/dictionary-table.tsx:192
 msgid "Add a fix and Lune Voice applies it every time you dictate. Try a starter below or add your own above."
 msgstr "교정 규칙을 추가하면 Lune Voice가 받아쓰기할 때마다 적용합니다. 아래 예시로 시작하거나 위에서 직접 추가하세요."
 
@@ -238,7 +238,7 @@ msgstr "모양"
 msgid "Application behavior and startup preferences."
 msgstr "앱 동작과 시작 설정입니다."
 
-#: src/features/dictionary/components/dictionary-table.tsx:304
+#: src/features/dictionary/components/dictionary-table.tsx:309
 msgid "Applied on every dictation · highest priority first"
 msgstr "모든 받아쓰기에 적용 · 우선순위 높은 순"
 
@@ -481,7 +481,7 @@ msgid "close"
 msgstr "닫기"
 
 #: src/components/feedback/help-feedback-dialog.tsx:281
-#: src/features/history/components/session-detail-modal.tsx:223
+#: src/features/history/components/session-detail-modal.tsx:226
 #: src/features/settings/components/asr-engine-cards.tsx:406
 #: src/features/styles/components/style-editor-modal.tsx:238
 #: src/features/updates/update-dialog.tsx:326
@@ -510,7 +510,7 @@ msgstr "단축키에는 보조 키(Ctrl, Shift 등)가 아닌 키가 하나 이�
 msgid "Compact"
 msgstr "소형"
 
-#: src/features/history/components/session-detail-modal.tsx:183
+#: src/features/history/components/session-detail-modal.tsx:186
 #: src/lib/session-format.ts:9
 msgid "Completed"
 msgstr "완료"
@@ -534,11 +534,11 @@ msgstr "계속"
 msgid "Control how your speech is turned into text."
 msgstr "음성을 텍스트로 변환하는 방식을 설정합니다."
 
-#: src/features/history/components/history-table.tsx:503
+#: src/features/history/components/history-table.tsx:506
 msgid "Copied"
 msgstr "복사됨"
 
-#: src/features/history/components/history-table.tsx:503
+#: src/features/history/components/history-table.tsx:506
 msgid "Copy"
 msgstr "복사"
 
@@ -634,8 +634,8 @@ msgid "Dark"
 msgstr "어둡게"
 
 #: src/components/feedback/confirm-dialog.tsx:72
-#: src/features/history/components/history-table.tsx:512
-#: src/features/history/components/session-detail-modal.tsx:216
+#: src/features/history/components/history-table.tsx:515
+#: src/features/history/components/session-detail-modal.tsx:219
 #: src/features/settings/components/asr-engine-cards.tsx:330
 #: src/features/settings/components/asr-engine-cards.tsx:331
 msgid "Delete"
@@ -644,8 +644,8 @@ msgstr "삭제"
 #. placeholder {0}: entry.phrase
 #. placeholder {0}: preset.name
 #. placeholder {0}: snippet.triggerPhrase
-#: src/features/dictionary/components/dictionary-table.tsx:167
-#: src/features/snippets/snippets-page.tsx:468
+#: src/features/dictionary/components/dictionary-table.tsx:168
+#: src/features/snippets/snippets-page.tsx:470
 #: src/features/styles/components/style-preset-card.tsx:113
 msgid "Delete {0}"
 msgstr "{0} 삭제"
@@ -667,16 +667,16 @@ msgstr "모델 삭제"
 msgid "Delete selected"
 msgstr "선택 항목 삭제"
 
-#: src/features/history/components/history-table.tsx:510
-#: src/features/history/components/session-detail-modal.tsx:214
+#: src/features/history/components/history-table.tsx:513
+#: src/features/history/components/session-detail-modal.tsx:217
 msgid "Delete session?"
 msgstr "세션을 삭제하시겠습니까?"
 
-#: src/features/snippets/snippets-page.tsx:466
+#: src/features/snippets/snippets-page.tsx:468
 msgid "Delete snippet?"
 msgstr "스니펫을 삭제하시겠습니까?"
 
-#: src/features/dictionary/components/dictionary-table.tsx:165
+#: src/features/dictionary/components/dictionary-table.tsx:166
 msgid "Delete this word fix?"
 msgstr "이 단어 교정을 삭제하시겠습니까?"
 
@@ -759,7 +759,7 @@ msgstr "오류 닫기"
 msgid "Don't save history"
 msgstr "기록을 저장하지 않음"
 
-#: src/features/history/components/history-table.tsx:506
+#: src/features/history/components/history-table.tsx:509
 #: src/features/settings/components/asr-engine-cards.tsx:344
 #: src/features/settings/components/gpu-backend-card.tsx:38
 msgid "Download"
@@ -813,7 +813,7 @@ msgstr "다운로드 중…"
 msgid "Duplicate"
 msgstr "복제"
 
-#: src/features/history/components/session-detail-modal.tsx:171
+#: src/features/history/components/session-detail-modal.tsx:174
 msgid "Duration"
 msgstr "소요 시간"
 
@@ -836,8 +836,8 @@ msgstr "편집"
 
 #. placeholder {0}: entry.phrase
 #. placeholder {0}: snippet.triggerPhrase
-#: src/features/dictionary/components/dictionary-table.tsx:160
-#: src/features/snippets/snippets-page.tsx:461
+#: src/features/dictionary/components/dictionary-table.tsx:161
+#: src/features/snippets/snippets-page.tsx:463
 msgid "Edit {0}"
 msgstr "{0} 편집"
 
@@ -863,7 +863,7 @@ msgid "Enable styling"
 msgstr "스타일 적용 사용"
 
 #: src/features/history/components/history-table.tsx:189
-#: src/features/history/components/session-detail-modal.tsx:172
+#: src/features/history/components/session-detail-modal.tsx:175
 #: src/features/settings/sections/styling-engine-section.tsx:44
 msgid "Engine"
 msgstr "엔진"
@@ -920,11 +920,11 @@ msgstr "Lune Voice {version}을(를) 다운로드하는 중입니다. 완료될 
 msgid "Few-shot examples"
 msgstr "퓨샷 예시"
 
-#: src/features/dictionary/components/dictionary-table.tsx:253
+#: src/features/dictionary/components/dictionary-table.tsx:258
 msgid "Filter rules"
 msgstr "규칙 검색"
 
-#: src/features/dictionary/components/dictionary-table.tsx:252
+#: src/features/dictionary/components/dictionary-table.tsx:257
 msgid "Filter rules…"
 msgstr "규칙 검색…"
 
@@ -1381,7 +1381,7 @@ msgstr "표시 안 함"
 
 #: src/features/snippets/snippets-page.tsx:207
 #: src/features/snippets/snippets-page.tsx:245
-#: src/features/snippets/snippets-page.tsx:509
+#: src/features/snippets/snippets-page.tsx:511
 msgid "New snippet"
 msgstr "새 스니펫"
 
@@ -1409,7 +1409,7 @@ msgstr "GPU 드라이버를 찾을 수 없습니다. 그래픽 카드 드라이�
 msgid "No microphone found. Plug one in, then pick it in Settings › Dictation."
 msgstr "마이크를 찾을 수 없습니다. 마이크를 연결한 뒤 설정 › 받아쓰기에서 선택하세요."
 
-#: src/features/dictionary/components/dictionary-table.tsx:265
+#: src/features/dictionary/components/dictionary-table.tsx:270
 msgid "No rules match “{query}”."
 msgstr "“{query}”과(와) 일치하는 규칙이 없습니다."
 
@@ -1438,7 +1438,7 @@ msgstr "아직 세션이 없습니다. 받아쓰기를 시작하면 여기에 �
 msgid "No snippets match “{query}”."
 msgstr "“{query}”과(와) 일치하는 스니펫이 없습니다."
 
-#: src/features/snippets/snippets-page.tsx:499
+#: src/features/snippets/snippets-page.tsx:501
 msgid "No snippets yet"
 msgstr "아직 스니펫이 없습니다"
 
@@ -1446,13 +1446,13 @@ msgstr "아직 스니펫이 없습니다"
 msgid "No styling — transcripts are delivered exactly as transcribed."
 msgstr "스타일 없음 — 인식한 그대로 전달합니다."
 
-#: src/features/history/components/history-table.tsx:484
-#: src/features/history/components/session-detail-modal.tsx:163
+#: src/features/history/components/history-table.tsx:487
+#: src/features/history/components/session-detail-modal.tsx:166
 msgid "No transcript"
 msgstr "텍스트 없음"
 
-#: src/features/history/components/history-table.tsx:496
-#: src/features/history/components/session-detail-modal.tsx:176
+#: src/features/history/components/history-table.tsx:499
+#: src/features/history/components/session-detail-modal.tsx:179
 msgid "None"
 msgstr "없음"
 
@@ -1595,7 +1595,7 @@ msgid "Performance or speed"
 msgstr "성능 또는 속도"
 
 #: src/features/dictionary/components/dictionary-table.tsx:78
-#: src/features/dictionary/components/dictionary-table.tsx:273
+#: src/features/dictionary/components/dictionary-table.tsx:278
 msgid "Phrase"
 msgstr "문구"
 
@@ -1688,7 +1688,7 @@ msgid "primary"
 msgstr "주 모니터"
 
 #: src/features/dictionary/components/dictionary-form.tsx:100
-#: src/features/dictionary/components/dictionary-table.tsx:279
+#: src/features/dictionary/components/dictionary-table.tsx:284
 #: src/features/dictionary/components/priority-picker.tsx:63
 msgid "Priority"
 msgstr "우선순위"
@@ -1753,7 +1753,7 @@ msgstr "제거"
 
 #. placeholder {0}: entry.phrase
 #. placeholder {1}: entry.replacement
-#: src/features/dictionary/components/dictionary-table.tsx:166
+#: src/features/dictionary/components/dictionary-table.tsx:167
 msgid "Remove the saved correction for \"{0}\" → \"{1}\"."
 msgstr "\"{0}\" → \"{1}\" 교정을 제거합니다."
 
@@ -1765,7 +1765,7 @@ msgstr "제거 중…"
 #: src/features/dictionary/components/dictionary-table.tsx:90
 #: src/features/dictionary/components/dictionary-table.tsx:102
 #: src/features/dictionary/components/dictionary-table.tsx:103
-#: src/features/dictionary/components/dictionary-table.tsx:276
+#: src/features/dictionary/components/dictionary-table.tsx:281
 msgid "Replacement"
 msgstr "대체어"
 
@@ -1831,7 +1831,7 @@ msgstr "변경 사항 저장"
 msgid "Save Transcript"
 msgstr "받아쓰기 텍스트 저장"
 
-#: src/features/snippets/snippets-page.tsx:502
+#: src/features/snippets/snippets-page.tsx:504
 msgid "Save your signature, a meeting header, or anything you type often — then speak its trigger to drop it into any app."
 msgstr "서명이나 회의 머리글처럼 자주 입력하는 것을 저장해 두고, 트리거를 말해서 어떤 앱에든 넣으세요."
 
@@ -1847,7 +1847,7 @@ msgstr "저장된 스니펫"
 msgid "Say <0>“{spokenTrigger}”</0> as the whole utterance — or <1>“insert {spokenTrigger}”</1> — to type this snippet."
 msgstr "<0>“{spokenTrigger}”</0>만 단독으로 말하거나 <1>“insert {spokenTrigger}”</1>라고 말하면 이 스니펫이 입력됩니다."
 
-#: src/features/snippets/snippets-page.tsx:483
+#: src/features/snippets/snippets-page.tsx:485
 msgid "Say a trigger as your whole utterance to expand it"
 msgstr "트리거만 단독으로 말하면 스니펫이 입력됩니다"
 
@@ -1900,7 +1900,7 @@ msgstr "직접 설정한 OpenAI 호환 엔드포인트로 오디오를 보냅니
 msgid "Sends transcripts to an OpenAI-compatible endpoint you configure — Ollama, llama-server or LM Studio locally, or a hosted API."
 msgstr "직접 설정한 OpenAI 호환 엔드포인트로 텍스트를 보냅니다. 로컬의 Ollama, llama-server, LM Studio나 호스팅 API를 사용할 수 있습니다."
 
-#: src/features/history/components/session-detail-modal.tsx:207
+#: src/features/history/components/session-detail-modal.tsx:210
 msgid "Session details"
 msgstr "세션 세부 정보"
 
@@ -2078,7 +2078,7 @@ msgstr "받아쓰기 중지"
 msgid "Stored on this device"
 msgstr "이 기기에 저장됨"
 
-#: src/features/history/components/session-detail-modal.tsx:175
+#: src/features/history/components/session-detail-modal.tsx:178
 msgid "Style"
 msgstr "스타일"
 
@@ -2123,7 +2123,7 @@ msgstr "시스템"
 msgid "System default"
 msgstr "시스템 기본값"
 
-#: src/features/dictionary/components/dictionary-table.tsx:188
+#: src/features/dictionary/components/dictionary-table.tsx:189
 msgid "Teach Lune Voice your words"
 msgstr "Lune Voice에 자주 쓰는 단어를 알려 주세요"
 
@@ -2191,8 +2191,8 @@ msgstr "잠시만 기다려 주세요."
 msgid "This will permanently remove the selected dictation sessions and their transcripts."
 msgstr "선택한 받아쓰기 세션과 텍스트가 영구적으로 삭제됩니다."
 
-#: src/features/history/components/history-table.tsx:511
-#: src/features/history/components/session-detail-modal.tsx:215
+#: src/features/history/components/history-table.tsx:514
+#: src/features/history/components/session-detail-modal.tsx:218
 msgid "This will permanently remove this dictation session and its transcript."
 msgstr "이 받아쓰기 세션과 텍스트가 영구적으로 삭제됩니다."
 
@@ -2469,12 +2469,12 @@ msgstr "Whisper(로컬)"
 msgid "whisper.cpp running on-device. Choose a size to trade speed for accuracy."
 msgstr "기기에서 실행되는 whisper.cpp입니다. 속도와 정확도를 절충할 크기를 선택하세요."
 
-#: src/features/history/components/history-table.tsx:489
+#: src/features/history/components/history-table.tsx:492
 msgid "words"
 msgstr "단어"
 
 #: src/features/history/components/history-table.tsx:184
-#: src/features/history/components/session-detail-modal.tsx:170
+#: src/features/history/components/session-detail-modal.tsx:173
 #: src/features/overview/overview-page.tsx:225
 msgid "Words"
 msgstr "단어"

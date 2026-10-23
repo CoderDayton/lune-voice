@@ -18,7 +18,7 @@ msgid "— change it any time in Settings › Dictation."
 msgstr "— इसे कभी भी सेटिंग्स › डिक्टेशन में बदलें।"
 
 #. placeholder {0}: snippet.triggerPhrase
-#: src/features/snippets/snippets-page.tsx:467
+#: src/features/snippets/snippets-page.tsx:469
 msgid "“{0}” will stop expanding. The template text is not recoverable."
 msgstr "“{0}” अब टेक्स्ट में नहीं बदलेगा। टेम्पलेट का टेक्स्ट वापस नहीं मिल सकेगा।"
 
@@ -36,7 +36,7 @@ msgid "{0, plural, one {# preset} other {# presets}}"
 msgstr "{0, plural, one {# प्रीसेट} other {# प्रीसेट}}"
 
 #. placeholder {0}: entries.length
-#: src/features/dictionary/components/dictionary-table.tsx:257
+#: src/features/dictionary/components/dictionary-table.tsx:262
 msgid "{0, plural, one {# rule} other {# rules}}"
 msgstr "{0, plural, one {# नियम} other {# नियम}}"
 
@@ -53,7 +53,7 @@ msgstr "{0, plural, one {सत्र} other {सत्र}}"
 #. placeholder {0}: filtered.length
 #. placeholder {1}: entries.length
 #. placeholder {1}: snippets.length
-#: src/features/dictionary/components/dictionary-table.tsx:256
+#: src/features/dictionary/components/dictionary-table.tsx:261
 #: src/features/snippets/snippets-page.tsx:410
 msgid "{0} / {1}"
 msgstr "{0} / {1}"
@@ -137,7 +137,7 @@ msgstr "लंबवत संकेतक स्क्रीन के कि�
 msgid "Access still isn't available. A reboot may be needed for it to take effect."
 msgstr "पहुँच अब भी उपलब्ध नहीं है। इसे लागू करने के लिए कंप्यूटर को दोबारा चालू करना पड़ सकता है।"
 
-#: src/features/dictionary/components/dictionary-table.tsx:283
+#: src/features/dictionary/components/dictionary-table.tsx:288
 msgid "Action"
 msgstr "कार्रवाई"
 
@@ -163,7 +163,7 @@ msgstr "जोड़ें"
 msgid "Add a correction"
 msgstr "एक सुधार जोड़ें"
 
-#: src/features/dictionary/components/dictionary-table.tsx:191
+#: src/features/dictionary/components/dictionary-table.tsx:192
 msgid "Add a fix and Lune Voice applies it every time you dictate. Try a starter below or add your own above."
 msgstr "सुधार जोड़ें और Lune Voice हर बार डिक्टेशन करते समय उसे लागू करेगा। नीचे दिया नमूना आज़माएँ या ऊपर अपना नियम जोड़ें।"
 
@@ -238,7 +238,7 @@ msgstr "दिखावट"
 msgid "Application behavior and startup preferences."
 msgstr "एप्लिकेशन व्यवहार और स्टार्टअप प्राथमिकताएँ।"
 
-#: src/features/dictionary/components/dictionary-table.tsx:304
+#: src/features/dictionary/components/dictionary-table.tsx:309
 msgid "Applied on every dictation · highest priority first"
 msgstr "हर डिक्टेशन पर लागू · सर्वोच्च प्राथमिकता पहले"
 
@@ -481,7 +481,7 @@ msgid "close"
 msgstr "बंद करें"
 
 #: src/components/feedback/help-feedback-dialog.tsx:281
-#: src/features/history/components/session-detail-modal.tsx:223
+#: src/features/history/components/session-detail-modal.tsx:226
 #: src/features/settings/components/asr-engine-cards.tsx:406
 #: src/features/styles/components/style-editor-modal.tsx:238
 #: src/features/updates/update-dialog.tsx:326
@@ -510,7 +510,7 @@ msgstr "संयोजन में कम से कम एक ऐसी क�
 msgid "Compact"
 msgstr "छोटा"
 
-#: src/features/history/components/session-detail-modal.tsx:183
+#: src/features/history/components/session-detail-modal.tsx:186
 #: src/lib/session-format.ts:9
 msgid "Completed"
 msgstr "पूर्ण"
@@ -534,11 +534,11 @@ msgstr "जारी रखें"
 msgid "Control how your speech is turned into text."
 msgstr "तय करें कि आपकी बोली टेक्स्ट में कैसे बदली जाए।"
 
-#: src/features/history/components/history-table.tsx:503
+#: src/features/history/components/history-table.tsx:506
 msgid "Copied"
 msgstr "कॉपी किया गया"
 
-#: src/features/history/components/history-table.tsx:503
+#: src/features/history/components/history-table.tsx:506
 msgid "Copy"
 msgstr "कॉपी करें"
 
@@ -634,8 +634,8 @@ msgid "Dark"
 msgstr "डार्क"
 
 #: src/components/feedback/confirm-dialog.tsx:72
-#: src/features/history/components/history-table.tsx:512
-#: src/features/history/components/session-detail-modal.tsx:216
+#: src/features/history/components/history-table.tsx:515
+#: src/features/history/components/session-detail-modal.tsx:219
 #: src/features/settings/components/asr-engine-cards.tsx:330
 #: src/features/settings/components/asr-engine-cards.tsx:331
 msgid "Delete"
@@ -644,8 +644,8 @@ msgstr "हटाएँ"
 #. placeholder {0}: entry.phrase
 #. placeholder {0}: preset.name
 #. placeholder {0}: snippet.triggerPhrase
-#: src/features/dictionary/components/dictionary-table.tsx:167
-#: src/features/snippets/snippets-page.tsx:468
+#: src/features/dictionary/components/dictionary-table.tsx:168
+#: src/features/snippets/snippets-page.tsx:470
 #: src/features/styles/components/style-preset-card.tsx:113
 msgid "Delete {0}"
 msgstr "{0} हटाएँ"
@@ -667,16 +667,16 @@ msgstr "मॉडल हटाएँ"
 msgid "Delete selected"
 msgstr "चयनित हटाएँ"
 
-#: src/features/history/components/history-table.tsx:510
-#: src/features/history/components/session-detail-modal.tsx:214
+#: src/features/history/components/history-table.tsx:513
+#: src/features/history/components/session-detail-modal.tsx:217
 msgid "Delete session?"
 msgstr "सत्र हटाएँ?"
 
-#: src/features/snippets/snippets-page.tsx:466
+#: src/features/snippets/snippets-page.tsx:468
 msgid "Delete snippet?"
 msgstr "स्निपेट हटाएँ?"
 
-#: src/features/dictionary/components/dictionary-table.tsx:165
+#: src/features/dictionary/components/dictionary-table.tsx:166
 msgid "Delete this word fix?"
 msgstr "यह शब्द-सुधार हटाएँ?"
 
@@ -759,7 +759,7 @@ msgstr "त्रुटि ख़ारिज करें"
 msgid "Don't save history"
 msgstr "इतिहास न सहेजें"
 
-#: src/features/history/components/history-table.tsx:506
+#: src/features/history/components/history-table.tsx:509
 #: src/features/settings/components/asr-engine-cards.tsx:344
 #: src/features/settings/components/gpu-backend-card.tsx:38
 msgid "Download"
@@ -813,7 +813,7 @@ msgstr "डाउनलोड हो रहा है…"
 msgid "Duplicate"
 msgstr "डुप्लिकेट बनाएँ"
 
-#: src/features/history/components/session-detail-modal.tsx:171
+#: src/features/history/components/session-detail-modal.tsx:174
 msgid "Duration"
 msgstr "अवधि"
 
@@ -836,8 +836,8 @@ msgstr "संपादित करें"
 
 #. placeholder {0}: entry.phrase
 #. placeholder {0}: snippet.triggerPhrase
-#: src/features/dictionary/components/dictionary-table.tsx:160
-#: src/features/snippets/snippets-page.tsx:461
+#: src/features/dictionary/components/dictionary-table.tsx:161
+#: src/features/snippets/snippets-page.tsx:463
 msgid "Edit {0}"
 msgstr "{0} संपादित करें"
 
@@ -863,7 +863,7 @@ msgid "Enable styling"
 msgstr "स्टाइलिंग सक्षम करें"
 
 #: src/features/history/components/history-table.tsx:189
-#: src/features/history/components/session-detail-modal.tsx:172
+#: src/features/history/components/session-detail-modal.tsx:175
 #: src/features/settings/sections/styling-engine-section.tsx:44
 msgid "Engine"
 msgstr "इंजन"
@@ -920,11 +920,11 @@ msgstr "Lune Voice {version} डाउनलोड हो रहा है। �
 msgid "Few-shot examples"
 msgstr "फ़्यू-शॉट उदाहरण"
 
-#: src/features/dictionary/components/dictionary-table.tsx:253
+#: src/features/dictionary/components/dictionary-table.tsx:258
 msgid "Filter rules"
 msgstr "फ़िल्टर नियम"
 
-#: src/features/dictionary/components/dictionary-table.tsx:252
+#: src/features/dictionary/components/dictionary-table.tsx:257
 msgid "Filter rules…"
 msgstr "फ़िल्टर नियम…"
 
@@ -1381,7 +1381,7 @@ msgstr "कभी नहीं"
 
 #: src/features/snippets/snippets-page.tsx:207
 #: src/features/snippets/snippets-page.tsx:245
-#: src/features/snippets/snippets-page.tsx:509
+#: src/features/snippets/snippets-page.tsx:511
 msgid "New snippet"
 msgstr "नया स्निपेट"
 
@@ -1409,7 +1409,7 @@ msgstr "कोई GPU ड्राइवर नहीं मिला। अप�
 msgid "No microphone found. Plug one in, then pick it in Settings › Dictation."
 msgstr "कोई माइक्रोफ़ोन नहीं मिला। एक लगाएँ, फिर उसे सेटिंग्स › डिक्टेशन में चुनें।"
 
-#: src/features/dictionary/components/dictionary-table.tsx:265
+#: src/features/dictionary/components/dictionary-table.tsx:270
 msgid "No rules match “{query}”."
 msgstr "“{query}” से मेल खाता कोई नियम नहीं है।"
 
@@ -1438,7 +1438,7 @@ msgstr "अभी तक कोई सत्र नहीं। अपने ट
 msgid "No snippets match “{query}”."
 msgstr "“{query}” से मेल खाता कोई स्निपेट नहीं है।"
 
-#: src/features/snippets/snippets-page.tsx:499
+#: src/features/snippets/snippets-page.tsx:501
 msgid "No snippets yet"
 msgstr "अभी कोई स्निपेट नहीं"
 
@@ -1446,13 +1446,13 @@ msgstr "अभी कोई स्निपेट नहीं"
 msgid "No styling — transcripts are delivered exactly as transcribed."
 msgstr "कोई स्टाइलिंग नहीं — ट्रांसक्रिप्ट बिना किसी बदलाव के दिए जाते हैं।"
 
-#: src/features/history/components/history-table.tsx:484
-#: src/features/history/components/session-detail-modal.tsx:163
+#: src/features/history/components/history-table.tsx:487
+#: src/features/history/components/session-detail-modal.tsx:166
 msgid "No transcript"
 msgstr "कोई ट्रांसक्रिप्ट नहीं"
 
-#: src/features/history/components/history-table.tsx:496
-#: src/features/history/components/session-detail-modal.tsx:176
+#: src/features/history/components/history-table.tsx:499
+#: src/features/history/components/session-detail-modal.tsx:179
 msgid "None"
 msgstr "कोई नहीं"
 
@@ -1595,7 +1595,7 @@ msgid "Performance or speed"
 msgstr "प्रदर्शन या गति"
 
 #: src/features/dictionary/components/dictionary-table.tsx:78
-#: src/features/dictionary/components/dictionary-table.tsx:273
+#: src/features/dictionary/components/dictionary-table.tsx:278
 msgid "Phrase"
 msgstr "वाक्यांश"
 
@@ -1688,7 +1688,7 @@ msgid "primary"
 msgstr "प्राथमिक"
 
 #: src/features/dictionary/components/dictionary-form.tsx:100
-#: src/features/dictionary/components/dictionary-table.tsx:279
+#: src/features/dictionary/components/dictionary-table.tsx:284
 #: src/features/dictionary/components/priority-picker.tsx:63
 msgid "Priority"
 msgstr "प्राथमिकता"
@@ -1753,7 +1753,7 @@ msgstr "हटाएँ"
 
 #. placeholder {0}: entry.phrase
 #. placeholder {1}: entry.replacement
-#: src/features/dictionary/components/dictionary-table.tsx:166
+#: src/features/dictionary/components/dictionary-table.tsx:167
 msgid "Remove the saved correction for \"{0}\" → \"{1}\"."
 msgstr "\"{0}\" → \"{1}\" का सहेजा गया सुधार हटाएँ।"
 
@@ -1765,7 +1765,7 @@ msgstr "हटाया जा रहा है…"
 #: src/features/dictionary/components/dictionary-table.tsx:90
 #: src/features/dictionary/components/dictionary-table.tsx:102
 #: src/features/dictionary/components/dictionary-table.tsx:103
-#: src/features/dictionary/components/dictionary-table.tsx:276
+#: src/features/dictionary/components/dictionary-table.tsx:281
 msgid "Replacement"
 msgstr "प्रतिस्थापन"
 
@@ -1831,7 +1831,7 @@ msgstr "बदलाव सहेजें"
 msgid "Save Transcript"
 msgstr "ट्रांसक्रिप्ट सहेजें"
 
-#: src/features/snippets/snippets-page.tsx:502
+#: src/features/snippets/snippets-page.tsx:504
 msgid "Save your signature, a meeting header, or anything you type often — then speak its trigger to drop it into any app."
 msgstr "अपना हस्ताक्षर, बैठक शीर्षक, या जो कुछ आप अक्सर टाइप करते हैं उसे सहेजें — फिर उसका ट्रिगर बोलकर उसे किसी भी ऐप में डालें।"
 
@@ -1847,7 +1847,7 @@ msgstr "सहेजे गए स्निपेट"
 msgid "Say <0>“{spokenTrigger}”</0> as the whole utterance — or <1>“insert {spokenTrigger}”</1> — to type this snippet."
 msgstr "इस स्निपेट को टाइप करने के लिए <0>“{spokenTrigger}”</0> को पूरे वाक्य के रूप में बोलें — या <1>“insert {spokenTrigger}”</1> कहें।"
 
-#: src/features/snippets/snippets-page.tsx:483
+#: src/features/snippets/snippets-page.tsx:485
 msgid "Say a trigger as your whole utterance to expand it"
 msgstr "स्निपेट डालने के लिए उसका ट्रिगर पूरे वाक्य के रूप में बोलें"
 
@@ -1900,7 +1900,7 @@ msgstr "आपके द्वारा तय किए गए OpenAI-संग
 msgid "Sends transcripts to an OpenAI-compatible endpoint you configure — Ollama, llama-server or LM Studio locally, or a hosted API."
 msgstr "आपके द्वारा तय किए गए OpenAI-संगत एंडपॉइंट पर ट्रांसक्रिप्ट भेजता है — स्थानीय रूप से Ollama, llama-server या LM Studio, या कोई होस्टेड API।"
 
-#: src/features/history/components/session-detail-modal.tsx:207
+#: src/features/history/components/session-detail-modal.tsx:210
 msgid "Session details"
 msgstr "सत्र विवरण"
 
@@ -2078,7 +2078,7 @@ msgstr "डिक्टेशन रोकें"
 msgid "Stored on this device"
 msgstr "इस डिवाइस पर सहेजा गया"
 
-#: src/features/history/components/session-detail-modal.tsx:175
+#: src/features/history/components/session-detail-modal.tsx:178
 msgid "Style"
 msgstr "शैली"
 
@@ -2123,7 +2123,7 @@ msgstr "सिस्टम"
 msgid "System default"
 msgstr "सिस्टम डिफ़ॉल्ट"
 
-#: src/features/dictionary/components/dictionary-table.tsx:188
+#: src/features/dictionary/components/dictionary-table.tsx:189
 msgid "Teach Lune Voice your words"
 msgstr "Lune Voice को अपने शब्द सिखाएँ"
 
@@ -2191,8 +2191,8 @@ msgstr "इसमें बस एक पल लगता है।"
 msgid "This will permanently remove the selected dictation sessions and their transcripts."
 msgstr "इससे चुने गए डिक्टेशन सत्र और उनके ट्रांसक्रिप्ट हमेशा के लिए हट जाएँगे।"
 
-#: src/features/history/components/history-table.tsx:511
-#: src/features/history/components/session-detail-modal.tsx:215
+#: src/features/history/components/history-table.tsx:514
+#: src/features/history/components/session-detail-modal.tsx:218
 msgid "This will permanently remove this dictation session and its transcript."
 msgstr "इससे यह डिक्टेशन सत्र और इसका ट्रांसक्रिप्ट हमेशा के लिए हट जाएगा।"
 
@@ -2469,12 +2469,12 @@ msgstr "Whisper (स्थानीय)"
 msgid "whisper.cpp running on-device. Choose a size to trade speed for accuracy."
 msgstr "whisper.cpp डिवाइस पर चल रहा है। गति और सटीकता के बीच संतुलन के लिए एक आकार चुनें।"
 
-#: src/features/history/components/history-table.tsx:489
+#: src/features/history/components/history-table.tsx:492
 msgid "words"
 msgstr "शब्द"
 
 #: src/features/history/components/history-table.tsx:184
-#: src/features/history/components/session-detail-modal.tsx:170
+#: src/features/history/components/session-detail-modal.tsx:173
 #: src/features/overview/overview-page.tsx:225
 msgid "Words"
 msgstr "शब्द"
