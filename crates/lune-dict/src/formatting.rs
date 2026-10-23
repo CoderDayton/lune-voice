@@ -549,6 +549,72 @@ pub fn strip_fillers(text: &str) -> String {
     kept.join(" ")
 }
 
+fn lone_letter(tok: &str) -> Option<char> {
+    let mut chars = word_core(tok).chars();
+    match (chars.next(), chars.next()) {
+        (Some(c), None) if c.is_ascii_alphabetic() => Some(c),
+        _ => None,
+    }
+}
+
+fn continues_letter_run(prev: &str, next: &str) -> bool {
+    let (Some(p), Some(n)) = (lone_letter(prev), lone_letter(next)) else {
+        return false;
+    };
+    let lower_word = |c: char| c == 'a' || c == 'i';
+    prev.ends_with(p)
+        && next.starts_with(n)
+        && p.is_ascii_uppercase() == n.is_ascii_uppercase()
+        && !(p.is_ascii_lowercase() && (lower_word(p) || lower_word(n)))
+}
+
+pub fn strip_false_starts(text: &str) -> String {
+    if !is_latin(text) {
+        return text.to_owned();
+    }
+    let toks: Vec<&str> = text.split_whitespace().collect();
+    let mut kept: Vec<std::borrow::Cow<str>> = Vec::new();
+    let mut i = 0;
+    while i < toks.len() {
+        let tok = toks[i];
+        let mut end = i + 1;
+        while end < toks.len() && continues_letter_run(toks[end - 1], toks[end]) {
+            end += 1;
+        }
+        if end - i > 1 {
+            let run = &toks[i..end];
+            if lone_letter(tok).is_some_and(|c| c.is_ascii_uppercase())
+                && run.iter().any(|t| lone_letter(t) != Some('I'))
+            {
+                kept.push(run.concat().into());
+            } else {
+                kept.extend(run.iter().map(|&t| t.into()));
+            }
+        } else if keeps_token(tok, i.checked_sub(1).map(|p| toks[p])) {
+            kept.push(tok.into());
+        }
+        i = end;
+    }
+    if kept.is_empty() {
+        return text.to_owned();
+    }
+    kept.join(" ")
+}
+
+const KEY_WORDS: &[&str] = &[
+    "ctrl", "control", "alt", "shift", "dash", "plus", "press", "key", "letter",
+];
+
+fn keeps_token(tok: &str, prev: Option<&str>) -> bool {
+    let bare_lower = tok.len() == 1
+        && tok
+            .chars()
+            .all(|c| c.is_ascii_lowercase() && c != 'a' && c != 'i');
+    let after_key =
+        prev.is_some_and(|p| KEY_WORDS.contains(&word_core(p).to_ascii_lowercase().as_str()));
+    !bare_lower || after_key
+}
+
 /// If the ENTIRE text is wrapped in a single matched pair of double quotes —
 /// straight (`"…"`) or curly (`“…”`) — remove them. Whisper sometimes quotes a
 /// whole utterance when it detects the speaker is reading/quoting aloud; the
@@ -1012,7 +1078,7 @@ fn word_core(word: &str) -> &str {
 pub fn shape(text: &str, lang: &str, fmt: &FormatToggles) -> String {
     let english = lang == "English";
     let text = if english {
-        strip_fillers(&defuse_inconsistent(text))
+        strip_false_starts(&strip_fillers(&defuse_inconsistent(text)))
     } else {
         text.to_owned()
     };
@@ -1205,6 +1271,67 @@ mod tests {
         assert_eq!(
             strip_fillers("you might have to uh make a new token"),
             "you might have to make a new token"
+        );
+    }
+
+    #[test]
+    fn strip_false_starts_drops_cut_off_letters() {
+        assert_eq!(
+            strip_false_starts("Sure build it and then f fix the edge cases as you go."),
+            "Sure build it and then fix the edge cases as you go."
+        );
+        assert_eq!(
+            strip_false_starts("see if we're d kind of doing things"),
+            "see if we're kind of doing things"
+        );
+        assert_eq!(
+            strip_false_starts("This is c two people now"),
+            "This is two people now"
+        );
+        assert_eq!(
+            strip_false_starts("I can't they're not r I don't have"),
+            "I can't they're not I don't have"
+        );
+    }
+
+    #[test]
+    fn strip_false_starts_joins_spelled_acronyms() {
+        assert_eq!(
+            strip_false_starts("a single paragraph that I can give an L L M."),
+            "a single paragraph that I can give an LLM."
+        );
+        assert_eq!(strip_false_starts("the G P U is busy"), "the GPU is busy");
+        assert_eq!(strip_false_starts("pick A, B, or C"), "pick A, B, or C");
+    }
+
+    #[test]
+    fn strip_false_starts_keeps_real_letters() {
+        for text in [
+            "Why wouldn't B be better?",
+            "make sure that i it's updated",
+            "create a another document",
+            "make a JSON-L document",
+            "we fall back to plan B",
+            "type l l m in the box",
+            "Like I I have to do",
+            "it failed c. Then",
+            "the command line, dash p, it doesn't",
+            "you gotta go ctrl x leader plus r, okay",
+            "I just meant d, like you advised",
+            "the keyline control x like the leader",
+            "press q to quit",
+            "f",
+        ] {
+            assert_eq!(strip_false_starts(text), text);
+        }
+    }
+
+    #[test]
+    fn shape_strips_english_false_starts() {
+        let fmt = FormatToggles::default();
+        assert_eq!(
+            shape("d so you do know w what it loads", "English", &fmt),
+            "So you do know what it loads."
         );
     }
 
