@@ -3,6 +3,7 @@
 import type { DictionaryEntry } from '../features/dictionary/data/dictionary-data';
 import type {
   ActivationModeValue,
+  AgcModeValue,
   AsrBackendValue,
   DictationModeValue,
   LlmBackendValue,
@@ -54,7 +55,7 @@ export interface WorkspaceSettings {
   modelIdleUnloadMinutes: number | null;
   /** Preferred microphone device name; null = system default. */
   inputDevice: string | null;
-  vadPcen: boolean;
+  agcMode: AgcModeValue;
   startMinimized: boolean;
   /** Contact the release endpoint for a newer version at startup. */
   checkUpdatesOnLaunch: boolean;
@@ -178,7 +179,7 @@ export const DEFAULT_SETTINGS: WorkspaceSettings = {
   dictationLanguage: 'auto',
   modelIdleUnloadMinutes: null,
   inputDevice: null,
-  vadPcen: true,
+  agcMode: 'Auto',
   startMinimized: false,
   checkUpdatesOnLaunch: false,
   brandCasing: true,

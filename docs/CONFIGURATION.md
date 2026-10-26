@@ -27,6 +27,7 @@ Lune Voice keeps its settings in a TOML file. The same settings are in the app's
   - [Few-Shot Examples](#few-shot-examples)
 - [User Dictionary](#user-dictionary)
 - [Session History](#session-history)
+- [Mic Gain Control](#mic-gain-control)
 - [Pipeline Tuning](#pipeline-tuning)
 - [Model Management](#model-management)
 - [Environment Variables](#environment-variables)
@@ -45,7 +46,7 @@ When each setting takes effect:
 | Tier | When Applied | Fields |
 |------|-------------|--------|
 | **Hot** | On save | `hotkey`, `activation_mode`, `model_idle_unload_minutes`, `input_device`, `sound_cues_enabled`, `sound_cue_volume`, every `pill_*` field |
-| **Warm** | Next session start, when the pipeline rebuilds | `asr_backend`, `llm_backend`, `device`, `privacy_mode`, `default_style`, `language`, `dictation_language`, `vad_pcen`, `brand_casing`, `dictation_mode`, `copy_to_clipboard`, `session_history_days` (it decides whether a dictation is recorded at all) |
+| **Warm** | Next session start, when the pipeline rebuilds | `asr_backend`, `llm_backend`, `device`, `privacy_mode`, `default_style`, `language`, `dictation_language`, `agc_mode`, `brand_casing`, `dictation_mode`, `copy_to_clipboard`, `session_history_days` (it decides whether a dictation is recorded at all) |
 | **Cold** | Next app start | `terminal_mode`, `start_minimized`, `check_updates_on_launch` |
 
 Every change is written to disk right away. After saving, the app reloads the settings from disk, so what you see is what was stored.
@@ -91,7 +92,7 @@ session_history_days = 30
 # model_idle_unload_minutes is optional. Leave it out to keep the model loaded.
 # input_device is optional. Leave it out to use the system default input. The
 # value is a name from the mic picker.
-vad_pcen = true
+agc_mode = "auto"
 start_minimized = false
 check_updates_on_launch = false
 brand_casing = true
@@ -529,6 +530,29 @@ Each session record contains:
 | `transcript` | string | Final styled transcript (null if empty) |
 
 Database location: `~/.local/share/lune-voice/lune.db` on Linux, `%APPDATA%\lune-voice\lune.db` on Windows.
+
+---
+
+## Mic Gain Control
+
+`agc_mode` sets how the mic level is adjusted before the recognizer hears it. In the app: Settings → Dictation → Adaptive gain control.
+
+| Value | Does |
+|---|---|
+| `auto` **(default)** | Holds the dictation until you stop, then measures it. Audio more than 3 dB off the target level (−20 dBFS) gets full PCEN. Audio near the target is left alone while its SNR is 20 dB or better; below that, PCEN strength ramps up to full at 10 dB, so a little more noise never jumps the gain. Clipped audio and silence are left alone |
+| `always` | PCEN on every frame as it streams |
+| `off` | Raw mic audio |
+
+Why auto: PCEN helps real speech that sits below the target, but changes audio that is already there. Measured with Whisper large:
+
+| Set | `off` | `always` | `auto` |
+|---|---|---|---|
+| `fixtures/bench`, 23 real clips (WER) | 4.36% | 3.89% | 3.89% |
+| 252 clean TTS clips at −20 dBFS (match reference) | 168 | 163 | 168 |
+
+Holding the clip costs no latency, since every backend decodes the whole clip at stop anyway. It costs memory: 64 KB per second of dictation while recording.
+
+Older files have `vad_pcen` instead. `vad_pcen = false` loads as `off`; `true` was the old default and loads as `auto`.
 
 ---
 

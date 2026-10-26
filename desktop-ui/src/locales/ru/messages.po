@@ -108,7 +108,7 @@ msgstr "## Встреча — {date}\n"
 "Участники:\n"
 "- "
 
-#: src/features/settings/data/settings-data.ts:550
+#: src/features/settings/data/settings-data.ts:570
 msgid "1 year"
 msgstr "1 год"
 
@@ -116,15 +116,15 @@ msgstr "1 год"
 msgid "25 European languages"
 msgstr "25 европейских языков"
 
-#: src/features/settings/data/settings-data.ts:548
+#: src/features/settings/data/settings-data.ts:568
 msgid "30 days"
 msgstr "30 дней"
 
-#: src/features/settings/data/settings-data.ts:547
+#: src/features/settings/data/settings-data.ts:567
 msgid "7 days"
 msgstr "7 дней"
 
-#: src/features/settings/data/settings-data.ts:549
+#: src/features/settings/data/settings-data.ts:569
 msgid "90 days"
 msgstr "90 дней"
 
@@ -151,7 +151,7 @@ msgid "Active style"
 msgstr "Активный стиль"
 
 #: src/features/settings/sections/dictation-section.tsx:154
-#: src/features/settings/sections/dictation-section.tsx:162
+#: src/features/settings/sections/dictation-section.tsx:160
 msgid "Adaptive gain control"
 msgstr "Адаптивная регулировка усиления"
 
@@ -171,23 +171,27 @@ msgstr "Добавьте исправление, и Lune Voice будет при
 msgid "Add snippet"
 msgstr "Добавить фрагмент"
 
-#: src/features/settings/data/settings-data.ts:584
+#: src/features/settings/data/settings-data.ts:552
+msgid "Adjusts the level of every recording as it goes."
+msgstr "Подстраивает уровень каждой записи по ходу."
+
+#: src/features/settings/data/settings-data.ts:604
 msgid "After 1 hour"
 msgstr "Через 1 час"
 
-#: src/features/settings/data/settings-data.ts:582
+#: src/features/settings/data/settings-data.ts:602
 msgid "After 15 minutes"
 msgstr "Через 15 минут"
 
-#: src/features/settings/data/settings-data.ts:585
+#: src/features/settings/data/settings-data.ts:605
 msgid "After 2 hours"
 msgstr "Через 2 часа"
 
-#: src/features/settings/data/settings-data.ts:583
+#: src/features/settings/data/settings-data.ts:603
 msgid "After 30 minutes"
 msgstr "Через 30 минут"
 
-#: src/features/settings/data/settings-data.ts:581
+#: src/features/settings/data/settings-data.ts:601
 msgid "After 5 minutes"
 msgstr "Через 5 минут"
 
@@ -220,6 +224,10 @@ msgstr "Всегда Ctrl+Shift+V"
 #: src/features/settings/data/settings-data.ts:531
 msgid "Always Ctrl+V"
 msgstr "Всегда Ctrl+V"
+
+#: src/features/settings/data/settings-data.ts:551
+msgid "Always on"
+msgstr "Всегда включено"
 
 #: src/features/settings/components/openai-fields.tsx:37
 msgid "API endpoint"
@@ -280,6 +288,7 @@ msgid "Auto-detect"
 msgstr "Определять автоматически"
 
 #: src/features/settings/data/settings-data.ts:526
+#: src/features/settings/data/settings-data.ts:546
 #: src/features/settings/sections/pill-section.tsx:55
 msgid "Automatic"
 msgstr "Автоматически"
@@ -438,6 +447,10 @@ msgstr "Проверка установленных моделей…"
 #: src/features/welcome/components/ready-checks.tsx:113
 msgid "Checking…"
 msgstr "Проверка…"
+
+#: src/features/settings/data/settings-data.ts:547
+msgid "Checks each dictation when you stop. Leaves clean audio at a normal level alone and evens out quiet, loud, or noisy audio. Recommended."
+msgstr "Проверяет каждую диктовку после остановки. Чистый звук нормальной громкости не трогает, а тихий, громкий или шумный выравнивает. Рекомендуется."
 
 #: src/features/settings/sections/output-section.tsx:22
 msgid "Choose how finished text is inserted into the app you are currently using."
@@ -755,7 +768,7 @@ msgstr "Использование диска"
 msgid "Dismiss error"
 msgstr "Закрыть уведомление об ошибке"
 
-#: src/features/settings/data/settings-data.ts:546
+#: src/features/settings/data/settings-data.ts:566
 msgid "Don't save history"
 msgstr "Не сохранять историю"
 
@@ -871,6 +884,10 @@ msgstr "Движок"
 #: src/features/welcome/welcome-page.tsx:441
 msgid "Enter Lune Voice"
 msgstr "Перейти в Lune Voice"
+
+#: src/features/settings/sections/dictation-section.tsx:155
+msgid "Evens out the microphone level before transcription. Helps quiet mics and noisy rooms."
+msgstr "Выравнивает уровень микрофона перед расшифровкой. Помогает с тихими микрофонами и шумными комнатами."
 
 #: src/features/styles/components/style-editor-modal.tsx:225
 msgid "Examples are out of date since you edited the prompt."
@@ -1168,11 +1185,11 @@ msgstr "Присоединиться к обсуждениям"
 msgid "Just now"
 msgstr "Только что"
 
-#: src/features/settings/data/settings-data.ts:551
+#: src/features/settings/data/settings-data.ts:571
 msgid "Keep forever"
 msgstr "Хранить всегда"
 
-#: src/features/settings/data/settings-data.ts:578
+#: src/features/settings/data/settings-data.ts:598
 msgid "Keep loaded"
 msgstr "Держать загруженной"
 
@@ -1456,10 +1473,6 @@ msgstr "Нет расшифровки"
 msgid "None"
 msgstr "Нет"
 
-#: src/features/settings/sections/dictation-section.tsx:155
-msgid "Normalizes microphone level before voice detection. Helps quiet mics and noisy rooms. Recommended."
-msgstr "Нормализует уровень микрофона перед обнаружением голоса. Помогает с тихими микрофонами и в шумных помещениях. Рекомендуется."
-
 #: src/features/settings/sections/pill-section.tsx:66
 msgid "not connected"
 msgstr "нет подключения"
@@ -1481,6 +1494,7 @@ msgid "NVIDIA Parakeet running on-device. Punctuates by itself and detects which
 msgstr "NVIDIA Parakeet работает на устройстве. Сам расставляет знаки препинания и определяет, на каком из своих языков вы говорите."
 
 #: src/features/settings/data/settings-data.ts:169
+#: src/features/settings/data/settings-data.ts:556
 #: src/features/styles/components/style-editor-modal.tsx:192
 msgid "Off"
 msgstr "Выключено"
@@ -1518,7 +1532,7 @@ msgstr "Открыть страницу выпусков"
 msgid "Open session from {time}"
 msgstr "Открыть сессию от {time}"
 
-#: src/features/settings/data/settings-data.ts:623
+#: src/features/settings/data/settings-data.ts:643
 msgid "OpenAI-compatible"
 msgstr "Совместимо с OpenAI"
 
@@ -1556,7 +1570,7 @@ msgid "Pagination"
 msgstr "Навигация по страницам"
 
 #: src/features/settings/components/asr-engine-cards.tsx:170
-#: src/features/settings/data/settings-data.ts:622
+#: src/features/settings/data/settings-data.ts:642
 #: src/features/welcome/components/engine-step.tsx:83
 msgid "Parakeet"
 msgstr "Parakeet"
@@ -1573,7 +1587,7 @@ msgstr "Parakeet не может сообщить Lune, какой язык он
 msgid "Parakeet cannot transcribe {languageName}, so dictation will not start. Choose a language it covers below, or use Whisper."
 msgstr "Parakeet не умеет распознавать язык «{languageName}», поэтому диктовка не запустится. Выберите ниже поддерживаемый язык или используйте Whisper."
 
-#: src/features/settings/data/settings-data.ts:627
+#: src/features/settings/data/settings-data.ts:647
 msgid "Paste"
 msgstr "Вставка"
 
@@ -1896,6 +1910,10 @@ msgstr "Отправляет аудио на настроенную вами к�
 msgid "Sends audio to an OpenAI-compatible endpoint you configure — a server on your own machine, or a hosted API."
 msgstr "Отправляет звук на указанную вами конечную точку, совместимую с OpenAI, — сервер на вашей машине или размещённый API."
 
+#: src/features/settings/data/settings-data.ts:557
+msgid "Sends the microphone audio as it is."
+msgstr "Передаёт звук микрофона как есть."
+
 #: src/features/settings/data/settings-data.ts:176
 msgid "Sends transcripts to an OpenAI-compatible endpoint you configure — Ollama, llama-server or LM Studio locally, or a hosted API."
 msgstr "Отправляет расшифровки на указанную вами конечную точку, совместимую с OpenAI, — локальные Ollama, llama-server или LM Studio либо размещённый API."
@@ -2163,7 +2181,7 @@ msgstr "Основное сочетание клавиш для голосово
 msgid "The microphone is in use"
 msgstr "Микрофон занят"
 
-#: src/features/settings/data/settings-data.ts:579
+#: src/features/settings/data/settings-data.ts:599
 msgid "The model stays in memory. Every dictation starts instantly."
 msgstr "Модель остаётся в памяти. Каждая диктовка начинается мгновенно."
 
@@ -2301,7 +2319,7 @@ msgstr "Фраза-триггер"
 msgid "Try again"
 msgstr "Повторить"
 
-#: src/features/settings/data/settings-data.ts:628
+#: src/features/settings/data/settings-data.ts:648
 msgid "Type"
 msgstr "Ввод"
 
@@ -2456,7 +2474,7 @@ msgid "Which screen the pill appears on."
 msgstr "На каком экране появляется индикатор."
 
 #: src/features/settings/components/asr-engine-cards.tsx:169
-#: src/features/settings/data/settings-data.ts:621
+#: src/features/settings/data/settings-data.ts:641
 #: src/features/welcome/components/engine-step.tsx:76
 msgid "Whisper"
 msgstr "Whisper"

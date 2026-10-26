@@ -77,10 +77,10 @@ Each crate has one job. `lune-core` defines shared types and traits but has no r
 - A saved `input_device` matches a display name first, then a source's ALSA name (`"{alsa.card_name}, {alsa.name}"`, the name the ALSA host shows). At startup, a setting that matched the second way is rewritten to the current name (`persistence::migrate_input_device`), but only if the settings file parsed, and only if the saved name looks like an ALSA name (it contains `", "`), so most launches skip the device listing. The lookup gives up after 3 s and keeps the saved name. The rewrite only goes one way: with no Pulse server, the ALSA host doesn't know source names, so capture uses the system default and says so. A device is identified by its display name, so two mics with the same name are one picker entry
 - Pulse capture asks for a fixed 20 ms period (`capture_buffer_size`). Left to the server, a recording stream's fragment defaults to about 2 s, and the first audio arrives 2 s after the stream opens
 - Delivers 16 kHz mono PCM in 80 ms chunks (1280 samples). Most hardware records at 44.1 or 48 kHz, so a `rubato` async resampler converts to 16 kHz whenever the device's rate differs
-- `MicAgc` (PCEN) brings each frame toward a target level before it leaves the capture loop, controlled by the `vad_pcen` setting (default on). The level meter shows the signal **after** this gain, so it matches what whisper hears
-- Chunks go to the ASR backend through `push_audio` as they arrive. No VAD runs at this stage
+- `MicAgc` applies the `agc_mode` setting. `always` runs PCEN on each frame as it streams. `auto` (default) holds the clip until stop, measures it (`lune_audio::auto_gain`), then runs full PCEN if it is more than 3 dB off the target level. Near the target it leaves clean audio alone and ramps PCEN up as SNR drops from 20 to 10 dB. The level meter shows the signal after PCEN in both modes, so a quiet mic still moves the bar
+- Chunks go to the ASR backend through `push_audio` as they arrive, or all at once at stop under `auto`. Every backend decodes the whole clip at `poll_final`, so that costs no latency. No VAD runs at this stage
 - The session loop handles Stop, Cancel, deadline and max-speech signals and ends the capture loop when one arrives
-- After Stop, the producer is asked to flush and gets 30 ms to hand over the chunk it still holds (up to ~80 ms, which is the end of the last word), then the AGC's leftover partial frame. Then `poll_final` decodes the buffer
+- After Stop, the producer is asked to flush and gets 30 ms to hand over the chunk it still holds (up to ~80 ms, which is the end of the last word), then the AGC's leftover partial frame (or, under `auto`, the whole held clip). Then `poll_final` decodes the buffer
 
 ### 2. ASR
 

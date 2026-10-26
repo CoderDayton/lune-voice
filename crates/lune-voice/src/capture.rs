@@ -3,11 +3,11 @@
 //! Audio capture stage.
 //!
 //! Streams microphone audio into the ASR backend, which buffers the whole
-//! utterance and decodes it on stop. An optional PCEN adaptive-gain frontend
-//! (the `vad_pcen` setting) boosts quiet mics toward a target speech level
-//! before the audio reaches the recognizer; there is no online VAD in this
-//! stage. Extracted from `session.rs` so
-//! orchestration and the capture stage stay separable; the session calls
+//! utterance and decodes it on stop. A PCEN adaptive-gain frontend (the
+//! `agc_mode` setting) brings quiet mics toward a target speech level before
+//! the audio reaches the recognizer; there is no online VAD in this stage.
+//! Extracted from `session.rs` so orchestration and the capture stage stay
+//! separable; the session calls
 //! [`run_capture`] and consumes its [`CaptureResult`].
 
 use std::time::Duration;
@@ -19,7 +19,7 @@ use uuid::Uuid;
 use lune_audio::{AudioConfig, AudioPull, AudioStream, PcenAgc, PcenAgcConfig};
 use lune_core::asr::{AsrBackend, AsrSegment, AsrSessionConfig};
 use lune_core::audio::SAMPLE_RATE;
-use lune_core::config::PipelineConfig;
+use lune_core::config::{AgcMode, PipelineConfig};
 use lune_core::session::{SessionEvent, SessionStatus};
 
 use crate::redact::Transcript;
@@ -154,22 +154,31 @@ struct SessionRuntime<H> {
     asr_session: H,
 }
 
-/// Open audio capture; not async because all current variants are sync.
-/// Optional PCEN adaptive-gain frontend applied to mic audio before it reaches
-/// the recognizer. Quiet mics are boosted toward a target speech level so soft
-/// word onsets (notably the first word) aren't lost. Disabled => passthrough.
+/// Room `Auto` reserves for the held clip up front, so a typical dictation
+/// never reallocates it (10 s, 640 KB).
+const HELD_RESERVE: usize = 10 * SAMPLE_RATE;
+
+/// PCEN adaptive-gain frontend applied to mic audio before it reaches the
+/// recognizer, per [`AgcMode`].
 ///
-/// PCEN updates its envelopes per fixed hop, so variable-length input chunks are
-/// re-framed to [`AGC_HOP`]; the sub-hop remainder is held until the next
-/// `push` and emitted by [`MicAgc::flush`] at end of utterance.
+/// - `Off`: passthrough.
+/// - `Always`: PCEN on every frame as it streams. PCEN updates its envelopes
+///   per fixed hop, so variable-length chunks are re-framed to [`AGC_HOP`]; the
+///   sub-hop remainder waits for the next `push` or [`MicAgc::flush`].
+/// - `Auto`: the clip is held until [`MicAgc::flush`], which measures it and
+///   picks a plan ([`lune_audio::auto_gain`]). The backends decode in one batch
+///   at stop, so holding costs no latency. PCEN still runs on a copy so the
+///   level meter moves while the clip is held.
 struct MicAgc {
+    mode: AgcMode,
     agc: Option<PcenAgc>,
     pending: Vec<f32>,
+    held: Vec<f32>,
 }
 
 impl MicAgc {
-    fn new(enabled: bool) -> Self {
-        let agc = enabled
+    fn new(mode: AgcMode) -> Self {
+        let agc = (mode != AgcMode::Off)
             .then(|| PcenAgc::new(PcenAgcConfig::default(), SAMPLE_RATE as u32, AGC_HOP))
             .transpose()
             .unwrap_or_else(|e| {
@@ -177,36 +186,75 @@ impl MicAgc {
                 None
             });
         Self {
+            mode,
             agc,
             pending: Vec::with_capacity(AGC_HOP * 4),
+            held: if mode == AgcMode::Auto {
+                Vec::with_capacity(HELD_RESERVE)
+            } else {
+                Vec::new()
+            },
         }
     }
 
-    /// Append gain-adjusted samples for `input` to `out`. Passthrough when disabled.
-    fn push(&mut self, input: &[f32], out: &mut Vec<f32>) {
+    /// Append the samples ready for the recognizer to `out` and return the RMS
+    /// the level meter should show for `input`.
+    fn push(&mut self, input: &[f32], out: &mut Vec<f32>) -> f32 {
         let Some(agc) = self.agc.as_mut() else {
             out.extend_from_slice(input);
-            return;
+            return rms_of(input);
         };
+        let auto = self.mode == AgcMode::Auto;
+        if auto {
+            self.held.extend_from_slice(input);
+        }
         self.pending.extend_from_slice(input);
         let mut frame = [0f32; AGC_HOP];
+        let mut sum_sq = 0f32;
+        let mut metered = 0usize;
         while self.pending.len() >= AGC_HOP {
             frame.copy_from_slice(&self.pending[..AGC_HOP]);
             agc.process_frame(&mut frame);
-            out.extend_from_slice(&frame);
+            sum_sq += frame.iter().map(|s| s * s).sum::<f32>();
+            metered += AGC_HOP;
+            if !auto {
+                out.extend_from_slice(&frame);
+            }
             self.pending.drain(..AGC_HOP);
+        }
+        if metered == 0 {
+            0.0
+        } else {
+            (sum_sq / metered as f32).sqrt()
         }
     }
 
-    /// Emit the held sub-hop remainder, scaled by the last applied gain so the
-    /// final phonemes match the level of the preceding audio.
+    /// End of utterance. `Always` emits the sub-hop remainder at the last gain
+    /// so the final phonemes match the audio before them; `Auto` emits the
+    /// whole held clip with its plan applied.
     fn flush(&mut self, out: &mut Vec<f32>) {
-        match self.agc.as_ref() {
-            Some(agc) => {
-                let g = agc.last_gain();
-                out.extend(self.pending.drain(..).map(|s| s * g));
-            }
-            None => out.append(&mut self.pending),
+        let Some(agc) = self.agc.as_ref() else {
+            out.append(&mut self.pending);
+            return;
+        };
+        if self.mode != AgcMode::Auto {
+            lune_audio::apply_gain(&mut self.pending, agc.last_gain());
+            out.append(&mut self.pending);
+            return;
+        }
+        self.pending.clear();
+        match lune_audio::auto_gain::apply_auto(
+            &mut self.held,
+            SAMPLE_RATE as u32,
+            &PcenAgcConfig::default(),
+        ) {
+            Ok(plan) => info!(?plan, "agc: auto plan"),
+            Err(e) => warn!(error = %e, "agc: auto plan failed; using raw mic audio"),
+        }
+        if out.is_empty() {
+            std::mem::swap(out, &mut self.held);
+        } else {
+            out.append(&mut self.held);
         }
     }
 }
@@ -296,7 +344,7 @@ pub(crate) async fn run_capture<A: AsrBackend + 'static>(
     asr_config: AsrSessionConfig,
     audio_override: SessionAudio,
     pipeline: &PipelineConfig,
-    vad_pcen: bool,
+    agc_mode: AgcMode,
     input_device: Option<String>,
     segment_capacity_hint: usize,
     event_tx: &mpsc::Sender<SessionEvent>,
@@ -323,9 +371,9 @@ pub(crate) async fn run_capture<A: AsrBackend + 'static>(
     let mut saw_asr_success = false;
     let mut cancelled = false;
 
-    // Adaptive-gain frontend (PCEN): boosts quiet mics so soft onsets aren't
-    // lost. Disabled => passthrough. `framed` is the reusable output scratch.
-    let mut agc = MicAgc::new(vad_pcen);
+    // Adaptive-gain frontend (PCEN), per `agc_mode`. `framed` is the reusable
+    // output scratch.
+    let mut agc = MicAgc::new(agc_mode);
     let mut framed: Vec<f32> = Vec::with_capacity(AGC_HOP * 8);
 
     // `.max(1)`: a misconfigured max_speech_samples below one second of audio
@@ -381,20 +429,21 @@ pub(crate) async fn run_capture<A: AsrBackend + 'static>(
                         first_audio_logged = true;
                     }
 
-                    // Adaptive-gain (if enabled) before the recognizer; whisper
-                    // decodes the full buffer (no online VAD in this stage).
+                    // Adaptive gain before the recognizer; whisper decodes the
+                    // full buffer (no online VAD in this stage).
                     framed.clear();
-                    agc.push(&chunk.samples, &mut framed);
-                    if let Err(e) = asr.push_audio(&asr_session, &framed).await {
+                    let level = agc.push(&chunk.samples, &mut framed);
+                    if !framed.is_empty()
+                        && let Err(e) = asr.push_audio(&asr_session, &framed).await
+                    {
                         let msg = e.to_string();
                         warn!(error = %msg, "push_audio error during capture");
                         first_asr_error.get_or_insert(msg);
                     }
                     speech_samples += chunk.samples.len();
-                    // Meter the POST-AGC signal (`framed`) so the bar reflects
-                    // what the recognizer hears — a quiet mic that the AGC boosts
-                    // now reads correctly instead of barely moving.
-                    peak_rms = peak_rms.max(rms_of(&framed));
+                    // Meter the post-AGC signal so a quiet mic the AGC boosts
+                    // doesn't read as barely moving.
+                    peak_rms = peak_rms.max(level);
 
                     if speech_samples >= pipeline.max_speech_samples {
                         info!(
@@ -455,7 +504,9 @@ pub(crate) async fn run_capture<A: AsrBackend + 'static>(
         while let Some(chunk) = audio_source.try_next_chunk() {
             framed.clear();
             agc.push(&chunk.samples, &mut framed);
-            if let Err(e) = asr.push_audio(&asr_session, &framed).await {
+            if !framed.is_empty()
+                && let Err(e) = asr.push_audio(&asr_session, &framed).await
+            {
                 let msg = e.to_string();
                 warn!(error = %msg, "push_audio error during tail flush");
                 first_asr_error.get_or_insert(msg);
@@ -578,9 +629,99 @@ pub(crate) async fn run_capture<A: AsrBackend + 'static>(
 
 #[cfg(test)]
 mod tests {
-    use super::{POLL_FINAL_TIMEOUT, final_decode_ceiling, is_speech_content};
+    use super::{MicAgc, POLL_FINAL_TIMEOUT, final_decode_ceiling, is_speech_content, rms_of};
     use lune_core::audio::SAMPLE_RATE;
+    use lune_core::config::AgcMode;
     use std::time::Duration;
+
+    /// Tone bursts, 200 ms on and 100 ms off, for `secs`.
+    fn speech(amp: f32, secs: f32) -> Vec<f32> {
+        let n = (SAMPLE_RATE as f32 * secs) as usize;
+        let on = SAMPLE_RATE / 5;
+        let period = on + SAMPLE_RATE / 10;
+        (0..n)
+            .map(|i| {
+                if i % period < on {
+                    amp * (2.0 * std::f32::consts::PI * 220.0 * i as f32 / SAMPLE_RATE as f32).sin()
+                } else {
+                    0.0
+                }
+            })
+            .collect()
+    }
+
+    /// Feed `clip` in uneven chunks, as the capture ring does, then flush.
+    /// Returns everything emitted and the meter levels reported per push.
+    fn run(mode: AgcMode, clip: &[f32]) -> (Vec<f32>, Vec<f32>, usize) {
+        let mut agc = MicAgc::new(mode);
+        let mut out = Vec::new();
+        let mut meter = Vec::new();
+        for chunk in clip.chunks(1_000) {
+            meter.push(agc.push(chunk, &mut out));
+        }
+        let before_flush = out.len();
+        agc.flush(&mut out);
+        (out, meter, before_flush)
+    }
+
+    #[test]
+    fn agc_off_passes_audio_through_untouched() {
+        let clip = speech(0.01, 2.0);
+        let (out, _, before_flush) = run(AgcMode::Off, &clip);
+        assert_eq!(out, clip);
+        assert_eq!(before_flush, clip.len());
+    }
+
+    #[test]
+    fn agc_always_boosts_a_quiet_clip_as_it_streams() {
+        let clip = speech(0.01, 3.0);
+        let (out, _, before_flush) = run(AgcMode::Always, &clip);
+        assert_eq!(out.len(), clip.len());
+        assert!(before_flush > clip.len() / 2, "audio must stream out");
+        assert!(rms_of(&out) > 2.0 * rms_of(&clip));
+    }
+
+    #[test]
+    fn agc_always_clamps_and_cleans_the_flushed_tail() {
+        // 3 s is 187.5 hops, so the last 128 samples only leave through flush,
+        // after a quiet clip has pushed the gain well above 1.
+        let mut clip = speech(0.01, 3.0);
+        let n = clip.len();
+        clip[n - 2] = 0.95;
+        clip[n - 1] = f32::NAN;
+        let (out, _, _) = run(AgcMode::Always, &clip);
+        assert!(
+            out.iter()
+                .all(|s| s.is_finite() && (-1.0..=1.0).contains(s))
+        );
+    }
+
+    #[test]
+    fn agc_auto_holds_the_clip_until_flush() {
+        let clip = speech(0.01, 2.0);
+        let (out, meter, before_flush) = run(AgcMode::Auto, &clip);
+        assert_eq!(before_flush, 0);
+        assert_eq!(out.len(), clip.len());
+        assert!(
+            meter.iter().any(|&m| m > 0.0),
+            "the level meter must still move"
+        );
+    }
+
+    #[test]
+    fn agc_auto_leaves_a_clean_clip_at_target_untouched() {
+        let clip = speech(0.14, 2.0);
+        let (out, _, _) = run(AgcMode::Auto, &clip);
+        assert_eq!(out, clip);
+    }
+
+    #[test]
+    fn agc_auto_treats_a_quiet_clean_clip_like_always() {
+        let clip = speech(0.014, 2.0);
+        let (auto, _, _) = run(AgcMode::Auto, &clip);
+        let (always, _, _) = run(AgcMode::Always, &clip);
+        assert_eq!(auto, always);
+    }
 
     #[test]
     fn a_long_utterance_extends_the_final_decode_ceiling() {

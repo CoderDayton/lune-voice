@@ -205,3 +205,19 @@ impl std::str::FromStr for TerminalMode {
 fn terminal_mode_parse_err(s: &str) -> String {
     format!("unknown terminal mode: {s} (expected Auto|Terminal|Normal)")
 }
+
+/// Microphone gain control before the recognizer (the PCEN AGC).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
+#[serde(rename_all = "lowercase")]
+#[non_exhaustive]
+pub enum AgcMode {
+    /// Raw microphone audio.
+    Off,
+    /// Measure each dictation at stop. Off-target audio gets full PCEN;
+    /// near-target audio is left alone while clean and gets more PCEN as it
+    /// gets noisier.
+    #[default]
+    Auto,
+    /// Full PCEN on every frame.
+    Always,
+}

@@ -4,7 +4,9 @@ use serde::{Deserialize, Serialize};
 use url::Url;
 
 use super::hotkey::HotkeyConfig;
-use super::modes::{ActivationMode, DictationMode, PillVisibility, PrivacyMode, TerminalMode};
+use super::modes::{
+    ActivationMode, AgcMode, DictationMode, PillVisibility, PrivacyMode, TerminalMode,
+};
 use super::pipeline::PipelineOverrides;
 use super::redacted::RedactedString;
 use super::style_llm::StyleId;
@@ -120,7 +122,7 @@ where
 /// A new setting belongs **here at top level** when it is a *binary
 /// feature toggle or session-level preference* that the session reads
 /// directly at start time and that has no per-backend default —
-/// e.g. `vad_pcen`, `model_idle_unload_minutes`, hotkey config, language.
+/// e.g. `agc_mode`, `model_idle_unload_minutes`, hotkey config, language.
 /// These bypass
 /// the pipeline merge and are read straight from `UserSettings` in
 /// `SessionManager` / `AppRuntime`.
@@ -247,10 +249,10 @@ pub struct UserSettings {
     /// back to the default at capture-open time — never fatal.
     #[serde(default)]
     pub input_device: Option<String>,
-    /// Enable the PCEN-style adaptive AGC frontend before the VAD.
-    /// Improves robustness on quiet mics and noisy environments. Default on.
-    #[serde(default = "default_true")]
-    pub vad_pcen: bool,
+    /// Microphone gain control before the recognizer. Replaces the old
+    /// `vad_pcen` bool, which `lune-persist` migrates on load.
+    #[serde(default, deserialize_with = "lenient")]
+    pub agc_mode: AgcMode,
     /// Launch the desktop app with the main window hidden to the system
     /// tray instead of shown. Useful when Lune is autostarted on login.
     #[serde(default)]
@@ -368,7 +370,7 @@ impl Default for UserSettings {
             pipeline: PipelineOverrides::default(),
             model_idle_unload_minutes: None,
             input_device: None,
-            vad_pcen: true,
+            agc_mode: AgcMode::default(),
             start_minimized: false,
             check_updates_on_launch: false,
             brand_casing: true,
@@ -996,6 +998,33 @@ model = "LargeV4"
         assert!(settings.brand_casing);
         let off: UserSettings = toml::from_str("brand_casing = false\n").unwrap();
         assert!(!off.brand_casing);
+    }
+
+    #[test]
+    fn agc_mode_is_auto_by_default_and_when_absent_or_unknown() {
+        assert_eq!(UserSettings::default().agc_mode, AgcMode::Auto);
+        let absent: UserSettings = toml::from_str("language = \"en\"\n").unwrap();
+        assert_eq!(absent.agc_mode, AgcMode::Auto);
+        let unknown: UserSettings = toml::from_str("agc_mode = \"turbo\"\n").unwrap();
+        assert_eq!(unknown.agc_mode, AgcMode::Auto);
+    }
+
+    #[test]
+    fn agc_mode_round_trips_as_a_lowercase_string() {
+        for (mode, text) in [
+            (AgcMode::Off, "off"),
+            (AgcMode::Auto, "auto"),
+            (AgcMode::Always, "always"),
+        ] {
+            let raw = toml::to_string(&UserSettings {
+                agc_mode: mode,
+                ..UserSettings::default()
+            })
+            .unwrap();
+            assert!(raw.contains(&format!("agc_mode = \"{text}\"")), "{raw}");
+            let back: UserSettings = toml::from_str(&raw).unwrap();
+            assert_eq!(back.agc_mode, mode);
+        }
     }
 
     #[test]

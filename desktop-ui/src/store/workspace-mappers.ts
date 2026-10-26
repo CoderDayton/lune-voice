@@ -75,7 +75,7 @@ export function mapWorkspaceSettings(snapshot: WorkspaceSnapshot): WorkspaceSett
     modelIdleUnloadMinutes:
       snapshot.settings.modelIdleUnloadMinutes ?? DEFAULT_SETTINGS.modelIdleUnloadMinutes,
     inputDevice: snapshot.settings.inputDevice ?? DEFAULT_SETTINGS.inputDevice,
-    vadPcen: snapshot.settings.vadPcen ?? DEFAULT_SETTINGS.vadPcen,
+    agcMode: snapshot.settings.agcMode ?? DEFAULT_SETTINGS.agcMode,
     startMinimized: snapshot.settings.startMinimized ?? DEFAULT_SETTINGS.startMinimized,
     checkUpdatesOnLaunch:
       snapshot.settings.checkUpdatesOnLaunch ?? DEFAULT_SETTINGS.checkUpdatesOnLaunch,
@@ -153,7 +153,7 @@ export function settingsToSaveInput(settings: WorkspaceSettings): SaveWorkspaceS
     dictationLanguage: settings.dictationLanguage,
     modelIdleUnloadMinutes: settings.modelIdleUnloadMinutes,
     inputDevice: settings.inputDevice,
-    vadPcen: settings.vadPcen,
+    agcMode: settings.agcMode,
     startMinimized: settings.startMinimized,
     checkUpdatesOnLaunch: settings.checkUpdatesOnLaunch,
     brandCasing: settings.brandCasing,

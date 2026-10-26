@@ -108,7 +108,7 @@ msgstr "## 회의 — {date}\n"
 "참석자:\n"
 "- "
 
-#: src/features/settings/data/settings-data.ts:550
+#: src/features/settings/data/settings-data.ts:570
 msgid "1 year"
 msgstr "1년"
 
@@ -116,15 +116,15 @@ msgstr "1년"
 msgid "25 European languages"
 msgstr "유럽 언어 25개"
 
-#: src/features/settings/data/settings-data.ts:548
+#: src/features/settings/data/settings-data.ts:568
 msgid "30 days"
 msgstr "30일"
 
-#: src/features/settings/data/settings-data.ts:547
+#: src/features/settings/data/settings-data.ts:567
 msgid "7 days"
 msgstr "7일"
 
-#: src/features/settings/data/settings-data.ts:549
+#: src/features/settings/data/settings-data.ts:569
 msgid "90 days"
 msgstr "90일"
 
@@ -151,7 +151,7 @@ msgid "Active style"
 msgstr "활성 스타일"
 
 #: src/features/settings/sections/dictation-section.tsx:154
-#: src/features/settings/sections/dictation-section.tsx:162
+#: src/features/settings/sections/dictation-section.tsx:160
 msgid "Adaptive gain control"
 msgstr "적응형 게인 제어"
 
@@ -171,23 +171,27 @@ msgstr "교정 규칙을 추가하면 Lune Voice가 받아쓰기할 때마다 �
 msgid "Add snippet"
 msgstr "스니펫 추가"
 
-#: src/features/settings/data/settings-data.ts:584
+#: src/features/settings/data/settings-data.ts:552
+msgid "Adjusts the level of every recording as it goes."
+msgstr "모든 녹음의 레벨을 녹음 중에 조정합니다."
+
+#: src/features/settings/data/settings-data.ts:604
 msgid "After 1 hour"
 msgstr "1시간 후"
 
-#: src/features/settings/data/settings-data.ts:582
+#: src/features/settings/data/settings-data.ts:602
 msgid "After 15 minutes"
 msgstr "15분 후"
 
-#: src/features/settings/data/settings-data.ts:585
+#: src/features/settings/data/settings-data.ts:605
 msgid "After 2 hours"
 msgstr "2시간 후"
 
-#: src/features/settings/data/settings-data.ts:583
+#: src/features/settings/data/settings-data.ts:603
 msgid "After 30 minutes"
 msgstr "30분 후"
 
-#: src/features/settings/data/settings-data.ts:581
+#: src/features/settings/data/settings-data.ts:601
 msgid "After 5 minutes"
 msgstr "5분 후"
 
@@ -220,6 +224,10 @@ msgstr "항상 Ctrl+Shift+V"
 #: src/features/settings/data/settings-data.ts:531
 msgid "Always Ctrl+V"
 msgstr "항상 Ctrl+V"
+
+#: src/features/settings/data/settings-data.ts:551
+msgid "Always on"
+msgstr "항상 켜기"
 
 #: src/features/settings/components/openai-fields.tsx:37
 msgid "API endpoint"
@@ -280,6 +288,7 @@ msgid "Auto-detect"
 msgstr "자동 감지"
 
 #: src/features/settings/data/settings-data.ts:526
+#: src/features/settings/data/settings-data.ts:546
 #: src/features/settings/sections/pill-section.tsx:55
 msgid "Automatic"
 msgstr "자동"
@@ -438,6 +447,10 @@ msgstr "설치된 모델을 확인하는 중…"
 #: src/features/welcome/components/ready-checks.tsx:113
 msgid "Checking…"
 msgstr "확인 중…"
+
+#: src/features/settings/data/settings-data.ts:547
+msgid "Checks each dictation when you stop. Leaves clean audio at a normal level alone and evens out quiet, loud, or noisy audio. Recommended."
+msgstr "멈출 때 받아쓰기마다 확인합니다. 보통 레벨의 깨끗한 오디오는 그대로 두고, 작거나 크거나 잡음이 많은 오디오는 고르게 맞춥니다. 권장."
 
 #: src/features/settings/sections/output-section.tsx:22
 msgid "Choose how finished text is inserted into the app you are currently using."
@@ -755,7 +768,7 @@ msgstr "디스크 사용량"
 msgid "Dismiss error"
 msgstr "오류 닫기"
 
-#: src/features/settings/data/settings-data.ts:546
+#: src/features/settings/data/settings-data.ts:566
 msgid "Don't save history"
 msgstr "기록을 저장하지 않음"
 
@@ -871,6 +884,10 @@ msgstr "엔진"
 #: src/features/welcome/welcome-page.tsx:441
 msgid "Enter Lune Voice"
 msgstr "Lune Voice 열기"
+
+#: src/features/settings/sections/dictation-section.tsx:155
+msgid "Evens out the microphone level before transcription. Helps quiet mics and noisy rooms."
+msgstr "텍스트 변환 전에 마이크 레벨을 고르게 맞춥니다. 소리가 작은 마이크와 시끄러운 방에서 도움이 됩니다."
 
 #: src/features/styles/components/style-editor-modal.tsx:225
 msgid "Examples are out of date since you edited the prompt."
@@ -1168,11 +1185,11 @@ msgstr "토론에 참여하기"
 msgid "Just now"
 msgstr "방금 전"
 
-#: src/features/settings/data/settings-data.ts:551
+#: src/features/settings/data/settings-data.ts:571
 msgid "Keep forever"
 msgstr "영구 보관"
 
-#: src/features/settings/data/settings-data.ts:578
+#: src/features/settings/data/settings-data.ts:598
 msgid "Keep loaded"
 msgstr "메모리에 유지"
 
@@ -1456,10 +1473,6 @@ msgstr "텍스트 없음"
 msgid "None"
 msgstr "없음"
 
-#: src/features/settings/sections/dictation-section.tsx:155
-msgid "Normalizes microphone level before voice detection. Helps quiet mics and noisy rooms. Recommended."
-msgstr "음성 감지 전에 마이크 레벨을 일정하게 맞춥니다. 소리가 작은 마이크나 시끄러운 환경에서 도움이 됩니다. 권장."
-
 #: src/features/settings/sections/pill-section.tsx:66
 msgid "not connected"
 msgstr "연결되지 않음"
@@ -1481,6 +1494,7 @@ msgid "NVIDIA Parakeet running on-device. Punctuates by itself and detects which
 msgstr "기기에서 실행되는 NVIDIA Parakeet입니다. 문장 부호를 스스로 넣고, 지원하는 언어 중 어떤 언어로 말하는지 감지합니다."
 
 #: src/features/settings/data/settings-data.ts:169
+#: src/features/settings/data/settings-data.ts:556
 #: src/features/styles/components/style-editor-modal.tsx:192
 msgid "Off"
 msgstr "끄기"
@@ -1518,7 +1532,7 @@ msgstr "릴리스 페이지 열기"
 msgid "Open session from {time}"
 msgstr "{time} 세션 열기"
 
-#: src/features/settings/data/settings-data.ts:623
+#: src/features/settings/data/settings-data.ts:643
 msgid "OpenAI-compatible"
 msgstr "OpenAI 호환"
 
@@ -1556,7 +1570,7 @@ msgid "Pagination"
 msgstr "페이지 탐색"
 
 #: src/features/settings/components/asr-engine-cards.tsx:170
-#: src/features/settings/data/settings-data.ts:622
+#: src/features/settings/data/settings-data.ts:642
 #: src/features/welcome/components/engine-step.tsx:83
 msgid "Parakeet"
 msgstr "Parakeet"
@@ -1573,7 +1587,7 @@ msgstr "Parakeet은 어떤 언어를 들었는지 Lune에 알려줄 수 없으�
 msgid "Parakeet cannot transcribe {languageName}, so dictation will not start. Choose a language it covers below, or use Whisper."
 msgstr "Parakeet은 {languageName}을(를) 인식할 수 없어 받아쓰기가 시작되지 않습니다. 아래에서 지원되는 언어를 선택하거나 Whisper를 사용하세요."
 
-#: src/features/settings/data/settings-data.ts:627
+#: src/features/settings/data/settings-data.ts:647
 msgid "Paste"
 msgstr "붙여넣기"
 
@@ -1896,6 +1910,10 @@ msgstr "설정한 엔드포인트로 오디오를 보냅니다"
 msgid "Sends audio to an OpenAI-compatible endpoint you configure — a server on your own machine, or a hosted API."
 msgstr "직접 설정한 OpenAI 호환 엔드포인트로 오디오를 보냅니다. 내 컴퓨터의 서버든 호스팅 API든 상관없습니다."
 
+#: src/features/settings/data/settings-data.ts:557
+msgid "Sends the microphone audio as it is."
+msgstr "마이크 오디오를 그대로 보냅니다."
+
 #: src/features/settings/data/settings-data.ts:176
 msgid "Sends transcripts to an OpenAI-compatible endpoint you configure — Ollama, llama-server or LM Studio locally, or a hosted API."
 msgstr "직접 설정한 OpenAI 호환 엔드포인트로 텍스트를 보냅니다. 로컬의 Ollama, llama-server, LM Studio나 호스팅 API를 사용할 수 있습니다."
@@ -2163,7 +2181,7 @@ msgstr "음성 입력에 사용하는 기본 단축키입니다. 단축키를 �
 msgid "The microphone is in use"
 msgstr "마이크가 사용 중입니다"
 
-#: src/features/settings/data/settings-data.ts:579
+#: src/features/settings/data/settings-data.ts:599
 msgid "The model stays in memory. Every dictation starts instantly."
 msgstr "모델이 메모리에 남습니다. 매번 바로 받아쓰기가 시작됩니다."
 
@@ -2301,7 +2319,7 @@ msgstr "트리거 문구"
 msgid "Try again"
 msgstr "다시 시도"
 
-#: src/features/settings/data/settings-data.ts:628
+#: src/features/settings/data/settings-data.ts:648
 msgid "Type"
 msgstr "입력"
 
@@ -2456,7 +2474,7 @@ msgid "Which screen the pill appears on."
 msgstr "표시기가 나타나는 화면입니다."
 
 #: src/features/settings/components/asr-engine-cards.tsx:169
-#: src/features/settings/data/settings-data.ts:621
+#: src/features/settings/data/settings-data.ts:641
 #: src/features/welcome/components/engine-step.tsx:76
 msgid "Whisper"
 msgstr "Whisper"

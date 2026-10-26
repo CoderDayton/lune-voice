@@ -108,7 +108,7 @@ msgstr "## बैठक — {date}\n"
 "उपस्थित:\n"
 "- "
 
-#: src/features/settings/data/settings-data.ts:550
+#: src/features/settings/data/settings-data.ts:570
 msgid "1 year"
 msgstr "1 साल"
 
@@ -116,15 +116,15 @@ msgstr "1 साल"
 msgid "25 European languages"
 msgstr "25 यूरोपीय भाषाएँ"
 
-#: src/features/settings/data/settings-data.ts:548
+#: src/features/settings/data/settings-data.ts:568
 msgid "30 days"
 msgstr "30 दिन"
 
-#: src/features/settings/data/settings-data.ts:547
+#: src/features/settings/data/settings-data.ts:567
 msgid "7 days"
 msgstr "7 दिन"
 
-#: src/features/settings/data/settings-data.ts:549
+#: src/features/settings/data/settings-data.ts:569
 msgid "90 days"
 msgstr "90 दिन"
 
@@ -151,7 +151,7 @@ msgid "Active style"
 msgstr "सक्रिय शैली"
 
 #: src/features/settings/sections/dictation-section.tsx:154
-#: src/features/settings/sections/dictation-section.tsx:162
+#: src/features/settings/sections/dictation-section.tsx:160
 msgid "Adaptive gain control"
 msgstr "अनुकूली गेन नियंत्रण"
 
@@ -171,23 +171,27 @@ msgstr "सुधार जोड़ें और Lune Voice हर बार �
 msgid "Add snippet"
 msgstr "स्निपेट जोड़ें"
 
-#: src/features/settings/data/settings-data.ts:584
+#: src/features/settings/data/settings-data.ts:552
+msgid "Adjusts the level of every recording as it goes."
+msgstr "हर रिकॉर्डिंग का स्तर साथ-साथ समायोजित करता है।"
+
+#: src/features/settings/data/settings-data.ts:604
 msgid "After 1 hour"
 msgstr "1 घंटे बाद"
 
-#: src/features/settings/data/settings-data.ts:582
+#: src/features/settings/data/settings-data.ts:602
 msgid "After 15 minutes"
 msgstr "15 मिनट बाद"
 
-#: src/features/settings/data/settings-data.ts:585
+#: src/features/settings/data/settings-data.ts:605
 msgid "After 2 hours"
 msgstr "2 घंटे बाद"
 
-#: src/features/settings/data/settings-data.ts:583
+#: src/features/settings/data/settings-data.ts:603
 msgid "After 30 minutes"
 msgstr "30 मिनट बाद"
 
-#: src/features/settings/data/settings-data.ts:581
+#: src/features/settings/data/settings-data.ts:601
 msgid "After 5 minutes"
 msgstr "5 मिनट बाद"
 
@@ -220,6 +224,10 @@ msgstr "हमेशा Ctrl+Shift+V"
 #: src/features/settings/data/settings-data.ts:531
 msgid "Always Ctrl+V"
 msgstr "हमेशा Ctrl+V"
+
+#: src/features/settings/data/settings-data.ts:551
+msgid "Always on"
+msgstr "हमेशा चालू"
 
 #: src/features/settings/components/openai-fields.tsx:37
 msgid "API endpoint"
@@ -280,6 +288,7 @@ msgid "Auto-detect"
 msgstr "स्वतः पहचान"
 
 #: src/features/settings/data/settings-data.ts:526
+#: src/features/settings/data/settings-data.ts:546
 #: src/features/settings/sections/pill-section.tsx:55
 msgid "Automatic"
 msgstr "स्वतः"
@@ -438,6 +447,10 @@ msgstr "इंस्टॉल किए गए मॉडल जाँचे ज�
 #: src/features/welcome/components/ready-checks.tsx:113
 msgid "Checking…"
 msgstr "जाँच हो रही है…"
+
+#: src/features/settings/data/settings-data.ts:547
+msgid "Checks each dictation when you stop. Leaves clean audio at a normal level alone and evens out quiet, loud, or noisy audio. Recommended."
+msgstr "रोकने पर हर डिक्टेशन की जाँच करता है। सामान्य स्तर वाले साफ़ ऑडियो को वैसा ही छोड़ता है, और धीमे, तेज़ या शोर वाले ऑडियो को संतुलित करता है। अनुशंसित।"
 
 #: src/features/settings/sections/output-section.tsx:22
 msgid "Choose how finished text is inserted into the app you are currently using."
@@ -755,7 +768,7 @@ msgstr "डिस्क उपयोग"
 msgid "Dismiss error"
 msgstr "त्रुटि ख़ारिज करें"
 
-#: src/features/settings/data/settings-data.ts:546
+#: src/features/settings/data/settings-data.ts:566
 msgid "Don't save history"
 msgstr "इतिहास न सहेजें"
 
@@ -871,6 +884,10 @@ msgstr "इंजन"
 #: src/features/welcome/welcome-page.tsx:441
 msgid "Enter Lune Voice"
 msgstr "Lune Voice खोलें"
+
+#: src/features/settings/sections/dictation-section.tsx:155
+msgid "Evens out the microphone level before transcription. Helps quiet mics and noisy rooms."
+msgstr "ट्रांसक्रिप्शन से पहले माइक्रोफ़ोन का स्तर संतुलित करता है। धीमे माइक और शोर वाले कमरों में मदद करता है।"
 
 #: src/features/styles/components/style-editor-modal.tsx:225
 msgid "Examples are out of date since you edited the prompt."
@@ -1168,11 +1185,11 @@ msgstr "चर्चाओं में शामिल हों"
 msgid "Just now"
 msgstr "अभी-अभी"
 
-#: src/features/settings/data/settings-data.ts:551
+#: src/features/settings/data/settings-data.ts:571
 msgid "Keep forever"
 msgstr "हमेशा रखें"
 
-#: src/features/settings/data/settings-data.ts:578
+#: src/features/settings/data/settings-data.ts:598
 msgid "Keep loaded"
 msgstr "लोड रखें"
 
@@ -1456,10 +1473,6 @@ msgstr "कोई ट्रांसक्रिप्ट नहीं"
 msgid "None"
 msgstr "कोई नहीं"
 
-#: src/features/settings/sections/dictation-section.tsx:155
-msgid "Normalizes microphone level before voice detection. Helps quiet mics and noisy rooms. Recommended."
-msgstr "आवाज़ पहचानने से पहले माइक्रोफ़ोन का स्तर सामान्य करता है। धीमे माइक और शोर-भरे कमरों में मददगार। अनुशंसित।"
-
 #: src/features/settings/sections/pill-section.tsx:66
 msgid "not connected"
 msgstr "जुड़ा नहीं है"
@@ -1481,6 +1494,7 @@ msgid "NVIDIA Parakeet running on-device. Punctuates by itself and detects which
 msgstr "NVIDIA Parakeet डिवाइस पर चल रहा है। अपने-आप विराम चिह्न लगाता है और पहचानता है कि आप उसकी किस भाषा में बोल रहे हैं।"
 
 #: src/features/settings/data/settings-data.ts:169
+#: src/features/settings/data/settings-data.ts:556
 #: src/features/styles/components/style-editor-modal.tsx:192
 msgid "Off"
 msgstr "बंद"
@@ -1518,7 +1532,7 @@ msgstr "रिलीज़ पेज खोलें"
 msgid "Open session from {time}"
 msgstr "{time} का सत्र खोलें"
 
-#: src/features/settings/data/settings-data.ts:623
+#: src/features/settings/data/settings-data.ts:643
 msgid "OpenAI-compatible"
 msgstr "OpenAI-संगत"
 
@@ -1556,7 +1570,7 @@ msgid "Pagination"
 msgstr "पृष्ठ नेविगेशन"
 
 #: src/features/settings/components/asr-engine-cards.tsx:170
-#: src/features/settings/data/settings-data.ts:622
+#: src/features/settings/data/settings-data.ts:642
 #: src/features/welcome/components/engine-step.tsx:83
 msgid "Parakeet"
 msgstr "Parakeet"
@@ -1573,7 +1587,7 @@ msgstr "Parakeet, Lune को यह नहीं बता सकता कि 
 msgid "Parakeet cannot transcribe {languageName}, so dictation will not start. Choose a language it covers below, or use Whisper."
 msgstr "Parakeet {languageName} का ट्रांसक्रिप्शन नहीं कर सकता, इसलिए डिक्टेशन शुरू नहीं होगा। नीचे कोई समर्थित भाषा चुनें, या Whisper का उपयोग करें।"
 
-#: src/features/settings/data/settings-data.ts:627
+#: src/features/settings/data/settings-data.ts:647
 msgid "Paste"
 msgstr "पेस्ट"
 
@@ -1896,6 +1910,10 @@ msgstr "ऑडियो आपके सेट किए एंडपॉइं�
 msgid "Sends audio to an OpenAI-compatible endpoint you configure — a server on your own machine, or a hosted API."
 msgstr "आपके द्वारा तय किए गए OpenAI-संगत एंडपॉइंट पर ऑडियो भेजता है — आपकी अपनी मशीन का सर्वर, या कोई होस्टेड API।"
 
+#: src/features/settings/data/settings-data.ts:557
+msgid "Sends the microphone audio as it is."
+msgstr "माइक्रोफ़ोन ऑडियो को जैसा है वैसा ही भेजता है।"
+
 #: src/features/settings/data/settings-data.ts:176
 msgid "Sends transcripts to an OpenAI-compatible endpoint you configure — Ollama, llama-server or LM Studio locally, or a hosted API."
 msgstr "आपके द्वारा तय किए गए OpenAI-संगत एंडपॉइंट पर ट्रांसक्रिप्ट भेजता है — स्थानीय रूप से Ollama, llama-server या LM Studio, या कोई होस्टेड API।"
@@ -2163,7 +2181,7 @@ msgstr "वॉइस टाइपिंग के लिए मुख्य श�
 msgid "The microphone is in use"
 msgstr "माइक्रोफ़ोन उपयोग में है"
 
-#: src/features/settings/data/settings-data.ts:579
+#: src/features/settings/data/settings-data.ts:599
 msgid "The model stays in memory. Every dictation starts instantly."
 msgstr "मॉडल मेमोरी में रहता है। हर डिक्टेशन तुरंत शुरू होता है।"
 
@@ -2301,7 +2319,7 @@ msgstr "ट्रिगर वाक्यांश"
 msgid "Try again"
 msgstr "फिर से कोशिश करें"
 
-#: src/features/settings/data/settings-data.ts:628
+#: src/features/settings/data/settings-data.ts:648
 msgid "Type"
 msgstr "टाइप"
 
@@ -2456,7 +2474,7 @@ msgid "Which screen the pill appears on."
 msgstr "संकेतक किस स्क्रीन पर दिखाई देता है।"
 
 #: src/features/settings/components/asr-engine-cards.tsx:169
-#: src/features/settings/data/settings-data.ts:621
+#: src/features/settings/data/settings-data.ts:641
 #: src/features/welcome/components/engine-step.tsx:76
 msgid "Whisper"
 msgstr "Whisper"

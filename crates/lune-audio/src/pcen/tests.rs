@@ -94,6 +94,40 @@ fn rejects_min_gt_max_gain() {
 }
 
 #[test]
+fn rejects_strength_outside_unit_interval() {
+    for bad in [-0.1, 1.1, f32::NAN] {
+        let cfg = PcenAgcConfig {
+            strength: bad,
+            ..Default::default()
+        };
+        assert!(matches!(
+            PcenAgc::new(cfg, SR, HOP),
+            Err(AudioError::Vad(_))
+        ));
+    }
+}
+
+#[test]
+fn strength_scales_the_gain_toward_unity() {
+    let gain_at = |strength: f32| {
+        let mut a = agc(PcenAgcConfig {
+            strength,
+            ..Default::default()
+        });
+        let mut buf = bursty(440.0, 0.014, HOP * 400, 50, 150);
+        process_in_hops(&mut a, &mut buf).gain_applied
+    };
+    let full = gain_at(1.0);
+    let half = gain_at(0.5);
+    assert!(full > 2.0, "full {full}");
+    assert_eq!(gain_at(0.0), 1.0);
+    assert!(
+        (half - (1.0 + 0.5 * (full - 1.0))).abs() < 0.05 * full,
+        "half {half} full {full}"
+    );
+}
+
+#[test]
 fn coeff_in_unit_interval() {
     assert!((0.0..=1.0).contains(&coeff(16.0, 150.0)));
     assert!(coeff(16.0, 1.0) <= 1.0);

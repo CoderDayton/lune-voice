@@ -12,7 +12,7 @@ import { backendClient } from '../../../lib/backend/client';
 import { saveWorkspaceSetting } from '../../../store/workspace-store';
 import { KeyCaptureInput } from '../components/key-capture-input';
 import { type SettingsProps, SettingsRow, SettingsSection } from '../components/section';
-import { activationModes, localizeOptions } from '../data/settings-data';
+import { activationModes, agcModes, localizeOptions } from '../data/settings-data';
 
 /** Empty string is the picker's sentinel for "use the system default input". */
 const DEFAULT_DEVICE = '';
@@ -152,14 +152,15 @@ export function DictationSection({ settings }: SettingsProps) {
 
         <SettingsRow
           label={t`Adaptive gain control`}
-          description={t`Normalizes microphone level before voice detection. Helps quiet mics and noisy rooms. Recommended.`}
+          description={t`Evens out the microphone level before transcription. Helps quiet mics and noisy rooms.`}
           control={
-            <input
-              type="checkbox"
-              className="toggle toggle-primary"
-              checked={settings.vadPcen}
-              onChange={() => void saveWorkspaceSetting('vadPcen', !settings.vadPcen)}
-              aria-label={t`Adaptive gain control`}
+            <DescriptiveDropdown
+              value={settings.agcMode}
+              options={localizeOptions(i18n, agcModes)}
+              ariaLabel={t`Adaptive gain control`}
+              onChange={(next) =>
+                void saveWorkspaceSetting('agcMode', next as typeof settings.agcMode)
+              }
             />
           }
         />

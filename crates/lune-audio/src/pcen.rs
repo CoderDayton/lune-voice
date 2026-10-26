@@ -59,6 +59,9 @@ pub struct PcenAgcConfig {
     /// holds `gain = 1.0`. Prevents misapplied gain on hotkey-onset speech
     /// before the noise tracker has had time to drain to the room floor.
     pub warmup_frames: u32,
+    /// How much of the computed gain to apply, in `[0, 1]`: the target gain
+    /// becomes `1 + strength · (gain − 1)`. `1.0` = full AGC, `0.0` = unity.
+    pub strength: f32,
     /// Numerical floor for divisions and envelope clamps.
     pub eps: f32,
 }
@@ -76,6 +79,7 @@ impl Default for PcenAgcConfig {
             tau_noise_down_ms: 200.0,
             tau_gain_ms: 80.0,
             warmup_frames: 16,
+            strength: 1.0,
             eps: 1.0e-8,
         }
     }
@@ -197,6 +201,7 @@ impl PcenAgc {
             if !raw_gain.is_finite() {
                 raw_gain = 1.0;
             }
+            raw_gain = 1.0 + self.cfg.strength * (raw_gain - 1.0);
 
             self.last_gain = lerp(self.last_gain, raw_gain, self.s_gain);
             self.last_gain = self.last_gain.clamp(self.cfg.min_gain, self.cfg.max_gain);
@@ -205,11 +210,8 @@ impl PcenAgc {
             }
         }
 
+        apply_gain(frame, self.last_gain);
         let g = self.last_gain;
-        for x in frame.iter_mut() {
-            let v = if x.is_finite() { *x * g } else { 0.0 };
-            *x = v.clamp(-1.0, 1.0);
-        }
 
         let sig_rms = self.sig_env_pow.sqrt();
         let noise_rms = self.noise_env_pow.sqrt();
@@ -240,6 +242,19 @@ impl PcenAgc {
     }
 }
 
+/// Scale `samples` by `gain` in place, clamped to `[-1, 1]`; non-finite
+/// samples become silence. The one place gain meets audio, so a frame and a
+/// clip's sub-hop tail are treated the same.
+pub fn apply_gain(samples: &mut [f32], gain: f32) {
+    for x in samples {
+        *x = if x.is_finite() {
+            (*x * gain).clamp(-1.0, 1.0)
+        } else {
+            0.0
+        };
+    }
+}
+
 fn validate(cfg: &PcenAgcConfig) -> Result<(), AudioError> {
     let bad = |k: &str| Err(AudioError::Vad(format!("pcen: invalid {k}")));
     if !cfg.target_rms.is_finite() || cfg.target_rms <= 0.0 {
@@ -256,6 +271,9 @@ fn validate(cfg: &PcenAgcConfig) -> Result<(), AudioError> {
     }
     if !cfg.alpha.is_finite() || cfg.alpha <= 0.0 || cfg.alpha > 1.0 {
         return bad("alpha");
+    }
+    if !(0.0..=1.0).contains(&cfg.strength) {
+        return bad("strength");
     }
     for (k, v) in [
         ("tau_signal_ms", cfg.tau_signal_ms),

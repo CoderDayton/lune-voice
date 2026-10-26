@@ -2,10 +2,10 @@
 
 use lune_asr::AsrRegistry;
 use lune_core::config::{
-    ActivationMode, AsrBackendConfig, DevicePolicy, DictationMode, FormatToggles, HistoryRetention,
-    HotkeyConfig, KeyCombo, LlmBackendConfig, Modifier, OpenAiLlmProvider, PillAnchor, PillCorner,
-    PillOrientation, PillSize, PillVisibility, PrivacyMode, RedactedString, StreamingMode,
-    StylePreset, TerminalMode, UserSettings, builtin_registry,
+    ActivationMode, AgcMode, AsrBackendConfig, DevicePolicy, DictationMode, FormatToggles,
+    HistoryRetention, HotkeyConfig, KeyCombo, LlmBackendConfig, Modifier, OpenAiLlmProvider,
+    PillAnchor, PillCorner, PillOrientation, PillSize, PillVisibility, PrivacyMode, RedactedString,
+    StreamingMode, StylePreset, TerminalMode, UserSettings, builtin_registry,
 };
 use lune_core::session::SessionStatus;
 use lune_persist::{
@@ -13,13 +13,13 @@ use lune_persist::{
 };
 
 use crate::dto::{
-    ActivationModeDto, AsrBackendTypeDto, CreateCustomStyleInput, CreateDictionaryEntryInput,
-    DevicePolicyDto, DictationModeDto, DictionaryItemDto, HistoryItemDto, HistoryPageDto,
-    LlmBackendTypeDto, ParakeetModelDto, PillAnchorDto, PillCornerDto, PillOrientationDto,
-    PillSizeDto, PillVisibilityDto, PlatformCapabilitiesDto, PrivacyModeDto, SaveSnippetInput,
-    SaveWorkspaceSettingsInput, SessionStatsDto, SettingsCoreDto, SnippetItemDto, StylePresetDto,
-    TerminalModeDto, UpdateCustomStyleInput, UpdateDictionaryEntryInput, WhisperModelDto,
-    WorkspaceSettingsDto, WorkspaceSnapshot,
+    ActivationModeDto, AgcModeDto, AsrBackendTypeDto, CreateCustomStyleInput,
+    CreateDictionaryEntryInput, DevicePolicyDto, DictationModeDto, DictionaryItemDto,
+    HistoryItemDto, HistoryPageDto, LlmBackendTypeDto, ParakeetModelDto, PillAnchorDto,
+    PillCornerDto, PillOrientationDto, PillSizeDto, PillVisibilityDto, PlatformCapabilitiesDto,
+    PrivacyModeDto, SaveSnippetInput, SaveWorkspaceSettingsInput, SessionStatsDto, SettingsCoreDto,
+    SnippetItemDto, StylePresetDto, TerminalModeDto, UpdateCustomStyleInput,
+    UpdateDictionaryEntryInput, WhisperModelDto, WorkspaceSettingsDto, WorkspaceSnapshot,
 };
 
 /// Page size ceiling for `list_history_page`, which is what the History tab
@@ -888,7 +888,7 @@ fn settings_to_dto(settings: &UserSettings) -> WorkspaceSettingsDto {
             dictation_language: settings.dictation_language.clone(),
             model_idle_unload_minutes: settings.model_idle_unload_minutes,
             input_device: settings.input_device.clone(),
-            vad_pcen: settings.vad_pcen,
+            agc_mode: agc_mode_to_dto(settings.agc_mode),
             start_minimized: settings.start_minimized,
             check_updates_on_launch: settings.check_updates_on_launch,
             brand_casing: settings.brand_casing,
@@ -1037,7 +1037,7 @@ fn apply_settings_dto(
     // and pay a reload on the next one, which no user means to ask for.
     settings.model_idle_unload_minutes = input.model_idle_unload_minutes.filter(|&m| m > 0);
     settings.input_device = input.input_device.clone();
-    settings.vad_pcen = input.vad_pcen;
+    settings.agc_mode = agc_mode_from_dto(input.agc_mode);
     settings.start_minimized = input.start_minimized;
     settings.check_updates_on_launch = input.check_updates_on_launch;
     settings.brand_casing = input.brand_casing;
@@ -1206,6 +1206,22 @@ fn pill_corner_from_dto(dto: PillCornerDto) -> PillCorner {
         PillCornerDto::Pill => PillCorner::Pill,
         PillCornerDto::Rounded => PillCorner::Rounded,
         PillCornerDto::Square => PillCorner::Square,
+    }
+}
+
+fn agc_mode_to_dto(mode: AgcMode) -> AgcModeDto {
+    match mode {
+        AgcMode::Off => AgcModeDto::Off,
+        AgcMode::Always => AgcModeDto::Always,
+        _ => AgcModeDto::Auto,
+    }
+}
+
+fn agc_mode_from_dto(dto: AgcModeDto) -> AgcMode {
+    match dto {
+        AgcModeDto::Off => AgcMode::Off,
+        AgcModeDto::Auto => AgcMode::Auto,
+        AgcModeDto::Always => AgcMode::Always,
     }
 }
 

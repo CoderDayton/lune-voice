@@ -23,6 +23,20 @@ fn dictation_mode_was_both(content: &str) -> bool {
     })
 }
 
+/// True when a file predating `agc_mode` turned the old `vad_pcen` AGC toggle
+/// off. `vad_pcen = true` was the default every save wrote, so it carries no
+/// choice and the file takes the new default.
+fn legacy_agc_was_off(content: &str) -> bool {
+    if !content.contains("vad_pcen") {
+        return false;
+    }
+    let Ok(table) = content.parse::<toml::Table>() else {
+        return false;
+    };
+    !table.contains_key("agc_mode")
+        && table.get("vad_pcen").and_then(toml::Value::as_bool) == Some(false)
+}
+
 /// True when the raw settings TOML carries a non-empty `api_key = "..."` line —
 /// i.e. a plaintext secret that should be migrated into the keyring. Empty
 /// (`api_key = ""`, the blanked/keyring-backed state) does not count.
@@ -99,6 +113,9 @@ impl SettingsStore {
         // separate `copy_to_clipboard` toggle, so set that for legacy configs.
         if dictation_mode_was_both(&content) {
             settings.copy_to_clipboard = true;
+        }
+        if legacy_agc_was_off(&content) {
+            settings.agc_mode = lune_core::config::AgcMode::Off;
         }
         self.restore_secrets(&mut settings);
         Ok(settings)
@@ -573,6 +590,36 @@ mod tests {
         let loaded = store.load().unwrap();
         assert_eq!(loaded.dictation_mode, DictationMode::TypeInPlace);
         assert!(loaded.copy_to_clipboard, "legacy Both must enable copy");
+    }
+
+    /// `vad_pcen` was a bool before `agc_mode`. Every saved file carries it, so
+    /// `true` (the old default) means no choice was made and takes the new
+    /// default; only an explicit `false` carries over.
+    #[test]
+    fn legacy_vad_pcen_maps_onto_agc_mode() {
+        use lune_core::config::AgcMode;
+
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("settings.toml");
+        let store =
+            SettingsStore::with_vault(&path, Box::new(crate::secrets::InMemoryVault::default()));
+
+        for (legacy, expected) in [
+            ("vad_pcen = false\n", AgcMode::Off),
+            ("vad_pcen = true\n", AgcMode::Auto),
+        ] {
+            fs::write(&path, format!("{legacy}language = \"en\"\n")).unwrap();
+            assert_eq!(store.load().unwrap().agc_mode, expected, "{legacy}");
+        }
+
+        fs::write(&path, "vad_pcen = false\nagc_mode = \"always\"\n").unwrap();
+        assert_eq!(store.load().unwrap().agc_mode, AgcMode::Always);
+
+        fs::write(&path, "vad_pcen = false\n").unwrap();
+        store.save(&store.load().unwrap()).unwrap();
+        let raw = fs::read_to_string(&path).unwrap();
+        assert!(!raw.contains("vad_pcen"), "{raw}");
+        assert_eq!(store.load().unwrap().agc_mode, AgcMode::Off);
     }
 
     #[test]

@@ -9,7 +9,9 @@ mod style_llm;
 
 // Re-export everything so `use lune_core::config::X` paths remain valid.
 pub use hotkey::{HotkeyConfig, KeyCombo, Modifier};
-pub use modes::{ActivationMode, DictationMode, PillVisibility, PrivacyMode, TerminalMode};
+pub use modes::{
+    ActivationMode, AgcMode, DictationMode, PillVisibility, PrivacyMode, TerminalMode,
+};
 pub use pipeline::{PipelineConfig, PipelineOverrides};
 pub use redacted::RedactedString;
 pub use settings::{
@@ -142,7 +144,7 @@ mod tests {
         assert_eq!(parsed.default_style, None);
         assert_eq!(parsed.language, "auto");
         assert_eq!(parsed.dictation_language, "auto");
-        assert!(parsed.vad_pcen);
+        assert_eq!(parsed.agc_mode, AgcMode::Auto);
         assert!(matches!(
             parsed.asr_backend,
             AsrBackendConfig::WhisperCpp { .. }

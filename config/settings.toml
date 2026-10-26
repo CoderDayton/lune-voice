@@ -70,9 +70,12 @@ session_history_days = 30
 # buffered across the reload, so nothing you say during it is lost.
 # model_idle_unload_minutes = 30
 
-# Enable the PCEN-style adaptive AGC frontend before the VAD.
-# Improves robustness on quiet mics and noisy environments.
-vad_pcen = true
+# Mic gain control before the recognizer:
+#   "auto"   - measure each dictation; leave clean audio near the target
+#              level alone, use PCEN on the rest (default)
+#   "always" - PCEN on every frame
+#   "off"    - raw mic audio
+agc_mode = "auto"
 
 # Launch the app hidden to the system tray instead of showing the main
 # window. Click the tray icon (or press the dictation hotkey) to bring it up.

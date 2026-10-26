@@ -493,9 +493,9 @@ async fn run_session<A: AsrBackend + 'static>(
 ) {
     let session_id = deps.session_id;
     let td = deps.teardown();
-    let (input_device, vad_pcen) = {
+    let (input_device, agc_mode) = {
         let settings = deps.settings.read().await;
-        (settings.input_device.clone(), settings.vad_pcen)
+        (settings.input_device.clone(), settings.agc_mode)
     };
 
     let capture = match crate::capture::run_capture(
@@ -504,7 +504,7 @@ async fn run_session<A: AsrBackend + 'static>(
         deps.config.asr_config.clone(),
         audio_override,
         &deps.config.pipeline,
-        vad_pcen,
+        agc_mode,
         input_device,
         asr.segment_capacity_hint(),
         &deps.event_tx,

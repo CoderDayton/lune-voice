@@ -91,7 +91,7 @@ baseline. Targets that use a model compile whisper.cpp and need the model on dis
 | Technique | Location | Impact |
 |-----------|----------|--------|
 | **O(1) risk lookup in corrector** | `crates/lune-dict/src/corrector.rs` | Risk positions are indexed in a `HashMap`, so each word costs an O(1) lookup instead of a linear scan over the risk list |
-| **PCEN AGC frontend** | `crates/lune-audio/src/pcen.rs`, `crates/lune-voice/src/capture.rs` | Automatic gain on every captured frame through `MicAgc`, controlled by the `vad_pcen` setting (default on). It brings a quiet mic up toward a target level before whisper hears it |
+| **PCEN AGC frontend** | `crates/lune-audio/src/pcen.rs`, `crates/lune-voice/src/capture.rs` | Gain control through `MicAgc`, set by `agc_mode`. `auto` (default, `crates/lune-audio/src/auto_gain.rs`) measures the whole clip at stop and leaves clean audio within 3 dB of the target alone; everything else gets PCEN. `always` runs PCEN on every frame |
 
 ### Concurrency
 

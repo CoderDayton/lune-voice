@@ -223,6 +223,17 @@ pub struct MonitorInfoDto {
     pub is_primary: bool,
 }
 
+/// Mic gain control before the recognizer. Mirrors
+/// [`lune_core::config::AgcMode`].
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize, TS)]
+#[ts(export, export_to = "../../src/lib/backend/generated/")]
+pub enum AgcModeDto {
+    Off,
+    #[default]
+    Auto,
+    Always,
+}
+
 /// Paste-shortcut selection strategy for the output stage.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, TS)]
 #[ts(export, export_to = "../../src/lib/backend/generated/")]
@@ -409,7 +420,7 @@ pub struct SettingsCoreDto {
     /// Preferred microphone input device by name; null = system default.
     #[serde(default)]
     pub input_device: Option<String>,
-    pub vad_pcen: bool,
+    pub agc_mode: AgcModeDto,
     pub start_minimized: bool,
     /// Check the release endpoint for a newer version at startup.
     #[serde(default)]
@@ -778,7 +789,7 @@ mod tests {
             "pillVisibility": "Always",
             "language": "en",
             "dictationLanguage": "auto",
-            "vadPcen": true,
+            "agcMode": "Auto",
             "startMinimized": false,
             "terminalMode": "Auto",
             "llmEnabled": false,

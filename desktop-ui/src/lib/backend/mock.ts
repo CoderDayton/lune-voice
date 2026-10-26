@@ -52,7 +52,7 @@ function createMockSnapshot(): WorkspaceSnapshot {
       dictationLanguage: 'auto',
       modelIdleUnloadMinutes: null,
       inputDevice: null,
-      vadPcen: true,
+      agcMode: 'Auto',
       startMinimized: false,
       checkUpdatesOnLaunch: false,
       brandCasing: true,

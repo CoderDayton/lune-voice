@@ -25,6 +25,7 @@
 //! }
 //! ```
 
+pub mod auto_gain;
 mod capture;
 mod devices;
 pub mod pcen;
@@ -39,7 +40,7 @@ pub use devices::{
 };
 pub use pcen::{
     DEFAULT_NOISE_CEILING_RMS, EXPECTED_OUTPUT_RMS, PCEN_HOP_SIZE, PcenAgc, PcenAgcConfig,
-    PcenFrameStats,
+    PcenFrameStats, apply_gain,
 };
 
 /// Polling source for downstream consumers (sessions, tests).

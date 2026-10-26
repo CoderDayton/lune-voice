@@ -538,6 +538,26 @@ export const terminalModes: DescriptiveOptionData<TerminalModeValue>[] = [
   },
 ];
 
+export type AgcModeValue = 'Off' | 'Auto' | 'Always';
+
+export const agcModes: DescriptiveOptionData<AgcModeValue>[] = [
+  {
+    value: 'Auto',
+    label: msg`Automatic`,
+    description: msg`Checks each dictation when you stop. Leaves clean audio at a normal level alone and evens out quiet, loud, or noisy audio. Recommended.`,
+  },
+  {
+    value: 'Always',
+    label: msg`Always on`,
+    description: msg`Adjusts the level of every recording as it goes.`,
+  },
+  {
+    value: 'Off',
+    label: msg`Off`,
+    description: msg`Sends the microphone audio as it is.`,
+  },
+];
+
 export type PrivacyModeValue = 'LocalOnly' | 'AllowRemote';
 
 export type HistoryRetentionValue = 'off' | '7' | '30' | '90' | '365' | 'forever';

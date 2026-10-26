@@ -17,8 +17,8 @@
 //! Corpus: the English clips in `fixtures/audio` and `fixtures/bench/*`, cut
 //! to [`HEAD_MS`] after the onset. `LUNE_BENCH_DIR=<dir>` scores your own
 //! `.wav` + `.txt` pairs instead, uncut. `LUNE_BENCH_AGC=1` runs each
-//! utterance through the capture path's PCEN gain first (the `vad_pcen`
-//! setting).
+//! utterance through the capture path's PCEN gain first (`agc_mode =
+//! "always"`).
 //!
 //! Run: WHISPER_MODEL=large cargo run --release --example lead_in_ab \
 //!        -p lune-voice --features whisper-cpp
@@ -90,7 +90,7 @@ fn utterance(pcm: &[f32], onset: usize, lead_ms: usize, head_ms: Option<usize>) 
 }
 
 /// The utterance as the capture path hands it to the recognizer with
-/// `vad_pcen` on: gain applied per hop, the last partial hop at the final gain.
+/// `agc_mode = "always"`: gain applied per hop, the last partial hop at the final gain.
 fn with_agc(pcm: &[f32]) -> Vec<f32> {
     let mut agc = PcenAgc::new(PcenAgcConfig::default(), 16_000, PCEN_HOP_SIZE)
         .expect("default PCEN config is valid");
