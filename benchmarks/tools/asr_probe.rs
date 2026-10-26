@@ -143,27 +143,23 @@ fn load_pcm(path: &Path, is_f32: bool, pregain: f32) -> Vec<f32> {
 
 /// Push the whole clip straight to the ASR backend, no VAD, no LLM.
 async fn run_direct(pcm: &[f32], asr: Arc<AsrRegistry>) -> Option<String> {
-    tokio::task::LocalSet::new()
-        .run_until(async {
-            let session = asr
-                .start_session(AsrSessionConfig::default())
-                .await
-                .expect("start asr session");
-            asr.push_audio(&session, pcm).await.expect("push audio");
-            let segs = asr.poll_final(&session).await.expect("poll final");
-            asr.end_session(session).await.ok();
-            let text = segs
-                .into_iter()
-                .map(|s| s.text)
-                .collect::<Vec<_>>()
-                .join(" ");
-            if text.trim().is_empty() {
-                None
-            } else {
-                Some(text)
-            }
-        })
+    let session = asr
+        .start_session(AsrSessionConfig::default())
         .await
+        .expect("start asr session");
+    asr.push_audio(&session, pcm).await.expect("push audio");
+    let segs = asr.poll_final(&session).await.expect("poll final");
+    asr.end_session(session).await.ok();
+    let text = segs
+        .into_iter()
+        .map(|s| s.text)
+        .collect::<Vec<_>>()
+        .join(" ");
+    if text.trim().is_empty() {
+        None
+    } else {
+        Some(text)
+    }
 }
 
 /// Full SessionManager path (VAD + ASR + LLM), mirroring `pipeline_real`.
@@ -175,14 +171,22 @@ async fn run_full_pipeline(
 ) -> Option<String> {
     let audio_stream = AudioStream::from_samples(pcm, AudioConfig::default()).unwrap();
     let db = lune_persist::Database::open_in_memory().unwrap();
-    let dict = lune_dict::UserDictionary::default();
+    let (settings, dict) = user_profile();
 
+    let language = match settings.dictation_language.as_str() {
+        "" | "auto" => None,
+        lang => Some(lang.to_owned()),
+    };
     let config = lune_voice::SessionManagerConfig {
         asr_backend_kind: asr.kind(),
-        pipeline,
-        ..Default::default()
+        asr_config: AsrSessionConfig {
+            language,
+            ..Default::default()
+        },
+        pipeline: pipeline.with_overrides(&settings.pipeline).clamp().0,
+        persist_history: false,
     };
-    let settings = Arc::new(RwLock::new(UserSettings::default()));
+    let settings = Arc::new(RwLock::new(settings));
 
     let mgr = SessionManager::new(
         asr,
@@ -196,34 +200,55 @@ async fn run_full_pipeline(
     );
     let (event_tx, mut event_rx) = mpsc::channel::<SessionEvent>(256);
 
-    tokio::task::LocalSet::new()
-        .run_until(async {
-            let _id = mgr
-                .start(
-                    event_tx,
-                    lune_voice::SessionAudio::Owned(audio_stream),
-                    lune_voice::SessionKind::Dictate,
-                )
-                .await
-                .expect("start session");
-            let mut final_text = String::new();
-            let deadline = tokio::time::Instant::now() + std::time::Duration::from_secs(120);
-            loop {
-                match tokio::time::timeout_at(deadline, event_rx.recv()).await {
-                    Ok(Some(SessionEvent::FinalizedText { text: t, .. })) => {
-                        final_text.push_str(&t)
-                    }
-                    Ok(Some(SessionEvent::Stopped { .. })) => break,
-                    Ok(Some(_)) => {}
-                    Ok(None) => break,
-                    Err(_) => break,
-                }
+    async {
+        let _id = mgr
+            .start(
+                event_tx,
+                lune_voice::SessionAudio::Owned(audio_stream),
+                lune_voice::SessionKind::Dictate,
+            )
+            .await
+            .expect("start session");
+        let mut final_text = String::new();
+        let deadline = tokio::time::Instant::now() + std::time::Duration::from_secs(120);
+        loop {
+            match tokio::time::timeout_at(deadline, event_rx.recv()).await {
+                Ok(Some(SessionEvent::FinalizedText { text: t, .. })) => final_text.push_str(&t),
+                Ok(Some(SessionEvent::Stopped { .. })) => break,
+                Ok(Some(_)) => {}
+                Ok(None) => break,
+                Err(_) => break,
             }
-            if final_text.trim().is_empty() {
-                None
-            } else {
-                Some(final_text)
-            }
-        })
-        .await
+        }
+        if final_text.trim().is_empty() {
+            None
+        } else {
+            Some(final_text)
+        }
+    }
+    .await
+}
+
+/// `LUNE_USER=1` runs with the user's settings.toml and the dictionary in
+/// `LUNE_DICT_DB` (default: the user's lune.db); otherwise defaults.
+fn user_profile() -> (UserSettings, lune_dict::UserDictionary) {
+    if std::env::var("LUNE_USER").as_deref() != Ok("1") {
+        return (
+            UserSettings::default(),
+            lune_dict::UserDictionary::default(),
+        );
+    }
+    let paths = lune_persist::AppPaths::resolve().expect("resolve app paths");
+    let mut settings = lune_persist::SettingsStore::new(paths.settings_file())
+        .load()
+        .expect("load settings.toml");
+    settings.migrate_pipeline_fields();
+    let db_path = std::env::var("LUNE_DICT_DB")
+        .map(PathBuf::from)
+        .unwrap_or_else(|_| paths.database_file());
+    let entries = lune_persist::Database::open(&db_path)
+        .expect("open dictionary db")
+        .list_dictionary_entries()
+        .expect("list dictionary entries");
+    (settings, lune_dict::UserDictionary::new(entries))
 }
