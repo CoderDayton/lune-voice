@@ -29,7 +29,7 @@ pub enum DictationModeDto {
 #[ts(export, export_to = "../../src/lib/backend/generated/")]
 pub enum DevicePolicyDto {
     Cpu,
-    Cuda,
+    Vulkan,
     Auto,
 }
 

@@ -1105,7 +1105,7 @@ fn dictation_mode_from_dto(dto: DictationModeDto) -> DictationMode {
 fn device_policy_to_dto(policy: DevicePolicy) -> DevicePolicyDto {
     match policy {
         DevicePolicy::Cpu => DevicePolicyDto::Cpu,
-        DevicePolicy::Cuda => DevicePolicyDto::Cuda,
+        DevicePolicy::Vulkan => DevicePolicyDto::Vulkan,
         DevicePolicy::Auto => DevicePolicyDto::Auto,
     }
 }
@@ -1115,7 +1115,7 @@ fn resolve_device_policy(use_gpu: bool, policy: DevicePolicyDto) -> DevicePolicy
         return DevicePolicy::Cpu;
     }
     match policy {
-        DevicePolicyDto::Cuda => DevicePolicy::Cuda,
+        DevicePolicyDto::Vulkan => DevicePolicy::Vulkan,
         DevicePolicyDto::Auto | DevicePolicyDto::Cpu => DevicePolicy::Auto,
     }
 }
@@ -1797,18 +1797,18 @@ mod tests {
     }
 
     #[test]
-    fn device_policy_round_trips_cuda_without_downgrade() {
+    fn device_policy_round_trips_vulkan_without_downgrade() {
         let mut settings = UserSettings {
-            device: DevicePolicy::Cuda,
+            device: DevicePolicy::Vulkan,
             ..UserSettings::default()
         };
         let mut db = Database::open_in_memory().expect("db");
         let mut input = default_save_input();
         input.core.use_gpu = true;
-        input.core.device_policy = DevicePolicyDto::Cuda;
+        input.core.device_policy = DevicePolicyDto::Vulkan;
 
         apply_settings_dto(&mut settings, input, &mut db).unwrap();
-        assert!(matches!(settings.device, DevicePolicy::Cuda));
+        assert!(matches!(settings.device, DevicePolicy::Vulkan));
     }
 
     #[test]

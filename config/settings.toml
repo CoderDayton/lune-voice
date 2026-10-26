@@ -7,13 +7,14 @@
 
 # ── Compute device ────────────────────────────────────────────────────────────
 #
-# Controls whether the local ASR backends (whisper.cpp, Parakeet) use CUDA.
+# Controls whether the local ASR backends (whisper.cpp, Parakeet) use the GPU,
+# through the downloadable Vulkan plugin (any vendor).
 #
-#   "auto"  — Try CUDA at startup; fall back to CPU if unavailable. (default)
-#   "cuda"  — Prefer CUDA; still falls back gracefully if CUDA init fails.
-#   "cpu"   — Force CPU-only, even if a GPU is present.
+#   "auto"    — Use the GPU when the plugin and a GPU are there, else CPU. (default)
+#   "vulkan"  — Ask for the GPU; still falls back to CPU if it can't start.
+#   "cpu"     — Force CPU-only, even if a GPU is present.
 #
-# On machines without NVIDIA drivers, "auto" and "cuda" both behave as "cpu".
+# The old value "cuda" still loads, as "vulkan".
 device = "auto"
 
 # Built-in style preset applied by default.
@@ -41,15 +42,15 @@ privacy_mode = "LocalOnly"
 dictation_mode = "TypeInPlace"
 
 # How the hotkey activates dictation.
-# "Toggle"  — Press once to start, press again to stop. (default)
-# "Hold"    — Hold key to dictate, release to stop.
-activation_mode = "Toggle"
+# "Toggle"  — Press once to start, press again to stop.
+# "Hold"    — Hold key to dictate, release to stop. (default)
+activation_mode = "Hold"
 
 # When to show the floating dictation pill overlay.
-# "Always"        — Show whenever the service is ready. (default)
-# "WhenDictating" — Show only while a session is active.
+# "Always"        — Show whenever the service is ready.
+# "WhenDictating" — Show only while a session is active. (default)
 # "Never"         — Don't show the pill.
-pill_visibility = "Always"
+pill_visibility = "WhenDictating"
 
 # How delivery picks the paste chord (Ctrl+V vs Ctrl+Shift+V).
 # "Auto"     — Probe compositor (Hyprland/Sway/KDE/GNOME). (default)

@@ -83,11 +83,11 @@ fn evict_page_cache(_path: &Path) -> bool {
     false
 }
 
-/// Where the model is loaded. Taken from `DEVICE` so a single CUDA build can
+/// Where the model is loaded. Taken from `DEVICE` so a single GPU build can
 /// measure both halves of the "unload it, or run it on the CPU?" question —
 /// two builds would differ in more than the device and not be comparable.
 ///
-/// `Cuda` still falls back to the CPU when no device registered, which is why
+/// `Vulkan` still falls back to the CPU when no device registered, which is why
 /// the header prints what actually happened rather than what was asked for.
 fn device_policy() -> DevicePolicy {
     match std::env::var("DEVICE")
@@ -97,10 +97,10 @@ fn device_policy() -> DevicePolicy {
         .as_str()
     {
         "cpu" => DevicePolicy::Cpu,
-        "cuda" | "gpu" => DevicePolicy::Cuda,
+        "vulkan" | "cuda" | "gpu" => DevicePolicy::Vulkan,
         "" | "auto" => DevicePolicy::Auto,
         other => {
-            eprintln!("  [warn] ignoring DEVICE={other:?}; expected cpu|cuda|auto");
+            eprintln!("  [warn] ignoring DEVICE={other:?}; expected cpu|vulkan|auto");
             DevicePolicy::Auto
         }
     }
@@ -266,8 +266,10 @@ fn main() {
         target.label(),
         models_dir().display()
     );
-    if matches!(target.device, DevicePolicy::Cuda) && !cuda {
-        println!("  [warn] DEVICE=cuda but no CUDA device registered — this ran on the CPU\n");
+    if matches!(target.device, DevicePolicy::Vulkan) && !cuda {
+        println!(
+            "  [warn] DEVICE asked for the GPU but no GPU device registered — this ran on the CPU\n"
+        );
     }
     if !vad_file().is_file() {
         println!("  [warn] silero VAD missing — loads exclude it and read low\n");

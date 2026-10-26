@@ -43,7 +43,7 @@ fn main() {
     // ── Load ASR ─────────────────────────────────────────────────────────
 
     let device_policy = if has_gpu {
-        DevicePolicy::Cuda
+        DevicePolicy::Vulkan
     } else {
         DevicePolicy::Cpu
     };

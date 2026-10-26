@@ -29,7 +29,7 @@ export interface WorkspaceSettings {
   whisperModel: WhisperModelValue;
   parakeetModel: ParakeetModelValue;
   useGpu: boolean;
-  devicePolicy: 'Cpu' | 'Cuda' | 'Auto';
+  devicePolicy: 'Cpu' | 'Vulkan' | 'Auto';
   confidenceThreshold: string;
   dictationMode: DictationModeValue;
   copyToClipboard: boolean;

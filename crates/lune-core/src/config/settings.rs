@@ -138,7 +138,7 @@ where
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(default)]
 pub struct UserSettings {
-    /// Compute device for local inference: `Cpu`, `Cuda`, or `Auto`.
+    /// Compute device for local inference: `Cpu`, `Vulkan`, or `Auto`.
     #[serde(deserialize_with = "lenient")]
     pub device: DevicePolicy,
     pub asr_backend: AsrBackendConfig,
@@ -781,13 +781,16 @@ pub enum StreamingMode {
 
 /// Compute device policy for local model inference.
 ///
-/// Serializes as lowercase TOML strings: `"auto"`, `"cuda"`, `"cpu"`.
+/// Serializes as lowercase TOML strings: `"auto"`, `"vulkan"`, `"cpu"`.
+/// `"cuda"`, the old name for the GPU choice, still reads as `Vulkan`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
 #[serde(rename_all = "lowercase")]
 pub enum DevicePolicy {
     /// Force CPU-only inference.
     Cpu,
-    Cuda,
+    /// Ask for the GPU (the Vulkan plugin, any vendor), falling back to CPU.
+    #[serde(alias = "cuda")]
+    Vulkan,
     /// This is the recommended setting: zero-config on GPU machines, safe on CPU-only.
     #[default]
     Auto,
@@ -795,11 +798,11 @@ pub enum DevicePolicy {
 
 impl DevicePolicy {
     /// Resolve to a boolean for backend `use_gpu` fields.
-    pub fn use_gpu(self, cuda_available: bool) -> bool {
+    pub fn use_gpu(self, gpu_available: bool) -> bool {
         match self {
             Self::Cpu => false,
-            Self::Cuda => true,
-            Self::Auto => cuda_available,
+            Self::Vulkan => true,
+            Self::Auto => gpu_available,
         }
     }
 }
@@ -1062,12 +1065,29 @@ model = "LargeV4"
     }
 
     #[test]
-    fn auto_device_follows_the_runtime_cuda_answer() {
+    fn auto_device_follows_the_runtime_gpu_answer() {
         assert!(DevicePolicy::Auto.use_gpu(true));
         assert!(!DevicePolicy::Auto.use_gpu(false));
         // The explicit choices ignore it in both directions.
-        assert!(DevicePolicy::Cuda.use_gpu(false));
+        assert!(DevicePolicy::Vulkan.use_gpu(false));
         assert!(!DevicePolicy::Cpu.use_gpu(true));
+    }
+
+    #[test]
+    fn device_is_written_as_vulkan_and_still_reads_the_old_cuda_name() {
+        #[derive(Serialize, Deserialize)]
+        struct Wrap {
+            device: DevicePolicy,
+        }
+        let written = toml::to_string(&Wrap {
+            device: DevicePolicy::Vulkan,
+        })
+        .unwrap();
+        assert_eq!(written.trim(), r#"device = "vulkan""#);
+        for old in [r#"device = "cuda""#, r#"device = "vulkan""#] {
+            let read: Wrap = toml::from_str(old).unwrap();
+            assert_eq!(read.device, DevicePolicy::Vulkan, "{old}");
+        }
     }
 
     #[test]

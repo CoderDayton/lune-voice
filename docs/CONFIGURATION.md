@@ -254,7 +254,7 @@ device = "auto"
 | Value | Behavior |
 |-------|----------|
 | `"auto"` | Use the GPU when a GPU device is registered; fall back to CPU otherwise. **(default)** |
-| `"cuda"` | Ask for the GPU (any vendor, despite the name). If none is available, it still falls back to CPU. |
+| `"vulkan"` | Ask for the GPU (any vendor). If none is available, it still falls back to CPU. The old value `"cuda"` loads as this. |
 | `"cpu"` | Always use the CPU. |
 
 Only a discrete GPU counts. On a machine with just integrated graphics, transcription stays on the CPU, which is usually faster there.
