@@ -69,6 +69,3 @@ libc.workspace = true
 [[bin]]
 name = "lune-voice"
 path = "src/main.rs"
-
-[dev-dependencies]
-tempfile.workspace = true
