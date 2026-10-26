@@ -515,7 +515,7 @@ const FILLERS: &[&str] = &[
     "um", "umm", "uhm", "uh", "uhh", "er", "erm", "hmm", "hm", "mm",
 ];
 
-/// Remove standalone hesitation fillers ("um", "uh", …) that Qwen3-ASR
+/// Remove standalone hesitation fillers ("um", "uh", …) that the recognizer
 /// transcribes verbatim, including mid-sentence ("the sidebar um, in its open
 /// state" → "the sidebar in its open state"). A token is dropped only when its
 /// punctuation-stripped, lowercased core is exactly a filler, so "umbrella",

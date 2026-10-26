@@ -17,12 +17,13 @@ First release, for Linux and Windows.
 - Whisper offers Auto-detect plus 28 languages (the same 25 European ones, and Japanese, Korean and Chinese), each formatted by its own rules
 - Remote transcription through any OpenAI-compatible endpoint, as an alternative to the local engines
 - Silero endpoint trim before decode: silence is cut off both ends and internal pauses are kept, because whisper reads them as punctuation. Dictations longer than 28 s are decoded in pieces split at pauses
-- PCEN automatic gain control on the capture path, so a quiet microphone still reaches the recognizer at a usable level. Toggle it in Settings → Dictation
+- Automatic gain control on the capture path, so a quiet microphone still reaches the recognizer at a usable level. **Adaptive gain control** in Settings → Dictation picks Off, Auto (the default) or Always. Auto measures each dictation when you stop and leaves clean audio at a normal level alone, so it only changes audio that needs it. An older `vad_pcen = false` loads as Off
 - Correction pass over the transcript:
   - your dictionary, matched exactly, plus a one-letter near miss on longer words the recognizer was confident about
   - about 2,170 bundled brand, product and tech names re-cased exactly (**Capitalize known names**, on by default; a style can override it)
   - a **Correction sensitivity** slider for how unsure a word must be before it is flagged
 - Formatting pass: capitalization, terminal punctuation, English filler-word removal, spoken key chords ("control shift p" → `Ctrl+Shift+P`), and the quotes whisper wraps around a read-aloud utterance
+- English cleanup of what the recognizer keeps from false starts: a cut-off start of the next word is dropped ("h hello" → "hello", "mon monokai" → "monokai"), and spelled-out acronyms are joined ("L L M" → "LLM"). "a", "I", common words, and letters after "ctrl", "shift" or "press" are kept. A word next to "I" is no longer lowercased as if "I" were a name
 - Optional styling through any OpenAI-compatible endpoint, local or hosted: five built-in presets (casual, professional, formal, technical, writing), or your own with custom prompts and generated few-shot examples. Spaced digit groups that are not thousands separators, such as phone numbers, are left intact in styled text
 - Voice commands at the start of an utterance: "switch to <preset>" changes the style, "insert <snippet>" types a snippet. There are no fixed phrases, so words like "new line" are always dictated as text
 - Snippets: saved text delivered verbatim by voice, with a recorder for the trigger phrase
@@ -64,7 +65,7 @@ First release, for Linux and Windows.
 - Sidebar quick actions: theme, keyboard shortcuts, check for updates, help and feedback, quit
 - Light, dark or system theme
 - Licence, warranty and source-code notice in Settings → General
-- Interface in 12 languages: Arabic, Chinese, English, French, German, Hindi, Italian, Japanese, Korean, Portuguese, Russian and Spanish. Keyboard-navigable with visible focus rings
+- Interface in 12 languages: Arabic, Chinese, English, French, German, Hindi, Italian, Japanese, Korean, Portuguese, Russian and Spanish, with the layout mirrored right to left for Arabic. Keyboard-navigable with visible focus rings
 
 ### Performance
 

@@ -48,7 +48,7 @@ Backends are chosen in one place, through registries and DTO mappers. The deskto
 
 ```
 lune-core (types, config, errors)
-├─ lune-audio (mic, resample, ringbuf, vad, pcen)
+├─ lune-audio (mic, resample, ringbuf, vad, pcen, auto_gain)
 ├─ lune-asr (whisper.cpp, parakeet, openai remote, registry)
 ├─ lune-llm (openai remote, null passthrough, style pipeline, prompt, few-shot)
 ├─ lune-dict (corrector, vocab, voice commands)
@@ -170,7 +170,9 @@ Once the ASR segments are in, the session runs a fixed, rule-based text pass:
    - **Bundled vocabulary.** Exact, case-insensitive matches get their capitals fixed. There is no fuzzy guessing here.
    - **`ALWAYS_REPLACE`.** A built-in table of common mishearings and their fixes.
 
-   `formatting` then handles capitalization, end punctuation, filler words, and quotes wrapped around the whole text.
+   `formatting` then handles capitalization, end punctuation, filler words, and quotes wrapped around the whole text. For English it also cleans up false starts (`strip_false_starts`):
+   - **Cut-off starts.** A lone lowercase letter ("h hello"), or a 2–3 letter fragment that begins the next word ("mon monokai", also across an article: "a mod a modal" → "a modal"), is dropped. A fragment that is itself a common word (en frequency ≥ 50,000) stays, as do "a", "I", a letter with punctuation attached ("dash p,"), and a letter after a key word (`ctrl`, `shift`, `press`, `letter`, …).
+   - **Spelled acronyms.** A run of single capital letters is joined ("L L M" → "LLM"), except a run of only "I"s. A run of lowercase letters is kept as is.
 3. The corrected text and the dictionary entries go into `PostProcessInput` for the optional styling stage.
 
 Styling doesn't depend on word confidence. It only runs when a style is selected: when `default_style` is `None`, the LLM is skipped and this output is delivered as is. (`apply_dictionary_seed`, below, is a second pass inside the styling stage. It only changes the text sent to the LLM, not this output.)

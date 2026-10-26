@@ -90,7 +90,9 @@ Work down this list:
      The picker then lists every input cpal sees, including sink monitors.
 3. **Everything thrown out as non-speech.** Look for `dropping non-speech
    segment` or `dropping garbage segment` at WARN. This is usually a mic gain
-   problem.
+   problem. Raise the input level in the system mixer, or set **Adaptive gain
+   control** (Settings → Dictation, `agc_mode`) to Always so every frame is
+   brought toward the target level.
 4. **Backend not compiled in.** An error containing `not compiled in` means the
    binary was built without `whisper-cpp`. Rebuild with `cgs build`.
 5. **Remote transcription with remote services off.** An error saying
