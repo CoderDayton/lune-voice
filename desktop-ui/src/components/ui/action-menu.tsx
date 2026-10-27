@@ -59,6 +59,7 @@ function computeMenuStyle(rect: DOMRect, placement: Placement, width: number): C
     const menuWidth = Math.min(width, maxWidth);
     return {
       position: 'fixed',
+      zIndex: 'var(--z-popover, 400)',
       left: Math.min(rect.right + GUTTER, window.innerWidth - menuWidth - GUTTER),
       // Bottom-aligned to the anchor, so the menu grows upward like the mock.
       bottom: Math.max(GUTTER, window.innerHeight - rect.bottom),
@@ -70,6 +71,7 @@ function computeMenuStyle(rect: DOMRect, placement: Placement, width: number): C
   const menuWidth = Math.min(Math.max(rect.width - ANCHOR_INSET * 2, MIN_WIDTH), maxWidth);
   return {
     position: 'fixed',
+    zIndex: 'var(--z-popover, 400)',
     bottom: window.innerHeight - rect.top + GUTTER,
     left: Math.min(
       Math.max(GUTTER, rect.left + ANCHOR_INSET),
@@ -275,7 +277,7 @@ export function ActionMenu({
       aria-label={ariaLabel}
       style={menuStyle}
       onKeyDown={onKeyDown}
-      className="animate-page-in z-popover flex flex-col overflow-y-auto rounded-3xl border border-surface-border-strong bg-surface-elevated p-1.5 shadow-overlay"
+      className="animate-page-in flex flex-col overflow-y-auto rounded-3xl border border-surface-border-strong bg-surface-elevated p-1.5 shadow-overlay"
     >
       {items.map((item, i) => (
         <ActionMenuRow

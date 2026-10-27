@@ -616,10 +616,6 @@ msgstr "无法连接反馈服务。请使用上方的链接，或重新打开此
 msgid "Couldn't save that snippet. Try again."
 msgstr "无法保存该片段。请重试。"
 
-#: src/features/welcome/components/engine-step.tsx:259
-msgid "Covers {languages}. For any other language, choose Whisper."
-msgstr "支持 {languages}。其他语言请选择 Whisper。"
-
 #: src/components/feedback/help-feedback-dialog.tsx:59
 msgid "Crash or freeze"
 msgstr "崩溃或卡死"
@@ -738,8 +734,8 @@ msgstr "听写"
 
 #: src/features/settings/sections/transcription-section.tsx:70
 #: src/features/settings/sections/transcription-section.tsx:83
-#: src/features/welcome/components/engine-step.tsx:263
-#: src/features/welcome/components/engine-step.tsx:271
+#: src/features/welcome/components/engine-step.tsx:136
+#: src/features/welcome/components/engine-step.tsx:145
 msgid "Dictation language"
 msgstr "听写语言"
 
@@ -945,7 +941,7 @@ msgstr "在 CPU 上也很快"
 msgid "Fast; less accurate than Medium."
 msgstr "速度快，但准确度低于“中”。"
 
-#: src/features/welcome/components/engine-step.tsx:81
+#: src/features/welcome/components/engine-step.tsx:74
 msgid "Fastest on CPU · 25 European languages"
 msgstr "CPU 上最快 · 25 种欧洲语言"
 
@@ -1414,8 +1410,7 @@ msgstr "模式"
 msgid "Model"
 msgstr "模型"
 
-#: src/features/welcome/components/engine-step.tsx:146
-#: src/features/welcome/components/engine-step.tsx:244
+#: src/features/welcome/components/engine-step.tsx:114
 msgid "Model size"
 msgstr "模型大小"
 
@@ -1445,7 +1440,7 @@ msgstr "显示器"
 msgid "More"
 msgstr "更多"
 
-#: src/features/welcome/components/engine-step.tsx:74
+#: src/features/welcome/components/engine-step.tsx:68
 msgid "Multilingual · runs on-device"
 msgstr "多语言 · 在本机运行"
 
@@ -1564,10 +1559,6 @@ msgstr "尚未安装任何内容。"
 msgid "NVIDIA Parakeet on-device. Much faster than Whisper on a CPU, for 25 European languages."
 msgstr "在本机运行 NVIDIA Parakeet。在 CPU 上比 Whisper 快得多，支持 25 种欧洲语言。"
 
-#: src/features/welcome/components/engine-step.tsx:82
-msgid "NVIDIA Parakeet running on-device. Punctuates by itself and detects which of its languages you speak."
-msgstr "NVIDIA Parakeet 在本机运行。自动添加标点，并识别你说的是它支持的哪种语言。"
-
 #: src/features/settings/data/settings-data.ts:169
 #: src/features/settings/data/settings-data.ts:556
 #: src/features/styles/components/style-editor-modal.tsx:192
@@ -1648,7 +1639,7 @@ msgstr "分页"
 #: src/features/settings/components/asr-engine-cards.tsx:141
 #: src/features/settings/components/model-library.tsx:147
 #: src/features/settings/data/settings-data.ts:642
-#: src/features/welcome/components/engine-step.tsx:80
+#: src/features/welcome/components/engine-step.tsx:73
 msgid "Parakeet"
 msgstr "Parakeet"
 
@@ -1656,7 +1647,7 @@ msgstr "Parakeet"
 msgid "Parakeet (local)"
 msgstr "Parakeet（本地）"
 
-#: src/features/welcome/components/engine-step.tsx:265
+#: src/features/welcome/components/engine-step.tsx:139
 msgid "Parakeet cannot tell Lune which language it heard, so set the one you speak. You can change it later in Settings."
 msgstr "Parakeet 无法告诉 Lune 它听到的是哪种语言，请设置你所说的语言。之后可以在设置中更改。"
 
@@ -2131,7 +2122,7 @@ msgstr "说话时长"
 msgid "Speech"
 msgstr "语音"
 
-#: src/features/welcome/components/engine-step.tsx:96
+#: src/features/welcome/components/engine-step.tsx:85
 msgid "Speech engine"
 msgstr "语音引擎"
 
@@ -2591,17 +2582,13 @@ msgstr "指示器显示在哪个屏幕上。"
 #: src/features/settings/components/asr-engine-cards.tsx:140
 #: src/features/settings/components/model-library.tsx:144
 #: src/features/settings/data/settings-data.ts:641
-#: src/features/welcome/components/engine-step.tsx:73
+#: src/features/welcome/components/engine-step.tsx:67
 msgid "Whisper"
 msgstr "Whisper"
 
 #: src/features/settings/data/settings-data.ts:140
 msgid "Whisper (local)"
 msgstr "Whisper（本地）"
-
-#: src/features/welcome/components/engine-step.tsx:75
-msgid "whisper.cpp running on-device. Choose a size to trade speed for accuracy."
-msgstr "whisper.cpp 在设备端运行。选择一个大小以在速度与准确性之间权衡。"
 
 #: src/features/history/components/history-table.tsx:492
 msgid "words"

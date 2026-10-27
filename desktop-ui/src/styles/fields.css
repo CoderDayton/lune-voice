@@ -1,7 +1,7 @@
 /* SPDX-License-Identifier: GPL-3.0-or-later */
 
 /* ── Fields ────────────────────────────────────────────────────────────
-   Every text-entry control shares one shape: 2.5rem tall (2rem for `-sm`),
+   Every text-entry control shares one shape: 2.75rem tall (2rem for `-sm`),
    one corner radius, on the field surface, with the standard hairline that
    firms up on hover.
    Unlayered on purpose: DaisyUI's own rules sit in a layer and would
@@ -29,12 +29,13 @@
   border-color: var(--surface-border-strong);
 }
 
+/* 2.75rem leaves a 32px icon chip 6px above and below. */
 .input,
 .select,
 .field-trigger {
-  height: 2.5rem;
+  height: 2.75rem;
   border-radius: var(--radius-field);
-  padding-inline-start: 1rem;
+  padding-inline-start: 1.125rem;
   font-size: 0.875rem;
 }
 
@@ -61,14 +62,15 @@
   align-items: center;
   justify-content: space-between;
   gap: 0.75rem;
-  padding-inline-end: 1rem;
+  padding-inline-end: 1.125rem;
   text-align: start;
   cursor: pointer;
 }
 
-/* A leading icon chip sits close to the edge instead of the usual inset. */
+/* A leading icon chip sits closer to the edge than text does, but level with
+   its top and bottom gap. */
 .field-trigger:has(> :first-child > :first-child.field-chip) {
-  padding-inline-start: 0.5rem;
+  padding-inline-start: 0.375rem;
 }
 
 .input:has(input:disabled),

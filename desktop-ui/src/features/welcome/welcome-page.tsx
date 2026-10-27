@@ -102,7 +102,7 @@ export function WelcomePage({ onFinish }: WelcomePageProps) {
       />
 
       {isWizardStep(phase) && (
-        <div className="mt-5">
+        <div className="mt-4">
           <WizardStepper steps={steps} current={phase} />
         </div>
       )}
@@ -111,7 +111,7 @@ export function WelcomePage({ onFinish }: WelcomePageProps) {
           stay where they were as the user moves between a tall screen and a
           short one; a short screen sits in the middle of it. */}
       <div
-        className={`mt-6 flex flex-col gap-4 ${isWizardStep(phase) ? 'min-h-92 justify-center' : ''}`}
+        className={`mt-5 flex flex-col gap-4 ${isWizardStep(phase) ? 'min-h-80 justify-center' : ''}`}
       >
         {phase === 'engine' ? (
           <EngineStep
@@ -190,7 +190,7 @@ export function WelcomePage({ onFinish }: WelcomePageProps) {
         )}
       </div>
 
-      <div className="mt-6">
+      <div className="mt-5">
         <Actions
           phase={phase}
           steps={steps}
@@ -208,7 +208,7 @@ export function WelcomePage({ onFinish }: WelcomePageProps) {
         />
       </div>
 
-      <div className="mt-4">
+      <div className="mt-3">
         <Footer />
       </div>
     </div>

@@ -63,8 +63,8 @@ describe('NavBead', () => {
     expect(on.getAttribute('aria-hidden')).toBe('true');
     expect(off.className).toContain('rounded-full');
     expect(on.className).toContain('rounded-full');
-    expect(on.className).toContain('bg-primary/15');
-    expect(off.className).not.toContain('bg-primary/15');
+    expect(on.className).toContain('bg-primary/20');
+    expect(off.className).not.toContain('bg-primary/20');
   });
 });
 

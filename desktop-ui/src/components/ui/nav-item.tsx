@@ -6,16 +6,15 @@
  * layout; the frame, the active state, the accent bar and the icon colour come
  * from here so the two read as one family.
  *
- * Active is a neutral pill with the icon's chip lit in primary. Primary stays
- * out of the label, so the only loud colour left in the sidebar is the mic
- * button.
+ * Active is a pill washed in primary with the icon's chip lit to match; the
+ * label stays in the strong text colour so it reads at a glance.
  */
 export const NAV_ITEM_BASE =
-  'group relative flex items-center gap-3 rounded-full text-sm transition-colors focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-primary';
+  'group relative flex items-center gap-3 rounded-full text-base transition-colors focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-primary';
 
 export function navItemState(active: boolean): string {
   return active
-    ? 'bg-surface-nav-active font-medium text-content-strong ring-1 ring-surface-border'
+    ? 'bg-primary/10 font-medium text-content-strong ring-1 ring-primary/25'
     : 'text-content hover:bg-surface-hover hover:text-content-strong';
 }
 
@@ -43,7 +42,7 @@ export function NavBead({
       aria-hidden="true"
       className={`flex size-8 shrink-0 items-center justify-center rounded-full transition-colors ${
         active
-          ? 'bg-primary/15 ring-1 ring-primary/30'
+          ? 'bg-primary/20 ring-1 ring-primary/35'
           : 'bg-transparent group-hover:bg-surface-hover'
       } ${className}`}
     >

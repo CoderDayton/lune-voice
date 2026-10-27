@@ -52,7 +52,7 @@ export function SidebarContent() {
             aria-hidden="true"
           />
         </label>
-        <span className="min-w-0 flex-1 truncate font-display text-base leading-tight tracking-heading text-content-strong is-drawer-close:hidden">
+        <span className="min-w-0 flex-1 truncate font-display text-lg leading-tight tracking-heading text-content-strong is-drawer-close:hidden">
           <span className="font-semibold">Lune</span>
           <span className="font-light text-content-muted"> Voice</span>
         </span>
@@ -119,7 +119,7 @@ function NavRow({ item, pathname }: { item: NavigationItem; pathname: string }) 
           className={`${NAV_ITEM_BASE} mx-3 h-12 pe-4 ps-2 ${navItemState(active)} is-drawer-close:justify-center is-drawer-close:gap-0 is-drawer-close:px-0`}
         >
           <NavBead active={active}>
-            <Icon size={17} strokeWidth={active ? 2 : 1.7} className={navIconClass(active)} />
+            <Icon size={18} strokeWidth={active ? 2 : 1.7} className={navIconClass(active)} />
           </NavBead>
           <span className="flex min-w-0 flex-col is-drawer-close:hidden">
             <span className="truncate">{label}</span>

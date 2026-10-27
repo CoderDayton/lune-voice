@@ -616,10 +616,6 @@ msgstr "피드백 서비스에 연결할 수 없습니다. 위의 링크를 사�
 msgid "Couldn't save that snippet. Try again."
 msgstr "스니펫을 저장하지 못했습니다. 다시 시도하세요."
 
-#: src/features/welcome/components/engine-step.tsx:259
-msgid "Covers {languages}. For any other language, choose Whisper."
-msgstr "지원 언어: {languages}. 그 밖의 언어는 Whisper를 선택하세요."
-
 #: src/components/feedback/help-feedback-dialog.tsx:59
 msgid "Crash or freeze"
 msgstr "충돌 또는 멈춤"
@@ -738,8 +734,8 @@ msgstr "받아쓰기"
 
 #: src/features/settings/sections/transcription-section.tsx:70
 #: src/features/settings/sections/transcription-section.tsx:83
-#: src/features/welcome/components/engine-step.tsx:263
-#: src/features/welcome/components/engine-step.tsx:271
+#: src/features/welcome/components/engine-step.tsx:136
+#: src/features/welcome/components/engine-step.tsx:145
 msgid "Dictation language"
 msgstr "받아쓰기 언어"
 
@@ -945,7 +941,7 @@ msgstr "CPU에서도 빠름"
 msgid "Fast; less accurate than Medium."
 msgstr "빠르지만 중형보다 정확도가 낮습니다."
 
-#: src/features/welcome/components/engine-step.tsx:81
+#: src/features/welcome/components/engine-step.tsx:74
 msgid "Fastest on CPU · 25 European languages"
 msgstr "CPU에서 가장 빠름 · 유럽 25개 언어"
 
@@ -1414,8 +1410,7 @@ msgstr "모드"
 msgid "Model"
 msgstr "모델"
 
-#: src/features/welcome/components/engine-step.tsx:146
-#: src/features/welcome/components/engine-step.tsx:244
+#: src/features/welcome/components/engine-step.tsx:114
 msgid "Model size"
 msgstr "모델 크기"
 
@@ -1445,7 +1440,7 @@ msgstr "모니터"
 msgid "More"
 msgstr "더 보기"
 
-#: src/features/welcome/components/engine-step.tsx:74
+#: src/features/welcome/components/engine-step.tsx:68
 msgid "Multilingual · runs on-device"
 msgstr "다국어 · 기기에서 실행"
 
@@ -1564,10 +1559,6 @@ msgstr "아직 설치된 항목이 없습니다."
 msgid "NVIDIA Parakeet on-device. Much faster than Whisper on a CPU, for 25 European languages."
 msgstr "기기에서 실행되는 NVIDIA Parakeet. CPU에서 Whisper보다 훨씬 빠르며, 유럽 25개 언어를 지원합니다."
 
-#: src/features/welcome/components/engine-step.tsx:82
-msgid "NVIDIA Parakeet running on-device. Punctuates by itself and detects which of its languages you speak."
-msgstr "기기에서 실행되는 NVIDIA Parakeet입니다. 문장 부호를 스스로 넣고, 지원하는 언어 중 어떤 언어로 말하는지 감지합니다."
-
 #: src/features/settings/data/settings-data.ts:169
 #: src/features/settings/data/settings-data.ts:556
 #: src/features/styles/components/style-editor-modal.tsx:192
@@ -1648,7 +1639,7 @@ msgstr "페이지 탐색"
 #: src/features/settings/components/asr-engine-cards.tsx:141
 #: src/features/settings/components/model-library.tsx:147
 #: src/features/settings/data/settings-data.ts:642
-#: src/features/welcome/components/engine-step.tsx:80
+#: src/features/welcome/components/engine-step.tsx:73
 msgid "Parakeet"
 msgstr "Parakeet"
 
@@ -1656,7 +1647,7 @@ msgstr "Parakeet"
 msgid "Parakeet (local)"
 msgstr "Parakeet(로컬)"
 
-#: src/features/welcome/components/engine-step.tsx:265
+#: src/features/welcome/components/engine-step.tsx:139
 msgid "Parakeet cannot tell Lune which language it heard, so set the one you speak. You can change it later in Settings."
 msgstr "Parakeet은 어떤 언어를 들었는지 Lune에 알려줄 수 없으니 말하는 언어를 설정하세요. 나중에 설정에서 바꿀 수 있습니다."
 
@@ -2131,7 +2122,7 @@ msgstr "말한 시간"
 msgid "Speech"
 msgstr "음성"
 
-#: src/features/welcome/components/engine-step.tsx:96
+#: src/features/welcome/components/engine-step.tsx:85
 msgid "Speech engine"
 msgstr "음성 인식 엔진"
 
@@ -2591,17 +2582,13 @@ msgstr "표시기가 나타나는 화면입니다."
 #: src/features/settings/components/asr-engine-cards.tsx:140
 #: src/features/settings/components/model-library.tsx:144
 #: src/features/settings/data/settings-data.ts:641
-#: src/features/welcome/components/engine-step.tsx:73
+#: src/features/welcome/components/engine-step.tsx:67
 msgid "Whisper"
 msgstr "Whisper"
 
 #: src/features/settings/data/settings-data.ts:140
 msgid "Whisper (local)"
 msgstr "Whisper(로컬)"
-
-#: src/features/welcome/components/engine-step.tsx:75
-msgid "whisper.cpp running on-device. Choose a size to trade speed for accuracy."
-msgstr "기기에서 실행되는 whisper.cpp입니다. 속도와 정확도를 절충할 크기를 선택하세요."
 
 #: src/features/history/components/history-table.tsx:492
 msgid "words"

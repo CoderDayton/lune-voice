@@ -40,7 +40,7 @@ export function AccelerationStep({
   const { t } = useLingui();
 
   return (
-    <label className="setup-card mx-auto flex w-full max-w-md cursor-pointer items-center gap-3 p-4">
+    <label className="setup-card flex w-full cursor-pointer items-center gap-3 px-4 py-3.5 transition-colors hover:bg-surface-hover">
       <span className="setup-tile bg-primary/15 text-primary">
         <Zap size={18} strokeWidth={1.8} />
       </span>

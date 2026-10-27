@@ -616,10 +616,6 @@ msgstr "تعذّر الوصول إلى خدمة الملاحظات. استخدم
 msgid "Couldn't save that snippet. Try again."
 msgstr "تعذّر حفظ هذا المقتطف. حاول مرة أخرى."
 
-#: src/features/welcome/components/engine-step.tsx:259
-msgid "Covers {languages}. For any other language, choose Whisper."
-msgstr "يدعم: {languages}. لأي لغة أخرى، اختر Whisper."
-
 #: src/components/feedback/help-feedback-dialog.tsx:59
 msgid "Crash or freeze"
 msgstr "تعطّل أو تجمّد"
@@ -738,8 +734,8 @@ msgstr "الإملاء"
 
 #: src/features/settings/sections/transcription-section.tsx:70
 #: src/features/settings/sections/transcription-section.tsx:83
-#: src/features/welcome/components/engine-step.tsx:263
-#: src/features/welcome/components/engine-step.tsx:271
+#: src/features/welcome/components/engine-step.tsx:136
+#: src/features/welcome/components/engine-step.tsx:145
 msgid "Dictation language"
 msgstr "لغة الإملاء"
 
@@ -945,7 +941,7 @@ msgstr "سريع على المعالج المركزي"
 msgid "Fast; less accurate than Medium."
 msgstr "سريع؛ أقل دقة من المتوسط."
 
-#: src/features/welcome/components/engine-step.tsx:81
+#: src/features/welcome/components/engine-step.tsx:74
 msgid "Fastest on CPU · 25 European languages"
 msgstr "الأسرع على المعالج المركزي · 25 لغة أوروبية"
 
@@ -1414,8 +1410,7 @@ msgstr "الوضع"
 msgid "Model"
 msgstr "النموذج"
 
-#: src/features/welcome/components/engine-step.tsx:146
-#: src/features/welcome/components/engine-step.tsx:244
+#: src/features/welcome/components/engine-step.tsx:114
 msgid "Model size"
 msgstr "حجم النموذج"
 
@@ -1445,7 +1440,7 @@ msgstr "الشاشة"
 msgid "More"
 msgstr "المزيد"
 
-#: src/features/welcome/components/engine-step.tsx:74
+#: src/features/welcome/components/engine-step.tsx:68
 msgid "Multilingual · runs on-device"
 msgstr "متعدد اللغات · يعمل على الجهاز"
 
@@ -1564,10 +1559,6 @@ msgstr "لا شيء مثبت بعد."
 msgid "NVIDIA Parakeet on-device. Much faster than Whisper on a CPU, for 25 European languages."
 msgstr "NVIDIA Parakeet على الجهاز. أسرع بكثير من Whisper على المعالج المركزي، ويدعم 25 لغة أوروبية."
 
-#: src/features/welcome/components/engine-step.tsx:82
-msgid "NVIDIA Parakeet running on-device. Punctuates by itself and detects which of its languages you speak."
-msgstr "NVIDIA Parakeet يعمل على جهازك. يضع علامات الترقيم بنفسه ويكتشف أيّ لغة من لغاته تتحدث."
-
 #: src/features/settings/data/settings-data.ts:169
 #: src/features/settings/data/settings-data.ts:556
 #: src/features/styles/components/style-editor-modal.tsx:192
@@ -1648,7 +1639,7 @@ msgstr "ترقيم الصفحات"
 #: src/features/settings/components/asr-engine-cards.tsx:141
 #: src/features/settings/components/model-library.tsx:147
 #: src/features/settings/data/settings-data.ts:642
-#: src/features/welcome/components/engine-step.tsx:80
+#: src/features/welcome/components/engine-step.tsx:73
 msgid "Parakeet"
 msgstr "Parakeet"
 
@@ -1656,7 +1647,7 @@ msgstr "Parakeet"
 msgid "Parakeet (local)"
 msgstr "Parakeet (محلي)"
 
-#: src/features/welcome/components/engine-step.tsx:265
+#: src/features/welcome/components/engine-step.tsx:139
 msgid "Parakeet cannot tell Lune which language it heard, so set the one you speak. You can change it later in Settings."
 msgstr "لا يستطيع Parakeet إخبار Lune باللغة التي سمعها، لذا اضبط اللغة التي تتحدثها. يمكنك تغييرها لاحقًا من الإعدادات."
 
@@ -2131,7 +2122,7 @@ msgstr "مدة التحدث"
 msgid "Speech"
 msgstr "الكلام"
 
-#: src/features/welcome/components/engine-step.tsx:96
+#: src/features/welcome/components/engine-step.tsx:85
 msgid "Speech engine"
 msgstr "محرك التعرف على الكلام"
 
@@ -2591,17 +2582,13 @@ msgstr "الشاشة التي يظهر عليها المؤشر."
 #: src/features/settings/components/asr-engine-cards.tsx:140
 #: src/features/settings/components/model-library.tsx:144
 #: src/features/settings/data/settings-data.ts:641
-#: src/features/welcome/components/engine-step.tsx:73
+#: src/features/welcome/components/engine-step.tsx:67
 msgid "Whisper"
 msgstr "Whisper"
 
 #: src/features/settings/data/settings-data.ts:140
 msgid "Whisper (local)"
 msgstr "Whisper (محلي)"
-
-#: src/features/welcome/components/engine-step.tsx:75
-msgid "whisper.cpp running on-device. Choose a size to trade speed for accuracy."
-msgstr "whisper.cpp يعمل على جهازك. اختر حجمًا للمفاضلة بين السرعة والدقة."
 
 #: src/features/history/components/history-table.tsx:492
 msgid "words"

@@ -60,6 +60,11 @@ export function DescriptiveDropdown<Value extends string>({
   const listboxId = useId();
 
   const current = options.find((opt) => opt.value === value) ?? options[0];
+  // Primitives, not `options` itself: callers build that array on every render,
+  // and an effect keyed on it re-ran with each scroll and snapped the list
+  // back to the selected row.
+  const optionCount = options.length;
+  const hasDescriptions = options.some((opt) => opt.description);
 
   useEffect(() => {
     if (!open) return;
@@ -83,7 +88,9 @@ export function DescriptiveDropdown<Value extends string>({
   useEffect(() => {
     if (!open) return;
 
-    function updateMenuPosition() {
+    function updateMenuPosition(event?: Event) {
+      // Scrolling the menu itself must not reposition it.
+      if (event?.target instanceof Node && menuRef.current?.contains(event.target)) return;
       const trigger = containerRef.current;
       if (!trigger) return;
 
@@ -102,8 +109,8 @@ export function DescriptiveDropdown<Value extends string>({
       const spaceAbove = rect.top - gutter;
       // Prefer the measured height once the portal is mounted; on first open it
       // isn't rendered yet, so estimate from the option list.
-      const estRow = options.some((opt) => opt.description) ? 60 : 44;
-      const estContent = options.length * estRow + 12;
+      const estRow = hasDescriptions ? 60 : 44;
+      const estContent = optionCount * estRow + 12;
       const desired = menuRef.current?.scrollHeight || estContent;
       // About eight plain rows (fewer with descriptions): a long list such as
       // the dictation languages scrolls inside the menu instead of covering
@@ -116,6 +123,7 @@ export function DescriptiveDropdown<Value extends string>({
 
       setMenuStyle({
         position: 'fixed',
+        zIndex: 'var(--z-popover, 400)',
         ...(openUp
           ? { bottom: window.innerHeight - rect.top + gutter }
           : { top: rect.bottom + gutter }),
@@ -126,21 +134,24 @@ export function DescriptiveDropdown<Value extends string>({
     }
 
     updateMenuPosition();
-    // Bring the selected option into view once the menu has rendered, so a
-    // choice far down a scrolling list is visible on open.
+    window.addEventListener('resize', updateMenuPosition);
+    window.addEventListener('scroll', updateMenuPosition, true);
+    return () => {
+      window.removeEventListener('resize', updateMenuPosition);
+      window.removeEventListener('scroll', updateMenuPosition, true);
+    };
+  }, [open, align, optionCount, hasDescriptions]);
+
+  // Once, on open: a choice far down a scrolling list is visible straight away.
+  useEffect(() => {
+    if (!open) return;
     const reveal = requestAnimationFrame(() => {
       menuRef.current
         ?.querySelector<HTMLElement>('[aria-selected="true"]')
         ?.scrollIntoView({ block: 'nearest' });
     });
-    window.addEventListener('resize', updateMenuPosition);
-    window.addEventListener('scroll', updateMenuPosition, true);
-    return () => {
-      cancelAnimationFrame(reveal);
-      window.removeEventListener('resize', updateMenuPosition);
-      window.removeEventListener('scroll', updateMenuPosition, true);
-    };
-  }, [open, align, options]);
+    return () => cancelAnimationFrame(reveal);
+  }, [open]);
 
   function pick(next: Value) {
     onChange(next);
@@ -157,7 +168,7 @@ export function DescriptiveDropdown<Value extends string>({
             role="listbox"
             aria-label={ariaLabel}
             style={menuStyle}
-            className="z-popover flex flex-col gap-1 overflow-y-auto rounded-box border border-surface-border bg-surface-elevated p-1.5 shadow-card backdrop-blur-xl"
+            className="flex flex-col gap-1 overflow-y-auto overscroll-contain rounded-box border border-surface-border-strong bg-surface-elevated p-1.5 shadow-overlay"
           >
             {options.map((option) => {
               const Icon = option.icon;

@@ -616,10 +616,6 @@ msgstr "Não foi possível acessar o serviço de feedback. Use os links acima ou
 msgid "Couldn't save that snippet. Try again."
 msgstr "Não foi possível salvar esse trecho. Tente novamente."
 
-#: src/features/welcome/components/engine-step.tsx:259
-msgid "Covers {languages}. For any other language, choose Whisper."
-msgstr "Idiomas suportados: {languages}. Para qualquer outro idioma, escolha o Whisper."
-
 #: src/components/feedback/help-feedback-dialog.tsx:59
 msgid "Crash or freeze"
 msgstr "Travamento ou congelamento"
@@ -738,8 +734,8 @@ msgstr "Ditado"
 
 #: src/features/settings/sections/transcription-section.tsx:70
 #: src/features/settings/sections/transcription-section.tsx:83
-#: src/features/welcome/components/engine-step.tsx:263
-#: src/features/welcome/components/engine-step.tsx:271
+#: src/features/welcome/components/engine-step.tsx:136
+#: src/features/welcome/components/engine-step.tsx:145
 msgid "Dictation language"
 msgstr "Idioma do ditado"
 
@@ -945,7 +941,7 @@ msgstr "Rápido na CPU"
 msgid "Fast; less accurate than Medium."
 msgstr "Rápido; menos preciso que o Médio."
 
-#: src/features/welcome/components/engine-step.tsx:81
+#: src/features/welcome/components/engine-step.tsx:74
 msgid "Fastest on CPU · 25 European languages"
 msgstr "O mais rápido em CPU · 25 idiomas europeus"
 
@@ -1414,8 +1410,7 @@ msgstr "Modo"
 msgid "Model"
 msgstr "Modelo"
 
-#: src/features/welcome/components/engine-step.tsx:146
-#: src/features/welcome/components/engine-step.tsx:244
+#: src/features/welcome/components/engine-step.tsx:114
 msgid "Model size"
 msgstr "Tamanho do modelo"
 
@@ -1445,7 +1440,7 @@ msgstr "Tela"
 msgid "More"
 msgstr "Mais"
 
-#: src/features/welcome/components/engine-step.tsx:74
+#: src/features/welcome/components/engine-step.tsx:68
 msgid "Multilingual · runs on-device"
 msgstr "Multilíngue · executa no dispositivo"
 
@@ -1564,10 +1559,6 @@ msgstr "Nada instalado ainda."
 msgid "NVIDIA Parakeet on-device. Much faster than Whisper on a CPU, for 25 European languages."
 msgstr "NVIDIA Parakeet no dispositivo. Muito mais rápido que o Whisper em uma CPU, para 25 idiomas europeus."
 
-#: src/features/welcome/components/engine-step.tsx:82
-msgid "NVIDIA Parakeet running on-device. Punctuates by itself and detects which of its languages you speak."
-msgstr "NVIDIA Parakeet em execução no dispositivo. Insere a pontuação sozinho e detecta qual dos seus idiomas você fala."
-
 #: src/features/settings/data/settings-data.ts:169
 #: src/features/settings/data/settings-data.ts:556
 #: src/features/styles/components/style-editor-modal.tsx:192
@@ -1648,7 +1639,7 @@ msgstr "Paginação"
 #: src/features/settings/components/asr-engine-cards.tsx:141
 #: src/features/settings/components/model-library.tsx:147
 #: src/features/settings/data/settings-data.ts:642
-#: src/features/welcome/components/engine-step.tsx:80
+#: src/features/welcome/components/engine-step.tsx:73
 msgid "Parakeet"
 msgstr "Parakeet"
 
@@ -1656,7 +1647,7 @@ msgstr "Parakeet"
 msgid "Parakeet (local)"
 msgstr "Parakeet (local)"
 
-#: src/features/welcome/components/engine-step.tsx:265
+#: src/features/welcome/components/engine-step.tsx:139
 msgid "Parakeet cannot tell Lune which language it heard, so set the one you speak. You can change it later in Settings."
 msgstr "O Parakeet não consegue informar ao Lune qual idioma ouviu, então defina o que você fala. Você pode mudar isso depois nas Configurações."
 
@@ -2131,7 +2122,7 @@ msgstr "Tempo de fala"
 msgid "Speech"
 msgstr "Fala"
 
-#: src/features/welcome/components/engine-step.tsx:96
+#: src/features/welcome/components/engine-step.tsx:85
 msgid "Speech engine"
 msgstr "Motor de fala"
 
@@ -2591,17 +2582,13 @@ msgstr "Em qual tela o indicador aparece."
 #: src/features/settings/components/asr-engine-cards.tsx:140
 #: src/features/settings/components/model-library.tsx:144
 #: src/features/settings/data/settings-data.ts:641
-#: src/features/welcome/components/engine-step.tsx:73
+#: src/features/welcome/components/engine-step.tsx:67
 msgid "Whisper"
 msgstr "Whisper"
 
 #: src/features/settings/data/settings-data.ts:140
 msgid "Whisper (local)"
 msgstr "Whisper (local)"
-
-#: src/features/welcome/components/engine-step.tsx:75
-msgid "whisper.cpp running on-device. Choose a size to trade speed for accuracy."
-msgstr "whisper.cpp em execução no dispositivo. Escolha um tamanho para equilibrar velocidade e precisão."
 
 #: src/features/history/components/history-table.tsx:492
 msgid "words"
