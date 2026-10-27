@@ -594,7 +594,7 @@ Models are downloaded automatically on first run from HuggingFace Hub.
 | Parakeet TDT 0.6B v3 (q8_0) | `ggml-org/parakeet-GGUF` | `parakeet-tdt-0.6b-v3-q8_0` | `ggml-parakeet-tdt-0.6b-v3-q8_0.bin` | ~669 MB |
 | Whisper VAD | `ggml-org/whisper-vad` | `whisper-vad-silero` | `ggml-silero-v5.1.2.bin` | ~9 MB |
 
-The VAD downloads with whichever speech model you get first, and both local engines share it. Models are stored in `~/.local/share/lune-voice/models/` on Linux and `%APPDATA%\lune-voice\models\` on Windows.
+The VAD downloads with whichever speech model you get first, and both local engines share it. Tick any models in Settings → Models and download them together (same checklist and progress as setup; it keeps running if you leave the page). Delete there too. Pick which installed model to use in Settings → Transcription. The settings rail is grouped (App, Speech, Text). Models are stored in `~/.local/share/lune-voice/models/` on Linux and `%APPDATA%\lune-voice\models\` on Windows.
 
 Styling has no local model to manage. It runs against an OpenAI-compatible endpoint, set up like this:
 

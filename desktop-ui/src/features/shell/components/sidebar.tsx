@@ -121,7 +121,16 @@ function NavRow({ item, pathname }: { item: NavigationItem; pathname: string }) 
           <NavBead active={active}>
             <Icon size={17} strokeWidth={active ? 2 : 1.7} className={navIconClass(active)} />
           </NavBead>
-          <span className="truncate is-drawer-close:hidden">{label}</span>
+          <span className="flex min-w-0 flex-col is-drawer-close:hidden">
+            <span className="truncate">{label}</span>
+            {/* A bare "Settings" hides the models and shortcuts inside, so a
+                page can carry a line saying what it holds. */}
+            {item.blurb && (
+              <span className="truncate text-xs font-normal text-content-subtle">
+                {i18n._(item.blurb)}
+              </span>
+            )}
+          </span>
           {/* Shortcut hint: out of the way until the row is hovered or focused. */}
           <span
             aria-hidden="true"

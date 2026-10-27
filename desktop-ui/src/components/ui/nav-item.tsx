@@ -16,12 +16,12 @@ export const NAV_ITEM_BASE =
 export function navItemState(active: boolean): string {
   return active
     ? 'bg-surface-nav-active font-medium text-content-strong ring-1 ring-surface-border'
-    : 'text-content-muted hover:bg-surface-hover hover:text-content';
+    : 'text-content hover:bg-surface-hover hover:text-content-strong';
 }
 
 export function navIconClass(active: boolean): string {
   return `shrink-0 transition-colors ${
-    active ? 'text-primary' : 'text-content-subtle group-hover:text-content-muted'
+    active ? 'text-primary' : 'text-content-muted group-hover:text-content'
   }`;
 }
 

@@ -3,34 +3,32 @@
 import { useLingui } from '@lingui/react/macro';
 import { useNavigate, useSearch } from '@tanstack/react-router';
 import { useStore } from '@tanstack/react-store';
-import {
-  AudioLines,
-  type LucideIcon,
-  Mic,
-  Palette,
-  Pill,
-  Send,
-  SlidersHorizontal,
-  Wand2,
-} from 'lucide-react';
 import type { ReactNode } from 'react';
 import { NAV_ITEM_BASE, NavBead, navIconClass, navItemState } from '../../components/ui/nav-item';
 import { workspaceStore } from '../../store/workspace-store';
+import { useModelStatus } from './hooks/use-model-status';
 import type { SettingsSectionId } from './sections';
 import { AppearanceSection } from './sections/appearance-section';
 import { DictationSection } from './sections/dictation-section';
 import { GeneralSection } from './sections/general-section';
+import { ModelsSection } from './sections/models-section';
 import { OutputSection } from './sections/output-section';
 import { PillSection } from './sections/pill-section';
 import { StylingEngineSection } from './sections/styling-engine-section';
 import { TranscriptionSection } from './sections/transcription-section';
+import { settingsRailGroups } from './settings-rail';
 
 type SectionId = SettingsSectionId;
 
+/** The shared nav look without its keyboard focus outline: the rail marks the
+ *  open section with the active style alone. */
+const RAIL_ITEM_BASE = `${NAV_ITEM_BASE.replace(/ focus-visible:\S+/g, '')} outline-none`;
+
 export function SettingsPage() {
-  const { t } = useLingui();
+  const { t, i18n } = useLingui();
   const settings = useStore(workspaceStore, (s) => s.settings);
   const loaded = useStore(workspaceStore, (s) => s.runtime.loaded);
+  const modelStatus = useModelStatus();
   const { tab } = useSearch({ from: '/settings' });
   const navigate = useNavigate({ from: '/settings' });
 
@@ -66,22 +64,19 @@ export function SettingsPage() {
     );
   }
 
-  const sections: { id: SectionId; label: string; icon: LucideIcon }[] = [
-    { id: 'general', label: t`General`, icon: SlidersHorizontal },
-    { id: 'appearance', label: t`Appearance`, icon: Palette },
-    { id: 'dictation', label: t`Dictation`, icon: Mic },
-    { id: 'pill', label: t`Pill`, icon: Pill },
-    { id: 'transcription', label: t`Transcription`, icon: AudioLines },
-    { id: 'styling', label: t`Styling`, icon: Wand2 },
-    { id: 'output', label: t`Output`, icon: Send },
-  ];
-
   const content: Record<SectionId, ReactNode> = {
     general: <GeneralSection settings={settings} />,
     appearance: <AppearanceSection />,
     dictation: <DictationSection settings={settings} />,
     pill: <PillSection />,
-    transcription: <TranscriptionSection settings={settings} />,
+    transcription: (
+      <TranscriptionSection
+        settings={settings}
+        modelStatus={modelStatus}
+        onOpenModels={() => setActive('models')}
+      />
+    ),
+    models: <ModelsSection status={modelStatus} />,
     styling: <StylingEngineSection settings={settings} />,
     output: <OutputSection settings={settings} />,
   };
@@ -91,7 +86,7 @@ export function SettingsPage() {
     // the app sidebar takes a share of the window, so a window breakpoint gave
     // the rail a quarter of an already narrow page and its labels spilled out.
     <div className="@container">
-      <div className="grid gap-space-md @3xl:grid-cols-[13.5rem_minmax(0,1fr)]">
+      <div className="grid gap-space-md @3xl:grid-cols-[14.5rem_minmax(0,1fr)]">
         {/* Section rail — a scrolling tab strip when the page is narrow, a
           vertical rail of fixed width once there is room for one. Only the
           rail stays pinned: a pinned strip left a band above it where the
@@ -100,41 +95,58 @@ export function SettingsPage() {
           aria-label={t`Settings sections`}
           className="bento-cell z-20 flex-row gap-1 overflow-x-auto p-space-sm @3xl:sticky @3xl:top-0 @3xl:flex-col @3xl:self-start @3xl:overflow-x-visible"
         >
-          {sections.map(({ id, label, icon: Icon }) => {
-            const isActive = id === active;
-            return (
-              <button
-                key={id}
-                type="button"
-                onClick={() => setActive(id)}
-                aria-current={isActive ? 'page' : undefined}
-                title={label}
-                className={`${NAV_ITEM_BASE} h-12 shrink-0 pe-4 ps-2 text-start @3xl:w-full @3xl:min-w-0 ${navItemState(isActive)}`}
+          {settingsRailGroups.map((group, index) => (
+            <div key={group.name.id} className="flex flex-row gap-1 @3xl:flex-col">
+              {/* A caption per group in the rail; the tab strip has no room
+                for them. */}
+              <span
+                className={`hidden px-3 pb-1 text-xs font-medium uppercase tracking-wider text-content-subtle @3xl:block ${
+                  index === 0 ? 'pt-1' : 'pt-2.5'
+                }`}
               >
-                <NavBead active={isActive}>
-                  <Icon
-                    size={17}
-                    strokeWidth={isActive ? 2 : 1.7}
-                    className={navIconClass(isActive)}
-                  />
-                </NavBead>
-                {/* Whole in the tab strip; in the rail, a translation longer
-                  than the rail ends in an ellipsis (full text in the title)
-                  instead of running past the panel edge. */}
-                <span className="whitespace-nowrap @3xl:min-w-0 @3xl:truncate">{label}</span>
-              </button>
-            );
-          })}
+                {i18n._(group.name)}
+              </span>
+              {group.items.map(({ id, label, icon: Icon }) => {
+                const isActive = id === active;
+                return (
+                  <button
+                    key={id}
+                    type="button"
+                    onClick={() => setActive(id)}
+                    aria-current={isActive ? 'page' : undefined}
+                    title={i18n._(label)}
+                    className={`${RAIL_ITEM_BASE} h-12 shrink-0 pe-4 ps-2 text-start text-base @3xl:w-full @3xl:min-w-0 ${navItemState(isActive)}`}
+                  >
+                    <NavBead active={isActive}>
+                      <Icon
+                        size={17}
+                        strokeWidth={isActive ? 2 : 1.7}
+                        className={navIconClass(isActive)}
+                      />
+                    </NavBead>
+                    {/* Whole in the tab strip; in the rail, a translation longer
+                      than the rail ends in an ellipsis (full text in the title)
+                      instead of running past the panel edge. */}
+                    <span className="whitespace-nowrap @3xl:min-w-0 @3xl:truncate">
+                      {i18n._(label)}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+          ))}
         </nav>
 
         {/* All sections stay mounted; inactive ones are hidden so transient
           state (e.g. an in-progress model download) survives tab switches. */}
         <div className="min-w-0">
-          {sections.map(({ id }) => (
-            <div key={id} hidden={id !== active}>
-              {content[id]}
-            </div>
-          ))}
+          {settingsRailGroups
+            .flatMap((group) => group.items)
+            .map(({ id }) => (
+              <div key={id} hidden={id !== active}>
+                {content[id]}
+              </div>
+            ))}
         </div>
       </div>
     </div>

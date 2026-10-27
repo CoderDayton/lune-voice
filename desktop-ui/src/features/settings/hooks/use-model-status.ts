@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 import { invoke } from '@tauri-apps/api/core';
-import { listen } from '@tauri-apps/api/event';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { isTauriRuntime } from '../../../lib/backend/runtime';
+import { useModelDownloads } from '../../model-downloads/model-downloads';
 
 export interface ModelStatus {
   name: string;
@@ -18,14 +18,8 @@ export interface ModelStatus {
   role: string;
   /** Actual on-disk size in bytes when installed; `null` otherwise. */
   sizeBytes: number | null;
-}
-
-export interface DownloadProgress {
-  modelName: string;
-  fileName: string;
-  fileIndex: number;
-  fileCount: number;
-  done: boolean;
+  /** Bytes a download would fetch, VAD included; `null` when unknown. */
+  downloadBytes: number | null;
 }
 
 export interface ModelStatusApi {
@@ -33,11 +27,7 @@ export interface ModelStatusApi {
   /** Lookup by on-disk directory (`local_name`). */
   byName: Map<string, ModelStatus>;
   loading: boolean;
-  /** `local_name` currently downloading, or `null`. */
-  downloading: string | null;
-  progress: DownloadProgress | null;
   refresh: () => void;
-  download: (localName: string) => void;
   remove: (localName: string) => Promise<void>;
 }
 
@@ -45,12 +35,13 @@ export interface ModelStatusApi {
  * `check_model_status` reports the full installable library (every Whisper
  * size), each flagged with `inUse` for the active config. Call
  * `refresh` when the backend or selected model changes to keep `inUse` current.
+ * Downloads are not handled here: they run on the app's shared queue, and a
+ * finished one makes this list reload.
  */
 export function useModelStatus(): ModelStatusApi {
   const [models, setModels] = useState<ModelStatus[]>([]);
   const [loading, setLoading] = useState(true);
-  const [downloading, setDownloading] = useState<string | null>(null);
-  const [progress, setProgress] = useState<DownloadProgress | null>(null);
+  const completions = useModelDownloads().completions;
 
   const refresh = useCallback(() => {
     if (!isTauriRuntime()) {
@@ -67,30 +58,12 @@ export function useModelStatus(): ModelStatusApi {
     refresh();
   }, [refresh]);
 
+  const seen = useRef(completions);
   useEffect(() => {
-    if (!isTauriRuntime()) return;
-    const unlisten = listen<DownloadProgress>('lune://download-progress', (event) => {
-      setProgress(event.payload);
-      if (event.payload.done) {
-        setDownloading(null);
-        setProgress(null);
-        refresh();
-      }
-    });
-    return () => {
-      void unlisten.then((f) => f());
-    };
-  }, [refresh]);
-
-  const download = useCallback((localName: string) => {
-    setDownloading(localName);
-    setProgress(null);
-    invoke('download_model_cmd', { localName }).catch((e) => {
-      console.error('download_model_cmd:', e);
-      setDownloading(null);
-      setProgress(null);
-    });
-  }, []);
+    if (completions === seen.current) return;
+    seen.current = completions;
+    refresh();
+  }, [refresh, completions]);
 
   const remove = useCallback(
     async (localName: string) => {
@@ -106,5 +79,5 @@ export function useModelStatus(): ModelStatusApi {
 
   const byName = new Map(models.map((m) => [m.localName, m]));
 
-  return { models, byName, loading, downloading, progress, refresh, download, remove };
+  return { models, byName, loading, refresh, remove };
 }

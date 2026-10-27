@@ -13,6 +13,7 @@ export const SETTINGS_SECTION_IDS = [
   'dictation',
   'pill',
   'transcription',
+  'models',
   'styling',
   'output',
 ] as const;

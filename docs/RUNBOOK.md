@@ -69,7 +69,7 @@ through uinput, which never touches your input method.
 Work down this list:
 
 1. **No model.** Check `~/.local/share/lune-voice/models/` has the model named
-   in settings. Download it again from Settings → Transcription. A stuck download
+   in settings. Download it again from Settings → Models. A stuck download
    gives up on its own: 30 s to connect, 30 s to respond, one hour for the
    file.
 2. **No audio from the mic.** Run with `RUST_LOG=info`, look for capture logs,

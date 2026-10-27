@@ -45,6 +45,9 @@ export interface NavigationItem {
   group: NavigationGroupLabel;
   shortcut: RegisterableHotkey;
   icon: LucideIcon;
+  /** A line under the label in the expanded sidebar, for a page whose name
+   *  alone does not say what is inside. Short: the row truncates it. */
+  blurb?: MessageDescriptor;
   /** Page owns the viewport height instead of growing with its content: the
    *  frame fills the region and the page's own list is the only scroller.
    *  Falls back to ordinary page scrolling below the `lg` breakpoint. */
@@ -103,6 +106,7 @@ export const navigationItems: NavigationItem[] = [
     group: 'System',
     shortcut: navigationShortcuts['/settings'],
     icon: Settings,
+    blurb: msg`Models, shortcuts, output`,
   },
 ];
 

@@ -21,8 +21,20 @@ import {
   modelIdleUnloadValue,
 } from '../data/settings-data';
 import { useDebouncedSetting } from '../hooks/use-debounced-setting';
+import type { ModelStatusApi } from '../hooks/use-model-status';
 
-export function TranscriptionSection({ settings }: SettingsProps) {
+interface TranscriptionSectionProps extends SettingsProps {
+  /** Shared with the rail and the Models page so installs show everywhere. */
+  modelStatus: ModelStatusApi;
+  /** Opens the Models page, where the model library lives. */
+  onOpenModels: () => void;
+}
+
+export function TranscriptionSection({
+  settings,
+  modelStatus,
+  onOpenModels,
+}: TranscriptionSectionProps) {
   const { t, i18n } = useLingui();
   const [confidence, setConfidence] = useDebouncedSetting(
     'confidenceThreshold',
@@ -47,7 +59,7 @@ export function TranscriptionSection({ settings }: SettingsProps) {
           label={t`Voice model`}
           description={t`What turns your speech into text. The local engines run on your machine.`}
         >
-          <AsrEngineCards settings={settings} />
+          <AsrEngineCards settings={settings} status={modelStatus} onOpenModels={onOpenModels} />
         </SettingsBlock>
         {settings.asrBackend === 'OpenAiCompatible' && settings.privacyMode === 'LocalOnly' && (
           <div role="alert" className="alert alert-warning alert-soft sm:flex-row">

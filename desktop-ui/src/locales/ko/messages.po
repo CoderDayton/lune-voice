@@ -13,7 +13,7 @@ msgstr ""
 "Language-Team: \n"
 "Plural-Forms: \n"
 
-#: src/features/welcome/welcome-page.tsx:421
+#: src/features/welcome/welcome-page.tsx:496
 msgid "— change it any time in Settings › Dictation."
 msgstr "— 설정 › 받아쓰기에서 언제든지 바꿀 수 있습니다."
 
@@ -112,7 +112,8 @@ msgstr "## 회의 — {date}\n"
 msgid "1 year"
 msgstr "1년"
 
-#: src/features/settings/components/asr-engine-cards.tsx:230
+#: src/features/settings/components/asr-engine-cards.tsx:201
+#: src/features/settings/components/model-library.tsx:147
 msgid "25 European languages"
 msgstr "유럽 언어 25개"
 
@@ -195,7 +196,7 @@ msgstr "30분 후"
 msgid "After 5 minutes"
 msgstr "5분 후"
 
-#: src/features/welcome/welcome-page.tsx:220
+#: src/features/welcome/welcome-page.tsx:245
 msgid "All required models are already installed. Continue when you're ready."
 msgstr "필요한 모든 모델이 이미 설치되어 있습니다. 준비가 되면 계속하세요."
 
@@ -237,8 +238,12 @@ msgstr "API 엔드포인트"
 msgid "API key"
 msgstr "API 키"
 
+#: src/features/settings/settings-rail.ts:32
+msgid "App"
+msgstr "앱"
+
 #: src/features/settings/sections/appearance-section.tsx:16
-#: src/features/settings/settings-page.tsx:71
+#: src/features/settings/settings-rail.ts:35
 msgid "Appearance"
 msgstr "모양"
 
@@ -297,6 +302,10 @@ msgstr "자동"
 msgid "Automatic updates are off"
 msgstr "자동 업데이트가 꺼져 있습니다"
 
+#: src/features/welcome/welcome-page.tsx:455
+msgid "Back"
+msgstr "뒤로"
+
 #: src/features/settings/data/settings-data.ts:207
 msgid "Balanced accuracy and speed."
 msgstr "정확도와 속도의 균형."
@@ -309,7 +318,7 @@ msgstr "기본"
 msgid "Base URL for the OpenAI-compatible styling API."
 msgstr "OpenAI 호환 스타일 API의 기본 URL입니다."
 
-#: src/features/settings/components/asr-engine-cards.tsx:125
+#: src/features/settings/components/asr-engine-cards.tsx:112
 msgid "Base URL for the OpenAI-compatible transcription API."
 msgstr "OpenAI 호환 음성 인식 API의 기본 URL입니다."
 
@@ -321,11 +330,11 @@ msgstr "시작하기 전에"
 msgid "Best accuracy; turbo decoder keeps it fast."
 msgstr "최고 정확도. 터보 디코더로 속도도 유지합니다."
 
-#: src/features/settings/components/asr-engine-cards.tsx:223
+#: src/features/settings/components/asr-engine-cards.tsx:194
 msgid "Bigger is more accurate, but slower"
 msgstr "클수록 정확하지만 느립니다"
 
-#: src/features/shell/config/navigation.ts:85
+#: src/features/shell/config/navigation.ts:88
 msgid "Blocks of text Lune Voice types when you speak their trigger phrase"
 msgstr "트리거 문구를 말하면 Lune Voice가 입력하는 텍스트 블록"
 
@@ -353,7 +362,7 @@ msgstr "브랜드 표기(\"github\" → \"GitHub\")"
 msgid "Brands"
 msgstr "브랜드"
 
-#: src/features/shell/config/navigation.ts:67
+#: src/features/shell/config/navigation.ts:70
 msgid "Browse and search past dictations"
 msgstr "지난 받아쓰기 보기 및 검색"
 
@@ -372,7 +381,8 @@ msgstr "내장"
 
 #: src/components/feedback/confirm-dialog.tsx:61
 #: src/features/dictionary/components/dictionary-table.tsx:113
-#: src/features/settings/components/asr-engine-cards.tsx:396
+#: src/features/settings/components/model-library.tsx:215
+#: src/features/settings/components/model-library.tsx:371
 #: src/features/snippets/snippets-page.tsx:249
 #: src/features/styles/components/style-editor-modal.tsx:247
 msgid "Cancel"
@@ -382,7 +392,7 @@ msgstr "취소"
 msgid "Cancel current recording"
 msgstr "현재 녹음 취소"
 
-#: src/features/welcome/welcome-page.tsx:315
+#: src/features/welcome/welcome-page.tsx:373
 msgid "Cancel download"
 msgstr "다운로드 취소"
 
@@ -390,8 +400,8 @@ msgstr "다운로드 취소"
 msgid "Cancelled"
 msgstr "취소됨"
 
-#: src/features/settings/sections/transcription-section.tsx:121
-#: src/features/settings/sections/transcription-section.tsx:129
+#: src/features/settings/sections/transcription-section.tsx:133
+#: src/features/settings/sections/transcription-section.tsx:141
 msgid "Capitalize known names"
 msgstr "알려진 이름 대문자 표기"
 
@@ -412,10 +422,6 @@ msgstr "녹음 장치와 말소리를 감지하는 방식입니다."
 msgid "Casual"
 msgstr "캐주얼"
 
-#: src/features/welcome/welcome-page.tsx:380
-msgid "Change engine"
-msgstr "엔진 변경"
-
 #: src/features/settings/sections/general-section.tsx:159
 #: src/features/shell/components/sidebar-quick-actions.tsx:73
 msgid "Check for updates"
@@ -430,7 +436,7 @@ msgstr "시작할 때 업데이트 확인"
 msgid "Check whether a newer version has been released."
 msgstr "더 새로운 버전이 나왔는지 확인합니다."
 
-#: src/features/welcome/welcome-page.tsx:214
+#: src/features/welcome/welcome-page.tsx:261
 msgid "Check your network and retry. Files that finished downloading are kept."
 msgstr "네트워크를 확인한 뒤 다시 시도하세요. 다운로드가 끝난 파일은 유지됩니다."
 
@@ -438,11 +444,11 @@ msgstr "네트워크를 확인한 뒤 다시 시도하세요. 다운로드가 �
 msgid "Checking for updates"
 msgstr "업데이트 확인 중"
 
-#: src/features/welcome/welcome-page.tsx:76
+#: src/features/welcome/welcome-page.tsx:87
 msgid "Checking installed models…"
 msgstr "설치된 모델을 확인하는 중…"
 
-#: src/features/settings/components/asr-engine-cards.tsx:314
+#: src/features/settings/components/asr-engine-cards.tsx:89
 #: src/features/settings/sections/general-section.tsx:159
 #: src/features/welcome/components/ready-checks.tsx:113
 msgid "Checking…"
@@ -464,16 +470,16 @@ msgstr "Lune Voice의 모양을 선택하세요."
 msgid "Choose how transcripts are restyled — sent to an OpenAI-compatible endpoint you configure, local or hosted, or left off entirely."
 msgstr "텍스트에 스타일을 적용하는 방식을 선택하세요. 직접 설정한 OpenAI 호환 엔드포인트(로컬 또는 호스팅)로 보내거나 아예 끌 수 있습니다."
 
-#: src/features/welcome/welcome-page.tsx:217
-#: src/features/welcome/welcome-page.tsx:223
+#: src/features/welcome/welcome-page.tsx:241
 msgid "Choose the AI models to install. Everything runs offline — no cloud, no accounts."
 msgstr "설치할 AI 모델을 선택하세요. 모든 작업이 오프라인에서 실행되며, 클라우드도 계정도 필요 없습니다."
 
-#: src/features/settings/components/asr-engine-cards.tsx:422
+#: src/features/settings/components/asr-engine-cards.tsx:226
 msgid "Choose your dictation language below. Parakeet cannot tell Lune which language it heard, so until one is set every dictation is formatted as English."
 msgstr "아래에서 받아쓰기 언어를 선택하세요. Parakeet은 어떤 언어를 들었는지 Lune에 알려줄 수 없어, 언어를 설정하기 전까지는 모든 받아쓰기가 영어로 서식 처리됩니다."
 
-#: src/features/welcome/welcome-page.tsx:199
+#: src/features/welcome/welcome-page.tsx:235
+#: src/features/welcome/welcome-page.tsx:264
 msgid "Choose your speech engine. Everything runs offline — no cloud, no accounts."
 msgstr "음성 인식 엔진을 선택하세요. 모든 작업이 오프라인에서 실행되며, 클라우드도 계정도 필요 없습니다."
 
@@ -482,6 +488,7 @@ msgid "Clear {label}"
 msgstr "{label} 지우기"
 
 #: src/features/history/components/history-table.tsx:294
+#: src/features/settings/components/model-library.tsx:159
 msgid "Clear selection"
 msgstr "선택 해제"
 
@@ -495,7 +502,7 @@ msgstr "닫기"
 
 #: src/components/feedback/help-feedback-dialog.tsx:281
 #: src/features/history/components/session-detail-modal.tsx:226
-#: src/features/settings/components/asr-engine-cards.tsx:406
+#: src/features/settings/components/model-library.tsx:381
 #: src/features/styles/components/style-editor-modal.tsx:238
 #: src/features/updates/update-dialog.tsx:326
 #: src/features/updates/update-dialog.tsx:338
@@ -538,12 +545,12 @@ msgstr "연결 중"
 msgid "Contact the release server shortly after startup and tell you only when a newer version exists. Off by default — dictation itself never needs the network."
 msgstr "시작 직후 릴리스 서버에 접속해 더 새로운 버전이 있을 때만 알려 줍니다. 기본값은 꺼짐입니다 — 받아쓰기 자체는 네트워크가 필요 없습니다."
 
-#: src/features/welcome/welcome-page.tsx:295
-#: src/features/welcome/welcome-page.tsx:374
+#: src/features/welcome/welcome-page.tsx:341
+#: src/features/welcome/welcome-page.tsx:432
 msgid "Continue"
 msgstr "계속"
 
-#: src/features/settings/sections/transcription-section.tsx:43
+#: src/features/settings/sections/transcription-section.tsx:55
 msgid "Control how your speech is turned into text."
 msgstr "음성을 텍스트로 변환하는 방식을 설정합니다."
 
@@ -572,20 +579,20 @@ msgstr "표시기 막대의 모서리 둥글기입니다."
 msgid "Corners"
 msgstr "모서리"
 
-#: src/features/settings/sections/transcription-section.tsx:116
+#: src/features/settings/sections/transcription-section.tsx:128
 msgid "Correction"
 msgstr "교정"
 
-#: src/features/settings/sections/transcription-section.tsx:135
-#: src/features/settings/sections/transcription-section.tsx:150
+#: src/features/settings/sections/transcription-section.tsx:147
+#: src/features/settings/sections/transcription-section.tsx:162
 msgid "Correction sensitivity"
 msgstr "교정 민감도"
 
-#: src/features/shell/config/navigation.ts:76
+#: src/features/shell/config/navigation.ts:79
 msgid "Corrections Lune Voice applies every time you dictate"
 msgstr "받아쓰기할 때마다 Lune Voice가 적용하는 교정"
 
-#: src/features/welcome/components/download-checklist.tsx:99
+#: src/features/models/components/download-checklist.tsx:102
 msgid "Could not download GPU support — transcription will run on the CPU. You can retry under Settings › Models."
 msgstr "GPU 지원을 다운로드하지 못했습니다. 음성 인식은 CPU에서 실행됩니다. 설정 › 모델에서 다시 시도할 수 있습니다."
 
@@ -609,7 +616,7 @@ msgstr "피드백 서비스에 연결할 수 없습니다. 위의 링크를 사�
 msgid "Couldn't save that snippet. Try again."
 msgstr "스니펫을 저장하지 못했습니다. 다시 시도하세요."
 
-#: src/features/welcome/components/engine-step.tsx:281
+#: src/features/welcome/components/engine-step.tsx:259
 msgid "Covers {languages}. For any other language, choose Whisper."
 msgstr "지원 언어: {languages}. 그 밖의 언어는 Whisper를 선택하세요."
 
@@ -629,7 +636,7 @@ msgstr "새 스타일 만들기"
 msgid "Create style"
 msgstr "스타일 만들기"
 
-#: src/features/welcome/welcome-page.tsx:420
+#: src/features/welcome/welcome-page.tsx:495
 msgid "Ctrl+Space"
 msgstr "Ctrl+Space"
 
@@ -649,8 +656,8 @@ msgstr "어둡게"
 #: src/components/feedback/confirm-dialog.tsx:72
 #: src/features/history/components/history-table.tsx:515
 #: src/features/history/components/session-detail-modal.tsx:219
-#: src/features/settings/components/asr-engine-cards.tsx:330
-#: src/features/settings/components/asr-engine-cards.tsx:331
+#: src/features/settings/components/model-library.tsx:334
+#: src/features/settings/components/model-library.tsx:335
 msgid "Delete"
 msgstr "삭제"
 
@@ -664,7 +671,7 @@ msgid "Delete {0}"
 msgstr "{0} 삭제"
 
 #. placeholder {0}: model.name
-#: src/features/settings/components/asr-engine-cards.tsx:387
+#: src/features/settings/components/model-library.tsx:362
 msgid "Delete {0}?"
 msgstr "{0}을(를) 삭제하시겠습니까?"
 
@@ -672,7 +679,7 @@ msgstr "{0}을(를) 삭제하시겠습니까?"
 msgid "Delete {count, plural, one {# session} other {# sessions}}?"
 msgstr "{count, plural, other {세션 #개}}를 삭제하시겠습니까?"
 
-#: src/features/settings/components/asr-engine-cards.tsx:399
+#: src/features/settings/components/model-library.tsx:374
 msgid "Delete model"
 msgstr "모델 삭제"
 
@@ -713,7 +720,7 @@ msgstr "설명이 너무 깁니다."
 msgid "Detects terminals and picks the matching paste shortcut. Works on most compositors."
 msgstr "터미널을 감지해 알맞은 붙여넣기 단축키를 고릅니다. 대부분의 컴포지터에서 동작합니다."
 
-#: src/features/settings/components/asr-engine-cards.tsx:222
+#: src/features/settings/components/asr-engine-cards.tsx:193
 msgid "Detects the language you speak"
 msgstr "말하는 언어를 감지합니다"
 
@@ -725,14 +732,14 @@ msgstr "세션마다 말한 언어를 감지합니다."
 msgid "Deterministic fixes applied before any AI styling."
 msgstr "AI 스타일 적용 전에 항상 같은 방식으로 적용되는 규칙 기반 교정입니다."
 
-#: src/features/settings/settings-page.tsx:72
+#: src/features/settings/settings-rail.ts:42
 msgid "Dictation"
 msgstr "받아쓰기"
 
-#: src/features/settings/sections/transcription-section.tsx:58
-#: src/features/settings/sections/transcription-section.tsx:71
-#: src/features/welcome/components/engine-step.tsx:285
-#: src/features/welcome/components/engine-step.tsx:293
+#: src/features/settings/sections/transcription-section.tsx:70
+#: src/features/settings/sections/transcription-section.tsx:83
+#: src/features/welcome/components/engine-step.tsx:263
+#: src/features/welcome/components/engine-step.tsx:271
 msgid "Dictation language"
 msgstr "받아쓰기 언어"
 
@@ -760,9 +767,13 @@ msgstr "현재 초안을 버리고 대기 상태로 돌아갑니다. 단축키�
 msgid "Disconnected"
 msgstr "연결 끊김"
 
-#: src/features/settings/components/asr-engine-cards.tsx:143
+#: src/features/settings/components/model-library.tsx:178
 msgid "Disk usage"
 msgstr "디스크 사용량"
+
+#: src/features/settings/components/model-library.tsx:225
+msgid "Dismiss"
+msgstr "닫기"
 
 #: src/components/feedback/error-toast.tsx:26
 msgid "Dismiss error"
@@ -772,34 +783,52 @@ msgstr "오류 닫기"
 msgid "Don't save history"
 msgstr "기록을 저장하지 않음"
 
+#: src/features/settings/components/model-library.tsx:242
+msgid "Done"
+msgstr "완료"
+
 #: src/features/history/components/history-table.tsx:509
-#: src/features/settings/components/asr-engine-cards.tsx:344
 #: src/features/settings/components/gpu-backend-card.tsx:38
+#: src/features/settings/components/model-library.tsx:169
 msgid "Download"
 msgstr "다운로드"
 
-#: src/features/welcome/welcome-page.tsx:366
+#. placeholder {0}: wanted.length
+#: src/features/settings/components/model-library.tsx:172
+msgid "Download {0} selected"
+msgstr "선택한 {0}개 다운로드"
+
+#. placeholder {0}: wanted.length
+#. placeholder {1}: formatBytes(wantedBytes)
+#: src/features/settings/components/model-library.tsx:171
+msgid "Download {0} selected · {1}"
+msgstr "선택한 {0}개 다운로드 · {1}"
+
+#: src/features/welcome/welcome-page.tsx:424
 msgid "Download {pendingCount} models"
 msgstr "모델 {pendingCount}개 다운로드"
 
-#: src/features/welcome/welcome-page.tsx:363
+#: src/features/welcome/welcome-page.tsx:421
 msgid "Download {size}"
 msgstr "{size} 다운로드"
 
-#: src/features/welcome/welcome-page.tsx:365
+#: src/features/welcome/welcome-page.tsx:423
 msgid "Download 1 model"
 msgstr "모델 1개 다운로드"
 
-#: src/features/welcome/welcome-page.tsx:152
+#: src/features/settings/sections/models-section.tsx:14
+msgid "Download and delete the speech models stored on this machine."
+msgstr "이 컴퓨터에 저장된 음성 모델을 다운로드하고 삭제합니다."
+
+#: src/features/welcome/welcome-page.tsx:184
 msgid "Download failed"
 msgstr "다운로드 실패"
 
-#: src/features/welcome/welcome-page.tsx:213
+#: src/features/welcome/welcome-page.tsx:260
 msgid "Download interrupted"
 msgstr "다운로드 중단됨"
 
 #: src/components/ui/byte-progress.tsx:37
-#: src/features/settings/components/asr-engine-cards.tsx:356
 msgid "Download progress"
 msgstr "다운로드 진행 상황"
 
@@ -807,11 +836,11 @@ msgstr "다운로드 진행 상황"
 msgid "Download transcript"
 msgstr "받아쓰기 텍스트 다운로드"
 
-#: src/features/welcome/components/download-checklist.tsx:106
+#: src/features/models/components/download-checklist.tsx:109
 msgid "Downloaded"
 msgstr "다운로드됨"
 
-#: src/features/welcome/welcome-page.tsx:204
+#: src/features/welcome/welcome-page.tsx:251
 msgid "Downloading models"
 msgstr "모델 다운로드 중"
 
@@ -819,8 +848,8 @@ msgstr "모델 다운로드 중"
 msgid "Downloading update"
 msgstr "업데이트 다운로드 중"
 
-#: src/features/settings/components/asr-engine-cards.tsx:318
 #: src/features/settings/components/gpu-backend-card.tsx:27
+#: src/features/settings/components/model-library.tsx:341
 msgid "Downloading…"
 msgstr "다운로드 중…"
 
@@ -880,10 +909,11 @@ msgstr "스타일 적용 사용"
 #: src/features/history/components/history-table.tsx:189
 #: src/features/history/components/session-detail-modal.tsx:175
 #: src/features/settings/sections/styling-engine-section.tsx:44
+#: src/features/welcome/components/wizard-stepper.tsx:20
 msgid "Engine"
 msgstr "엔진"
 
-#: src/features/welcome/welcome-page.tsx:344
+#: src/features/welcome/welcome-page.tsx:402
 msgid "Enter Lune Voice"
 msgstr "Lune Voice 열기"
 
@@ -907,7 +937,7 @@ msgstr "사이드바 펼치기"
 msgid "Failed: {reason}"
 msgstr "실패: {reason}"
 
-#: src/features/settings/components/asr-engine-cards.tsx:236
+#: src/features/settings/components/asr-engine-cards.tsx:207
 msgid "Fast on a CPU"
 msgstr "CPU에서도 빠름"
 
@@ -915,7 +945,7 @@ msgstr "CPU에서도 빠름"
 msgid "Fast; less accurate than Medium."
 msgstr "빠르지만 중형보다 정확도가 낮습니다."
 
-#: src/features/welcome/components/engine-step.tsx:84
+#: src/features/welcome/components/engine-step.tsx:81
 msgid "Fastest on CPU · 25 European languages"
 msgstr "CPU에서 가장 빠름 · 유럽 25개 언어"
 
@@ -927,7 +957,7 @@ msgstr "가장 빠르지만 정확도는 가장 낮습니다. 오래되었거나
 msgid "Feature request"
 msgstr "기능 요청"
 
-#: src/features/welcome/welcome-page.tsx:211
+#: src/features/welcome/welcome-page.tsx:258
 msgid "Fetching GPU support. This is the last step, and it only happens once."
 msgstr "GPU 지원을 가져오는 중입니다. 마지막 단계이며 한 번만 진행됩니다."
 
@@ -955,7 +985,7 @@ msgstr "스니펫 검색"
 msgid "Filter snippets…"
 msgstr "스니펫 검색…"
 
-#: src/features/settings/sections/transcription-section.tsx:117
+#: src/features/settings/sections/transcription-section.tsx:129
 msgid "Fix recognizer errors with your dictionary and known vocabulary, on your device. It uses per-word confidence and statistical patterns — no AI model, and it never rewrites what you said."
 msgstr "사전과 알려진 어휘로 인식 오류를 기기에서 바로잡습니다. 단어별 신뢰도와 통계 패턴을 사용하며, AI 모델을 쓰지 않고 말한 내용을 다시 쓰지도 않습니다."
 
@@ -984,12 +1014,12 @@ msgstr "격식체"
 msgid "Formatting"
 msgstr "서식"
 
-#: src/features/shell/config/navigation.ts:94
+#: src/features/shell/config/navigation.ts:97
 msgid "Formatting presets for your text"
 msgstr "텍스트 서식 프리셋"
 
-#: src/features/settings/sections/transcription-section.tsx:96
-#: src/features/settings/sections/transcription-section.tsx:102
+#: src/features/settings/sections/transcription-section.tsx:108
+#: src/features/settings/sections/transcription-section.tsx:114
 msgid "Free the model when idle"
 msgstr "사용하지 않을 때 모델 해제"
 
@@ -1006,7 +1036,7 @@ msgid "Gap between the pill and the screen edge, so it clears a taskbar or dock.
 msgstr "표시기와 화면 가장자리 사이의 간격입니다. 작업 표시줄이나 독과 겹치지 않게 합니다."
 
 #: src/features/settings/sections/general-section.tsx:62
-#: src/features/settings/settings-page.tsx:70
+#: src/features/settings/settings-rail.ts:34
 msgid "General"
 msgstr "일반"
 
@@ -1027,7 +1057,7 @@ msgstr "github"
 msgid "GitHub"
 msgstr "GitHub"
 
-#: src/features/settings/sections/transcription-section.tsx:97
+#: src/features/settings/sections/transcription-section.tsx:109
 msgid "Give the memory back after a quiet spell. The next dictation reloads the model, which adds up to a second before it starts listening — your speech is recorded during the wait, so nothing is lost."
 msgstr "한동안 쓰지 않으면 메모리를 반환합니다. 다음 받아쓰기에서 모델을 다시 불러오므로 듣기 시작까지 최대 1초가 더 걸립니다. 기다리는 동안에도 음성은 녹음되므로 놓치는 내용은 없습니다."
 
@@ -1044,15 +1074,17 @@ msgid "Good morning."
 msgstr "좋은 아침입니다."
 
 #: src/features/settings/components/gpu-backend-card.tsx:55
-#: src/features/welcome/components/engine-step.tsx:349
+#: src/features/welcome/components/review-step.tsx:58
+#: src/features/welcome/components/wizard-stepper.tsx:21
+#: src/features/welcome/welcome-page.tsx:237
 msgid "GPU acceleration"
 msgstr "GPU 가속"
 
-#: src/features/welcome/components/download-checklist.tsx:117
+#: src/features/models/components/download-checklist.tsx:120
 msgid "GPU support"
 msgstr "GPU 지원"
 
-#: src/features/welcome/welcome-page.tsx:208
+#: src/features/welcome/welcome-page.tsx:255
 msgid "GPU support is downloaded. Moving transcription onto it now."
 msgstr "GPU 지원을 다운로드했습니다. 이제 받아쓰기를 GPU로 옮기는 중입니다."
 
@@ -1064,6 +1096,10 @@ msgstr "GPU 지원이 설치되어 있지만 작동하지 않습니다."
 #: src/features/shell/components/sidebar-quick-actions.tsx:83
 msgid "Help & feedback"
 msgstr "도움말 및 피드백"
+
+#: src/features/welcome/welcome-page.tsx:246
+msgid "Here is what setup will install. Everything stays on this machine."
+msgstr "설정에서 설치할 항목입니다. 모든 것은 이 컴퓨터에만 보관됩니다."
 
 #: src/features/dictionary/components/priority-picker.tsx:21
 msgid "High"
@@ -1105,11 +1141,11 @@ msgstr "말하는 동안 단축키를 누르고 있다가 놓으면 멈춥니다
 msgid "Hold while speaking"
 msgstr "말하는 동안 누르고 있기"
 
-#: src/features/welcome/welcome-page.tsx:416
+#: src/features/welcome/welcome-page.tsx:491
 msgid "Hold your hotkey, speak, then let go. The text is typed into whatever app you were using."
 msgstr "단축키를 누른 채 말한 뒤 손을 떼세요. 사용 중이던 앱에 텍스트가 입력됩니다."
 
-#: src/features/shell/config/navigation.ts:57
+#: src/features/shell/config/navigation.ts:60
 msgid "Home"
 msgstr "홈"
 
@@ -1129,7 +1165,7 @@ msgstr "받아쓰기 알림음의 크기입니다."
 msgid "How the pill bar looks. Changes apply immediately."
 msgstr "표시기 막대의 모양입니다. 변경 사항은 즉시 적용됩니다."
 
-#: src/features/welcome/welcome-page.tsx:413
+#: src/features/welcome/welcome-page.tsx:488
 msgid "How to dictate"
 msgstr "받아쓰기 사용법"
 
@@ -1141,13 +1177,14 @@ msgstr "대기 중 · 마이크 준비됨"
 msgid "In progress"
 msgstr "진행 중"
 
-#: src/features/settings/components/asr-engine-cards.tsx:196
-#: src/features/settings/components/asr-engine-cards.tsx:197
-#: src/features/settings/components/asr-engine-cards.tsx:307
+#: src/features/settings/components/asr-engine-cards.tsx:167
+#: src/features/settings/components/asr-engine-cards.tsx:168
+#: src/features/settings/components/installed-model-picker.tsx:57
+#: src/features/settings/components/model-library.tsx:290
 msgid "In use"
 msgstr "사용 중"
 
-#: src/features/shell/config/navigation.ts:102
+#: src/features/shell/config/navigation.ts:105
 msgid "Input, output, models, and shortcuts"
 msgstr "입력, 출력, 모델, 단축키"
 
@@ -1163,13 +1200,18 @@ msgstr "자리 표시자 삽입"
 msgid "Install and restart"
 msgstr "설치하고 다시 시작"
 
-#: src/features/settings/components/asr-engine-cards.tsx:324
+#: src/features/settings/components/model-library.tsx:329
 #: src/features/welcome/components/model-card.tsx:74
+#: src/features/welcome/components/review-step.tsx:47
 msgid "Installed"
 msgstr "설치됨"
 
+#: src/features/settings/components/installed-model-picker.tsx:34
+msgid "Installed models"
+msgstr "설치된 모델"
+
 #: src/features/settings/components/gpu-backend-card.tsx:123
-#: src/features/welcome/components/engine-step.tsx:339
+#: src/features/welcome/components/acceleration-step.tsx:19
 msgid "Installed. Restart Lune Voice to start using your GPU."
 msgstr "설치되었습니다. GPU를 사용하려면 Lune Voice를 다시 시작하세요."
 
@@ -1185,7 +1227,7 @@ msgstr "업데이트 설치 중"
 msgid "Instructions"
 msgstr "지침"
 
-#: src/features/welcome/components/download-checklist.tsx:101
+#: src/features/models/components/download-checklist.tsx:104
 msgid "Interrupted"
 msgstr "중단됨"
 
@@ -1332,6 +1374,10 @@ msgstr "Lune Voice가 다른 앱에 입력하고 단축키를 감지하려면 �
 msgid "Lune Voice writes"
 msgstr "입력되는 내용"
 
+#: src/features/settings/components/asr-engine-cards.tsx:96
+msgid "Manage models"
+msgstr "모델 관리"
+
 #. Short for medium priority
 #: src/features/dictionary/components/priority-picker.tsx:18
 msgid "Med"
@@ -1368,14 +1414,25 @@ msgstr "모드"
 msgid "Model"
 msgstr "모델"
 
-#: src/features/welcome/components/engine-step.tsx:166
-#: src/features/welcome/components/engine-step.tsx:266
+#: src/features/welcome/components/engine-step.tsx:146
+#: src/features/welcome/components/engine-step.tsx:244
 msgid "Model size"
 msgstr "모델 크기"
 
-#: src/features/welcome/welcome-page.tsx:434
+#: src/features/settings/sections/models-section.tsx:13
+#: src/features/settings/settings-rail.ts:44
+#: src/features/welcome/components/wizard-stepper.tsx:22
+#: src/features/welcome/welcome-page.tsx:240
+msgid "Models"
+msgstr "모델"
+
+#: src/features/welcome/welcome-page.tsx:509
 msgid "Models are stored locally. No telemetry, no accounts."
 msgstr "모델은 로컬에 저장됩니다. 원격 측정도, 계정도 없습니다."
+
+#: src/features/shell/config/navigation.ts:109
+msgid "Models, shortcuts, output"
+msgstr "모델, 단축키, 출력"
 
 #: src/features/settings/sections/pill-section.tsx:155
 msgid "Monitor"
@@ -1388,7 +1445,7 @@ msgstr "모니터"
 msgid "More"
 msgstr "더 보기"
 
-#: src/features/welcome/components/engine-step.tsx:77
+#: src/features/welcome/components/engine-step.tsx:74
 msgid "Multilingual · runs on-device"
 msgstr "다국어 · 기기에서 실행"
 
@@ -1400,7 +1457,8 @@ msgstr "이름"
 msgid "Name is too long."
 msgstr "이름이 너무 깁니다."
 
-#: src/features/settings/components/asr-engine-cards.tsx:221
+#: src/features/settings/components/asr-engine-cards.tsx:192
+#: src/features/settings/components/model-library.tsx:144
 msgid "Nearly 100 languages"
 msgstr "약 100개 언어"
 
@@ -1415,6 +1473,7 @@ msgid "New snippet"
 msgstr "새 스니펫"
 
 #: src/features/history/components/history-table.tsx:263
+#: src/features/welcome/welcome-page.tsx:355
 msgid "Next"
 msgstr "다음"
 
@@ -1426,7 +1485,7 @@ msgstr "다음 페이지"
 msgid "No"
 msgstr "아니요"
 
-#: src/features/settings/components/asr-engine-cards.tsx:237
+#: src/features/settings/components/asr-engine-cards.tsx:208
 msgid "No auto-detect: set your language below"
 msgstr "자동 감지 없음: 아래에서 언어를 설정하세요"
 
@@ -1493,15 +1552,19 @@ msgstr "연결되지 않음"
 msgid "Not installed"
 msgstr "설치되지 않음"
 
-#: src/features/settings/components/asr-engine-cards.tsx:145
+#: src/features/settings/components/model-library.tsx:181
 msgid "Nothing installed"
 msgstr "설치된 항목 없음"
+
+#: src/features/settings/components/asr-engine-cards.tsx:91
+msgid "Nothing installed yet."
+msgstr "아직 설치된 항목이 없습니다."
 
 #: src/features/settings/data/settings-data.ts:147
 msgid "NVIDIA Parakeet on-device. Much faster than Whisper on a CPU, for 25 European languages."
 msgstr "기기에서 실행되는 NVIDIA Parakeet. CPU에서 Whisper보다 훨씬 빠르며, 유럽 25개 언어를 지원합니다."
 
-#: src/features/welcome/components/engine-step.tsx:85
+#: src/features/welcome/components/engine-step.tsx:82
 msgid "NVIDIA Parakeet running on-device. Punctuates by itself and detects which of its languages you speak."
 msgstr "기기에서 실행되는 NVIDIA Parakeet입니다. 문장 부호를 스스로 넣고, 지원하는 언어 중 어떤 언어로 말하는지 감지합니다."
 
@@ -1565,7 +1628,7 @@ msgstr "또는 바로 보내기"
 msgid "Orientation"
 msgstr "방향"
 
-#: src/features/settings/settings-page.tsx:76
+#: src/features/settings/settings-rail.ts:51
 msgid "Output"
 msgstr "출력"
 
@@ -1573,8 +1636,8 @@ msgstr "출력"
 msgid "Overall footprint of the pill bar."
 msgstr "표시기 막대의 전체 크기입니다."
 
-#: src/features/welcome/components/download-checklist.tsx:34
-#: src/features/welcome/components/download-checklist.tsx:45
+#: src/features/models/components/download-checklist.tsx:37
+#: src/features/models/components/download-checklist.tsx:48
 msgid "Overall progress"
 msgstr "전체 진행률"
 
@@ -1582,9 +1645,10 @@ msgstr "전체 진행률"
 msgid "Pagination"
 msgstr "페이지 탐색"
 
-#: src/features/settings/components/asr-engine-cards.tsx:170
+#: src/features/settings/components/asr-engine-cards.tsx:141
+#: src/features/settings/components/model-library.tsx:147
 #: src/features/settings/data/settings-data.ts:642
-#: src/features/welcome/components/engine-step.tsx:83
+#: src/features/welcome/components/engine-step.tsx:80
 msgid "Parakeet"
 msgstr "Parakeet"
 
@@ -1592,11 +1656,11 @@ msgstr "Parakeet"
 msgid "Parakeet (local)"
 msgstr "Parakeet(로컬)"
 
-#: src/features/welcome/components/engine-step.tsx:287
+#: src/features/welcome/components/engine-step.tsx:265
 msgid "Parakeet cannot tell Lune which language it heard, so set the one you speak. You can change it later in Settings."
 msgstr "Parakeet은 어떤 언어를 들었는지 Lune에 알려줄 수 없으니 말하는 언어를 설정하세요. 나중에 설정에서 바꿀 수 있습니다."
 
-#: src/features/settings/components/asr-engine-cards.tsx:423
+#: src/features/settings/components/asr-engine-cards.tsx:227
 msgid "Parakeet cannot transcribe {languageName}, so dictation will not start. Choose a language it covers below, or use Whisper."
 msgstr "Parakeet은 {languageName}을(를) 인식할 수 없어 받아쓰기가 시작되지 않습니다. 아래에서 지원되는 언어를 선택하거나 Whisper를 사용하세요."
 
@@ -1626,7 +1690,7 @@ msgstr "성능 또는 속도"
 msgid "Phrase"
 msgstr "문구"
 
-#: src/features/settings/settings-page.tsx:73
+#: src/features/settings/settings-rail.ts:36
 msgid "Pill"
 msgstr "표시기"
 
@@ -1658,7 +1722,7 @@ msgstr "배치"
 msgid "Play a short sound when dictation starts, finishes, or runs into an error."
 msgstr "받아쓰기가 시작, 완료되거나 오류가 발생할 때 짧은 소리를 재생합니다."
 
-#: src/features/welcome/welcome-page.tsx:319
+#: src/features/welcome/welcome-page.tsx:377
 msgid "Please keep the app open until setup finishes"
 msgstr "설정이 끝날 때까지 앱을 열어 두세요"
 
@@ -1694,7 +1758,7 @@ msgstr "단축키를 눌러 시작하고 다시 눌러 멈춥니다. 긴 받아�
 msgid "Press your combo — hold Esc or click away to cancel"
 msgstr "원하는 조합을 누르세요 — Esc를 길게 누르거나 바깥을 클릭하면 취소됩니다"
 
-#: src/features/welcome/welcome-page.tsx:417
+#: src/features/welcome/welcome-page.tsx:492
 msgid "Press your hotkey, speak, then press it again. The text is typed into whatever app you were using."
 msgstr "단축키를 누르고 말한 뒤 다시 누르세요. 사용 중이던 앱에 텍스트가 입력됩니다."
 
@@ -1760,11 +1824,11 @@ msgstr "녹음 모드"
 msgid "Refresh few-shot examples"
 msgstr "퓨샷 예시 새로고침"
 
-#: src/features/settings/components/asr-engine-cards.tsx:171
+#: src/features/settings/components/asr-engine-cards.tsx:142
 msgid "Remote"
 msgstr "원격"
 
-#: src/features/settings/sections/transcription-section.tsx:54
+#: src/features/settings/sections/transcription-section.tsx:66
 msgid "Remote services are turned off, so dictation cannot start with this engine. Turn on Allow remote services in General, or switch to an on-device engine."
 msgstr "원격 서비스가 꺼져 있어 이 엔진으로는 받아쓰기를 시작할 수 없습니다. '일반'에서 '원격 서비스 허용'을 켜거나 기기에서 실행되는 엔진으로 전환하세요."
 
@@ -1812,7 +1876,7 @@ msgstr "초기화"
 msgid "Reset position"
 msgstr "위치 초기화"
 
-#: src/features/welcome/components/download-checklist.tsx:105
+#: src/features/models/components/download-checklist.tsx:108
 msgid "Restart Lune Voice to start using your GPU."
 msgstr "GPU를 사용하려면 Lune Voice를 다시 시작하세요."
 
@@ -1821,12 +1885,21 @@ msgid "Restart needed"
 msgstr "재시작 필요"
 
 #: src/features/overview/overview-page.tsx:331
+#: src/features/settings/components/model-library.tsx:232
 msgid "Retry"
 msgstr "다시 시도"
 
-#: src/features/welcome/welcome-page.tsx:331
+#: src/features/welcome/welcome-page.tsx:389
 msgid "Retry download"
 msgstr "다운로드 다시 시도"
+
+#: src/features/welcome/components/wizard-stepper.tsx:23
+msgid "Review"
+msgstr "검토"
+
+#: src/features/welcome/welcome-page.tsx:243
+msgid "Review your setup"
+msgstr "설정 검토"
 
 #: src/features/styles/styles-page.tsx:248
 msgid "Rewrite each transcript in a chosen style. When off, the raw transcript is delivered as-is."
@@ -1890,11 +1963,15 @@ msgstr "받아쓰기 텍스트 검색"
 msgid "Search transcripts…"
 msgstr "받아쓰기 텍스트 검색…"
 
+#: src/features/settings/components/model-library.tsx:159
+msgid "Select all"
+msgstr "모두 선택"
+
 #: src/features/history/components/history-table.tsx:177
 msgid "Select all sessions on this page"
 msgstr "이 페이지의 모든 세션 선택"
 
-#: src/features/welcome/welcome-page.tsx:370
+#: src/features/welcome/welcome-page.tsx:428
 msgid "Select required models"
 msgstr "필수 모델 선택"
 
@@ -1915,7 +1992,7 @@ msgstr "전송 방법"
 msgid "Sends a paste shortcut into the focused app. Fastest for long dictations."
 msgstr "활성 앱에 붙여넣기 단축키를 보냅니다. 긴 받아쓰기에 가장 빠릅니다."
 
-#: src/features/settings/components/asr-engine-cards.tsx:240
+#: src/features/settings/components/asr-engine-cards.tsx:211
 msgid "Sends audio to an endpoint you set up"
 msgstr "설정한 엔드포인트로 오디오를 보냅니다"
 
@@ -1939,7 +2016,7 @@ msgstr "세션 세부 정보"
 msgid "Session timed out — backend may be unresponsive"
 msgstr "세션이 시간 초과되었습니다 — 백엔드가 응답하지 않을 수 있습니다"
 
-#: src/features/shell/config/navigation.ts:66
+#: src/features/shell/config/navigation.ts:69
 msgid "Sessions"
 msgstr "세션"
 
@@ -1947,23 +2024,23 @@ msgstr "세션"
 msgid "Set hotkey"
 msgstr "단축키 설정"
 
-#: src/features/settings/sections/transcription-section.tsx:62
+#: src/features/settings/sections/transcription-section.tsx:74
 msgid "Set the language you speak. Auto uses detection from speech."
 msgstr "말하는 언어를 설정하세요. '자동 감지'는 음성에서 언어를 알아냅니다."
 
-#: src/features/welcome/welcome-page.tsx:361
+#: src/features/welcome/welcome-page.tsx:419
 msgid "Set up GPU acceleration"
 msgstr "GPU 가속 설정"
 
-#: src/features/welcome/welcome-page.tsx:210
+#: src/features/welcome/welcome-page.tsx:257
 msgid "Setting up your GPU"
 msgstr "GPU를 설정하는 중"
 
-#: src/features/shell/config/navigation.ts:101
+#: src/features/shell/config/navigation.ts:104
 msgid "Settings"
 msgstr "설정"
 
-#: src/features/settings/settings-page.tsx:100
+#: src/features/settings/settings-page.tsx:95
 msgid "Settings sections"
 msgstr "설정 섹션"
 
@@ -2002,9 +2079,9 @@ msgstr "크기"
 msgid "Size & shape"
 msgstr "크기 및 모양"
 
-#: src/features/welcome/welcome-page.tsx:299
-#: src/features/welcome/welcome-page.tsx:334
-#: src/features/welcome/welcome-page.tsx:383
+#: src/features/welcome/welcome-page.tsx:345
+#: src/features/welcome/welcome-page.tsx:392
+#: src/features/welcome/welcome-page.tsx:459
 msgid "Skip for now"
 msgstr "지금은 건너뛰기"
 
@@ -2025,7 +2102,7 @@ msgstr "다운로드와 메모리가 더 작고, 정확도는 약간 낮습니�
 msgid "Snippet text"
 msgstr "스니펫 텍스트"
 
-#: src/features/shell/config/navigation.ts:84
+#: src/features/shell/config/navigation.ts:87
 msgid "Snippets"
 msgstr "스니펫"
 
@@ -2046,7 +2123,11 @@ msgstr "알림음"
 msgid "Speaking time"
 msgstr "말한 시간"
 
-#: src/features/welcome/components/engine-step.tsx:99
+#: src/features/settings/settings-rail.ts:40
+msgid "Speech"
+msgstr "음성"
+
+#: src/features/welcome/components/engine-step.tsx:96
 msgid "Speech engine"
 msgstr "음성 인식 엔진"
 
@@ -2113,11 +2194,11 @@ msgstr "이 기기에 저장됨"
 msgid "Style"
 msgstr "스타일"
 
-#: src/features/shell/config/navigation.ts:93
+#: src/features/shell/config/navigation.ts:96
 msgid "Styles"
 msgstr "스타일"
 
-#: src/features/settings/settings-page.tsx:75
+#: src/features/settings/settings-rail.ts:50
 msgid "Styling"
 msgstr "스타일 적용"
 
@@ -2146,7 +2227,7 @@ msgid "Switch to light theme"
 msgstr "밝은 테마로 전환"
 
 #: src/features/settings/sections/appearance-section.tsx:26
-#: src/features/shell/config/navigation.ts:117
+#: src/features/shell/config/navigation.ts:121
 msgid "System"
 msgstr "시스템"
 
@@ -2161,6 +2242,10 @@ msgstr "Lune Voice에 자주 쓰는 단어를 알려 주세요"
 #: src/features/styles/builtin-styles.ts:17
 msgid "Technical"
 msgstr "기술"
+
+#: src/features/settings/settings-rail.ts:48
+msgid "Text"
+msgstr "텍스트"
 
 #: src/features/settings/sections/output-section.tsx:21
 msgid "Text delivery"
@@ -2178,7 +2263,7 @@ msgstr "감사합니다. 의견이 전송되었습니다."
 msgid "The floating status pill you see while dictating."
 msgstr "받아쓰는 동안 표시되는 떠 있는 상태 표시기입니다."
 
-#: src/features/settings/sections/transcription-section.tsx:61
+#: src/features/settings/sections/transcription-section.tsx:73
 msgid "The language you speak. Parakeet needs it set."
 msgstr "말하는 언어입니다. Parakeet은 이 설정이 필요합니다."
 
@@ -2198,7 +2283,7 @@ msgstr "마이크가 사용 중입니다"
 msgid "The model stays in memory. Every dictation starts instantly."
 msgstr "모델이 메모리에 남습니다. 매번 바로 받아쓰기가 시작됩니다."
 
-#: src/features/settings/sections/transcription-section.tsx:136
+#: src/features/settings/sections/transcription-section.tsx:148
 msgid "The words the recognizer is least sure about are checked against your dictionary and vocabulary. Higher checks more words; lower trusts the raw transcription."
 msgstr "인식기가 가장 확신하지 못하는 단어를 사전과 어휘에 대조하여 확인합니다. 높을수록 더 많은 단어를 확인하고, 낮을수록 원래 인식 결과를 신뢰합니다."
 
@@ -2206,11 +2291,11 @@ msgstr "인식기가 가장 확신하지 못하는 단어를 사전과 어휘에
 msgid "This copy can't update itself. Download the new version from {RELEASES_URL} and replace this one. Your settings, history and models are kept."
 msgstr "이 설치본은 자동으로 업데이트할 수 없습니다. {RELEASES_URL}에서 새 버전을 다운로드해 교체하세요. 설정, 기록, 모델은 그대로 유지됩니다."
 
-#: src/features/settings/components/asr-engine-cards.tsx:391
+#: src/features/settings/components/model-library.tsx:366
 msgid "This model is in use by your current configuration. Dictation may not work until you reinstall it or pick another."
 msgstr "이 모델은 현재 구성에서 사용 중입니다. 다시 설치하거나 다른 모델을 선택하기 전까지 받아쓰기가 작동하지 않을 수 있습니다."
 
-#: src/features/welcome/welcome-page.tsx:205
+#: src/features/welcome/welcome-page.tsx:252
 msgid "This only happens once. You can keep using your computer in the meantime."
 msgstr "처음 한 번만 진행됩니다. 그동안 컴퓨터를 계속 사용할 수 있습니다."
 
@@ -2289,8 +2374,8 @@ msgstr "인식하는 중…"
 msgid "Transcript"
 msgstr "받아쓰기 텍스트"
 
-#: src/features/settings/sections/transcription-section.tsx:42
-#: src/features/settings/settings-page.tsx:74
+#: src/features/settings/sections/transcription-section.tsx:54
+#: src/features/settings/settings-rail.ts:43
 msgid "Transcription"
 msgstr "음성 인식"
 
@@ -2307,11 +2392,11 @@ msgstr "음성 인식이 {0}에서 실행 중입니다."
 msgid "Transcription is running on your GPU."
 msgstr "음성 인식이 GPU에서 실행 중입니다."
 
-#: src/features/settings/components/asr-engine-cards.tsx:126
+#: src/features/settings/components/asr-engine-cards.tsx:113
 msgid "Transcription model name, e.g. whisper-1."
 msgstr "음성 인식 모델 이름(예: whisper-1)입니다."
 
-#: src/features/welcome/components/download-checklist.tsx:104
+#: src/features/models/components/download-checklist.tsx:107
 msgid "Transcription now runs on your GPU."
 msgstr "이제 음성 인식이 GPU에서 실행됩니다."
 
@@ -2336,11 +2421,11 @@ msgstr "트리거 문구"
 msgid "Try again"
 msgstr "다시 시도"
 
-#: src/features/welcome/welcome-page.tsx:207
+#: src/features/welcome/welcome-page.tsx:254
 msgid "Turning on your GPU"
 msgstr "GPU를 켜는 중"
 
-#: src/features/welcome/components/download-checklist.tsx:95
+#: src/features/models/components/download-checklist.tsx:98
 msgid "Turning on your GPU…"
 msgstr "GPU를 켜는 중…"
 
@@ -2381,12 +2466,13 @@ msgstr "업데이트 실패"
 msgid "Updates"
 msgstr "업데이트"
 
-#: src/features/welcome/components/engine-step.tsx:367
+#: src/features/welcome/components/acceleration-step.tsx:49
+#: src/features/welcome/components/acceleration-step.tsx:63
 msgid "Use GPU acceleration"
 msgstr "GPU 가속 사용"
 
-#: src/features/settings/sections/transcription-section.tsx:82
-#: src/features/settings/sections/transcription-section.tsx:90
+#: src/features/settings/sections/transcription-section.tsx:94
+#: src/features/settings/sections/transcription-section.tsx:102
 msgid "Use hardware acceleration"
 msgstr "하드웨어 가속 사용"
 
@@ -2394,7 +2480,7 @@ msgstr "하드웨어 가속 사용"
 msgid "Use the {name} style"
 msgstr "{name} 스타일 사용"
 
-#: src/features/settings/components/asr-engine-cards.tsx:135
+#: src/features/settings/components/asr-engine-cards.tsx:122
 msgid "Use the remote API"
 msgstr "원격 API 사용"
 
@@ -2427,12 +2513,12 @@ msgstr "스타일 보기"
 msgid "Visibility"
 msgstr "표시"
 
-#: src/features/shell/config/navigation.ts:75
+#: src/features/shell/config/navigation.ts:78
 msgid "Vocabulary"
 msgstr "어휘"
 
-#: src/features/settings/components/asr-engine-cards.tsx:176
-#: src/features/settings/sections/transcription-section.tsx:47
+#: src/features/settings/components/asr-engine-cards.tsx:147
+#: src/features/settings/sections/transcription-section.tsx:59
 msgid "Voice model"
 msgstr "음성 모델"
 
@@ -2444,17 +2530,13 @@ msgstr "전체 평균 대비"
 msgid "Wait {cooldown}s"
 msgstr "{cooldown}초 대기"
 
-#: src/features/welcome/components/download-checklist.tsx:93
+#: src/features/models/components/download-checklist.tsx:96
+#: src/features/settings/components/model-library.tsx:342
 msgid "Waiting"
 msgstr "대기 중"
 
-#: src/features/welcome/welcome-page.tsx:219
-msgid "Welcome back"
-msgstr "다시 오신 것을 환영합니다"
-
-#: src/features/welcome/welcome-page.tsx:198
-#: src/features/welcome/welcome-page.tsx:216
-#: src/features/welcome/welcome-page.tsx:222
+#: src/features/welcome/welcome-page.tsx:234
+#: src/features/welcome/welcome-page.tsx:263
 msgid "Welcome to Lune Voice"
 msgstr "Lune Voice에 오신 것을 환영합니다"
 
@@ -2466,7 +2548,7 @@ msgstr "어떤 문제가 있었나요? 또는 어떤 기능을 원하시나요?"
 msgid "What is this about?"
 msgstr "어떤 내용인가요?"
 
-#: src/features/settings/sections/transcription-section.tsx:48
+#: src/features/settings/sections/transcription-section.tsx:60
 msgid "What turns your speech into text. The local engines run on your machine."
 msgstr "음성을 텍스트로 바꾸는 엔진입니다. 로컬 엔진은 내 컴퓨터에서 실행됩니다."
 
@@ -2474,7 +2556,7 @@ msgstr "음성을 텍스트로 바꾸는 엔진입니다. 로컬 엔진은 내 �
 msgid "What's new"
 msgstr "새로운 기능"
 
-#: src/features/settings/sections/transcription-section.tsx:83
+#: src/features/settings/sections/transcription-section.tsx:95
 msgid "When available, this can make transcription finish faster."
 msgstr "사용 가능한 경우 음성 인식이 더 빨리 끝납니다."
 
@@ -2502,9 +2584,10 @@ msgstr "보낼 붙여넣기 단축키입니다. '자동'은 터미널을 감지�
 msgid "Which screen the pill appears on."
 msgstr "표시기가 나타나는 화면입니다."
 
-#: src/features/settings/components/asr-engine-cards.tsx:169
+#: src/features/settings/components/asr-engine-cards.tsx:140
+#: src/features/settings/components/model-library.tsx:144
 #: src/features/settings/data/settings-data.ts:641
-#: src/features/welcome/components/engine-step.tsx:76
+#: src/features/welcome/components/engine-step.tsx:73
 msgid "Whisper"
 msgstr "Whisper"
 
@@ -2512,7 +2595,7 @@ msgstr "Whisper"
 msgid "Whisper (local)"
 msgstr "Whisper(로컬)"
 
-#: src/features/welcome/components/engine-step.tsx:78
+#: src/features/welcome/components/engine-step.tsx:75
 msgid "whisper.cpp running on-device. Choose a size to trade speed for accuracy."
 msgstr "기기에서 실행되는 whisper.cpp입니다. 속도와 정확도를 절충할 크기를 선택하세요."
 
@@ -2526,7 +2609,7 @@ msgstr "단어"
 msgid "Words"
 msgstr "단어"
 
-#: src/features/shell/config/navigation.ts:116
+#: src/features/shell/config/navigation.ts:120
 msgid "Workspace"
 msgstr "작업 공간"
 
@@ -2534,7 +2617,7 @@ msgstr "작업 공간"
 msgid "WPM"
 msgstr "WPM"
 
-#: src/features/settings/sections/transcription-section.tsx:122
+#: src/features/settings/sections/transcription-section.tsx:134
 msgid "Write names like GitHub and iPhone the way their owners do. Turn this off to keep the recognizer's own capitals. A style can override this."
 msgstr "GitHub, iPhone 같은 이름을 소유자가 쓰는 방식대로 표기합니다. 끄면 인식기가 만든 대소문자를 그대로 유지합니다. 스타일에서 이 설정을 덮어쓸 수 있습니다."
 
@@ -2554,7 +2637,7 @@ msgstr "현재 버전은 {version}입니다."
 msgid "You say"
 msgstr "말하는 내용"
 
-#: src/features/welcome/welcome-page.tsx:201
+#: src/features/welcome/welcome-page.tsx:248
 msgid "You're all set"
 msgstr "모든 준비가 끝났습니다"
 
@@ -2566,7 +2649,7 @@ msgstr "최신 상태입니다"
 msgid "Your API key. Leave it blank to keep the saved key — or if the endpoint runs on your own machine or network and needs none."
 msgstr "API 키입니다. 저장된 키를 그대로 쓰려면, 또는 엔드포인트가 내 컴퓨터나 네트워크에서 실행되어 키가 필요 없다면 비워 두세요."
 
-#: src/features/shell/config/navigation.ts:58
+#: src/features/shell/config/navigation.ts:61
 msgid "Your dictation at a glance"
 msgstr "받아쓰기 한눈에 보기"
 
@@ -2574,11 +2657,11 @@ msgstr "받아쓰기 한눈에 보기"
 msgid "Your feedback"
 msgstr "의견"
 
-#: src/features/welcome/components/engine-step.tsx:337
+#: src/features/welcome/components/acceleration-step.tsx:17
 msgid "Your GPU is ready — use it for faster transcription."
 msgstr "GPU를 사용할 수 있습니다 — 더 빠른 음성 인식에 활용하세요."
 
-#: src/features/welcome/components/engine-step.tsx:340
+#: src/features/welcome/components/acceleration-step.tsx:20
 msgid "Your GPU qualifies. Setup downloads GPU support and turns it on."
 msgstr "GPU가 지원 대상입니다. 설정에서 GPU 지원을 내려받아 켭니다."
 
@@ -2590,7 +2673,7 @@ msgstr "그래픽 드라이버가 너무 오래되어 GPU 음성 인식을 사�
 msgid "your hotkey"
 msgstr "단축키"
 
-#: src/features/welcome/welcome-page.tsx:202
+#: src/features/welcome/welcome-page.tsx:249
 msgid "Your models are ready. Everything stays on this machine."
 msgstr "모델이 준비되었습니다. 모든 데이터는 이 컴퓨터에만 저장됩니다."
 

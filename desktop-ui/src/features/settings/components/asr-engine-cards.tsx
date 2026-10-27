@@ -1,16 +1,14 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 import { useLingui } from '@lingui/react/macro';
-import { AlertTriangle, Check, CircleAlert, Download, Loader2, Trash2 } from 'lucide-react';
-import { useEffect, useRef, useState } from 'react';
-import { formatBytes } from '../../../lib/format-bytes';
+import { CircleAlert } from 'lucide-react';
+import { useEffect, useState } from 'react';
 import { saveWorkspaceSettings, type WorkspaceSettings } from '../../../store/workspace-store';
 import {
   type AsrBackendValue,
   dictationLanguageName,
   engineAcceptsLanguage,
   formatLanguageList,
-  localizeText,
   type ModelChoice,
   modelChoiceSettings,
   parakeetLanguages,
@@ -19,43 +17,58 @@ import {
   systemLanguages,
   whisperModels,
 } from '../data/settings-data';
-import { type ModelStatusApi, useModelStatus } from '../hooks/use-model-status';
+import type { ModelStatusApi } from '../hooks/use-model-status';
+import { InstalledModelPicker, type ModelOption } from './installed-model-picker';
 import { OpenAiFields } from './openai-fields';
 
-type LocalModel = (typeof whisperModels)[number] | (typeof parakeetModels)[number];
-
-interface DeleteTarget {
-  localName: string;
-  name: string;
-  inUse: boolean;
+/** The installed models of the engine on `tab`, each marked if it is the one in use. */
+function installedOptions(
+  tab: AsrBackendValue,
+  settings: WorkspaceSettings,
+  status: ModelStatusApi,
+): ModelOption[] {
+  const ready = (localName: string) => status.byName.get(localName)?.ready ?? false;
+  if (tab === 'WhisperCpp') {
+    return whisperModels
+      .filter((model) => ready(model.localName))
+      .map((model) => ({
+        model,
+        choice: { engine: 'WhisperCpp', model: model.value },
+        active: settings.asrBackend === tab && settings.whisperModel === model.value,
+      }));
+  }
+  if (tab === 'ParakeetCpp') {
+    return parakeetModels
+      .filter((model) => ready(model.localName))
+      .map((model) => ({
+        model,
+        choice: { engine: 'ParakeetCpp', model: model.value },
+        active: settings.asrBackend === tab && settings.parakeetModel === model.value,
+      }));
+  }
+  return [];
 }
 
-export function AsrEngineCards({ settings }: { settings: WorkspaceSettings }) {
-  const { t, i18n } = useLingui();
-  const status = useModelStatus();
-  const [tab, setTab] = useState<AsrBackendValue>(settings.asrBackend);
-  const [deleting, setDeleting] = useState<DeleteTarget | null>(null);
-  const dialogRef = useRef<HTMLDialogElement>(null);
+interface AsrEngineCardsProps {
+  settings: WorkspaceSettings;
+  status: ModelStatusApi;
+  /** Opens the Models page, where downloads and switching live. */
+  onOpenModels: () => void;
+}
 
-  function choose(choice: ModelChoice) {
+/**
+ * The recognizer choice: which engine, and which of its installed models to
+ * use. Downloading and deleting models happens on the Models page, which this
+ * points to.
+ */
+export function AsrEngineCards({ settings, status, onOpenModels }: AsrEngineCardsProps) {
+  const { t, i18n } = useLingui();
+  const [tab, setTab] = useState<AsrBackendValue>(settings.asrBackend);
+
+  function select(choice: ModelChoice) {
     void saveWorkspaceSettings(
       modelChoiceSettings(choice, settings.dictationLanguage, [...systemLanguages(), i18n.locale]),
     );
-  }
-
-  function askDelete(target: DeleteTarget) {
-    setDeleting(target);
-    dialogRef.current?.showModal();
-  }
-
-  function closeDelete() {
-    dialogRef.current?.close();
-    setDeleting(null);
-  }
-
-  function confirmDelete() {
-    if (deleting) void status.remove(deleting.localName);
-    closeDelete();
   }
 
   // biome-ignore lint/correctness/useExhaustiveDependencies: asrBackend/whisperModel/parakeetModel are deliberate re-run triggers.
@@ -63,56 +76,30 @@ export function AsrEngineCards({ settings }: { settings: WorkspaceSettings }) {
     status.refresh();
   }, [status.refresh, settings.asrBackend, settings.whisperModel, settings.parakeetModel]);
 
-  const row = (m: LocalModel, inUse: boolean, choice: ModelChoice) => {
-    const name = localizeText(i18n, m.label);
-    return (
-      <ModelRow
-        key={m.value}
-        label={name}
-        description={m.description === undefined ? '' : localizeText(i18n, m.description)}
-        size={m.size}
-        localName={m.localName}
-        inUse={inUse}
-        status={status}
-        onSelect={() => choose(choice)}
-        onDelete={() => askDelete({ localName: m.localName, name, inUse })}
-      />
-    );
-  };
-
-  const installedBytes = status.models.reduce(
-    (sum, m) => sum + (m.ready && m.sizeBytes != null ? m.sizeBytes : 0),
-    0,
-  );
+  const options = installedOptions(tab, settings, status);
 
   return (
     <div className="flex flex-col gap-4">
       <EngineTabs tab={tab} inUse={settings.asrBackend} onSelect={setTab} />
       <EngineFacts tab={tab} />
 
-      {tab === 'WhisperCpp' && (
-        <ModelList>
-          {whisperModels.map((m) =>
-            row(m, settings.asrBackend === 'WhisperCpp' && settings.whisperModel === m.value, {
-              engine: 'WhisperCpp',
-              model: m.value,
-            }),
+      {tab !== 'OpenAiCompatible' && (
+        <div className="flex flex-col gap-3">
+          {status.loading ? (
+            <p className="text-sm text-content-muted">{t`Checking…`}</p>
+          ) : options.length === 0 ? (
+            <p className="text-sm text-content-muted">{t`Nothing installed yet.`}</p>
+          ) : (
+            <InstalledModelPicker options={options} onSelect={select} />
           )}
-        </ModelList>
+          <button type="button" className="btn btn-soft btn-sm w-fit" onClick={onOpenModels}>
+            {t`Manage models`}
+          </button>
+        </div>
       )}
 
-      {tab === 'ParakeetCpp' && (
-        <>
-          <ModelList>
-            {parakeetModels.map((m) =>
-              row(m, settings.asrBackend === 'ParakeetCpp' && settings.parakeetModel === m.value, {
-                engine: 'ParakeetCpp',
-                model: m.value,
-              }),
-            )}
-          </ModelList>
-          {settings.asrBackend === 'ParakeetCpp' && <ParakeetLanguageWarning settings={settings} />}
-        </>
+      {tab === 'ParakeetCpp' && settings.asrBackend === 'ParakeetCpp' && (
+        <ParakeetLanguageWarning settings={settings} />
       )}
 
       {tab === 'OpenAiCompatible' && (
@@ -130,29 +117,13 @@ export function AsrEngineCards({ settings }: { settings: WorkspaceSettings }) {
             <button
               type="button"
               className="btn btn-primary btn-sm w-fit"
-              onClick={() => choose({ engine: 'OpenAiCompatible' })}
+              onClick={() => select({ engine: 'OpenAiCompatible' })}
             >
               {t`Use the remote API`}
             </button>
           )}
         </div>
       )}
-
-      {tab !== 'OpenAiCompatible' && !status.loading && (
-        <div className="flex items-center justify-between text-sm">
-          <span className="text-content-muted">{t`Disk usage`}</span>
-          <span className="font-medium tabular-nums text-content">
-            {installedBytes > 0 ? formatBytes(installedBytes) : t`Nothing installed`}
-          </span>
-        </div>
-      )}
-
-      <DeleteModelDialog
-        dialogRef={dialogRef}
-        model={deleting}
-        onCancel={closeDelete}
-        onConfirm={confirmDelete}
-      />
     </div>
   );
 }
@@ -239,173 +210,6 @@ function EngineFacts({ tab }: { tab: AsrBackendValue }) {
       )}
       {tab === 'OpenAiCompatible' && fact(t`Sends audio to an endpoint you set up`)}
     </div>
-  );
-}
-
-function ModelList({ children }: { children: React.ReactNode }) {
-  return (
-    <div className="flex flex-col divide-y divide-surface-border overflow-hidden rounded-box border border-surface-border bg-surface-card">
-      {children}
-    </div>
-  );
-}
-
-interface ModelRowProps {
-  label: string;
-  description: string;
-  size: string;
-  localName: string;
-  inUse: boolean;
-  status: ModelStatusApi;
-  onSelect: () => void;
-  onDelete: () => void;
-}
-
-function ModelRow({
-  label,
-  description,
-  size,
-  localName,
-  inUse,
-  status,
-  onSelect,
-  onDelete,
-}: ModelRowProps) {
-  const { t } = useLingui();
-  const ready = status.byName.get(localName)?.ready ?? false;
-  const downloading = status.downloading === localName;
-  const progress = downloading ? status.progress : null;
-
-  return (
-    <div
-      className={`flex flex-col gap-3 border-s-2 px-5 py-4 transition-colors duration-fast ${
-        inUse ? 'border-s-primary bg-primary/12' : 'border-s-transparent hover:bg-surface-hover'
-      }`}
-    >
-      <div className="flex items-center gap-4">
-        <button
-          type="button"
-          aria-pressed={inUse}
-          onClick={onSelect}
-          className="flex min-w-0 flex-1 items-center gap-4 text-start"
-        >
-          <span
-            className={`flex size-[18px] shrink-0 items-center justify-center rounded-full border-[1.5px] ${
-              inUse
-                ? 'border-primary bg-primary text-primary-content'
-                : 'border-surface-border-strong'
-            }`}
-          >
-            {inUse && <Check size={11} strokeWidth={3.5} />}
-          </span>
-          <span className="flex min-w-0 flex-col gap-0.5">
-            <span className="flex flex-wrap items-baseline gap-x-2 text-[15px] font-medium text-content-strong">
-              {label}
-              <span className="text-[13px] font-normal tabular-nums text-content-muted">
-                {size}
-              </span>
-              {inUse && <span className="text-xs font-medium text-primary">{t`In use`}</span>}
-            </span>
-            <span className="text-[13px] text-content-muted">{description}</span>
-          </span>
-        </button>
-        <span className="flex min-w-24 shrink-0 items-center justify-end gap-1">
-          {status.loading ? (
-            <span className="text-xs text-content-muted">{t`Checking…`}</span>
-          ) : downloading ? (
-            <span className="inline-flex items-center gap-1.5 text-[13px] font-medium text-primary">
-              <Loader2 size={13} className="animate-spin" />
-              {t`Downloading…`}
-            </span>
-          ) : ready ? (
-            <>
-              <span className="inline-flex items-center gap-1 text-[13px] font-medium text-success">
-                <Check size={13} strokeWidth={2.5} />
-                {t`Installed`}
-              </span>
-              <button
-                type="button"
-                className="btn btn-ghost btn-sm btn-square text-content-muted hover:text-error"
-                onClick={onDelete}
-                aria-label={t`Delete`}
-                title={t`Delete`}
-              >
-                <Trash2 size={14} />
-              </button>
-            </>
-          ) : (
-            <button
-              type="button"
-              className="btn btn-sm btn-ghost gap-1.5 border border-surface-border-strong text-content-strong hover:border-primary"
-              onClick={() => status.download(localName)}
-              disabled={!!status.downloading}
-            >
-              <Download size={13} />
-              {t`Download`}
-            </button>
-          )}
-        </span>
-      </div>
-
-      {downloading && (
-        <div className="flex flex-col gap-1 ps-[34px]">
-          <progress
-            className="progress progress-primary h-1.5 w-full"
-            value={progress ? progress.fileIndex + 1 : undefined}
-            max={progress?.fileCount ?? 1}
-            aria-label={t`Download progress`}
-          />
-          {progress && progress.fileCount > 0 && (
-            <div className="flex items-center justify-between gap-2 text-xs tabular-nums text-content-muted">
-              <span className="truncate font-mono">{progress.fileName}</span>
-              <span className="shrink-0 font-medium text-primary">
-                {progress.fileIndex + 1}/{progress.fileCount} ·{' '}
-                {Math.round(((progress.fileIndex + 1) / progress.fileCount) * 100)}%
-              </span>
-            </div>
-          )}
-        </div>
-      )}
-    </div>
-  );
-}
-
-interface DeleteModelDialogProps {
-  dialogRef: React.RefObject<HTMLDialogElement | null>;
-  model: DeleteTarget | null;
-  onCancel: () => void;
-  onConfirm: () => void;
-}
-
-function DeleteModelDialog({ dialogRef, model, onCancel, onConfirm }: DeleteModelDialogProps) {
-  const { t } = useLingui();
-  return (
-    <dialog ref={dialogRef} className="modal" onClose={onCancel}>
-      <div className="modal-box">
-        {model && (
-          <>
-            <h3 className="text-lg font-bold">{t`Delete ${model.name}?`}</h3>
-            {model.inUse && (
-              <p className="flex items-start gap-2 py-2 text-sm text-warning">
-                <AlertTriangle size={14} className="mt-0.5 shrink-0" />
-                {t`This model is in use by your current configuration. Dictation may not work until you reinstall it or pick another.`}
-              </p>
-            )}
-            <div className="modal-action">
-              <button type="button" className="btn btn-soft" onClick={onCancel}>
-                {t`Cancel`}
-              </button>
-              <button type="button" className="btn btn-error" onClick={onConfirm}>
-                {t`Delete model`}
-              </button>
-            </div>
-          </>
-        )}
-      </div>
-      <form method="dialog" className="modal-backdrop">
-        <button type="submit">{t`Close`}</button>
-      </form>
-    </dialog>
   );
 }
 
