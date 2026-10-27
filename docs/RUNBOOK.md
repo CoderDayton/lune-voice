@@ -64,6 +64,15 @@ through uinput, which never touches your input method.
 
 ---
 
+## Overview says the last dictation failed
+
+The red banner shows when the status is anything but ready or live, which in
+practice means a failed dictation left it on `error`. Retry rebuilds the
+pipeline and clears it. Finishing setup runs the same recovery quietly. If the build still fails, the reason shows as a toast
+and the banner stays; the usual cause is a missing model (Settings → Models).
+Dictation is refused, without a red status, while a download or GPU install
+is running.
+
 ## Dictation produces no text
 
 Work down this list:

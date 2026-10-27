@@ -7,6 +7,7 @@ import {
   addDictionaryEntry,
   loadWorkspaceSnapshot,
   removeDictionaryEntry,
+  retryRuntime,
   saveWorkspaceSetting,
   toggleDictation,
   workspaceActions,
@@ -196,6 +197,68 @@ describe("workspace store", () => {
     workspaceActions.applySessionEvent({ type: "sessionStopped" });
 
     expect(workspaceStore.state.runtime.audioLevel).toBe(0);
+  });
+
+  test("retryRuntime asks the backend to recover, then shows the status it reports", async () => {
+    workspaceActions.applySessionEvent({ type: "serviceStatus", status: "error" });
+    const calls: string[] = [];
+    const originalRetry = backendClient.retryRuntime;
+    backendClient.retryRuntime = async () => {
+      calls.push("retry");
+    };
+    backendClient.loadWorkspaceSnapshot = async () => {
+      calls.push("load");
+      return makeSnapshot({ serviceStatus: "ready" });
+    };
+
+    await retryRuntime();
+    backendClient.retryRuntime = originalRetry;
+
+    expect(calls).toEqual(["retry", "load"]);
+    expect(workspaceStore.state.runtime.serviceStatus).toBe("ready");
+    expect(workspaceStore.state.runtime.error).toBeNull();
+  });
+
+  test("retryRuntime keeps the reason when the backend cannot recover", async () => {
+    const originalRetry = backendClient.retryRuntime;
+    backendClient.retryRuntime = async () => {
+      throw "model files are missing";
+    };
+    backendClient.loadWorkspaceSnapshot = async () => makeSnapshot({ serviceStatus: "error" });
+
+    await retryRuntime();
+    backendClient.retryRuntime = originalRetry;
+
+    expect(workspaceStore.state.runtime.serviceStatus).toBe("error");
+    expect(workspaceStore.state.runtime.error).toContain("model files are missing");
+  });
+
+  test("a quiet retryRuntime never raises an error, for the end of setup", async () => {
+    const originalRetry = backendClient.retryRuntime;
+    backendClient.retryRuntime = async () => {
+      throw "model files are missing";
+    };
+    backendClient.loadWorkspaceSnapshot = async () => makeSnapshot({ serviceStatus: "error" });
+
+    await retryRuntime({ quiet: true });
+    backendClient.retryRuntime = originalRetry;
+
+    expect(workspaceStore.state.runtime.error).toBeNull();
+  });
+
+  test("retryRuntime does not hide a failed snapshot load behind the retry failure", async () => {
+    const originalRetry = backendClient.retryRuntime;
+    backendClient.retryRuntime = async () => {
+      throw "model files are missing";
+    };
+    backendClient.loadWorkspaceSnapshot = async () => {
+      throw "snapshot unavailable";
+    };
+
+    await retryRuntime();
+    backendClient.retryRuntime = originalRetry;
+
+    expect(workspaceStore.state.runtime.error).toContain("snapshot unavailable");
   });
 
   test("toggleDictation mirrors backend command result into runtime state", async () => {

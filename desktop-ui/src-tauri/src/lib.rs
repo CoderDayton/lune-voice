@@ -500,6 +500,7 @@ pub fn run() {
             commands::remove_uinput_rule,
             commands::active_model_download,
             commands::cancel_model_download,
+            commands::retry_runtime,
             commands::install_gpu_backend,
             feedback::feedback_available,
             feedback::feedback_cooldown_remaining,

@@ -161,6 +161,8 @@ export interface BackendClient {
   activeModelDownload(): Promise<string | null>;
   /** Ask the in-flight model download to stop. */
   cancelModelDownload(): Promise<void>;
+  /** Rebuild the pipeline after a failure; rejects with the reason if it cannot. */
+  retryRuntime(): Promise<void>;
 }
 
 export type SessionStreamEvent =

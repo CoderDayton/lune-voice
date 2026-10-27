@@ -15,6 +15,7 @@ import {
   PlugZap,
   Search,
 } from 'lucide-react';
+import { useState } from 'react';
 import { dateLocale } from '../../i18n';
 import { LIMITS } from '../../lib/backend/generated/limits';
 import { formatDuration } from '../../lib/session-format';
@@ -22,7 +23,7 @@ import {
   getSessionStats,
   getTodayStats,
   type HistorySession,
-  loadWorkspaceSnapshot,
+  retryRuntime,
   summarizeAsrBackend,
   summarizeDictationMode,
   workspaceStore,
@@ -271,6 +272,7 @@ function OverviewSkeleton() {
 export function OverviewPage() {
   const { t, i18n } = useLingui();
   const { isActive, isConnected, isConnecting } = useServiceStatus();
+  const [retrying, setRetrying] = useState(false);
   const loading = useStore(workspaceStore, (s) => s.runtime.loading);
   const asrBackend = useStore(workspaceStore, (s) => s.settings.asrBackend);
   const dictationMode = useStore(workspaceStore, (s) => s.settings.dictationMode);
@@ -321,14 +323,19 @@ export function OverviewPage() {
           <div className="ov-alert">
             <PlugZap size={17} strokeWidth={1.7} className="shrink-0 text-error" />
             <span className="min-w-0 grow">
-              {t`The local runtime isn't responding. The figures below are the last known values.`}
+              {t`The last dictation failed. Retry reloads the speech engine.`}
             </span>
             <button
               type="button"
               className="btn btn-soft btn-sm"
-              onClick={() => void loadWorkspaceSnapshot()}
+              disabled={retrying}
+              onClick={() => {
+                setRetrying(true);
+                void retryRuntime().finally(() => setRetrying(false));
+              }}
             >
-              {t`Retry`}
+              {retrying && <span className="loading loading-spinner loading-xs" />}
+              {retrying ? t`Retrying…` : t`Retry`}
             </button>
           </div>
         )}

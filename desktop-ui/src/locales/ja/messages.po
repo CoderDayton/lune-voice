@@ -46,7 +46,7 @@ msgid "{0, plural, one {# snippet} other {# snippets}}"
 msgstr "{0, plural, other {# 件のスニペット}}"
 
 #. placeholder {0}: today.count
-#: src/features/overview/overview-page.tsx:149
+#: src/features/overview/overview-page.tsx:150
 msgid "{0, plural, one {session} other {sessions}}"
 msgstr "{0, plural, other {セッション}}"
 
@@ -82,7 +82,7 @@ msgstr "{page} / {totalPages}"
 msgid "{saved} (unavailable)"
 msgstr "{saved}（利用不可）"
 
-#: src/features/overview/overview-page.tsx:120
+#: src/features/overview/overview-page.tsx:121
 msgid "{todayMinutes} min today"
 msgstr "今日 {todayMinutes} 分"
 
@@ -90,7 +90,7 @@ msgstr "今日 {todayMinutes} 分"
 msgid "{totalCount, plural, one {# session} other {# sessions}}"
 msgstr "{totalCount, plural, other {# 件のセッション}}"
 
-#: src/features/overview/overview-page.tsx:341
+#: src/features/overview/overview-page.tsx:348
 msgid "{totalSessions} total"
 msgstr "全 {totalSessions} 件"
 
@@ -200,7 +200,7 @@ msgstr "5 分後"
 msgid "All required models are already installed. Continue when you're ready."
 msgstr "必要なモデルはすべてインストール済みです。準備ができたら続行してください。"
 
-#: src/features/overview/overview-page.tsx:106
+#: src/features/overview/overview-page.tsx:107
 msgid "all-time · today"
 msgstr "累計 · 今日"
 
@@ -272,7 +272,7 @@ msgstr "要求中…"
 msgid "At least {MIN_MESSAGE_CHARS} characters."
 msgstr "{MIN_MESSAGE_CHARS} 文字以上入力してください。"
 
-#: src/features/overview/overview-page.tsx:154
+#: src/features/overview/overview-page.tsx:155
 msgid "Audio"
 msgstr "オーディオ"
 
@@ -535,7 +535,7 @@ msgstr "コンパクト"
 msgid "Completed"
 msgstr "完了"
 
-#: src/features/overview/overview-page.tsx:289
+#: src/features/overview/overview-page.tsx:291
 #: src/features/shell/components/app-shell.tsx:176
 #: src/features/shell/components/sidebar-widgets.tsx:75
 msgid "Connecting"
@@ -592,7 +592,7 @@ msgstr "修正の感度"
 msgid "Corrections Lune Voice applies every time you dictate"
 msgstr "音声入力のたびに Lune Voice が適用する修正"
 
-#: src/features/models/components/download-checklist.tsx:102
+#: src/features/model-downloads/components/download-checklist.tsx:102
 msgid "Could not download GPU support — transcription will run on the CPU. You can retry under Settings › Models."
 msgstr "GPU サポートをダウンロードできませんでした — 文字起こしは CPU で実行されます。設定 › モデル から再試行できます。"
 
@@ -763,7 +763,7 @@ msgstr "音声入力を破棄"
 msgid "Discard the current draft and return to idle. Click the binding to change it."
 msgstr "現在の録音を破棄して待機状態に戻ります。割り当てをクリックすると変更できます。"
 
-#: src/features/overview/overview-page.tsx:289
+#: src/features/overview/overview-page.tsx:291
 msgid "Disconnected"
 msgstr "切断"
 
@@ -836,7 +836,7 @@ msgstr "ダウンロード進行状況"
 msgid "Download transcript"
 msgstr "文字起こしをダウンロード"
 
-#: src/features/models/components/download-checklist.tsx:109
+#: src/features/model-downloads/components/download-checklist.tsx:109
 msgid "Downloaded"
 msgstr "ダウンロード済み"
 
@@ -898,7 +898,7 @@ msgid "Editing “{spokenTrigger}”"
 msgstr "「{spokenTrigger}」を編集中"
 
 #: src/features/history/components/history-table.tsx:463
-#: src/features/overview/overview-page.tsx:187
+#: src/features/overview/overview-page.tsx:188
 msgid "Empty session"
 msgstr "空のセッション"
 
@@ -1061,15 +1061,15 @@ msgstr "GitHub"
 msgid "Give the memory back after a quiet spell. The next dictation reloads the model, which adds up to a second before it starts listening — your speech is recorded during the wait, so nothing is lost."
 msgstr "しばらく使わないとメモリを解放します。次の音声入力ではモデルを読み込み直すため、聞き取り開始までに最大 1 秒かかります。その待ち時間も録音されるので、内容は失われません。"
 
-#: src/features/overview/overview-page.tsx:287
+#: src/features/overview/overview-page.tsx:289
 msgid "Good afternoon."
 msgstr "こんにちは。"
 
-#: src/features/overview/overview-page.tsx:287
+#: src/features/overview/overview-page.tsx:289
 msgid "Good evening."
 msgstr "こんばんは。"
 
-#: src/features/overview/overview-page.tsx:287
+#: src/features/overview/overview-page.tsx:289
 msgid "Good morning."
 msgstr "おはようございます。"
 
@@ -1080,7 +1080,7 @@ msgstr "おはようございます。"
 msgid "GPU acceleration"
 msgstr "GPU アクセラレーション"
 
-#: src/features/models/components/download-checklist.tsx:120
+#: src/features/model-downloads/components/download-checklist.tsx:120
 msgid "GPU support"
 msgstr "GPU サポート"
 
@@ -1106,17 +1106,17 @@ msgid "High"
 msgstr "高"
 
 #: src/features/history/components/history-table.tsx:226
-#: src/features/overview/overview-page.tsx:364
+#: src/features/overview/overview-page.tsx:371
 msgid "History isn't saved"
 msgstr "履歴は保存されません"
 
 #: src/features/history/components/history-table.tsx:229
-#: src/features/overview/overview-page.tsx:367
+#: src/features/overview/overview-page.tsx:374
 msgid "History kept {historyDays} days"
 msgstr "履歴は {historyDays} 日間保持"
 
 #: src/features/history/components/history-table.tsx:228
-#: src/features/overview/overview-page.tsx:366
+#: src/features/overview/overview-page.tsx:373
 msgid "History kept forever"
 msgstr "履歴は無期限に保持"
 
@@ -1129,7 +1129,7 @@ msgstr "履歴の保持期間"
 msgid "Hold is unavailable right now, so the shortcut toggles recording instead. Grant keyboard access to use Hold."
 msgstr "現在は長押しモードを使用できないため、ショートカットを押すたびに録音を開始・停止します。長押しモードを使うには、キーボードへのアクセスを許可してください。"
 
-#: src/features/overview/overview-page.tsx:300
+#: src/features/overview/overview-page.tsx:302
 msgid "Hold the hotkey and speak, and your words land wherever your cursor is."
 msgstr "ホットキーを押しながら話すと、カーソルのある場所に文字が入力されます。"
 
@@ -1169,7 +1169,7 @@ msgstr "インジケーターバーの見た目です。変更はすぐに反映
 msgid "How to dictate"
 msgstr "音声入力の使い方"
 
-#: src/features/overview/overview-page.tsx:161
+#: src/features/overview/overview-page.tsx:162
 msgid "Idle · mic ready"
 msgstr "待機中 · マイク準備完了"
 
@@ -1227,7 +1227,7 @@ msgstr "更新をインストール中"
 msgid "Instructions"
 msgstr "指示"
 
-#: src/features/models/components/download-checklist.tsx:104
+#: src/features/model-downloads/components/download-checklist.tsx:104
 msgid "Interrupted"
 msgstr "中断されました"
 
@@ -1291,7 +1291,7 @@ msgid "Launch into the system tray instead of opening the main window. Useful wh
 msgstr "メインウィンドウを開かず、システムトレイに格納した状態で起動します。ログイン時に Lune Voice を自動起動する場合に便利です。"
 
 #: src/features/history/components/history-table.tsx:187
-#: src/features/overview/overview-page.tsx:226
+#: src/features/overview/overview-page.tsx:227
 msgid "Length"
 msgstr "長さ"
 
@@ -1319,7 +1319,7 @@ msgstr "聞き取り中 — フレーズを話し、もう一度クリックす�
 msgid "Listening — say the phrase…"
 msgstr "聞き取り中 — フレーズを話してください…"
 
-#: src/features/overview/overview-page.tsx:161
+#: src/features/overview/overview-page.tsx:162
 #: src/features/shell/components/sidebar-widgets.tsx:82
 msgid "Listening…"
 msgstr "聞き取り中…"
@@ -1398,11 +1398,11 @@ msgstr "会議ヘッダー"
 msgid "Microphone"
 msgstr "マイク"
 
-#: src/features/overview/overview-page.tsx:158
+#: src/features/overview/overview-page.tsx:159
 msgid "Microphone input level"
 msgstr "マイク入力レベル"
 
-#: src/features/overview/overview-page.tsx:117
+#: src/features/overview/overview-page.tsx:118
 msgid "min"
 msgstr "分"
 
@@ -1514,7 +1514,7 @@ msgstr "セッションが見つかりませんでした。"
 msgid "No sessions match \"{0}\"."
 msgstr "「{0}」に一致するセッションはありません。"
 
-#: src/features/overview/overview-page.tsx:211
+#: src/features/overview/overview-page.tsx:212
 msgid "No sessions yet"
 msgstr "まだセッションはありません"
 
@@ -1582,7 +1582,7 @@ msgstr "オフでは生の文字起こしがそのまま出力されます。ど
 msgid "Official correspondence and documents"
 msgstr "公式な書簡や文書"
 
-#: src/features/overview/overview-page.tsx:161
+#: src/features/overview/overview-page.tsx:162
 #: src/features/shell/components/app-shell.tsx:183
 msgid "Offline"
 msgstr "オフライン"
@@ -1603,7 +1603,7 @@ msgstr "メニューを開く"
 msgid "Open releases page"
 msgstr "リリースページを開く"
 
-#: src/features/overview/overview-page.tsx:183
+#: src/features/overview/overview-page.tsx:184
 msgid "Open session from {time}"
 msgstr "{time} のセッションを開く"
 
@@ -1636,8 +1636,8 @@ msgstr "出力"
 msgid "Overall footprint of the pill bar."
 msgstr "インジケーターバー全体の大きさ。"
 
-#: src/features/models/components/download-checklist.tsx:37
-#: src/features/models/components/download-checklist.tsx:48
+#: src/features/model-downloads/components/download-checklist.tsx:37
+#: src/features/model-downloads/components/download-checklist.tsx:48
 msgid "Overall progress"
 msgstr "全体の進捗"
 
@@ -1738,7 +1738,7 @@ msgstr "元のモデルとほぼ同じ精度です。推奨。"
 msgid "Preset corner or edge the pill starts at."
 msgstr "インジケーターが最初に表示される既定の角または辺。"
 
-#: src/features/overview/overview-page.tsx:213
+#: src/features/overview/overview-page.tsx:214
 msgid "Press"
 msgstr "音声入力を始めるには"
 
@@ -1806,12 +1806,12 @@ msgstr "質問・ヘルプ"
 msgid "Quit Lune Voice"
 msgstr "Lune Voice を終了"
 
-#: src/features/overview/overview-page.tsx:289
+#: src/features/overview/overview-page.tsx:291
 #: src/features/shell/components/app-shell.tsx:182
 msgid "Ready"
 msgstr "準備完了"
 
-#: src/features/overview/overview-page.tsx:340
+#: src/features/overview/overview-page.tsx:347
 msgid "Recent sessions"
 msgstr "最近のセッション"
 
@@ -1876,7 +1876,7 @@ msgstr "リセット"
 msgid "Reset position"
 msgstr "位置をリセット"
 
-#: src/features/models/components/download-checklist.tsx:108
+#: src/features/model-downloads/components/download-checklist.tsx:108
 msgid "Restart Lune Voice to start using your GPU."
 msgstr "GPU を使うには Lune Voice を再起動してください。"
 
@@ -1884,7 +1884,7 @@ msgstr "GPU を使うには Lune Voice を再起動してください。"
 msgid "Restart needed"
 msgstr "再起動が必要"
 
-#: src/features/overview/overview-page.tsx:331
+#: src/features/overview/overview-page.tsx:338
 #: src/features/settings/components/model-library.tsx:232
 msgid "Retry"
 msgstr "再試行"
@@ -1892,6 +1892,10 @@ msgstr "再試行"
 #: src/features/welcome/welcome-page.tsx:389
 msgid "Retry download"
 msgstr "ダウンロードを再試行"
+
+#: src/features/overview/overview-page.tsx:338
+msgid "Retrying…"
+msgstr "再試行中…"
 
 #: src/features/welcome/components/wizard-stepper.tsx:23
 msgid "Review"
@@ -1951,7 +1955,7 @@ msgstr "<0>「{spokenTrigger}」</0>とだけ話す（または<1>「insert {spo
 msgid "Say a trigger as your whole utterance to expand it"
 msgstr "トリガーだけを話すと展開されます"
 
-#: src/features/overview/overview-page.tsx:376
+#: src/features/overview/overview-page.tsx:383
 msgid "Search sessions"
 msgstr "セッションを検索"
 
@@ -2055,7 +2059,7 @@ msgid "Show on all workspaces"
 msgstr "すべてのワークスペースに表示"
 
 #. placeholder {0}: recentSessions.length
-#: src/features/overview/overview-page.tsx:357
+#: src/features/overview/overview-page.tsx:364
 msgid "Showing {0} of {totalSessions} sessions"
 msgstr "{totalSessions} 件中 {0} 件を表示"
 
@@ -2119,7 +2123,7 @@ msgstr "サウンド"
 msgid "Sound cues"
 msgstr "通知音"
 
-#: src/features/overview/overview-page.tsx:111
+#: src/features/overview/overview-page.tsx:112
 msgid "Speaking time"
 msgstr "発話時間"
 
@@ -2186,7 +2190,7 @@ msgid "Stop dictation"
 msgstr "音声入力を停止"
 
 #: src/features/history/components/history-table.tsx:237
-#: src/features/overview/overview-page.tsx:372
+#: src/features/overview/overview-page.tsx:379
 msgid "Stored on this device"
 msgstr "このデバイスに保存"
 
@@ -2267,9 +2271,9 @@ msgstr "音声入力中に表示されるフローティングのステータス
 msgid "The language you speak. Parakeet needs it set."
 msgstr "話す言語です。Parakeet では設定が必要です。"
 
-#: src/features/overview/overview-page.tsx:324
-msgid "The local runtime isn't responding. The figures below are the last known values."
-msgstr "ローカルランタイムが応答していません。以下の数値は最後に確認された値です。"
+#: src/features/overview/overview-page.tsx:326
+msgid "The last dictation failed. Retry reloads the speech engine."
+msgstr "前回の音声入力に失敗しました。再試行すると音声エンジンを再読み込みします。"
 
 #: src/features/settings/sections/dictation-section.tsx:77
 msgid "The main shortcut used for voice typing. Click the binding to change it."
@@ -2313,7 +2317,7 @@ msgid "This will permanently remove this dictation session and its transcript."
 msgstr "この音声入力セッションと文字起こしを完全に削除します。"
 
 #: src/features/history/components/history-table.tsx:181
-#: src/features/overview/overview-page.tsx:223
+#: src/features/overview/overview-page.tsx:224
 msgid "Time"
 msgstr "時刻"
 
@@ -2325,11 +2329,11 @@ msgstr "敬称の略記（「Mister」→「Mr.」）"
 msgid "Titles"
 msgstr "敬称"
 
-#: src/features/overview/overview-page.tsx:214
+#: src/features/overview/overview-page.tsx:215
 msgid "to start dictating"
 msgstr "を押します"
 
-#: src/features/overview/overview-page.tsx:143
+#: src/features/overview/overview-page.tsx:144
 msgid "Today"
 msgstr "今日"
 
@@ -2357,7 +2361,7 @@ msgstr "左上"
 msgid "Top right"
 msgstr "右上"
 
-#: src/features/overview/overview-page.tsx:94
+#: src/features/overview/overview-page.tsx:95
 msgid "Total words"
 msgstr "総単語数"
 
@@ -2370,7 +2374,7 @@ msgid "Transcribing…"
 msgstr "文字起こし中…"
 
 #: src/features/history/components/history-table.tsx:182
-#: src/features/overview/overview-page.tsx:224
+#: src/features/overview/overview-page.tsx:225
 msgid "Transcript"
 msgstr "文字起こし"
 
@@ -2396,7 +2400,7 @@ msgstr "文字起こしは GPU で実行されています。"
 msgid "Transcription model name, e.g. whisper-1."
 msgstr "文字起こしモデル名（例: whisper-1）。"
 
-#: src/features/models/components/download-checklist.tsx:107
+#: src/features/model-downloads/components/download-checklist.tsx:107
 msgid "Transcription now runs on your GPU."
 msgstr "文字起こしは GPU で実行されるようになりました。"
 
@@ -2425,7 +2429,7 @@ msgstr "再試行"
 msgid "Turning on your GPU"
 msgstr "GPU を有効にしています"
 
-#: src/features/models/components/download-checklist.tsx:98
+#: src/features/model-downloads/components/download-checklist.tsx:98
 msgid "Turning on your GPU…"
 msgstr "GPU を有効にしています…"
 
@@ -2445,7 +2449,7 @@ msgstr "アプリに入力"
 msgid "Types as"
 msgstr "入力される内容"
 
-#: src/store/workspace-store.ts:665
+#: src/store/workspace-store.ts:685
 msgid "Unable to reach the desktop backend."
 msgstr "デスクトップのバックエンドに接続できません。"
 
@@ -2497,7 +2501,7 @@ msgstr "縦向き"
 msgid "View"
 msgstr "表示"
 
-#: src/features/overview/overview-page.tsx:345
+#: src/features/overview/overview-page.tsx:352
 msgid "View all"
 msgstr "すべて見る"
 
@@ -2522,7 +2526,7 @@ msgstr "語彙"
 msgid "Voice model"
 msgstr "音声認識モデル"
 
-#: src/features/overview/overview-page.tsx:137
+#: src/features/overview/overview-page.tsx:138
 msgid "vs all-time avg"
 msgstr "累計平均との比較"
 
@@ -2530,7 +2534,7 @@ msgstr "累計平均との比較"
 msgid "Wait {cooldown}s"
 msgstr "あと {cooldown} 秒"
 
-#: src/features/models/components/download-checklist.tsx:96
+#: src/features/model-downloads/components/download-checklist.tsx:96
 #: src/features/settings/components/model-library.tsx:342
 msgid "Waiting"
 msgstr "待機中"
@@ -2605,7 +2609,7 @@ msgstr "語"
 
 #: src/features/history/components/history-table.tsx:184
 #: src/features/history/components/session-detail-modal.tsx:173
-#: src/features/overview/overview-page.tsx:225
+#: src/features/overview/overview-page.tsx:226
 msgid "Words"
 msgstr "単語数"
 
@@ -2613,7 +2617,7 @@ msgstr "単語数"
 msgid "Workspace"
 msgstr "ワークスペース"
 
-#: src/features/overview/overview-page.tsx:125
+#: src/features/overview/overview-page.tsx:126
 msgid "WPM"
 msgstr "WPM"
 
@@ -2669,7 +2673,7 @@ msgstr "お使いの GPU は対応しています。セットアップで GPU �
 msgid "Your graphics driver is too old for GPU transcription. Update it and the download will appear here."
 msgstr "グラフィックドライバーが古いため、GPU で文字起こしできません。ドライバーを更新すると、ここにダウンロードが表示されます。"
 
-#: src/features/overview/overview-page.tsx:213
+#: src/features/overview/overview-page.tsx:214
 msgid "your hotkey"
 msgstr "ホットキー"
 

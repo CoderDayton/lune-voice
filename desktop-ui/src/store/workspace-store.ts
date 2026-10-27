@@ -235,6 +235,26 @@ export async function loadWorkspaceSnapshot() {
   }
 }
 
+/**
+ * The red banner's Retry: the backend rebuilds first, so the snapshot read
+ * after it is the new status. `quiet` is for the end of setup, which clears a
+ * stale error but must never put a new one in front of someone who just
+ * finished.
+ */
+export async function retryRuntime({ quiet = false }: { quiet?: boolean } = {}) {
+  let failure: string | null = null;
+  try {
+    await backendClient.retryRuntime();
+  } catch (error) {
+    failure = formatError(error);
+  }
+  const loaded = await loadWorkspaceSnapshot().then(
+    () => true,
+    () => false,
+  );
+  if (failure && loaded && !quiet) workspaceActions.setError(failure);
+}
+
 // Shared sequence for every settings save, single-key or patch. Saves persist
 // the *whole* settings object and hydrate from the response, so an older
 // in-flight save resolving last would overwrite a newer change with a snapshot

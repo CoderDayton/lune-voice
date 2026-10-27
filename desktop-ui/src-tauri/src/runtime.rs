@@ -798,6 +798,12 @@ impl AppRuntime {
                 warn!(%error, "GPU plugin loaded; moving the model onto it failed");
             }
         }
+        // With no rebuild above (device is CPU), an `error` from before the
+        // plugin loaded would still show the red banner; this clears it, and is
+        // a no-op once the rebuild already has. No second model load for it.
+        if ready {
+            self.clear_stale_error().await;
+        }
         Ok(())
     }
 
@@ -844,6 +850,22 @@ impl AppRuntime {
         *self.inner.settings.write().await = new_settings_val;
         drop(pipeline);
         tracing::info!("pipeline pre-warmed");
+        self.clear_stale_error().await;
+        Ok(())
+    }
+
+    /// What the red banner's Retry does: rebuild the pipeline so a leftover
+    /// `error` clears, or say why it cannot be built. Only an `error` status has
+    /// anything to retry; a live or ready one is left alone.
+    pub async fn retry_runtime(&self) -> Result<(), String> {
+        if self.service_status().await != "error" {
+            return Ok(());
+        }
+        self.eager_rebuild()
+            .await
+            .map_err(|e| sanitize_error_for_frontend(&e))?;
+        // `eager_rebuild` returns early, without clearing, when a session holds
+        // the pipeline; the retry still succeeded, so the leftover goes either way.
         self.clear_stale_error().await;
         Ok(())
     }

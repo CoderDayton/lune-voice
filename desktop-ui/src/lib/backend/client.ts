@@ -50,6 +50,10 @@ const tauriBackendClient: BackendClient = {
     return invoke<void>('cancel_model_download');
   },
 
+  retryRuntime() {
+    return invoke<void>('retry_runtime');
+  },
+
   installPendingUpdate() {
     return invoke<void>('install_pending_update');
   },

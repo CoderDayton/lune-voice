@@ -565,6 +565,8 @@ export const mockBackendClient: BackendClient = {
 
   async cancelModelDownload() {},
 
+  async retryRuntime() {},
+
   async gpuBackendStatus() {
     // The browser/mock runtime has no native backend at all, so the onboarding
     // GPU affordance and the Settings GPU section both stay hidden.

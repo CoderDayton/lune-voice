@@ -46,7 +46,7 @@ msgid "{0, plural, one {# snippet} other {# snippets}}"
 msgstr "{0, plural, other {# 个片段}}"
 
 #. placeholder {0}: today.count
-#: src/features/overview/overview-page.tsx:149
+#: src/features/overview/overview-page.tsx:150
 msgid "{0, plural, one {session} other {sessions}}"
 msgstr "{0, plural, other {会话}}"
 
@@ -82,7 +82,7 @@ msgstr "{page} / {totalPages}"
 msgid "{saved} (unavailable)"
 msgstr "{saved}（不可用）"
 
-#: src/features/overview/overview-page.tsx:120
+#: src/features/overview/overview-page.tsx:121
 msgid "{todayMinutes} min today"
 msgstr "今天 {todayMinutes} 分钟"
 
@@ -90,7 +90,7 @@ msgstr "今天 {todayMinutes} 分钟"
 msgid "{totalCount, plural, one {# session} other {# sessions}}"
 msgstr "{totalCount, plural, other {# 个会话}}"
 
-#: src/features/overview/overview-page.tsx:341
+#: src/features/overview/overview-page.tsx:348
 msgid "{totalSessions} total"
 msgstr "共 {totalSessions} 条"
 
@@ -200,7 +200,7 @@ msgstr "5 分钟后"
 msgid "All required models are already installed. Continue when you're ready."
 msgstr "所有必需的模型均已安装。准备好后继续。"
 
-#: src/features/overview/overview-page.tsx:106
+#: src/features/overview/overview-page.tsx:107
 msgid "all-time · today"
 msgstr "累计 · 今天"
 
@@ -272,7 +272,7 @@ msgstr "正在请求…"
 msgid "At least {MIN_MESSAGE_CHARS} characters."
 msgstr "至少 {MIN_MESSAGE_CHARS} 个字符。"
 
-#: src/features/overview/overview-page.tsx:154
+#: src/features/overview/overview-page.tsx:155
 msgid "Audio"
 msgstr "音频"
 
@@ -535,7 +535,7 @@ msgstr "紧凑"
 msgid "Completed"
 msgstr "已完成"
 
-#: src/features/overview/overview-page.tsx:289
+#: src/features/overview/overview-page.tsx:291
 #: src/features/shell/components/app-shell.tsx:176
 #: src/features/shell/components/sidebar-widgets.tsx:75
 msgid "Connecting"
@@ -592,7 +592,7 @@ msgstr "纠错灵敏度"
 msgid "Corrections Lune Voice applies every time you dictate"
 msgstr "Lune Voice 每次听写时应用的更正"
 
-#: src/features/models/components/download-checklist.tsx:102
+#: src/features/model-downloads/components/download-checklist.tsx:102
 msgid "Could not download GPU support — transcription will run on the CPU. You can retry under Settings › Models."
 msgstr "无法下载 GPU 支持 — 转写将在 CPU 上运行。你可以在“设置 › 模型”中重试。"
 
@@ -763,7 +763,7 @@ msgstr "放弃听写"
 msgid "Discard the current draft and return to idle. Click the binding to change it."
 msgstr "放弃当前草稿并返回空闲状态。点击按键绑定即可更改。"
 
-#: src/features/overview/overview-page.tsx:289
+#: src/features/overview/overview-page.tsx:291
 msgid "Disconnected"
 msgstr "已断开连接"
 
@@ -836,7 +836,7 @@ msgstr "下载进度"
 msgid "Download transcript"
 msgstr "下载转写结果"
 
-#: src/features/models/components/download-checklist.tsx:109
+#: src/features/model-downloads/components/download-checklist.tsx:109
 msgid "Downloaded"
 msgstr "已下载"
 
@@ -898,7 +898,7 @@ msgid "Editing “{spokenTrigger}”"
 msgstr "正在编辑“{spokenTrigger}”"
 
 #: src/features/history/components/history-table.tsx:463
-#: src/features/overview/overview-page.tsx:187
+#: src/features/overview/overview-page.tsx:188
 msgid "Empty session"
 msgstr "空会话"
 
@@ -1061,15 +1061,15 @@ msgstr "GitHub"
 msgid "Give the memory back after a quiet spell. The next dictation reloads the model, which adds up to a second before it starts listening — your speech is recorded during the wait, so nothing is lost."
 msgstr "闲置一段时间后释放内存。下次听写会重新加载模型，开始聆听前最多多出一秒——等待期间语音照样录制，不会丢失内容。"
 
-#: src/features/overview/overview-page.tsx:287
+#: src/features/overview/overview-page.tsx:289
 msgid "Good afternoon."
 msgstr "下午好。"
 
-#: src/features/overview/overview-page.tsx:287
+#: src/features/overview/overview-page.tsx:289
 msgid "Good evening."
 msgstr "晚上好。"
 
-#: src/features/overview/overview-page.tsx:287
+#: src/features/overview/overview-page.tsx:289
 msgid "Good morning."
 msgstr "早上好。"
 
@@ -1080,7 +1080,7 @@ msgstr "早上好。"
 msgid "GPU acceleration"
 msgstr "GPU 加速"
 
-#: src/features/models/components/download-checklist.tsx:120
+#: src/features/model-downloads/components/download-checklist.tsx:120
 msgid "GPU support"
 msgstr "GPU 支持"
 
@@ -1106,17 +1106,17 @@ msgid "High"
 msgstr "高"
 
 #: src/features/history/components/history-table.tsx:226
-#: src/features/overview/overview-page.tsx:364
+#: src/features/overview/overview-page.tsx:371
 msgid "History isn't saved"
 msgstr "不保存历史记录"
 
 #: src/features/history/components/history-table.tsx:229
-#: src/features/overview/overview-page.tsx:367
+#: src/features/overview/overview-page.tsx:374
 msgid "History kept {historyDays} days"
 msgstr "历史记录保留 {historyDays} 天"
 
 #: src/features/history/components/history-table.tsx:228
-#: src/features/overview/overview-page.tsx:366
+#: src/features/overview/overview-page.tsx:373
 msgid "History kept forever"
 msgstr "历史记录永久保留"
 
@@ -1129,7 +1129,7 @@ msgstr "历史记录保留时长"
 msgid "Hold is unavailable right now, so the shortcut toggles recording instead. Grant keyboard access to use Hold."
 msgstr "按住模式当前不可用，因此快捷键改为切换录音。授予键盘访问权限即可使用按住模式。"
 
-#: src/features/overview/overview-page.tsx:300
+#: src/features/overview/overview-page.tsx:302
 msgid "Hold the hotkey and speak, and your words land wherever your cursor is."
 msgstr "按住快捷键说话，文字会输入到光标所在的位置。"
 
@@ -1169,7 +1169,7 @@ msgstr "指示器的外观。更改会立即生效。"
 msgid "How to dictate"
 msgstr "如何听写"
 
-#: src/features/overview/overview-page.tsx:161
+#: src/features/overview/overview-page.tsx:162
 msgid "Idle · mic ready"
 msgstr "空闲 · 麦克风就绪"
 
@@ -1227,7 +1227,7 @@ msgstr "正在安装更新"
 msgid "Instructions"
 msgstr "指令"
 
-#: src/features/models/components/download-checklist.tsx:104
+#: src/features/model-downloads/components/download-checklist.tsx:104
 msgid "Interrupted"
 msgstr "已中断"
 
@@ -1291,7 +1291,7 @@ msgid "Launch into the system tray instead of opening the main window. Useful wh
 msgstr "启动后最小化到系统托盘，不打开主窗口。适合 Lune Voice 随登录自动启动时使用。"
 
 #: src/features/history/components/history-table.tsx:187
-#: src/features/overview/overview-page.tsx:226
+#: src/features/overview/overview-page.tsx:227
 msgid "Length"
 msgstr "长度"
 
@@ -1319,7 +1319,7 @@ msgstr "正在聆听 — 说出该短语，然后再次点击停止。"
 msgid "Listening — say the phrase…"
 msgstr "正在聆听 — 请说出该短语…"
 
-#: src/features/overview/overview-page.tsx:161
+#: src/features/overview/overview-page.tsx:162
 #: src/features/shell/components/sidebar-widgets.tsx:82
 msgid "Listening…"
 msgstr "正在聆听…"
@@ -1398,11 +1398,11 @@ msgstr "会议抬头"
 msgid "Microphone"
 msgstr "麦克风"
 
-#: src/features/overview/overview-page.tsx:158
+#: src/features/overview/overview-page.tsx:159
 msgid "Microphone input level"
 msgstr "麦克风输入电平"
 
-#: src/features/overview/overview-page.tsx:117
+#: src/features/overview/overview-page.tsx:118
 msgid "min"
 msgstr "分钟"
 
@@ -1514,7 +1514,7 @@ msgstr "未找到会话。"
 msgid "No sessions match \"{0}\"."
 msgstr "没有会话匹配“{0}”。"
 
-#: src/features/overview/overview-page.tsx:211
+#: src/features/overview/overview-page.tsx:212
 msgid "No sessions yet"
 msgstr "还没有会话"
 
@@ -1582,7 +1582,7 @@ msgstr "关闭时输出原始转写结果。具体使用哪种风格在“风格
 msgid "Official correspondence and documents"
 msgstr "正式信函和文件"
 
-#: src/features/overview/overview-page.tsx:161
+#: src/features/overview/overview-page.tsx:162
 #: src/features/shell/components/app-shell.tsx:183
 msgid "Offline"
 msgstr "离线"
@@ -1603,7 +1603,7 @@ msgstr "打开菜单"
 msgid "Open releases page"
 msgstr "打开发布页面"
 
-#: src/features/overview/overview-page.tsx:183
+#: src/features/overview/overview-page.tsx:184
 msgid "Open session from {time}"
 msgstr "打开 {time} 的会话"
 
@@ -1636,8 +1636,8 @@ msgstr "输出"
 msgid "Overall footprint of the pill bar."
 msgstr "指示器的整体尺寸。"
 
-#: src/features/models/components/download-checklist.tsx:37
-#: src/features/models/components/download-checklist.tsx:48
+#: src/features/model-downloads/components/download-checklist.tsx:37
+#: src/features/model-downloads/components/download-checklist.tsx:48
 msgid "Overall progress"
 msgstr "总体进度"
 
@@ -1738,7 +1738,7 @@ msgstr "精度与原始模型几乎相同。推荐。"
 msgid "Preset corner or edge the pill starts at."
 msgstr "指示器起始的预设边角或边缘。"
 
-#: src/features/overview/overview-page.tsx:213
+#: src/features/overview/overview-page.tsx:214
 msgid "Press"
 msgstr "按"
 
@@ -1806,12 +1806,12 @@ msgstr "提问或求助"
 msgid "Quit Lune Voice"
 msgstr "退出 Lune Voice"
 
-#: src/features/overview/overview-page.tsx:289
+#: src/features/overview/overview-page.tsx:291
 #: src/features/shell/components/app-shell.tsx:182
 msgid "Ready"
 msgstr "就绪"
 
-#: src/features/overview/overview-page.tsx:340
+#: src/features/overview/overview-page.tsx:347
 msgid "Recent sessions"
 msgstr "最近会话"
 
@@ -1876,7 +1876,7 @@ msgstr "重置"
 msgid "Reset position"
 msgstr "重置位置"
 
-#: src/features/models/components/download-checklist.tsx:108
+#: src/features/model-downloads/components/download-checklist.tsx:108
 msgid "Restart Lune Voice to start using your GPU."
 msgstr "重启 Lune Voice 即可开始使用 GPU。"
 
@@ -1884,7 +1884,7 @@ msgstr "重启 Lune Voice 即可开始使用 GPU。"
 msgid "Restart needed"
 msgstr "需要重启"
 
-#: src/features/overview/overview-page.tsx:331
+#: src/features/overview/overview-page.tsx:338
 #: src/features/settings/components/model-library.tsx:232
 msgid "Retry"
 msgstr "重试"
@@ -1892,6 +1892,10 @@ msgstr "重试"
 #: src/features/welcome/welcome-page.tsx:389
 msgid "Retry download"
 msgstr "重试下载"
+
+#: src/features/overview/overview-page.tsx:338
+msgid "Retrying…"
+msgstr "正在重试…"
 
 #: src/features/welcome/components/wizard-stepper.tsx:23
 msgid "Review"
@@ -1951,7 +1955,7 @@ msgstr "将 <0>“{spokenTrigger}”</0> 作为整句说出 — 或说 <1>“ins
 msgid "Say a trigger as your whole utterance to expand it"
 msgstr "将触发词作为整句说出即可展开"
 
-#: src/features/overview/overview-page.tsx:376
+#: src/features/overview/overview-page.tsx:383
 msgid "Search sessions"
 msgstr "搜索会话"
 
@@ -2055,7 +2059,7 @@ msgid "Show on all workspaces"
 msgstr "在所有工作区显示"
 
 #. placeholder {0}: recentSessions.length
-#: src/features/overview/overview-page.tsx:357
+#: src/features/overview/overview-page.tsx:364
 msgid "Showing {0} of {totalSessions} sessions"
 msgstr "显示 {totalSessions} 条中的 {0} 条"
 
@@ -2119,7 +2123,7 @@ msgstr "声音"
 msgid "Sound cues"
 msgstr "提示音"
 
-#: src/features/overview/overview-page.tsx:111
+#: src/features/overview/overview-page.tsx:112
 msgid "Speaking time"
 msgstr "说话时长"
 
@@ -2186,7 +2190,7 @@ msgid "Stop dictation"
 msgstr "停止听写"
 
 #: src/features/history/components/history-table.tsx:237
-#: src/features/overview/overview-page.tsx:372
+#: src/features/overview/overview-page.tsx:379
 msgid "Stored on this device"
 msgstr "存储在此设备上"
 
@@ -2267,9 +2271,9 @@ msgstr "听写时显示的浮动状态指示器。"
 msgid "The language you speak. Parakeet needs it set."
 msgstr "你所说的语言。使用 Parakeet 时必须设置。"
 
-#: src/features/overview/overview-page.tsx:324
-msgid "The local runtime isn't responding. The figures below are the last known values."
-msgstr "本地运行时无响应。下方数据为最后已知的数值。"
+#: src/features/overview/overview-page.tsx:326
+msgid "The last dictation failed. Retry reloads the speech engine."
+msgstr "上次听写失败。点击“重试”将重新加载语音引擎。"
 
 #: src/features/settings/sections/dictation-section.tsx:77
 msgid "The main shortcut used for voice typing. Click the binding to change it."
@@ -2313,7 +2317,7 @@ msgid "This will permanently remove this dictation session and its transcript."
 msgstr "这将永久删除该听写会话及其转写结果。"
 
 #: src/features/history/components/history-table.tsx:181
-#: src/features/overview/overview-page.tsx:223
+#: src/features/overview/overview-page.tsx:224
 msgid "Time"
 msgstr "时间"
 
@@ -2325,11 +2329,11 @@ msgstr "头衔缩写（“Mister”→“Mr.”）"
 msgid "Titles"
 msgstr "头衔"
 
-#: src/features/overview/overview-page.tsx:214
+#: src/features/overview/overview-page.tsx:215
 msgid "to start dictating"
 msgstr "开始听写"
 
-#: src/features/overview/overview-page.tsx:143
+#: src/features/overview/overview-page.tsx:144
 msgid "Today"
 msgstr "今天"
 
@@ -2357,7 +2361,7 @@ msgstr "左上"
 msgid "Top right"
 msgstr "右上"
 
-#: src/features/overview/overview-page.tsx:94
+#: src/features/overview/overview-page.tsx:95
 msgid "Total words"
 msgstr "总字数"
 
@@ -2370,7 +2374,7 @@ msgid "Transcribing…"
 msgstr "正在转写…"
 
 #: src/features/history/components/history-table.tsx:182
-#: src/features/overview/overview-page.tsx:224
+#: src/features/overview/overview-page.tsx:225
 msgid "Transcript"
 msgstr "转写结果"
 
@@ -2396,7 +2400,7 @@ msgstr "转写正在你的 GPU 上运行。"
 msgid "Transcription model name, e.g. whisper-1."
 msgstr "转写模型名称，例如 whisper-1。"
 
-#: src/features/models/components/download-checklist.tsx:107
+#: src/features/model-downloads/components/download-checklist.tsx:107
 msgid "Transcription now runs on your GPU."
 msgstr "转写现在在你的 GPU 上运行。"
 
@@ -2425,7 +2429,7 @@ msgstr "重试"
 msgid "Turning on your GPU"
 msgstr "正在启用 GPU"
 
-#: src/features/models/components/download-checklist.tsx:98
+#: src/features/model-downloads/components/download-checklist.tsx:98
 msgid "Turning on your GPU…"
 msgstr "正在开启 GPU…"
 
@@ -2445,7 +2449,7 @@ msgstr "输入到应用"
 msgid "Types as"
 msgstr "输入为"
 
-#: src/store/workspace-store.ts:665
+#: src/store/workspace-store.ts:685
 msgid "Unable to reach the desktop backend."
 msgstr "无法连接到桌面后端。"
 
@@ -2497,7 +2501,7 @@ msgstr "纵向"
 msgid "View"
 msgstr "查看"
 
-#: src/features/overview/overview-page.tsx:345
+#: src/features/overview/overview-page.tsx:352
 msgid "View all"
 msgstr "查看全部"
 
@@ -2522,7 +2526,7 @@ msgstr "词汇"
 msgid "Voice model"
 msgstr "语音模型"
 
-#: src/features/overview/overview-page.tsx:137
+#: src/features/overview/overview-page.tsx:138
 msgid "vs all-time avg"
 msgstr "对比总体平均"
 
@@ -2530,7 +2534,7 @@ msgstr "对比总体平均"
 msgid "Wait {cooldown}s"
 msgstr "请等待 {cooldown} 秒"
 
-#: src/features/models/components/download-checklist.tsx:96
+#: src/features/model-downloads/components/download-checklist.tsx:96
 #: src/features/settings/components/model-library.tsx:342
 msgid "Waiting"
 msgstr "等待中"
@@ -2605,7 +2609,7 @@ msgstr "字"
 
 #: src/features/history/components/history-table.tsx:184
 #: src/features/history/components/session-detail-modal.tsx:173
-#: src/features/overview/overview-page.tsx:225
+#: src/features/overview/overview-page.tsx:226
 msgid "Words"
 msgstr "字数"
 
@@ -2613,7 +2617,7 @@ msgstr "字数"
 msgid "Workspace"
 msgstr "工作区"
 
-#: src/features/overview/overview-page.tsx:125
+#: src/features/overview/overview-page.tsx:126
 msgid "WPM"
 msgstr "WPM"
 
@@ -2669,7 +2673,7 @@ msgstr "你的 GPU 符合条件。设置会下载 GPU 支持并将其开启。"
 msgid "Your graphics driver is too old for GPU transcription. Update it and the download will appear here."
 msgstr "显卡驱动版本过旧，无法使用 GPU 转写。更新驱动后，下载选项会显示在这里。"
 
-#: src/features/overview/overview-page.tsx:213
+#: src/features/overview/overview-page.tsx:214
 msgid "your hotkey"
 msgstr "你的快捷键"
 

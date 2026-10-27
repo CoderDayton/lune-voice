@@ -716,6 +716,17 @@ pub fn cancel_model_download(window: WebviewWindow) -> Result<(), String> {
     Ok(())
 }
 
+/// Rebuild the pipeline after a failed dictation, clearing a leftover `error`
+/// status. Errors with the reason when the build still cannot succeed.
+#[tauri::command]
+pub async fn retry_runtime(
+    window: WebviewWindow,
+    runtime: State<'_, AppRuntime>,
+) -> Result<(), String> {
+    require_window_access(&window, &["main"])?;
+    runtime.retry_runtime().await
+}
+
 #[tauri::command]
 pub async fn download_model_cmd(
     window: WebviewWindow,

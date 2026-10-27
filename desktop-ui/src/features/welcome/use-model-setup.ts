@@ -9,6 +9,7 @@ import { installGpuBackend } from '../../lib/backend/gpu-install';
 import { isTauriRuntime } from '../../lib/backend/runtime';
 import {
   loadWorkspaceSnapshot,
+  retryRuntime,
   saveWorkspaceSetting,
   workspaceActions,
   workspaceStore,
@@ -113,6 +114,9 @@ export function useFirstRunGate(): FirstRunGate {
   const finish = useCallback(() => {
     markSetupComplete();
     setStatus('ready');
+    // Anything that failed before or during setup left the status red, and
+    // the overview would greet the new user with the banner. Recover once.
+    void retryRuntime({ quiet: true });
   }, []);
 
   return { status, finish };
