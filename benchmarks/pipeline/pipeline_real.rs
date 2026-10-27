@@ -5,7 +5,7 @@
 //! no style selected, same as production's `UserSettings::default()`).
 //!
 //! Run: cargo run --release --example pipeline_real -p lune-voice
-//! GPU: cargo run --release --features whisper-cuda --example pipeline_real -p lune-voice
+//! GPU: cargo run --release --features whisper-vulkan --example pipeline_real -p lune-voice
 //! Force backend: cargo run --release --example pipeline_real -p lune-voice -- --asr qwen3
 //!
 //! Unlike `pipeline_stages` (which calls stages individually), this feeds

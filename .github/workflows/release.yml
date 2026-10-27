@@ -73,7 +73,7 @@ jobs:
             echo "tag $GITHUB_REF_NAME matches version $conf"
           fi
 
-  # ── Linux bundles (CPU; GPU ships separately as the CUDA plugin) ──────────
+  # ── Linux bundles (CPU; GPU ships separately as the Vulkan plugin) ────────
   build-linux:
     name: Linux bundles
     needs: [verify-version]

@@ -254,7 +254,7 @@ mod imp {
     /// register duplicate devices — hence the `OnceLock`.
     struct Loaded {
         /// Every compute device in ggml's registry after the load. Not just the
-        /// ones the load added: a statically linked CUDA build registers its
+        /// ones the load added: a statically linked GPU build registers its
         /// device before we run, and it is just as real.
         devices: Vec<(String, DeviceKind)>,
         /// Whether the downloaded plugin was on disk when the registry was

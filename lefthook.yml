@@ -51,11 +51,10 @@ pre-push:
   parallel: false
   commands:
     clippy:
-      # Default features (stubs) — deliberately NOT --all-features. The `-cuda`
-      # backend feature that --all-features turns on source-compiles whisper.cpp
-      # CUDA kernels via nvcc, and the ggml-cuda template-instance
-      # compiles OOM/segfault (Error 139) on this machine, which made the gate
-      # unpassable (the branch sat 22 commits unpushed). Routine gates stay
+      # Default features (stubs) — deliberately NOT --all-features, which turns
+      # on `whisper-vulkan` and source-compiles whisper.cpp with the Vulkan
+      # backend (needs glslc, the Vulkan headers and SPIRV-Headers on every
+      # pushing machine). Routine gates stay
       # toolchain-light on stubs by design; the real native backends are built and
       # exercised by `cgs build` / `cgs ci`, which is where feature-gated backend
       # code gets compiled. --all-targets still lints tests/benches/examples,

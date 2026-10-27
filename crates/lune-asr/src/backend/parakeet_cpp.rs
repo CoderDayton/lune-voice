@@ -43,7 +43,7 @@ pub struct ParakeetCppConfig {
     pub model: ParakeetModel,
     /// Path to the GGML model file (`models/<dir>/ggml-parakeet-*.bin`).
     pub model_path: PathBuf,
-    /// Offload to GPU when a CUDA device is registered; otherwise the CPU.
+    /// Offload to GPU when a GPU device is registered; otherwise the CPU.
     pub use_gpu: bool,
     /// Path to the standalone silero VAD ggml model, used to endpoint-trim the
     /// buffer before decode. `None`/missing => the full buffer is decoded.

@@ -16,7 +16,7 @@
 //! - **warm** — file still cached. The best case, and the one a short timeout
 //!   on a roomy machine actually hits.
 //! - **unload** — how long `drop` takes. `release_backend` awaits this on a
-//!   blocking thread because a CUDA free of gigabytes is not instant.
+//!   blocking thread because freeing gigabytes of GPU memory is not instant.
 //!
 //! Timing covers `AsrRegistry::from_config`, which loads the whisper model
 //! *and* the silero VAD — exactly the pair the app reloads, so the number
@@ -121,7 +121,7 @@ impl Target {
     }
 
     fn label(self) -> &'static str {
-        if self.on_gpu() { "CUDA" } else { "CPU" }
+        if self.on_gpu() { "GPU" } else { "CPU" }
     }
 }
 
@@ -195,7 +195,7 @@ fn measure_footprint(model: WhisperModel, target: Target) -> (f64, Option<f64>) 
     let vram_after = vram_mb();
     drop(asr);
     let vram_delta = match (vram_before, vram_after) {
-        // `None` before the first CUDA allocation means "not listed yet", which
+        // `None` before the first GPU allocation means "not listed yet", which
         // is not zero — but as the *baseline* it is, so treat it as such.
         (before, Some(after)) => Some(after - before.unwrap_or(0.0)),
         _ => None,

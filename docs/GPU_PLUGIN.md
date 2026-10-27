@@ -124,7 +124,7 @@ refuses.
 | `DriverMissing` | No Vulkan loader or no device | Explains, offers nothing |
 | `DriverOutdated` | A discrete GPU whose driver predates Vulkan 1.2 | Asks for a driver update |
 | `NotInstalled` | Discrete Vulkan 1.2 GPU, plugin missing or built against another ggml | The offer, with size |
-| `Ready` | A discrete GPU registered (`Vulkan*`, or `CUDA*` in a dev build) | Names the device |
+| `Ready` | A discrete GPU registered (`Vulkan*`) | Names the device |
 | `NeedsRestart` | Plugin installed after the registry was built | Asks for a restart |
 | `Failed` | Plugin there at startup, but no discrete GPU registered | The reason: integrated only, or no Vulkan 1.2 |
 
@@ -181,10 +181,9 @@ readelf -d libggml-vulkan.so | grep -E 'NEEDED|RUNPATH'
 
 `cgs dev` and `cgs build` pick the GPU backend themselves: Vulkan when `glslc`
 is on `PATH` and `pkg-config` finds the Vulkan headers (source the Vulkan SDK's
-`setup-env.sh`), else CUDA when `nvcc` works, else CPU. They print the pick.
-Force one with `--env BACKEND=cpu|cuda|vulkan`.
+`setup-env.sh`, or install `glslc`, `libvulkan-dev` and `spirv-headers`), else
+CPU. They print the pick. Force one with `--env BACKEND=cpu|vulkan`.
 
 `cgs dev` builds the GPU backend as a plugin, so run `cgs stage-runtime` once to
 copy it into `target/debug/backends/`. The native `cgs build` links it
-statically and needs no staging. Only `BACKEND=vulkan` runs the same backend
-users get; CUDA stays a dev-only option.
+statically and needs no staging.

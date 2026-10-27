@@ -79,7 +79,7 @@ describe("mock backend client", () => {
       activationMode: "Hold" as const,
       dictationMode: "Clipboard" as const,
       pillVisibility: "Never" as const,
-      devicePolicy: "Cuda" as const,
+      devicePolicy: "Vulkan" as const,
     };
 
     const after = await mockBackendClient.saveWorkspaceSettings(input);
@@ -94,7 +94,7 @@ describe("mock backend client", () => {
     const input = {
       ...before.settings,
       useGpu: false,
-      devicePolicy: "Cuda" as const,
+      devicePolicy: "Vulkan" as const,
       activationMode: "Toggle" as const,
       dictationMode: "Clipboard" as const,
       pillVisibility: "Always" as const,

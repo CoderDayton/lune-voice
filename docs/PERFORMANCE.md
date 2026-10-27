@@ -47,7 +47,7 @@ After-speech wait = poll_final (Silero endpoint trim + whisper.cpp decode) + opt
 | 2 | LLM styling call | A few hundred milliseconds per utterance; skipped when no style is selected |
 | 3 | Memory use | whisper.cpp keeps the model weights in VRAM or RAM. Remote styling uses no local memory |
 
-**GPU:** with a GPU device, transcription runs on the GPU and decode time drops sharply. Releases get it from the downloadable Vulkan plugin ([docs/GPU_PLUGIN.md](GPU_PLUGIN.md)); a dev `whisper-cuda` build links CUDA in directly instead. Without either, whisper.cpp runs on the CPU. Release builds ship two CPU backends and load the one your CPU supports: `haswell` (AVX2 + FMA + F16C) for Intel since 2013 and AMD since 2015, and `sse42` for older or low-end CPUs without AVX2. AVX-512 is not used. The native `cgs build` compiles a single backend tuned for the machine that builds it.
+**GPU:** with a GPU device, transcription runs on the GPU and decode time drops sharply. Releases get it from the downloadable Vulkan plugin ([docs/GPU_PLUGIN.md](GPU_PLUGIN.md)); a dev `whisper-vulkan` build links Vulkan in directly instead. Without either, whisper.cpp runs on the CPU. Release builds ship two CPU backends and load the one your CPU supports: `haswell` (AVX2 + FMA + F16C) for Intel since 2013 and AMD since 2015, and `sse42` for older or low-end CPUs without AVX2. AVX-512 is not used. The native `cgs build` compiles a single backend tuned for the machine that builds it.
 
 **Model size:** `Base` (~78 MB) is the fastest and the one to use on weak hardware. `Small` (~190 MB) comes next, then `Medium` (~539 MB). `LargeV3Turbo` (~874 MB) is the most accurate, and its turbo decoder keeps it closer to `Medium` in speed than to the full `Large` model.
 
@@ -156,7 +156,7 @@ samply record -- ./target/release/lune-voice
 # then trigger a dictation session; Ctrl+C to stop recording
 ```
 
-For a statically linked GPU build, use `--features "whisper-cuda"` instead. To profile the plugin path, install the GPU plugin and run the CPU build; the backend is chosen at runtime.
+For a statically linked GPU build, use `--features "whisper-vulkan"` instead. To profile the plugin path, install the GPU plugin and run the CPU build; the backend is chosen at runtime.
 
 ### Tracing
 

@@ -25,8 +25,8 @@ homepage = "https://github.com/CoderDayton/lune-voice"
 # Upstream pins `BUILD_SHARED_LIBS=OFF` and decides the link kind from the
 # `intel-sycl` feature, which makes ggml's dlopen-able backends
 # (`GGML_BACKEND_DL`) impossible to build. The fork routes both off that one
-# switch so the CUDA backend can ship as a downloadable plugin instead of a
-# hard `DT_NEEDED` on the CUDA runtime. See docs/GPU_PLUGIN.md.
+# switch so the Vulkan backend can ship as a downloadable plugin instead of a
+# hard `DT_NEEDED` on the GPU runtime. See docs/GPU_PLUGIN.md.
 # It also binds and links whisper.cpp's `parakeet` library, which upstream
 # builds but never exposes — the Parakeet TDT backend in `lune-asr`.
 [patch.crates-io]

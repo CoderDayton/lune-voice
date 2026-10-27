@@ -19,7 +19,8 @@
 //!
 //! Run: `cgs bench --env TYPE=vram` (add `--env WHISPER_MODEL=small` to pin the
 //! toggle-loop model, `--env CYCLES=n` for a longer loop). Needs an NVIDIA GPU
-//! and a CUDA-enabled build; on CPU it says so and exits.
+//! (it reads `nvidia-smi`) and a `whisper-vulkan` build; on CPU it says so and
+//! exits.
 
 // `bench_utils` is shared by every benchmark, so most of it is unused here.
 #[path = "../bench_utils.rs"]
@@ -81,13 +82,13 @@ async fn main() {
     println!("\n=== ASR device-memory probe ===\n");
     if !cuda {
         println!(
-            "No CUDA device registered — there is no VRAM to measure.\n\
-             Build with the whisper-cuda feature on a machine with an NVIDIA GPU."
+            "No GPU device registered — there is no VRAM to measure.\n\
+             Install the Vulkan plugin or build with whisper-vulkan, on a machine with an NVIDIA GPU."
         );
         return;
     }
     if vram_mb().is_some() {
-        // Before any CUDA allocation this process has no compute context, so it
+        // Before any GPU allocation this process has no compute context, so it
         // is absent from the listing rather than listed at zero.
         println!("  [warn] this process already holds device memory before loading anything");
     }

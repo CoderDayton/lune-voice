@@ -50,13 +50,13 @@ downloaded at runtime into the models directory
 | Target | OS / arch | Backend | Cargo features | Status |
 |---|---|---|---|---|
 | Linux | Linux x86_64 | CPU (any x86-64-v2; best CPU variant picked at runtime) | `whisper-cpp` | **Supported** |
-| Linux GPU plugin | Linux x86_64, Vulkan 1.2 GPU | Vulkan, downloaded at runtime | none (built by `cgs gpu-plugin`) | **Built; archive not published yet** |
+| Linux GPU plugin | Linux x86_64, Vulkan 1.2 GPU | Vulkan, downloaded at runtime | none (built by `cgs gpu-plugin`) | **Published** (`gpu-v1`) |
 | Windows CPU | Windows x86_64 | CPU (any x86-64-v2; best CPU variant picked at runtime) | `whisper-cpp` | **Supported** (NSIS installer) |
-| Windows GPU plugin | Windows x86_64, Vulkan 1.2 GPU | Vulkan, downloaded at runtime | none (built by `cgs gpu-plugin` on Windows) | **Built; archive not published yet** |
+| Windows GPU plugin | Windows x86_64, Vulkan 1.2 GPU | Vulkan, downloaded at runtime | none (built by `cgs gpu-plugin` on Windows) | **Published** (`gpu-v1`) |
 
-The `whisper-cuda` feature passes through to `whisper-rs/cuda`. The CPU feature
-compiles the library with no GPU backend. The same `--features` flags work on
-Linux and Windows, but only the features are shared: the crates the desktop app
+`whisper-vulkan` (dev builds only) passes through to `whisper-rs/vulkan` and
+compiles the Vulkan backend in. The CPU feature compiles the library with no GPU
+backend. The same `--features` flags work on Linux and Windows, but only the features are shared: the crates the desktop app
 needs on top of them differ by platform.
 
 The GPU plugin is not a Cargo feature at all. It is built separately with
@@ -70,10 +70,10 @@ All targets need: **Rust** (stable), **CMake**, a **C/C++ compiler**, and
 build and the platform's Tauri/WebView prerequisites.
 
 - **Linux**: gcc/clang, `libwebkit2gtk-4.1-dev`, `libclang` (`LIBCLANG_PATH` may
-  need setting, e.g. `/lib/x86_64-linux-gnu`). CUDA target also needs the **CUDA
-  Toolkit** (`nvcc`).
-- **Windows**: MSVC build tools (or clang), CMake, LLVM (`libclang`). CUDA target
-  also needs the **CUDA Toolkit**.
+  need setting, e.g. `/lib/x86_64-linux-gnu`). A Vulkan dev build also needs
+  `glslc`, the Vulkan headers and `spirv-headers`.
+- **Windows**: MSVC build tools (or clang), CMake, LLVM (`libclang`). A Vulkan
+  dev build also needs the Vulkan SDK.
 
 ## Build commands
 
@@ -85,14 +85,13 @@ BUNDLE=1` bundles locally anyway, for testing the package layout.
 
 `cgs build` has two profiles. The default is a **native** build tuned to the
 machine building it (fast, low memory). **Release builds** use `--env
-PORTABLE=1`. Native builds pick CPU or CUDA by themselves unless you set `--env
-BACKEND`. PORTABLE is CPU only, because the GPU ships as the downloadable
-plugin.
+PORTABLE=1`. Native builds pick Vulkan when `glslc`, the Vulkan headers and
+SPIRV-Headers are found, else CPU, unless you set `--env BACKEND=cpu|vulkan`.
+PORTABLE is CPU only, because the GPU ships as the downloadable plugin.
 
 ```bash
-# Local build (default): NATIVE. Static; ggml targets only this machine's CPU
-# and GPU. The CUDA compile is ~8x smaller and won't run out of RAM. Does NOT
-# run on other hardware.
+# Local build (default): NATIVE. Static; ggml targets only this machine's CPU.
+# Does NOT run on other hardware.
 cgs build
 
 # Distributable release artifact (what CI and `cgs package` build): PORTABLE.
@@ -105,7 +104,7 @@ cgs package
 Native runs, from `desktop-ui/`:
 
 ```bash
-GGML_NATIVE=ON bun tauri build --features "whisper-cuda"
+GGML_NATIVE=ON bun tauri build --features "whisper-vulkan"
 ```
 
 PORTABLE runs `scripts/release/build-bundles.sh`. Every distributable build

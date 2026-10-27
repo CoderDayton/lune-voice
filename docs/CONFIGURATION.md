@@ -142,7 +142,7 @@ model = "Medium"
 | `Medium` | `ggml-medium-q5_0.bin` | ~539 MB | Balanced (recommended) |
 | `LargeV3Turbo` | `ggml-large-v3-turbo-q8_0.bin` | ~874 MB | Best accuracy; turbo decoder keeps it fast |
 
-CPU or GPU is set by the top-level `device` field. Running on the GPU needs the downloadable Vulkan plugin (or a dev build compiled with `whisper-cuda`). See [GPU / Device Settings](#gpu--device-settings).
+CPU or GPU is set by the top-level `device` field. Running on the GPU needs the downloadable Vulkan plugin (or a dev build compiled with `whisper-vulkan`). See [GPU / Device Settings](#gpu--device-settings).
 
 **VAD:** Silero runs as its own pass *before* decoding. It trims silence from the start and end and keeps the pauses inside your speech, because whisper uses them to place punctuation. whisper.cpp's built-in `enable_vad` is not used on purpose: it glues the speech together and removes those pauses, which gives run-on sentences. The VAD model (`ggml-silero-v5.1.2.bin`, in `models/whisper-vad-silero/`) loads automatically when it is there and always runs on the CPU. If it is missing, decoding runs without it and a warning is logged.
 

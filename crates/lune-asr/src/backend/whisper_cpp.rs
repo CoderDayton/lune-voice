@@ -29,8 +29,8 @@ use lune_core::error::Result;
 pub struct WhisperCppConfig {
     /// Path to the GGML model file (`models/<dir>/ggml-*.bin`).
     pub model_path: PathBuf,
-    /// Offload to GPU. Only meaningful when built with `whisper-cuda`; on a
-    /// CPU-only build whisper-rs ignores it and runs on the CPU.
+    /// Offload to GPU. Only meaningful when a GPU backend is present (the
+    /// Vulkan plugin, or a `whisper-vulkan` build); otherwise it runs on the CPU.
     pub use_gpu: bool,
     /// Path to the standalone silero VAD ggml model, used to endpoint-trim the
     /// buffer (drop leading/trailing silence) before decode. `None`/missing =>

@@ -291,5 +291,5 @@ relies on.
 
 Include the `RUST_LOG=info` log (redacted by default, but check it anyway),
 your OS and desktop session (`echo $XDG_SESSION_TYPE $XDG_CURRENT_DESKTOP`),
-whether the build is CPU or CUDA, and the model you use. If you include
+whether it runs on the CPU or the GPU, and the model you use. If you include
 `settings.toml`, remove every `api_key` line first.

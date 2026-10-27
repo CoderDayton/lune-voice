@@ -7,7 +7,7 @@
 //! Also saves a .wav file (16kHz mono f32) and a .txt transcript.
 //!
 //! Run: cargo run --release --example live_transcribe -p lune-voice
-//! GPU: cargo run --release --features whisper-cuda --example live_transcribe -p lune-voice
+//! GPU: cargo run --release --features whisper-vulkan --example live_transcribe -p lune-voice
 //! No delivery: DELIVER=0 cargo run --release --example live_transcribe -p lune-voice
 //!
 //! Press Ctrl+C to stop. The pipeline processes any remaining audio before
@@ -59,17 +59,9 @@ fn main() {
     eprint!("  Loading ASR ... ");
     let t = Instant::now();
     let models_dir = bench_utils::models_dir();
-    let cuda_available = lune_persist::AppPaths::resolve()
-        .map(|p| lune_asr::gpu_backend::gpu_available(p.data_dir()))
-        .unwrap_or(false);
     let asr = Arc::new(
-        AsrRegistry::from_config(
-            &asr_entry.config,
-            device_policy,
-            &models_dir,
-            cuda_available,
-        )
-        .expect("load ASR"),
+        AsrRegistry::from_config(&asr_entry.config, device_policy, &models_dir, has_gpu)
+            .expect("load ASR"),
     );
     let backend_kind = asr.kind();
     eprintln!("{:.1}s ({:?})", t.elapsed().as_secs_f64(), backend_kind);

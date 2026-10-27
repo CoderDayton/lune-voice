@@ -16,9 +16,8 @@ default = []
 # needs cmake + a C++ toolchain + libclang at build time. Without it the
 # backend links a stub that errors "… not compiled in".
 whisper-cpp = ["dep:whisper-rs"]
-# GPU whisper.cpp: source-compiles the CUDA kernels, so it additionally needs
-# the CUDA toolkit (nvcc) on the build host.
-whisper-cuda = ["whisper-cpp", "whisper-rs/cuda"]
+# GPU whisper.cpp for dev builds: compiles the Vulkan backend in, so it needs
+# glslc and the Vulkan headers. Releases ship it as a plugin instead.
 whisper-vulkan = ["whisper-cpp", "whisper-rs/vulkan"]
 
 [dependencies]

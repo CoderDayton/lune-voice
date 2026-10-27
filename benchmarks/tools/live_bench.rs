@@ -7,7 +7,7 @@
 //! overall WER/CER against the reference. A real-voice accuracy harness — unlike
 //! the fixture benchmarks, it measures your mic, your room, and your speech.
 //!
-//! Run (GPU): cargo run --release --features whisper-cuda --example live_bench -p lune-voice
+//! Run (GPU): cargo run --release --features whisper-vulkan --example live_bench -p lune-voice
 //!   Quieter prompts: append `2>/dev/null` to hide model-load logs.
 //!   Custom references: LUNE_REFS=path/to/lines.txt (one reference per line).
 

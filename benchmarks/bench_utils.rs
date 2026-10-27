@@ -85,7 +85,7 @@ pub fn process_memory_usage() -> Option<MemoryUsage> {
 /// the only source for this that does not require linking NVML.
 ///
 /// `None` means the question could not be answered — no `nvidia-smi`, or no
-/// compute context yet (before the first CUDA allocation the process is not
+/// compute context yet (before the first GPU allocation the process is not
 /// listed at all, which is not zero and must not be reported as zero).
 pub fn vram_mb() -> Option<f64> {
     let out = std::process::Command::new("nvidia-smi")
@@ -114,16 +114,16 @@ pub fn vram_str() -> String {
 
 // ─── GPU detection ───────────────────────────────────────────────────────────
 
-/// Whether this build can offload to CUDA. There is no ORT runtime probe
-/// anymore — whisper.cpp CUDA is a compile-time decision gated on the
-/// `whisper-cuda` feature. Returns `true` when compiled in; the backend still
-/// falls back to CPU at runtime if CUDA is absent.
+/// Whether ggml registered a discrete GPU: from a `whisper-vulkan` build or
+/// the downloaded Vulkan plugin on a CPU build — the same check the app makes.
 pub fn detect_gpu() -> bool {
-    let has_gpu = cfg!(feature = "whisper-cuda");
+    let has_gpu = AppPaths::resolve()
+        .map(|p| lune_asr::gpu_backend::gpu_available(p.data_dir()))
+        .unwrap_or(false);
     if has_gpu {
-        println!("  [info] CUDA feature compiled in (whisper offload enabled)");
+        println!("  [info] GPU device registered (whisper offload enabled)");
     } else {
-        println!("  [info] CPU-only build (no CUDA feature)");
+        println!("  [info] no GPU device registered (CPU)");
     }
     has_gpu
 }
@@ -922,21 +922,14 @@ impl HarnessBuilder {
         let device = DevicePolicy::Auto;
 
         let models_dir = models_dir();
-        let cuda_available = AppPaths::resolve()
-            .map(|p| lune_asr::gpu_backend::gpu_available(p.data_dir()))
-            .unwrap_or(false);
 
         // ASR — whisper.cpp.
         let asr_entry = benchmark_asr_entry().unwrap_or_else(|msg| {
             panic!("BenchmarkHarness: cannot load ASR — {msg}");
         });
-        let asr = lune_asr::AsrRegistry::from_config(
-            &asr_entry.config,
-            device,
-            &models_dir,
-            cuda_available,
-        )
-        .unwrap_or_else(|e| panic!("BenchmarkHarness: ASR load failed — {e}"));
+        let asr =
+            lune_asr::AsrRegistry::from_config(&asr_entry.config, device, &models_dir, has_gpu)
+                .unwrap_or_else(|e| panic!("BenchmarkHarness: ASR load failed — {e}"));
         let asr = Arc::new(asr);
 
         // LLM — remote OpenAI-compatible styling backend behind StylePipeline.

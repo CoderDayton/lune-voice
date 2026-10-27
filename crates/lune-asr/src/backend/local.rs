@@ -411,7 +411,7 @@ mod vad {
             }
             let mut params = WhisperVadContextParams::default();
             // Always on the CPU: silero is tiny (no GPU benefit) and standing
-            // up a second CUDA context at init is a crash source.
+            // up a second GPU context at init is a crash source.
             params.set_use_gpu(false);
             params.set_n_threads(n_threads);
             match WhisperVadContext::new(&path.to_string_lossy(), params) {

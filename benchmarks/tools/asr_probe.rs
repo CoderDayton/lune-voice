@@ -4,7 +4,7 @@
 //! for WAVs, the full VAD+ASR+LLM pipeline) and print the hypothesis.
 //! Throwaway diagnostic for the quiet short-utterance investigation.
 //!
-//! Run (GPU): cargo run --release --features whisper-cuda --example asr_probe -p lune-voice -- <path>
+//! Run (GPU): cargo run --release --features whisper-vulkan --example asr_probe -p lune-voice -- <path>
 //!   <path> may be a single .wav, a single .f32 (raw LE f32, 16 kHz mono — the
 //!   `LUNE_ASR_DUMP_DIR` dump format), or a DIRECTORY (all .f32/.wav in it).
 //!   .f32 dumps are already post-VAD, so they default to DIRECT (push whole

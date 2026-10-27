@@ -10,13 +10,10 @@ workspace = true
 [features]
 default = []
 # Local native backends, compiled into the shipped binary by `cgs build`.
-# Off by default so routine checks need no C++ toolchain. The `-cuda` variants
-# source-compile CUDA kernels (need nvcc); `gpu` is the umbrella `cgs build`
-# enables when the build host has a CUDA toolchain.
+# Off by default so routine checks need no C++ toolchain. `whisper-vulkan`
+# needs glslc, the Vulkan headers and SPIRV-Headers.
 whisper-cpp = ["lune-asr/whisper-cpp"]
-whisper-cuda = ["whisper-cpp", "lune-asr/whisper-cuda"]
 whisper-vulkan = ["whisper-cpp", "lune-asr/whisper-vulkan"]
-gpu = ["whisper-cuda"]
 
 [dependencies]
 lune-core.workspace = true

@@ -141,7 +141,7 @@ describe('relevantSetupModels', () => {
 });
 
 describe('gpuAccelerationOffer', () => {
-  test('claims acceleration is active only when a CUDA device is registered', () => {
+  test('claims acceleration is active only when a GPU device is registered', () => {
     expect(gpuAccelerationOffer('ready', true)).toBe('active');
     // Already working, so it stays offered even where no download is available.
     expect(gpuAccelerationOffer('ready', false)).toBe('active');

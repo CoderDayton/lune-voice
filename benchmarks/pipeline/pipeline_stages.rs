@@ -274,7 +274,7 @@ fn main() {
 
     println!(
         "  Device: {}   Fixtures: {}",
-        if harness.has_gpu { "CUDA" } else { "CPU" },
+        if harness.has_gpu { "GPU" } else { "CPU" },
         harness.fixtures.len(),
     );
     if let Some(mem) = process_memory_usage() {

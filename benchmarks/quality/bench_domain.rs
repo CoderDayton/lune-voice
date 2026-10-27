@@ -4,7 +4,7 @@
 //! and reports per-category WER, command exact-match, proper-noun accuracy,
 //! and long-form truncation.
 //!
-//! cargo run --release --features whisper-cuda --example bench_domain -p lune-voice
+//! cargo run --release --features whisper-vulkan --example bench_domain -p lune-voice
 
 #[allow(dead_code)]
 #[path = "../bench_utils.rs"]

@@ -281,8 +281,8 @@ impl ReleasedBackend {
 
 /// Drop released pipeline handles off the async workers, and wait for it.
 ///
-/// `WhisperContext`'s destructor frees the model's weights. On CUDA that is a
-/// `cudaFree` of gigabytes and it blocks — the same reason the matching *load*
+/// `WhisperContext`'s destructor frees the model's weights. On the GPU that is
+/// a free of gigabytes of device memory and it blocks — the same reason the matching *load*
 /// runs on `spawn_blocking` rather than inline.
 ///
 /// Awaited rather than detached because [`LivePipeline::take_reload_plan`]
@@ -1369,7 +1369,7 @@ impl AppRuntime {
         // released across `build_pipeline` (seconds of model loading), so two
         // concurrent starts — IPC from either window, or a Hold-mode key-down,
         // none of which are mutually exclusive on their own — could both pass
-        // the Phase 1 check and both load the model. On CUDA that is two
+        // the Phase 1 check and both load the model. On the GPU that is two
         // concurrent allocations of the same model and can OOM the GPU. The
         // loser now waits here and takes the winner's freshly-built pipeline.
         let _start_guard = self.inner.start_gate.lock().await;

@@ -15,24 +15,8 @@ info = "List all available scripts"
 [scripts.dev]
 interpreter = "bash"
 command = '''
+. scripts/dev/pick-backend.sh
 cd desktop-ui
-BACKEND="${BACKEND:-}"
-if [ -z "$BACKEND" ]; then
-  if command -v glslc >/dev/null 2>&1 && pkg-config --exists vulkan 2>/dev/null; then
-    BACKEND=vulkan
-  elif command -v nvcc >/dev/null 2>&1 && command -v nvidia-smi >/dev/null 2>&1 && nvidia-smi >/dev/null 2>&1; then
-    BACKEND=cuda
-  else
-    BACKEND=cpu
-  fi
-fi
-case "$BACKEND" in
-  cpu)    FEATURES="whisper-cpp" ;;
-  cuda)   FEATURES="whisper-cuda" ;;
-  vulkan) FEATURES="whisper-vulkan" ;;
-  *)      echo "BACKEND must be cpu|cuda|vulkan"; exit 1 ;;
-esac
-echo "GPU backend: $BACKEND (override with --env BACKEND=cpu|cuda|vulkan)"
 GGML_FLAGS="GGML_BACKEND_DL=ON GGML_NATIVE=OFF GGML_CPU_ALL_VARIANTS=ON"
 # Host-tuned Rust codegen for the dev build. Opt-in here rather than pinned in
 # `.cargo/config.toml`, so a plain `cargo build` stays portable.
@@ -40,7 +24,7 @@ export RUSTFLAGS="${RUSTFLAGS:--C target-cpu=native}"
 echo "Dev ($BACKEND): --features \"$FEATURES\" ($GGML_FLAGS)"
 env $GGML_FLAGS bun tauri dev --features "$FEATURES"
 '''
-info = "Launch Tauri app in dev mode (hot-reload; GPU auto-detected: Vulkan when glslc and the Vulkan headers are found, else CUDA; --env BACKEND=cpu|cuda|vulkan to force)"
+info = "Launch Tauri app in dev mode (hot-reload; Vulkan when glslc, the Vulkan headers and SPIRV-Headers are found, else CPU; --env BACKEND=cpu|vulkan to force)"
 requires = ["bun"]
 
 # ── Quick iteration ──────────────────────────────────────────────────────────
@@ -116,16 +100,12 @@ info = "Run lightweight app pipeline integration tests"
 interpreter = "bash"
 # Real-pipeline benchmarks. Model-backed ones build whisper.cpp and need a
 # model on disk; the styling pass talks to a remote OpenAI-compatible endpoint
-# (LUNE_BENCH_LLM_* env vars). CUDA features auto-detect (mirrors cgs build/dev).
+# (LUNE_BENCH_LLM_* env vars). Backend pick: scripts/dev/pick-backend.sh.
 # `transcribe` runs the whole capture→AGC→VAD→whisper(+styling) pipeline on a
 # WAV/f32/dir and prints the hypothesis — the GUI-free way to test ASR quality.
 command = '''
 TYPE="${TYPE:-agc}"
-if command -v nvcc >/dev/null 2>&1 && command -v nvidia-smi >/dev/null 2>&1 && nvidia-smi >/dev/null 2>&1; then
-  FEATURES="whisper-cuda"
-else
-  FEATURES="whisper-cpp"
-fi
+. scripts/dev/pick-backend.sh
 [ -d /lib/x86_64-linux-gnu ] && export LIBCLANG_PATH="${LIBCLANG_PATH:-/lib/x86_64-linux-gnu}"
 run() { cargo run --release --example "$1" -p lune-voice --features "$FEATURES" "${@:2}"; }
 case "$TYPE" in
@@ -150,7 +130,7 @@ case "$TYPE" in
   *) echo "TYPE must be: agc | transcribe(WAV=) | domain | pipeline | stages | latency | vram | modelload | punctuation | dict | leadin | snippets | styling | rulecmp | live | livewer | confusion | noisify"; exit 1 ;;
 esac
 '''
-info = "Benchmarks (--env TYPE=agc|transcribe|domain|pipeline|stages|latency|vram|modelload|punctuation|dict|leadin|snippets|styling|rulecmp|live|livewer|confusion|noisify; transcribe needs WAV=). TYPE=leadin scores opening-word errors per lead-in policy (--env LUNE_BENCH_DIR=dir of your own .wav+.txt clips). TYPE=modelload times cold/warm model load and unload per whisper model (--env REPEATS=n, DEVICE=cpu|cuda). TYPE=vram measures device memory across dictation toggles and a model swap (NVIDIA only; --env CYCLES=n). Pin the model with --env WHISPER_MODEL=small|medium|large. TYPE=domain gates on a baseline: --env LUNE_BENCH_JSON=out.json to record, --env LUNE_BENCH_BASELINE=base.json to fail on regression (--env LUNE_BENCH_TOLERANCE=pts, default 1.0)"
+info = "Benchmarks (--env TYPE=agc|transcribe|domain|pipeline|stages|latency|vram|modelload|punctuation|dict|leadin|snippets|styling|rulecmp|live|livewer|confusion|noisify; transcribe needs WAV=). TYPE=leadin scores opening-word errors per lead-in policy (--env LUNE_BENCH_DIR=dir of your own .wav+.txt clips). TYPE=modelload times cold/warm model load and unload per whisper model (--env REPEATS=n, DEVICE=cpu|vulkan). TYPE=vram measures device memory across dictation toggles and a model swap (NVIDIA only; --env CYCLES=n). Pin the model with --env WHISPER_MODEL=small|medium|large. TYPE=domain gates on a baseline: --env LUNE_BENCH_JSON=out.json to record, --env LUNE_BENCH_BASELINE=base.json to fail on regression (--env LUNE_BENCH_TOLERANCE=pts, default 1.0)"
 
 # ── Build ────────────────────────────────────────────────────────────────────
 
@@ -162,9 +142,8 @@ interpreter = "bash"
 #
 # TWO build profiles:
 #   • Default (NATIVE): a static build with `GGML_NATIVE=ON`, tuned to THIS
-#     machine's CPU and, for CUDA, only the build host's GPU arch (e.g. sm_89).
-#     The CUDA compile is ~8x smaller and won't exhaust RAM. The binary runs
-#     great here but is NOT portable to other CPUs/GPUs. The right local build.
+#     machine's CPU. The binary runs great here but is NOT portable to other
+#     CPUs. The right local build.
 command = '''
 # Compile only. The shippable installers are `cgs package`, which builds them in
 # containers against an old glibc so they install on other distros — a bundle
@@ -182,24 +161,8 @@ if [ -n "${PORTABLE:-}" ]; then
   APPIMAGE_EXTRACT_AND_RUN=1 bash scripts/release/build-bundles.sh $BUNDLE_ARGS
   exit $?
 fi
+. scripts/dev/pick-backend.sh
 cd desktop-ui
-BACKEND="${BACKEND:-}"
-if [ -z "$BACKEND" ]; then
-  if command -v glslc >/dev/null 2>&1 && pkg-config --exists vulkan 2>/dev/null; then
-    BACKEND=vulkan
-  elif command -v nvcc >/dev/null 2>&1 && command -v nvidia-smi >/dev/null 2>&1 && nvidia-smi >/dev/null 2>&1; then
-    BACKEND=cuda
-  else
-    BACKEND=cpu
-  fi
-fi
-case "$BACKEND" in
-  cpu)    FEATURES="whisper-cpp" ;;
-  cuda)   FEATURES="whisper-cuda" ;;
-  vulkan) FEATURES="whisper-vulkan" ;;
-  *)      echo "BACKEND must be cpu|cuda|vulkan (macOS Metal: see docs/RELEASE.md)"; exit 1 ;;
-esac
-echo "GPU backend: $BACKEND (override with --env BACKEND=cpu|cuda|vulkan)"
 GGML_FLAGS="GGML_NATIVE=ON"
 # Host-tuned Rust codegen to match GGML_NATIVE. This is opt-in per build
 # rather than pinned in `.cargo/config.toml`, so a plain `cargo build
@@ -208,7 +171,7 @@ export RUSTFLAGS="${RUSTFLAGS:--C target-cpu=native}"
 echo "Building NATIVE $BACKEND build (this machine only): --features \"$FEATURES\" RUSTFLAGS=\"$RUSTFLAGS\""
 env $GGML_FLAGS APPIMAGE_EXTRACT_AND_RUN=1 bun tauri build --features "$FEATURES" $BUNDLE_ARGS
 '''
-info = "Compile the desktop app, no installers — native to this machine (GPU auto-detected: Vulkan when glslc and the Vulkan headers are found, else CUDA). --env PORTABLE=1 for the distributable CPU build; --env BACKEND=cpu|cuda|vulkan to force; --env BUNDLE=1 to also bundle locally. Installers: cgs package. See docs/RELEASE.md"
+info = "Compile the desktop app, no installers — native to this machine (Vulkan when glslc, the Vulkan headers and SPIRV-Headers are found, else CPU). --env PORTABLE=1 for the distributable CPU build; --env BACKEND=cpu|vulkan to force; --env BUNDLE=1 to also bundle locally. Installers: cgs package. See docs/RELEASE.md"
 requires = ["bun"]
 
 [scripts.stage-runtime]
@@ -219,7 +182,7 @@ set -euo pipefail
 #
 #   <bin dir>/libwhisper.so.1, libparakeet.so.1,
 #             libggml.so.0, libggml-base.so.0                      (DT_NEEDED)
-#   <bin dir>/backends/libggml-cpu-*.so, libggml-cuda.so         (dlopen-ed)
+#   <bin dir>/backends/libggml-cpu-*.so, libggml-vulkan.so       (dlopen-ed)
 #
 # The executable carries RUNPATH=$ORIGIN (desktop-ui/src-tauri/build.rs), so the
 # core libraries resolve from its own directory with no LD_LIBRARY_PATH.
@@ -249,25 +212,19 @@ for dest in "$BIN_DIR" "$BIN_DIR/deps"; do
   cp -a "$SRC_DIR"/out/lib/libwhisper.so* "$SRC_DIR"/out/lib/libparakeet.so* \
     "$SRC_DIR"/out/lib/libggml*.so* "$dest/"
   cp -a "$SRC_DIR"/out/bin/libggml-cpu-*.so "$dest/backends/"
-  for gpu in libggml-cuda.so libggml-vulkan.so; do
-    if [ -e "$SRC_DIR/out/bin/$gpu" ]; then
-      cp -a "$SRC_DIR/out/bin/$gpu" "$dest/backends/"
-    fi
-  done
+  if [ -e "$SRC_DIR/out/bin/libggml-vulkan.so" ]; then
+    cp -a "$SRC_DIR/out/bin/libggml-vulkan.so" "$dest/backends/"
+  fi
 done
 
 COUNT=$(ls "$BIN_DIR"/backends | wc -l)
-GPUS=""
-for gpu in cuda vulkan; do
-  if [ -e "$BIN_DIR/backends/libggml-$gpu.so" ]; then GPUS="$GPUS + $gpu"; fi
-done
-if [ -n "$GPUS" ]; then
-  echo "staged $COUNT backend plugins into $BIN_DIR/backends (CPU$GPUS)"
+if [ -e "$BIN_DIR/backends/libggml-vulkan.so" ]; then
+  echo "staged $COUNT backend plugins into $BIN_DIR/backends (CPU + vulkan)"
 else
-  echo "staged $COUNT backend plugins into $BIN_DIR/backends (CPU only — build with whisper-vulkan or whisper-cuda for GPU)"
+  echo "staged $COUNT backend plugins into $BIN_DIR/backends (CPU only — build with whisper-vulkan for GPU)"
 fi
 '''
-info = "Copy the ggml shared libraries and backend plugins (CPU, plus Vulkan/CUDA when built) next to the built binary (--env PROFILE=release)"
+info = "Copy the ggml shared libraries and backend plugins (CPU, plus Vulkan when built) next to the built binary (--env PROFILE=release)"
 
 [scripts.gpu-plugin]
 interpreter = "bash"
