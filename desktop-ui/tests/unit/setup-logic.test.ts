@@ -7,11 +7,15 @@ import {
   gpuAccelerationOffer,
   hasOptionalModels,
   initialSetupEngine,
+  isWizardStep,
   initialWhisperModel,
   isSetupSatisfiable,
   type ModelStatus,
   relevantSetupModels,
   shouldInstallGpuDuringSetup,
+  stepAfter,
+  stepBefore,
+  wizardSteps,
 } from '../../src/features/welcome/setup-logic';
 
 const model = (localName: string, opts: Partial<ModelStatus> = {}): ModelStatus => ({
@@ -215,5 +219,70 @@ describe('isSetupSatisfiable', () => {
   test('ignores optional models', () => {
     const models = [model('engine'), model('optional')];
     expect(isSetupSatisfiable('engine', models, new Set(['engine']))).toBe(true);
+  });
+});
+
+describe('wizardSteps', () => {
+  test('always opens on the engine and closes on the review', () => {
+    const steps = wizardSteps(null, false);
+    expect(steps).toEqual(['engine', 'review']);
+  });
+
+  test('adds an acceleration step whenever the GPU has something to offer', () => {
+    expect(wizardSteps('after-download', false)).toEqual(['engine', 'acceleration', 'review']);
+    expect(wizardSteps('active', false)).toEqual(['engine', 'acceleration', 'review']);
+    expect(wizardSteps('needs-restart', false)).toEqual(['engine', 'acceleration', 'review']);
+  });
+
+  test('adds an extras step only when there is a model to decline', () => {
+    expect(wizardSteps(null, true)).toEqual(['engine', 'extras', 'review']);
+  });
+
+  test('keeps the order engine, acceleration, extras, review', () => {
+    expect(wizardSteps('after-download', true)).toEqual([
+      'engine',
+      'acceleration',
+      'extras',
+      'review',
+    ]);
+  });
+});
+
+describe('isWizardStep', () => {
+  test('is true for the four screens and false for the run phases', () => {
+    for (const step of ['engine', 'acceleration', 'extras', 'review']) {
+      expect(isWizardStep(step)).toBe(true);
+    }
+    for (const phase of ['loading', 'downloading', 'gpu', 'error', 'done']) {
+      expect(isWizardStep(phase)).toBe(false);
+    }
+  });
+});
+
+describe('stepAfter and stepBefore', () => {
+  const steps = wizardSteps('after-download', true);
+
+  test('walk the list in order', () => {
+    expect(stepAfter(steps, 'engine')).toBe('acceleration');
+    expect(stepAfter(steps, 'acceleration')).toBe('extras');
+    expect(stepAfter(steps, 'extras')).toBe('review');
+    expect(stepBefore(steps, 'review')).toBe('extras');
+    expect(stepBefore(steps, 'acceleration')).toBe('engine');
+  });
+
+  test('stop at the ends rather than falling off', () => {
+    expect(stepAfter(steps, 'review')).toBe('review');
+    expect(stepBefore(steps, 'engine')).toBe('engine');
+  });
+
+  test('skip a step that is not in the list', () => {
+    const plain = wizardSteps(null, false);
+    expect(stepAfter(plain, 'engine')).toBe('review');
+    expect(stepBefore(plain, 'review')).toBe('engine');
+  });
+
+  test('a step the list lacks falls back to its first step', () => {
+    expect(stepAfter(wizardSteps(null, false), 'acceleration')).toBe('engine');
+    expect(stepBefore(wizardSteps(null, false), 'extras')).toBe('engine');
   });
 });

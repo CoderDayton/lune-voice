@@ -16,11 +16,20 @@ import {
 import luneLogo from '../../assets/lune-voice-logo.png';
 import { formatBytes } from '../../lib/format-bytes';
 import { workspaceStore } from '../../store/workspace-store';
-import { DownloadChecklist } from './components/download-checklist';
+import { DownloadChecklist } from '../model-downloads/components/download-checklist';
+import { AccelerationStep, useGpuOfferDetail } from './components/acceleration-step';
 import { EngineStep } from './components/engine-step';
 import { ModelCard } from './components/model-card';
 import { ReadyChecks } from './components/ready-checks';
-import { isSetupSatisfiable, setupDownloadBytes } from './setup-logic';
+import { ReviewStep } from './components/review-step';
+import { WizardStepper } from './components/wizard-stepper';
+import {
+  type GpuAccelerationOffer,
+  isSetupSatisfiable,
+  isWizardStep,
+  setupDownloadBytes,
+  type WizardStep,
+} from './setup-logic';
 import { type SetupPhase, useModelSetup } from './use-model-setup';
 
 interface WelcomePageProps {
@@ -56,8 +65,10 @@ export function WelcomePage({ onFinish }: WelcomePageProps) {
     setEngineWhisper,
     setEngineParakeet,
     setEngineLanguage,
+    steps,
     confirmEngine,
-    backToEngine,
+    goNext,
+    goBack,
     toggleModel,
     startDownload,
     cancelDownload,
@@ -79,21 +90,29 @@ export function WelcomePage({ onFinish }: WelcomePageProps) {
   }
 
   return (
-    /* Explicit rhythm rather than one uniform gap. Everything used to sit
-       `gap-6` apart, which spaced the primary action exactly as far from the
-       last card as the cards were from each other — so the stack had no
-       shape and nothing marked where the reading ended and the decision
-       began. Now: header, a 32px break, the body as one tight list, a 32px
-       break, the action. */
+    /* Explicit rhythm rather than one uniform gap: header, the stepper, the
+       body as one tight block, then the action. Each screen of the wizard is
+       one decision, so the whole of it fits the window without scrolling. */
     <div className="flex flex-col">
       <Header
         phase={phase}
-        requiredOk={requiredOk}
-        pendingCount={pending.length}
+        gpuOffer={gpuOffer}
+        nothingToInstall={pending.length === 0 && !willInstallGpu}
         gpuActivating={gpuActivating === true}
       />
 
-      <div className="mt-8 flex flex-col gap-4">
+      {isWizardStep(phase) && (
+        <div className="mt-5">
+          <WizardStepper steps={steps} current={phase} />
+        </div>
+      )}
+
+      {/* A floor under the wizard screens, so the header, stepper and buttons
+          stay where they were as the user moves between a tall screen and a
+          short one; a short screen sits in the middle of it. */}
+      <div
+        className={`mt-6 flex flex-col gap-4 ${isWizardStep(phase) ? 'min-h-92 justify-center' : ''}`}
+      >
         {phase === 'engine' ? (
           <EngineStep
             engineBackend={engineBackend}
@@ -101,23 +120,20 @@ export function WelcomePage({ onFinish }: WelcomePageProps) {
             engineParakeet={engineParakeet}
             engineLanguage={engineLanguage}
             error={error}
-            gpuOffer={gpuOffer}
-            useGpu={useGpu}
-            gpuDownloadBytes={gpuDownloadBytes}
             onSelectEngine={setEngineBackend}
             onSelectWhisper={setEngineWhisper}
             onSelectParakeet={setEngineParakeet}
             onSelectLanguage={setEngineLanguage}
-            onToggleGpu={setUseGpu}
           />
-        ) : checklist && phase !== 'choose' ? (
-          <DownloadChecklist
-            checklist={checklist}
-            gpuActive={gpuOffer === 'active'}
-            gpuError={gpuError}
+        ) : phase === 'acceleration' && gpuOffer ? (
+          <AccelerationStep
+            offer={gpuOffer}
+            useGpu={useGpu}
+            downloadBytes={gpuDownloadBytes}
+            onToggle={setUseGpu}
           />
-        ) : (
-          <div className="flex flex-col gap-3">
+        ) : phase === 'extras' ? (
+          <div className="grid gap-3 sm:grid-cols-2">
             {models.map((m) => {
               const essential = m.required || m.localName === asrLocalName;
               return (
@@ -129,24 +145,40 @@ export function WelcomePage({ onFinish }: WelcomePageProps) {
                   icon={modelIcon(m.localName)}
                   ready={m.ready}
                   selected={selected.has(m.localName)}
-                  canToggle={!essential && phase === 'choose'}
+                  canToggle={!essential}
                   sizeBytes={m.ready ? null : m.downloadBytes}
                   onToggle={() => toggleModel(m.localName)}
                 />
               );
             })}
           </div>
-        )}
+        ) : phase === 'review' ? (
+          <ReviewStep
+            models={models}
+            selected={selected}
+            asrLocalName={asrLocalName}
+            willInstallGpu={willInstallGpu}
+            gpuDownloadBytes={gpuDownloadBytes}
+          />
+        ) : checklist ? (
+          <div className="mx-auto w-full max-w-xl">
+            <DownloadChecklist
+              checklist={checklist}
+              gpuActive={gpuOffer === 'active'}
+              gpuError={gpuError}
+            />
+          </div>
+        ) : null}
 
         {phase === 'done' && (
-          <>
+          <div className="mx-auto flex w-full max-w-xl flex-col gap-4">
             <ReadyChecks />
             <ReadyHint />
-          </>
+          </div>
         )}
 
         {phase === 'error' && error && (
-          <div className="alert alert-error gap-2 text-sm" role="alert">
+          <div className="alert alert-error mx-auto w-full max-w-xl gap-2 text-sm" role="alert">
             <CircleAlert size={18} className="shrink-0" />
             <div className="min-w-0 flex-1">
               <p className="font-medium">{t`Download failed`}</p>
@@ -158,9 +190,10 @@ export function WelcomePage({ onFinish }: WelcomePageProps) {
         )}
       </div>
 
-      <div className="mt-8">
+      <div className="mt-6">
         <Actions
           phase={phase}
+          steps={steps}
           requiredOk={requiredOk}
           pendingCount={pending.length}
           willInstallGpu={willInstallGpu}
@@ -170,11 +203,12 @@ export function WelcomePage({ onFinish }: WelcomePageProps) {
           onRetry={retry}
           onFinish={onFinish}
           onConfirmEngine={confirmEngine}
-          onBack={backToEngine}
+          onNext={goNext}
+          onBack={goBack}
         />
       </div>
 
-      <div className="mt-6">
+      <div className="mt-4">
         <Footer />
       </div>
     </div>
@@ -183,20 +217,33 @@ export function WelcomePage({ onFinish }: WelcomePageProps) {
 
 interface HeaderProps {
   phase: SetupPhase;
-  requiredOk: boolean;
-  pendingCount: number;
+  gpuOffer: GpuAccelerationOffer | null;
+  /** Nothing is left to install: every model is here and no GPU step is due. */
+  nothingToInstall: boolean;
   /** The GPU plugin is downloaded and loading into the app. */
   gpuActivating: boolean;
 }
 
-function Header({ phase, requiredOk, pendingCount, gpuActivating }: HeaderProps) {
+function Header({ phase, gpuOffer, nothingToInstall, gpuActivating }: HeaderProps) {
   const { t } = useLingui();
+  const gpuDetail = useGpuOfferDetail(gpuOffer ?? 'after-download');
   let title: string;
   let subtitle: string;
 
   if (phase === 'engine') {
     title = t`Welcome to Lune Voice`;
     subtitle = t`Choose your speech engine. Everything runs offline — no cloud, no accounts.`;
+  } else if (phase === 'acceleration') {
+    title = t`GPU acceleration`;
+    subtitle = gpuDetail;
+  } else if (phase === 'extras') {
+    title = t`Models`;
+    subtitle = t`Choose the AI models to install. Everything runs offline — no cloud, no accounts.`;
+  } else if (phase === 'review') {
+    title = t`Review your setup`;
+    subtitle = nothingToInstall
+      ? t`All required models are already installed. Continue when you're ready.`
+      : t`Here is what setup will install. Everything stays on this machine.`;
   } else if (phase === 'done') {
     title = t`You're all set`;
     subtitle = t`Your models are ready. Everything stays on this machine.`;
@@ -212,54 +259,50 @@ function Header({ phase, requiredOk, pendingCount, gpuActivating }: HeaderProps)
   } else if (phase === 'error') {
     title = t`Download interrupted`;
     subtitle = t`Check your network and retry. Files that finished downloading are kept.`;
-  } else if (!requiredOk) {
-    title = t`Welcome to Lune Voice`;
-    subtitle = t`Choose the AI models to install. Everything runs offline — no cloud, no accounts.`;
-  } else if (pendingCount === 0) {
-    title = t`Welcome back`;
-    subtitle = t`All required models are already installed. Continue when you're ready.`;
   } else {
     title = t`Welcome to Lune Voice`;
-    subtitle = t`Choose the AI models to install. Everything runs offline — no cloud, no accounts.`;
+    subtitle = t`Choose your speech engine. Everything runs offline — no cloud, no accounts.`;
   }
 
   return (
-    <header className="flex flex-col items-center gap-4 text-center">
-      {/* Was size-14 growing to size-16 around a 26px glyph — a large empty
-          box with a small mark adrift in it. One size, tighter ratio. */}
-      {phase === 'done' ? (
-        // The finish line is the one place the app can introduce itself, so it
-        // shows the product mark rather than one more generic glyph.
-        <div className="size-14 overflow-hidden rounded-field ring-1 ring-surface-border-strong">
-          <img
-            src={luneLogo}
-            alt=""
-            className="pointer-events-none size-full object-cover"
-            draggable={false}
-          />
-        </div>
-      ) : (
-        <div className="token-icon size-14">
-          <Mic size={24} strokeWidth={1.7} className="text-primary" />
-        </div>
-      )}
-      <div>
-        <h1 className="font-display tracking-heading text-2xl sm:text-3xl font-semibold text-balance">
+    <header className="flex flex-col items-center gap-2 text-center">
+      {/* The mark sits beside the title rather than above it: stacked, it cost
+          the screens with the most on them (Parakeet's language picker) the
+          last 60px they needed to fit a 720px window. */}
+      <div className="flex items-center gap-3">
+        {phase === 'done' ? (
+          // The finish line is the one place the app can introduce itself, so
+          // it shows the product mark rather than one more generic glyph.
+          <div className="size-10 overflow-hidden rounded-field ring-1 ring-surface-border-strong">
+            <img
+              src={luneLogo}
+              alt=""
+              className="pointer-events-none size-full object-cover"
+              draggable={false}
+            />
+          </div>
+        ) : (
+          <div className="token-icon size-10">
+            <Mic size={20} strokeWidth={1.7} className="text-primary" />
+          </div>
+        )}
+        <h1 className="font-display tracking-heading text-2xl font-semibold text-balance">
           {title}
         </h1>
-        {/* `max-w-md` inside a 36rem frame broke every two-clause subtitle
-            across two ragged lines mid-thought. Widened so `text-balance`
-            has room to find an even break. */}
-        <p className="mx-auto mt-2 max-w-lg text-balance text-sm text-content-subtle sm:text-base">
-          {subtitle}
-        </p>
       </div>
+      {/* Wide enough that a two-clause subtitle stays on one line; narrower
+          broke it across two ragged lines mid-thought. */}
+      <p className="mx-auto max-w-2xl text-balance text-sm text-content-subtle sm:text-base">
+        {subtitle}
+      </p>
     </header>
   );
 }
 
 interface ActionsProps {
   phase: SetupPhase;
+  /** The wizard's screens, to tell whether Back has anywhere to go. */
+  steps: WizardStep[];
   requiredOk: boolean;
   pendingCount: number;
   willInstallGpu: boolean;
@@ -270,11 +313,13 @@ interface ActionsProps {
   onRetry: () => void;
   onFinish: () => void;
   onConfirmEngine: () => void;
+  onNext: () => void;
   onBack: () => void;
 }
 
 function Actions({
   phase,
+  steps,
   requiredOk,
   pendingCount,
   willInstallGpu,
@@ -284,6 +329,7 @@ function Actions({
   onRetry,
   onFinish,
   onConfirmEngine,
+  onNext,
   onBack,
 }: ActionsProps) {
   const { t } = useLingui();
@@ -298,6 +344,18 @@ function Actions({
         <button type="button" className="btn btn-ghost btn-sm" onClick={onFinish}>
           {t`Skip for now`}
         </button>
+      </div>
+    );
+  }
+
+  if (phase === 'acceleration' || phase === 'extras') {
+    return (
+      <div className="flex flex-col items-center gap-2">
+        <button type="button" className="btn btn-primary btn-wide" onClick={onNext}>
+          {t`Next`}
+          <ArrowRight size={16} className="rtl:-scale-x-100" />
+        </button>
+        <BackAndSkip canGoBack={steps.indexOf(phase) > 0} onBack={onBack} onSkip={onFinish} />
       </div>
     );
   }
@@ -375,14 +433,31 @@ function Actions({
           <ArrowRight size={16} className="rtl:-scale-x-100" />
         </button>
       )}
-      <div className="flex items-center gap-2">
+      <BackAndSkip canGoBack onBack={onBack} onSkip={onFinish} />
+    </div>
+  );
+}
+
+function BackAndSkip({
+  canGoBack,
+  onBack,
+  onSkip,
+}: {
+  canGoBack: boolean;
+  onBack: () => void;
+  onSkip: () => void;
+}) {
+  const { t } = useLingui();
+  return (
+    <div className="flex items-center gap-2">
+      {canGoBack && (
         <button type="button" className="btn btn-ghost btn-sm" onClick={onBack}>
-          {t`Change engine`}
+          {t`Back`}
         </button>
-        <button type="button" className="btn btn-ghost btn-sm" onClick={onFinish}>
-          {t`Skip for now`}
-        </button>
-      </div>
+      )}
+      <button type="button" className="btn btn-ghost btn-sm" onClick={onSkip}>
+        {t`Skip for now`}
+      </button>
     </div>
   );
 }

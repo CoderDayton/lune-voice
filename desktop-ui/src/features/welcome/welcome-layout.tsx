@@ -12,8 +12,8 @@ export function WelcomeLayout({ children }: { children: ReactNode }) {
   return (
     <div className="welcome-shell relative h-dvh overflow-hidden select-none">
       <div className="app-shell-backdrop" aria-hidden="true" />
-      <div className="welcome-scroll relative z-10 flex h-full w-full items-center justify-center overflow-y-auto px-4 py-8 sm:px-8">
-        <div className="welcome-frame w-full max-w-xl my-auto animate-page-in">{children}</div>
+      <div className="welcome-scroll relative z-10 flex h-full w-full items-center justify-center overflow-y-auto px-4 py-6 sm:px-8">
+        <div className="welcome-frame w-full max-w-3xl my-auto animate-page-in">{children}</div>
       </div>
     </div>
   );

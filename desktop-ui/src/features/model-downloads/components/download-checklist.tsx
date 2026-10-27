@@ -4,22 +4,25 @@ import { useLingui } from '@lingui/react/macro';
 import { Check, CircleAlert, Loader2, Mic, Zap } from 'lucide-react';
 import { ByteProgress } from '../../../components/ui/byte-progress';
 import { formatBytes } from '../../../lib/format-bytes';
-import type { ChecklistRow } from '../setup-logic';
-import type { SetupChecklist } from '../use-model-setup';
+import type { ChecklistRow, RunChecklist } from '../checklist';
 
 interface DownloadChecklistProps {
-  checklist: SetupChecklist;
+  checklist: RunChecklist;
   /** The GPU finished loading into the running app. */
-  gpuActive: boolean;
-  gpuError: string | null;
+  gpuActive?: boolean;
+  gpuError?: string | null;
 }
 
 /**
- * Every download of a setup run in one list, in the order they happen. One row
+ * Every download of a run in one list, in the order they happen. One row
  * is active at a time; the bar on top counts bytes across all of them, so the
  * user can see both what is happening now and how much is left.
  */
-export function DownloadChecklist({ checklist, gpuActive, gpuError }: DownloadChecklistProps) {
+export function DownloadChecklist({
+  checklist,
+  gpuActive = false,
+  gpuError = null,
+}: DownloadChecklistProps) {
   const { t } = useLingui();
   const { rows, doneBytes, totalBytes, settled } = checklist;
   const pct = totalBytes > 0 ? Math.round((doneBytes / totalBytes) * 100) : 0;

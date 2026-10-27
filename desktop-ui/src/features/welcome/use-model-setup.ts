@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 import { invoke } from '@tauri-apps/api/core';
-import { listen } from '@tauri-apps/api/event';
 import { useCallback, useEffect, useEffectEvent, useRef, useState } from 'react';
 import { backendClient } from '../../lib/backend/client';
 import type { GpuBackendStatusDto } from '../../lib/backend/generated/GpuBackendStatusDto';
@@ -14,6 +13,9 @@ import {
   workspaceActions,
   workspaceStore,
 } from '../../store/workspace-store';
+import type { GpuStep, RunChecklist, RunModel } from '../model-downloads/checklist';
+import { runChecklist } from '../model-downloads/download-run';
+import { modelDownloads, useModelDownloads } from '../model-downloads/model-downloads';
 import {
   type AsrBackendValue,
   languageForEngine,
@@ -23,46 +25,29 @@ import {
 } from '../settings/data/settings-data';
 import {
   asrModelLocalName,
-  buildChecklist,
   buildInitialSelection,
-  type ChecklistRow,
   type GpuAccelerationOffer,
-  type GpuStep,
   gpuAccelerationOffer,
   hasOptionalModels,
   initialSetupEngine,
   initialWhisperModel,
+  isWizardStep,
   type ModelStatus,
-  type RunModel,
   relevantSetupModels,
   shouldInstallGpuDuringSetup,
+  stepAfter,
+  stepBefore,
+  type WizardStep,
+  wizardSteps,
 } from './setup-logic';
 
 export type { ModelStatus };
 
-export interface DownloadProgress {
-  modelName: string;
-  /** The model the download was asked for, even while its VAD transfers. */
-  localName: string;
-  fileName: string;
-  fileIndex: number;
-  fileCount: number;
-  /** Bytes fetched so far across the whole download, VAD included. */
-  downloadedBytes: number;
-  /** The download's size; 0 when unknown. */
-  totalBytes: number;
-  done: boolean;
-}
-
-/** Every download of the current run, for the setup checklist. */
-export interface SetupChecklist {
-  rows: ChecklistRow[];
-  doneBytes: number;
-  totalBytes: number;
-  settled: boolean;
-}
-
-export type SetupPhase = 'loading' | 'engine' | 'choose' | 'downloading' | 'gpu' | 'error' | 'done';
+/**
+ * The wizard's screens, then the run itself. `gpu` is the plugin install, not
+ * the screen that offers it — that one is the `acceleration` step.
+ */
+export type SetupPhase = 'loading' | WizardStep | 'downloading' | 'gpu' | 'error' | 'done';
 
 const STORAGE_KEY = 'lune-setup-complete';
 
@@ -74,70 +59,8 @@ export function markSetupComplete(): void {
   window.localStorage?.setItem(STORAGE_KEY, '1');
 }
 
-/** Where an interrupted download queue is parked between window lifetimes. */
-const QUEUE_KEY = 'lune-setup-queue';
-
-/**
- * A download run, written down so closing the window does not lose it.
- *
- * Closing the main window destroys the webview and every ref in this hook with
- * it. The transfer itself keeps going — it runs on a blocking task in Rust — but
- * without this the models queued behind it were simply forgotten, and reopening
- * started setup again from the first step.
- */
-interface SavedQueue {
-  /** Models still to fetch, the one in flight first. */
-  pending: string[];
-  /** How many the run started with, so the progress bar keeps its scale. */
-  total: number;
-  wantsGpu: boolean;
-}
-
-function saveSetupQueue(queue: SavedQueue): void {
-  try {
-    window.localStorage?.setItem(QUEUE_KEY, JSON.stringify(queue));
-  } catch {
-    // Storage can be unavailable or full. Losing the resume record only costs
-    // the user the clicks it would have saved, so it is never worth failing on.
-  }
-}
-
-function loadSetupQueue(): SavedQueue | null {
-  try {
-    const raw = window.localStorage?.getItem(QUEUE_KEY);
-    if (!raw) return null;
-    const parsed: unknown = JSON.parse(raw);
-    // Hand-checked rather than trusted: this outlives the app version that
-    // wrote it, and a shape change would otherwise crash the first screen.
-    if (
-      typeof parsed !== 'object' ||
-      parsed === null ||
-      !Array.isArray((parsed as SavedQueue).pending) ||
-      !(parsed as SavedQueue).pending.every((n) => typeof n === 'string')
-    ) {
-      return null;
-    }
-    const queue = parsed as SavedQueue;
-    return {
-      pending: queue.pending,
-      total: typeof queue.total === 'number' ? queue.total : queue.pending.length,
-      wantsGpu: queue.wantsGpu === true,
-    };
-  } catch {
-    return null;
-  }
-}
-
 function toRunModel(m: ModelStatus): RunModel {
   return { localName: m.localName, name: m.name, bytes: m.downloadBytes ?? 0 };
-}
-
-function clearSetupQueue(): void {
-  try {
-    window.localStorage?.removeItem(QUEUE_KEY);
-  } catch {
-    // Same reasoning as `saveSetupQueue`.
-  }
 }
 
 interface FirstRunGate {
@@ -199,11 +122,7 @@ interface ModelSetup {
   phase: SetupPhase;
   models: ModelStatus[];
   selected: Set<string>;
-  currentModel: string | null;
-  progress: DownloadProgress | null;
   error: string | null;
-  completed: number;
-  totalToDownload: number;
   /** Chosen ASR engine (engine step). */
   engineBackend: AsrBackendValue;
   /** Chosen Whisper size, used when engineBackend is WhisperCpp. */
@@ -235,33 +154,39 @@ interface ModelSetup {
    */
   gpuError: string | null;
   /** The downloads of the current run; `null` before a run starts. */
-  checklist: SetupChecklist | null;
+  checklist: RunChecklist | null;
   setEngineBackend: (backend: AsrBackendValue) => void;
   setEngineWhisper: (model: WhisperModelValue) => void;
   setEngineParakeet: (model: ParakeetModelValue) => void;
   setEngineLanguage: (language: string) => void;
+  /** The wizard's screens for the current choices, in order. */
+  steps: WizardStep[];
   confirmEngine: () => void;
-  backToEngine: () => void;
+  /** Move to the next wizard screen. */
+  goNext: () => void;
+  /** Move to the previous wizard screen. */
+  goBack: () => void;
   toggleModel: (localName: string) => void;
   startDownload: () => void;
-  /** Stop the transfer in flight and return to the download step. */
+  /** Stop the transfer in flight and return to the review. */
   cancelDownload: () => void;
   retry: () => void;
 }
 
 /**
  * Drives the model setup flow used on the welcome screen.
- * Owns the state machine: loading → choose → downloading → done | error.
+ * Owns the state machine: loading → the wizard screens (engine → acceleration →
+ * extras → review) → downloading → done | error.
  */
 export function useModelSetup({ onFinish }: { onFinish: () => void }): ModelSetup {
   const [phase, setPhase] = useState<SetupPhase>('loading');
   const [models, setModels] = useState<ModelStatus[]>([]);
   const [selected, setSelected] = useState<Set<string>>(new Set());
-  const [currentModel, setCurrentModel] = useState<string | null>(null);
-  const [progress, setProgress] = useState<DownloadProgress | null>(null);
+  // `models` describes the engine being picked only once the engine step has
+  // saved the choice and reloaded the list.
+  const [modelsConfirmed, setModelsConfirmed] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [completed, setCompleted] = useState(0);
-  const [totalToDownload, setTotalToDownload] = useState(0);
+  const run = useModelDownloads();
   const [engineBackend, setEngineBackend] = useState<AsrBackendValue>('WhisperCpp');
   const [engineWhisper, setEngineWhisper] = useState<WhisperModelValue>('Medium');
   const [engineParakeet, setEngineParakeet] = useState<ParakeetModelValue>('TdtV3Q8');
@@ -281,35 +206,31 @@ export function useModelSetup({ onFinish }: { onFinish: () => void }): ModelSetu
   const [gpuProgress, setGpuProgress] = useState<GpuInstallProgressDto | null>(null);
   const [gpuInstalled, setGpuInstalled] = useState(false);
   const [gpuError, setGpuError] = useState<string | null>(null);
-  // The run's models with their sizes, fixed when it starts so finished rows
-  // keep their place, and where the GPU step is. Both drive the checklist.
-  const [runModels, setRunModels] = useState<RunModel[]>([]);
   const [gpuStep, setGpuStep] = useState<GpuStep | null>(null);
-  const [failedModel, setFailedModel] = useState<string | null>(null);
-  // Bytes of a run model already on disk when its download stopped.
-  const [keptBytes, setKeptBytes] = useState<ReadonlyMap<string, number>>(new Map());
 
-  const queueRef = useRef<string[]>([]);
-  const currentRef = useRef<string | null>(null);
-  // The model whose download failed. Held separately from `currentModel`,
-  // which the failure clears (and which only reaches `currentRef` on the next
-  // render anyway) — reading it back in `retry` therefore found `null`, so the
-  // failed model was silently dropped from the queue and setup could finish
-  // reporting success with that model still missing.
-  const failedRef = useRef<string | null>(null);
   // Latched when the download starts, so a model failure and its retry cannot
   // lose the pending GPU step, and a second pass cannot repeat it.
   const wantsGpuRef = useRef(false);
-  // Set by `cancelDownload` so the rejection the backend answers with is
-  // recognised as the user's own doing rather than reported as a failure.
-  const cancelledRef = useRef(false);
-  // Mirrors `totalToDownload` for the parked record. A run writes its total and
-  // starts its first download in one tick, before that state has re-rendered.
-  const totalRef = useRef(0);
 
+  // A finished or failed run is this wizard's, so it must not keep showing as a
+  // checklist on the Models page once setup is left.
+  useEffect(() => () => modelDownloads.dismiss(), []);
+
+  // The queue decides when the models are in or one failed; this decides what
+  // the wizard does next.
   useEffect(() => {
-    currentRef.current = currentModel;
-  }, [currentModel]);
+    if (phase !== 'downloading') return;
+    if (run.status === 'settled') {
+      if (wantsGpuRef.current) {
+        wantsGpuRef.current = false;
+        runGpuInstall();
+        return;
+      }
+      setPhase('done');
+    } else if (run.status === 'failed') {
+      setPhase('error');
+    }
+  }, [phase, run.status]);
 
   // Bootstrap: hydrate real settings (the workspace bridge hasn't started yet
   // during onboarding) so the engine choice doesn't clobber them, pre-select the
@@ -367,7 +288,7 @@ export function useModelSetup({ onFinish }: { onFinish: () => void }): ModelSetu
         // rather than sending the user back through the engine step.
         const active = await backendClient.activeModelDownload().catch(() => null);
         if (cancelled) return;
-        if (resumeSetup(s, active)) return;
+        if (resumeSetup(library, active)) return;
 
         // Models already on disk normally mean there is nothing to set up. A
         // pending GPU plugin is the exception: skipping to `done` would be the
@@ -426,58 +347,10 @@ export function useModelSetup({ onFinish }: { onFinish: () => void }): ModelSetu
       })
       .finally(() => {
         setGpuProgress(null);
-        setPhase('done');
+        // Only finish if the install still owns the screen: a user who has
+        // since left the phase must not be pulled back to the end.
+        setPhase((current) => (current === 'gpu' ? 'done' : current));
       });
-  });
-
-  // Advance to next item in queue (or finish). Stable ref so the listener
-  // below can call it without restarting subscriptions.
-  const advance = useEffectEvent(() => {
-    const next = queueRef.current.shift();
-    if (!next) {
-      setCurrentModel(null);
-      setProgress(null);
-      clearSetupQueue();
-      if (wantsGpuRef.current) {
-        wantsGpuRef.current = false;
-        runGpuInstall();
-        return;
-      }
-      setPhase('done');
-      return;
-    }
-    setCurrentModel(next);
-    setProgress(null);
-    // Written down before the call, not after: the point of the record is to
-    // survive the window closing, and the window can close at any moment
-    // during the transfer this line is about to start.
-    saveSetupQueue({
-      pending: [next, ...queueRef.current],
-      total: totalRef.current,
-      wantsGpu: wantsGpuRef.current,
-    });
-    invoke('download_model_cmd', { localName: next }).catch((err) => {
-      // A cancel rejects this call by design; reporting it as a failed download
-      // would show an error for the thing the user just asked for.
-      if (cancelledRef.current) return;
-      failedRef.current = next;
-      setFailedModel(next);
-      setError(String(err));
-      setCurrentModel(null);
-      setPhase('error');
-      // Finished files survive a failure, and a retry fetches only the rest,
-      // so the row keeps counting them.
-      const runBytes = runModels.find((m) => m.localName === next)?.bytes ?? 0;
-      invoke<ModelStatus[]>('check_model_status')
-        .then((library) => {
-          const missing = library.find((m) => m.localName === next)?.downloadBytes;
-          if (missing == null || runBytes === 0) return;
-          setKeptBytes((prev) => new Map(prev).set(next, Math.max(0, runBytes - missing)));
-        })
-        .catch(() => {
-          // Only the bar's accuracy depends on this.
-        });
-    });
   });
 
   /**
@@ -489,17 +362,10 @@ export function useModelSetup({ onFinish }: { onFinish: () => void }): ModelSetu
    */
   const beginDownload = useEffectEvent(
     (list: ModelStatus[], selection: Set<string>, gpu: boolean) => {
-      failedRef.current = null;
-      setFailedModel(null);
-      cancelledRef.current = false;
       wantsGpuRef.current = gpu;
-
       const pending = list.filter((m) => selection.has(m.localName) && !m.ready);
-      setRunModels(pending.map(toRunModel));
-      setKeptBytes(new Map());
       setGpuStep(gpu ? 'queued' : null);
       if (pending.length === 0) {
-        clearSetupQueue();
         if (gpu) {
           wantsGpuRef.current = false;
           runGpuInstall();
@@ -509,92 +375,24 @@ export function useModelSetup({ onFinish }: { onFinish: () => void }): ModelSetu
         return;
       }
 
-      queueRef.current = pending.map((m) => m.localName);
-      totalRef.current = pending.length;
-      setTotalToDownload(pending.length);
-      setCompleted(0);
       setError(null);
+      modelDownloads.start(pending.map(toRunModel), gpu ? 'gpu' : null);
       setPhase('downloading');
-      advance();
     },
   );
 
-  /**
-   * Pick up a download run the last window lifetime left unfinished.
-   *
-   * Two sources, and the backend wins where they disagree: the parked queue says
-   * what was still owed, and `active` says what is transferring right now. The
-   * record can be a moment out of date — it is written just before each call —
-   * so a model the backend is working on is always put at the head.
-   *
-   * Returns whether it took over the flow.
-   */
-  const resumeSetup = useEffectEvent((list: ModelStatus[], active: string | null): boolean => {
-    const saved = loadSetupQueue();
-    if (!saved && !active) return false;
-
-    const isReady = (name: string) => list.some((m) => m.localName === name && m.ready);
-    const remaining = (saved?.pending ?? []).filter((name) => !isReady(name));
-    const queue = active ? [active, ...remaining.filter((n) => n !== active)] : remaining;
-
-    if (queue.length === 0) {
-      clearSetupQueue();
-      return false;
-    }
-
-    // `total` only sets the progress bar's scale, so a record that disagrees
-    // with reality must not produce a bar reading "3 of 2".
-    const total = Math.max(saved?.total ?? queue.length, queue.length);
-    wantsGpuRef.current = saved?.wantsGpu ?? false;
-    // Models finished before the window closed are not known by name here, so
-    // the resumed list starts from what is still owed.
-    setRunModels(
-      queue.flatMap((name) => {
-        const m = list.find((x) => x.localName === name);
-        return m ? [toRunModel(m)] : [];
-      }),
+  const resumeSetup = useEffectEvent((library: ModelStatus[], active: string | null): boolean => {
+    const resumed = modelDownloads.resume(
+      library.map((m) => ({ ...toRunModel(m), ready: m.ready })),
+      active,
     );
+    if (!resumed) return false;
+    wantsGpuRef.current = resumed.tag === 'gpu';
     setGpuStep(wantsGpuRef.current ? 'queued' : null);
-    setKeptBytes(new Map());
-    setFailedModel(null);
-    failedRef.current = null;
-    cancelledRef.current = false;
-    totalRef.current = total;
-    setTotalToDownload(total);
-    setCompleted(total - queue.length);
     setError(null);
     setPhase('downloading');
-    queueRef.current = queue;
-    // Re-issuing the command for a model already in flight is safe: the backend
-    // recognises the duplicate and answers from the transfer already running.
-    advance();
     return true;
   });
-
-  // Subscribe to backend download events
-  useEffect(() => {
-    if (!isTauriRuntime()) return;
-    const unlisten = listen<DownloadProgress>('lune://download-progress', (e) => {
-      setProgress(e.payload);
-      if (e.payload.done) {
-        const finished = currentRef.current;
-        if (finished) {
-          setModels((prev) =>
-            prev.map((m) => (m.localName === finished ? { ...m, ready: true } : m)),
-          );
-          setCompleted((c) => c + 1);
-        }
-        setProgress(null);
-        // A file that lands in the same moment Cancel is pressed still counts as
-        // installed, but must not carry the flow onward past the user's answer.
-        if (cancelledRef.current) return;
-        advance();
-      }
-    });
-    return () => {
-      unlisten.then((fn) => fn());
-    };
-  }, []);
 
   const toggleModel = useCallback(
     (localName: string) => {
@@ -641,29 +439,37 @@ export function useModelSetup({ onFinish }: { onFinish: () => void }): ModelSetu
       const selection = buildInitialSelection(asrName, s);
       setModels(s);
       setSelected(selection);
-      // The choose step earns its click only when there is something to choose.
-      // With one engine and one required model there never is: the list holds a
-      // single locked card under a heading that says "choose", and every first
-      // run pays a click to click past it.
-      if (hasOptionalModels(asrName, s)) {
-        setPhase('choose');
-        return;
-      }
-      const gpu = gpuStatus
-        ? shouldInstallGpuDuringSetup(gpuStatus.state, gpuStatus.downloadAvailable, useGpu)
-        : false;
-      beginDownload(s, selection, gpu);
+      setModelsConfirmed(true);
+      // The list of screens depends on the model list just fetched, so it is
+      // worked out here from that rather than from state React has not yet
+      // re-rendered with. Nothing downloads until the review screen.
+      setPhase(stepAfter(wizardSteps(gpuOffer, hasOptionalModels(asrName, s)), 'engine'));
     } catch (err) {
       console.error('[use-model-setup] confirmEngine failed', err);
       setError(String(err));
       setPhase('engine');
     }
-  }, [engineBackend, engineWhisper, engineParakeet, engineLanguage, onFinish, gpuStatus, useGpu]);
+  }, [engineBackend, engineWhisper, engineParakeet, engineLanguage, onFinish, gpuOffer]);
 
-  const backToEngine = useCallback(() => {
+  // Before the engine is confirmed `models` is the saved choice's list, not the
+  // one being picked, so it says nothing about extras yet.
+  const pickEngine =
+    <T>(set: (value: T) => void) =>
+    (value: T) => {
+      set(value);
+      setModelsConfirmed(false);
+    };
+  const steps = wizardSteps(gpuOffer, modelsConfirmed && hasOptionalModels(asrLocalName, models));
+
+  const goNext = useCallback(() => {
     setError(null);
-    setPhase('engine');
-  }, []);
+    setPhase((current) => (isWizardStep(current) ? stepAfter(steps, current) : current));
+  }, [steps]);
+
+  const goBack = useCallback(() => {
+    setError(null);
+    setPhase((current) => (isWizardStep(current) ? stepBefore(steps, current) : current));
+  }, [steps]);
 
   // Accept/decline GPU acceleration through the same settings path the
   // Transcription settings toggle uses, so the choice persists identically.
@@ -680,26 +486,23 @@ export function useModelSetup({ onFinish }: { onFinish: () => void }): ModelSetu
     : false;
   const willInstallGpu = gpuDownloadOffered && useGpu;
 
-  const currentBytes =
-    progress && progress.localName === currentModel ? progress.downloadedBytes : 0;
-  const checklist: SetupChecklist | null =
-    runModels.length > 0 || gpuStep !== null
-      ? buildChecklist({
-          models: runModels,
-          finished: new Set(models.filter((m) => m.ready).map((m) => m.localName)),
-          current: currentModel,
-          currentBytes,
-          failed: failedModel,
-          kept: keptBytes,
-          gpu:
-            gpuStep === null
-              ? null
-              : {
-                  bytes: gpuStatus?.downloadBytes ?? 0,
-                  step: gpuStep,
-                  downloadedBytes: gpuProgress?.downloadedBytes ?? 0,
-                },
-        })
+  // Finished by the shared queue means installed, whatever the earlier list says.
+  const modelsNow = models.map((m) =>
+    run.finished.includes(m.localName) ? { ...m, ready: true } : m,
+  );
+
+  const checklist: RunChecklist | null =
+    run.models.length > 0 || gpuStep !== null
+      ? runChecklist(
+          run,
+          gpuStep === null
+            ? null
+            : {
+                bytes: gpuStatus?.downloadBytes ?? 0,
+                step: gpuStep,
+                downloadedBytes: gpuProgress?.downloadedBytes ?? 0,
+              },
+        )
       : null;
 
   const startDownload = useCallback(() => {
@@ -712,48 +515,27 @@ export function useModelSetup({ onFinish }: { onFinish: () => void }): ModelSetu
    * The backend notices within a chunk and drops the partial file, so nothing
    * half-written is left claiming to be a model. Returning to `choose` rather
    * than `error` matters: this is the user's own decision, and the screen they
-   * land on is the one with the button that starts it again.
+   * land on is the review, with the button that starts it again.
    */
   const cancelDownload = useCallback(() => {
-    cancelledRef.current = true;
-    queueRef.current = [];
+    modelDownloads.cancel();
     wantsGpuRef.current = false;
-    setRunModels([]);
     setGpuStep(null);
-    clearSetupQueue();
-    void backendClient.cancelModelDownload().catch((err) => {
-      console.warn('[use-model-setup] cancel request failed', err);
-    });
-    setCurrentModel(null);
-    setProgress(null);
     setError(null);
-    setPhase('choose');
+    setPhase('review');
   }, []);
 
   const retry = useCallback(() => {
-    cancelledRef.current = false;
-    if (failedRef.current) {
-      // Put the failed model back at the head of the queue: `advance` had
-      // already shifted it off, so retrying without this would skip the one
-      // download that did not work.
-      queueRef.current = [failedRef.current, ...queueRef.current];
-      failedRef.current = null;
-    }
-    setFailedModel(null);
     setError(null);
+    modelDownloads.retry();
     setPhase('downloading');
-    advance();
   }, []);
 
   return {
     phase,
-    models,
+    models: modelsNow,
     selected,
-    currentModel,
-    progress,
-    error,
-    completed,
-    totalToDownload,
+    error: run.status === 'failed' ? run.error : error,
     engineBackend,
     engineWhisper,
     engineParakeet,
@@ -768,12 +550,14 @@ export function useModelSetup({ onFinish }: { onFinish: () => void }): ModelSetu
     gpuInstalled,
     gpuError,
     checklist,
-    setEngineBackend,
-    setEngineWhisper,
-    setEngineParakeet,
-    setEngineLanguage,
+    setEngineBackend: pickEngine(setEngineBackend),
+    setEngineWhisper: pickEngine(setEngineWhisper),
+    setEngineParakeet: pickEngine(setEngineParakeet),
+    setEngineLanguage: pickEngine(setEngineLanguage),
+    steps,
     confirmEngine,
-    backToEngine,
+    goNext,
+    goBack,
     toggleModel,
     startDownload,
     cancelDownload,

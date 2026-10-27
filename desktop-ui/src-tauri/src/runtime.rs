@@ -155,14 +155,25 @@ enum StartFailureReport {
     /// error status and a toast the user gets a beep, silence, and no way to
     /// learn the cause.
     Error,
+    /// Setup is still running. The user is told, but the status stays as it
+    /// was: a red status outlives the setup that caused it.
+    Refused,
 }
 
 fn classify_start_failure(error: &str) -> StartFailureReport {
     if error == START_ABORTED {
         StartFailureReport::Abandoned
+    } else if error == SETUP_RUNNING {
+        StartFailureReport::Refused
     } else {
         StartFailureReport::Error
     }
+}
+
+/// The status to publish once a rebuild has installed a working pipeline: a
+/// stale `error` from before it is cleared, anything live is left alone.
+fn status_after_rebuild(current: &str) -> Option<&'static str> {
+    (current == "error").then_some("ready")
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -831,7 +842,9 @@ impl AppRuntime {
         *self.inner.llm_service.write().await = new_llm_service;
         let new_settings_val = new_settings.read().await.clone();
         *self.inner.settings.write().await = new_settings_val;
+        drop(pipeline);
         tracing::info!("pipeline pre-warmed");
+        self.clear_stale_error().await;
         Ok(())
     }
 
@@ -1362,6 +1375,12 @@ impl AppRuntime {
         }
         match report {
             StartFailureReport::Abandoned => self.publish_status("ready").await,
+            StartFailureReport::Refused => {
+                self.push_session_event(SessionStreamEvent::SessionWarning {
+                    message: error.to_owned(),
+                })
+                .await;
+            }
             StartFailureReport::Error => {
                 warn!(error = %error, "dictation start failed");
                 self.publish_status("error").await;
@@ -1375,11 +1394,30 @@ impl AppRuntime {
 
     async fn publish_status(&self, status: &str) {
         let prev = std::mem::replace(&mut *self.inner.status.write().await, status.to_owned());
+        self.announce_status(&prev, status).await;
+    }
 
+    /// Clears a leftover `error` once a rebuild has landed. The check and the
+    /// swap share one lock, so a session that went live meanwhile keeps its
+    /// status instead of being overwritten with `ready`.
+    async fn clear_stale_error(&self) {
+        let (prev, next) = {
+            let mut slot = self.inner.status.write().await;
+            let Some(next) = status_after_rebuild(&slot) else {
+                return;
+            };
+            (std::mem::replace(&mut *slot, next.to_owned()), next)
+        };
+        self.announce_status(&prev, next).await;
+    }
+
+    /// Everything that follows a status change: the cue, the session stream,
+    /// and the pill.
+    async fn announce_status(&self, prev: &str, status: &str) {
         // Sound cues play from the backend — the only surface guaranteed alive
         // (the main window is destroyed on close / absent when minimized, and
         // the pill may not exist).
-        if let Some(cue) = cue_for_transition(&prev, status) {
+        if let Some(cue) = cue_for_transition(prev, status) {
             self.play_cue(cue).await;
         }
 
@@ -2170,11 +2208,33 @@ mod idle_unload_tests {
 #[cfg(test)]
 mod tests {
     use super::{
-        Arc, AsrRegistry, LivePipeline, PipelineState, PrewarmAction, ReloadScope, START_ABORTED,
-        SetupWork, StartFailureReport, asr_backend_needs_reload, classify_start_failure,
-        cue_for_transition, reconcile_prewarm, release_backend, remote_backends_denied,
-        sanitize_error_for_frontend, undelivered_message,
+        Arc, AsrRegistry, LivePipeline, PipelineState, PrewarmAction, ReloadScope, SETUP_RUNNING,
+        START_ABORTED, SetupWork, StartFailureReport, asr_backend_needs_reload,
+        classify_start_failure, cue_for_transition, reconcile_prewarm, release_backend,
+        remote_backends_denied, sanitize_error_for_frontend, status_after_rebuild,
+        undelivered_message,
     };
+
+    /// Pressing the hotkey during setup is a refusal, not a failure: it must
+    /// not turn the status red, because nothing clears it until the next
+    /// dictation succeeds.
+    #[test]
+    fn a_start_refused_during_setup_is_not_an_error() {
+        assert_eq!(
+            classify_start_failure(SETUP_RUNNING),
+            StartFailureReport::Refused
+        );
+    }
+
+    /// A rebuild that lands means the backend is connected, so a leftover red
+    /// status from before it is cleared. Live statuses are never touched.
+    #[test]
+    fn a_finished_rebuild_clears_only_a_stale_error() {
+        assert_eq!(status_after_rebuild("error"), Some("ready"));
+        assert_eq!(status_after_rebuild("ready"), None);
+        assert_eq!(status_after_rebuild("listening"), None);
+        assert_eq!(status_after_rebuild("processing"), None);
+    }
 
     /// Dictation stays refused until the last download or GPU install ends,
     /// however many overlap.

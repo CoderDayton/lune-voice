@@ -5,8 +5,8 @@ import { GlobalRegistrator } from '@happy-dom/global-registrator';
 import { i18n } from '@lingui/core';
 import { I18nProvider } from '@lingui/react';
 import { cleanup, render } from '@testing-library/react';
-import { DownloadChecklist } from '../../src/features/welcome/components/download-checklist';
-import { buildChecklist } from '../../src/features/welcome/setup-logic';
+import { buildChecklist } from '../../src/features/model-downloads/checklist';
+import { DownloadChecklist } from '../../src/features/model-downloads/components/download-checklist';
 
 i18n.load('en', {});
 i18n.activate('en');

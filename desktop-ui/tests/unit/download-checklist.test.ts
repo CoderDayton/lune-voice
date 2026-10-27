@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 import { describe, expect, it } from 'bun:test';
-import { buildChecklist, setupDownloadBytes } from '../../src/features/welcome/setup-logic';
+import { buildChecklist } from '../../src/features/model-downloads/checklist';
+import { setupDownloadBytes } from '../../src/features/welcome/setup-logic';
 
 const models = [
   { localName: 'a', name: 'A', bytes: 100 },
