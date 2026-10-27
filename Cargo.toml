@@ -112,7 +112,7 @@ url = { version = "2", features = ["serde"] }
 zeroize = "1"
 diesel = { version = "2", features = ["sqlite", "returning_clauses_for_sqlite_3_35"] }
 diesel_migrations = "2"
-dirs = "6"
+dirs = "7"
 cpal = "0.18"
 pulseaudio = "0.3"
 futures-executor = "0.3"
