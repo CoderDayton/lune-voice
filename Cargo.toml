@@ -120,7 +120,7 @@ rubato = "5.0"
 audioadapter-buffers = "5"
 mimalloc = { version = "0.1", default-features = false }
 hound = "3.5"
-async-openai = { version = "0.41", features = ["chat-completion", "middleware"] }
+async-openai = { version = "0.42", features = ["chat-completion", "middleware"] }
 reqwest = { version = "0.13", features = ["json", "multipart", "stream"] }
 # Streaming + unpacking the downloadable GPU backend archive
 # (crates/lune-persist/src/gpu_plugin.rs).
