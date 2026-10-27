@@ -275,7 +275,7 @@ fn max_download_bytes(release: &GpuPluginRelease) -> u64 {
 /// event crosses the IPC boundary, and a several-hundred-megabyte download
 /// yields tens of thousands of chunks — reporting each one floods the channel
 /// and janks the UI it is meant to inform.
-const PROGRESS_STEP_BYTES: u64 = 4 * 1024 * 1024;
+const PROGRESS_STEP_BYTES: u64 = 1024 * 1024;
 
 /// Stream the archive to `path`, hashing as it goes. Returns the hex digest.
 async fn stream_to_file<F>(

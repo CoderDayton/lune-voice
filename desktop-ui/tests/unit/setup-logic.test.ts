@@ -22,6 +22,7 @@ const model = (localName: string, opts: Partial<ModelStatus> = {}): ModelStatus 
   description: '',
   required: false,
   inUse: false,
+  downloadBytes: null,
   ...opts,
 });
 

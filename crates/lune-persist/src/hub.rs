@@ -66,6 +66,8 @@ pub struct ModelStatus {
     pub role: ModelRole,
     /// Actual on-disk directory size in bytes when installed; `None` otherwise.
     pub size_bytes: Option<u64>,
+    /// Bytes a download would fetch, VAD included; see [`download_bytes`].
+    pub download_bytes: Option<u64>,
 }
 
 /// Progress update during model download.
@@ -73,9 +75,15 @@ pub struct ModelStatus {
 #[serde(rename_all = "camelCase")]
 pub struct DownloadProgress {
     pub model_name: String,
+    /// The model the download was asked for, even while its VAD transfers.
+    pub local_name: String,
     pub file_name: String,
     pub file_index: usize,
     pub file_count: usize,
+    /// Bytes fetched so far across every file of this download, VAD included.
+    pub downloaded_bytes: u64,
+    /// What [`download_bytes`] said this download would fetch; 0 if unknown.
+    pub total_bytes: u64,
     pub done: bool,
 }
 
@@ -220,8 +228,45 @@ impl ModelSpec {
             } else {
                 None
             },
+            download_bytes: download_bytes(models_dir, self.local_name()),
         }
     }
+
+    /// Pinned bytes of the required files not yet on disk at their pinned
+    /// size. `None` when a missing file has no pinned size.
+    fn missing_bytes(&self, models_dir: &Path) -> Option<u64> {
+        let Self::Directory {
+            repo_id,
+            required_files,
+            local_name,
+            ..
+        } = self;
+        let dir = models_dir.join(local_name);
+        required_files.iter().try_fold(0u64, |sum, f| {
+            let size = pinned_meta(repo_id, f)?.size?;
+            let on_disk = std::fs::metadata(dir.join(file_basename(f)))
+                .is_ok_and(|m| m.is_file() && m.len() == size);
+            Some(if on_disk { sum } else { sum + size })
+        })
+    }
+}
+
+/// Bytes [`download_model`] would fetch for `local_name` right now, counting
+/// the VAD a speech model brings along. `Some(0)` when nothing is missing,
+/// `None` for an unknown model or a missing file without a pinned size.
+pub fn download_bytes(models_dir: &Path, local_name: &str) -> Option<u64> {
+    let spec = ModelSpec::all()
+        .into_iter()
+        .find(|s| s.local_name() == local_name)?;
+    let own = spec.missing_bytes(models_dir)?;
+    if !brings_vad(&spec) {
+        return Some(own);
+    }
+    Some(own + ModelSpec::vad_model().missing_bytes(models_dir)?)
+}
+
+fn brings_vad(spec: &ModelSpec) -> bool {
+    spec.role() == ModelRole::SpeechToText && spec.local_name() != model_dirs::DIR_WHISPER_VAD
 }
 
 /// Returns true if every local model the active config depends on is present.
@@ -383,51 +428,75 @@ pub fn download_model(
     // endpoint-trim with it, but it's never offered as its own library entry.
     // Fetched first (when absent) so the final `done` event below belongs to the
     // requested model and the UI clears progress on the right name.
-    if spec.role() == ModelRole::SpeechToText && spec.local_name() != model_dirs::DIR_WHISPER_VAD {
+    // Every event, the VAD's included, is reported against the requested
+    // model: the UI shows one row per model, and the VAD is part of its size.
+    let progress = ProgressReporter {
+        model_name: spec.display_name().to_string(),
+        local_name: spec.local_name().to_string(),
+        total_bytes: download_bytes(models_dir, local_name).unwrap_or(0),
+        file: std::cell::RefCell::new((String::new(), 0, 0)),
+        downloaded: std::cell::Cell::new(0),
+        reported: std::cell::Cell::new(0),
+        on_progress: &on_progress,
+    };
+    let on_file = |file: &str, idx: usize, count: usize| {
+        *progress.file.borrow_mut() = (file.to_string(), idx, count);
+        progress.emit(false);
+    };
+    let on_bytes = |n: u64| progress.add(n);
+
+    progress.emit(false);
+    if brings_vad(&spec) {
         let vad = ModelSpec::vad_model();
         if !vad.is_ready(models_dir) {
-            let vad_name = vad.display_name().to_string();
-            ensure_directory_model_with_progress(&vad, models_dir, cancel, |file, idx, total| {
-                on_progress(DownloadProgress {
-                    model_name: vad_name.clone(),
-                    file_name: file.to_string(),
-                    file_index: idx,
-                    file_count: total,
-                    done: false,
-                });
-            })?;
+            ensure_directory_model_with_progress(&vad, models_dir, cancel, on_file, &on_bytes)?;
+        }
+    }
+    let path = ensure_directory_model_with_progress(&spec, models_dir, cancel, on_file, &on_bytes)?;
+    progress.emit(true);
+
+    Ok(path)
+}
+
+/// Turns per-chunk byte counts into [`DownloadProgress`] events, at most one
+/// per [`PROGRESS_STEP_BYTES`] so a fast link does not flood the IPC channel.
+struct ProgressReporter<'a> {
+    model_name: String,
+    local_name: String,
+    total_bytes: u64,
+    /// Current file name, index and count.
+    file: std::cell::RefCell<(String, usize, usize)>,
+    downloaded: std::cell::Cell<u64>,
+    reported: std::cell::Cell<u64>,
+    on_progress: &'a dyn Fn(DownloadProgress),
+}
+
+const PROGRESS_STEP_BYTES: u64 = 1024 * 1024;
+
+impl ProgressReporter<'_> {
+    fn add(&self, n: u64) {
+        let downloaded = self.downloaded.get() + n;
+        self.downloaded.set(downloaded);
+        if downloaded - self.reported.get() >= PROGRESS_STEP_BYTES {
+            self.emit(false);
         }
     }
 
-    let name = spec.display_name().to_string();
-    on_progress(DownloadProgress {
-        model_name: name.clone(),
-        file_name: String::new(),
-        file_index: 0,
-        file_count: 0,
-        done: false,
-    });
-
-    let path =
-        ensure_directory_model_with_progress(&spec, models_dir, cancel, |file, idx, total| {
-            on_progress(DownloadProgress {
-                model_name: name.clone(),
-                file_name: file.to_string(),
-                file_index: idx,
-                file_count: total,
-                done: false,
-            });
-        })?;
-
-    on_progress(DownloadProgress {
-        model_name: name,
-        file_name: String::new(),
-        file_index: 0,
-        file_count: 0,
-        done: true,
-    });
-
-    Ok(path)
+    fn emit(&self, done: bool) {
+        let downloaded = self.downloaded.get();
+        self.reported.set(downloaded);
+        let (file_name, file_index, file_count) = self.file.borrow().clone();
+        (self.on_progress)(DownloadProgress {
+            model_name: self.model_name.clone(),
+            local_name: self.local_name.clone(),
+            file_name,
+            file_index,
+            file_count,
+            downloaded_bytes: downloaded,
+            total_bytes: self.total_bytes,
+            done,
+        });
+    }
 }
 
 /// Flat list of every file path in a repo, from the repo-info endpoint.
@@ -896,6 +965,7 @@ fn download_file_direct(
     filename: &str,
     dst: &Path,
     cancel: &AtomicBool,
+    on_bytes: &dyn Fn(u64),
 ) -> PersistResult<FileMetadata> {
     let url = resolve_url(repo_id, filename);
     let mut resp = hub_get(&url)
@@ -928,7 +998,7 @@ fn download_file_direct(
         // cancel that only takes effect at the end of the transfer is not a
         // cancel. 256 KiB is large enough that the check costs nothing and
         // small enough to stop within a few milliseconds of the click.
-        let result = copy_cancellable(&mut resp, &mut writer, cancel, filename);
+        let result = copy_cancellable(&mut resp, &mut writer, cancel, filename, on_bytes);
         let (written, sha256) = writer.finish();
         result.map(|()| (written, sha256))
     };
@@ -971,6 +1041,7 @@ fn ensure_directory_model_with_progress(
     models_dir: &Path,
     cancel: &AtomicBool,
     on_file: impl Fn(&str, usize, usize),
+    on_bytes: &dyn Fn(u64),
 ) -> PersistResult<PathBuf> {
     let ModelSpec::Directory {
         repo_id,
@@ -1059,7 +1130,7 @@ fn ensure_directory_model_with_progress(
         // client, a server that accepted the connection and then went silent
         // hung this thread forever with no way to cancel, on the
         // multi-hundred-MB model transfers.
-        let observed = match download_file_direct(repo_id, filename, &dst, cancel) {
+        let observed = match download_file_direct(repo_id, filename, &dst, cancel, on_bytes) {
             Ok(observed) => observed,
             Err(e @ PersistError::ModelDownloadCancelled) => {
                 // Same reason as the between-files check above, and this is the
@@ -1121,6 +1192,7 @@ fn copy_cancellable(
     writer: &mut impl std::io::Write,
     cancel: &AtomicBool,
     filename: &str,
+    on_bytes: &dyn Fn(u64),
 ) -> PersistResult<()> {
     const CHUNK: usize = 256 * 1024;
     let mut buf = vec![0u8; CHUNK];
@@ -1137,6 +1209,7 @@ fn copy_cancellable(
         writer
             .write_all(&buf[..read])
             .map_err(|e| PersistError::ModelDownload(format!("{filename}: write: {e}")))?;
+        on_bytes(read as u64);
     }
 }
 
@@ -1595,7 +1668,8 @@ mod tests {
         let mut source = &b"payload"[..];
         let mut sink: Vec<u8> = Vec::new();
 
-        let error = copy_cancellable(&mut source, &mut sink, &cancel, "ggml.bin").unwrap_err();
+        let error =
+            copy_cancellable(&mut source, &mut sink, &cancel, "ggml.bin", &|_| {}).unwrap_err();
 
         assert!(matches!(error, PersistError::ModelDownloadCancelled));
         assert!(sink.is_empty(), "a cancelled copy must write nothing");
@@ -1611,9 +1685,65 @@ mod tests {
         let mut source = payload.as_slice();
         let mut sink: Vec<u8> = Vec::new();
 
-        copy_cancellable(&mut source, &mut sink, &cancel, "ggml.bin").unwrap();
+        copy_cancellable(&mut source, &mut sink, &cancel, "ggml.bin", &|_| {}).unwrap();
 
         assert_eq!(sink, payload);
+    }
+
+    #[test]
+    fn a_copy_reports_every_byte_it_moves() {
+        let cancel = AtomicBool::new(false);
+        let payload = vec![7u8; 700 * 1024];
+        let mut source = payload.as_slice();
+        let mut sink: Vec<u8> = Vec::new();
+        let seen = std::cell::Cell::new(0u64);
+
+        copy_cancellable(&mut source, &mut sink, &cancel, "ggml.bin", &|n| {
+            seen.set(seen.get() + n);
+        })
+        .unwrap();
+
+        assert_eq!(seen.get(), payload.len() as u64);
+    }
+
+    fn pinned_size(repo_id: &str, file: &str) -> u64 {
+        pinned_meta(repo_id, file)
+            .and_then(|m| m.size)
+            .expect("pinned")
+    }
+
+    #[test]
+    fn a_fresh_speech_model_counts_its_own_bytes_and_the_vad() {
+        // The VAD is fetched as part of any speech model, so the size the user
+        // is shown up front has to include it.
+        let tmp = tempfile::tempdir().unwrap();
+        let base = pinned_size(WhisperModel::REPO_ID, "ggml-base-q8_0.bin");
+        let vad = pinned_size(VAD_REPO_ID, model_dirs::WHISPER_VAD_GGML);
+        assert_eq!(
+            download_bytes(tmp.path(), model_dirs::DIR_WHISPER_BASE),
+            Some(base + vad)
+        );
+    }
+
+    #[test]
+    fn an_installed_vad_is_not_counted_again() {
+        let tmp = tempfile::tempdir().unwrap();
+        let vad_dir = tmp.path().join(model_dirs::DIR_WHISPER_VAD);
+        std::fs::create_dir_all(&vad_dir).unwrap();
+        std::fs::File::create(vad_dir.join(model_dirs::WHISPER_VAD_GGML))
+            .unwrap()
+            .set_len(pinned_size(VAD_REPO_ID, model_dirs::WHISPER_VAD_GGML))
+            .unwrap();
+        assert_eq!(
+            download_bytes(tmp.path(), model_dirs::DIR_WHISPER_BASE),
+            Some(pinned_size(WhisperModel::REPO_ID, "ggml-base-q8_0.bin"))
+        );
+    }
+
+    #[test]
+    fn an_unknown_model_has_no_download_size() {
+        let tmp = tempfile::tempdir().unwrap();
+        assert_eq!(download_bytes(tmp.path(), "not-a-model"), None);
     }
 
     /// Real-network end-to-end: `download_model` writes the integrity

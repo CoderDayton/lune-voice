@@ -13,7 +13,7 @@ msgstr ""
 "Language-Team: \n"
 "Plural-Forms: \n"
 
-#: src/features/welcome/welcome-page.tsx:515
+#: src/features/welcome/welcome-page.tsx:421
 msgid "— change it any time in Settings › Dictation."
 msgstr "— 設定 › 音声入力 でいつでも変更できます。"
 
@@ -195,7 +195,7 @@ msgstr "30 分後"
 msgid "After 5 minutes"
 msgstr "5 分後"
 
-#: src/features/welcome/welcome-page.tsx:225
+#: src/features/welcome/welcome-page.tsx:220
 msgid "All required models are already installed. Continue when you're ready."
 msgstr "必要なモデルはすべてインストール済みです。準備ができたら続行してください。"
 
@@ -382,7 +382,7 @@ msgstr "キャンセル"
 msgid "Cancel current recording"
 msgstr "現在の録音をキャンセル"
 
-#: src/features/welcome/welcome-page.tsx:412
+#: src/features/welcome/welcome-page.tsx:315
 msgid "Cancel download"
 msgstr "ダウンロードを中止"
 
@@ -412,7 +412,7 @@ msgstr "録音デバイスと、発話を検出する方法。"
 msgid "Casual"
 msgstr "カジュアル"
 
-#: src/features/welcome/welcome-page.tsx:474
+#: src/features/welcome/welcome-page.tsx:380
 msgid "Change engine"
 msgstr "エンジンを変更"
 
@@ -430,15 +430,15 @@ msgstr "起動時に更新を確認"
 msgid "Check whether a newer version has been released."
 msgstr "新しいバージョンが公開されているか確認します。"
 
-#: src/features/welcome/welcome-page.tsx:219
-msgid "Check your network and we'll pick up where we left off."
-msgstr "ネットワーク接続を確認してください。中断したところから再開します。"
+#: src/features/welcome/welcome-page.tsx:214
+msgid "Check your network and retry. Files that finished downloading are kept."
+msgstr "ネットワークを確認して再試行してください。ダウンロードが完了したファイルは保持されます。"
 
 #: src/features/updates/update-dialog.tsx:108
 msgid "Checking for updates"
 msgstr "更新を確認中"
 
-#: src/features/welcome/welcome-page.tsx:82
+#: src/features/welcome/welcome-page.tsx:76
 msgid "Checking installed models…"
 msgstr "インストールされているモデルを確認しています…"
 
@@ -464,8 +464,8 @@ msgstr "Lune Voice の見た目を選択します。"
 msgid "Choose how transcripts are restyled — sent to an OpenAI-compatible endpoint you configure, local or hosted, or left off entirely."
 msgstr "文字起こしの整形方法を選びます — 設定した OpenAI 互換エンドポイント（ローカルでもホスト型でも）に送信するか、まったく行わないかを選べます。"
 
-#: src/features/welcome/welcome-page.tsx:222
-#: src/features/welcome/welcome-page.tsx:228
+#: src/features/welcome/welcome-page.tsx:217
+#: src/features/welcome/welcome-page.tsx:223
 msgid "Choose the AI models to install. Everything runs offline — no cloud, no accounts."
 msgstr "インストールする AI モデルを選択します。すべてオフラインで動作し、クラウドもアカウントも不要です。"
 
@@ -473,7 +473,7 @@ msgstr "インストールする AI モデルを選択します。すべてオ�
 msgid "Choose your dictation language below. Parakeet cannot tell Lune which language it heard, so until one is set every dictation is formatted as English."
 msgstr "下で音声入力の言語を選んでください。Parakeet は聞き取った言語を Lune に伝えられないため、言語を設定するまではすべて英語として整形されます。"
 
-#: src/features/welcome/welcome-page.tsx:207
+#: src/features/welcome/welcome-page.tsx:199
 msgid "Choose your speech engine. Everything runs offline — no cloud, no accounts."
 msgstr "音声認識エンジンを選択します。すべてオフラインで動作し、クラウドもアカウントも不要です。"
 
@@ -538,8 +538,8 @@ msgstr "接続中"
 msgid "Contact the release server shortly after startup and tell you only when a newer version exists. Off by default — dictation itself never needs the network."
 msgstr "起動の少し後にリリースサーバーへ接続し、新しいバージョンがあるときだけ通知します。既定はオフです — 音声入力そのものにネットワークは不要です。"
 
-#: src/features/welcome/welcome-page.tsx:389
-#: src/features/welcome/welcome-page.tsx:468
+#: src/features/welcome/welcome-page.tsx:295
+#: src/features/welcome/welcome-page.tsx:374
 msgid "Continue"
 msgstr "続行"
 
@@ -585,7 +585,7 @@ msgstr "修正の感度"
 msgid "Corrections Lune Voice applies every time you dictate"
 msgstr "音声入力のたびに Lune Voice が適用する修正"
 
-#: src/features/welcome/welcome-page.tsx:322
+#: src/features/welcome/components/download-checklist.tsx:99
 msgid "Could not download GPU support — transcription will run on the CPU. You can retry under Settings › Models."
 msgstr "GPU サポートをダウンロードできませんでした — 文字起こしは CPU で実行されます。設定 › モデル から再試行できます。"
 
@@ -629,7 +629,7 @@ msgstr "新しいスタイルを作成"
 msgid "Create style"
 msgstr "スタイルを作成"
 
-#: src/features/welcome/welcome-page.tsx:514
+#: src/features/welcome/welcome-page.tsx:420
 msgid "Ctrl+Space"
 msgstr "Ctrl+Space"
 
@@ -778,25 +778,28 @@ msgstr "履歴を保存しない"
 msgid "Download"
 msgstr "ダウンロード"
 
-#: src/features/welcome/welcome-page.tsx:460
+#: src/features/welcome/welcome-page.tsx:366
 msgid "Download {pendingCount} models"
 msgstr "{pendingCount} 個のモデルをダウンロード"
 
-#: src/features/welcome/welcome-page.tsx:459
+#: src/features/welcome/welcome-page.tsx:363
+msgid "Download {size}"
+msgstr "{size} をダウンロード"
+
+#: src/features/welcome/welcome-page.tsx:365
 msgid "Download 1 model"
 msgstr "1 個のモデルをダウンロード"
 
-#: src/features/welcome/welcome-page.tsx:162
+#: src/features/welcome/welcome-page.tsx:152
 msgid "Download failed"
 msgstr "ダウンロードに失敗しました"
 
-#: src/features/welcome/welcome-page.tsx:218
+#: src/features/welcome/welcome-page.tsx:213
 msgid "Download interrupted"
 msgstr "ダウンロードが中断されました"
 
 #: src/components/ui/byte-progress.tsx:37
 #: src/features/settings/components/asr-engine-cards.tsx:356
-#: src/features/welcome/components/model-card.tsx:105
 msgid "Download progress"
 msgstr "ダウンロード進行状況"
 
@@ -804,11 +807,11 @@ msgstr "ダウンロード進行状況"
 msgid "Download transcript"
 msgstr "文字起こしをダウンロード"
 
-#: src/features/welcome/welcome-page.tsx:313
-msgid "Downloading GPU support."
-msgstr "GPU サポートをダウンロードしています。"
+#: src/features/welcome/components/download-checklist.tsx:106
+msgid "Downloaded"
+msgstr "ダウンロード済み"
 
-#: src/features/welcome/welcome-page.tsx:212
+#: src/features/welcome/welcome-page.tsx:204
 msgid "Downloading models"
 msgstr "モデルをダウンロード中"
 
@@ -818,7 +821,6 @@ msgstr "更新をダウンロード中"
 
 #: src/features/settings/components/asr-engine-cards.tsx:318
 #: src/features/settings/components/gpu-backend-card.tsx:27
-#: src/features/welcome/welcome-page.tsx:404
 msgid "Downloading…"
 msgstr "ダウンロード中…"
 
@@ -881,7 +883,7 @@ msgstr "スタイル調整を有効にする"
 msgid "Engine"
 msgstr "エンジン"
 
-#: src/features/welcome/welcome-page.tsx:441
+#: src/features/welcome/welcome-page.tsx:344
 msgid "Enter Lune Voice"
 msgstr "Lune Voice を開く"
 
@@ -925,7 +927,7 @@ msgstr "最速ですが、精度は最も低くなります。古い PC や低�
 msgid "Feature request"
 msgstr "機能リクエスト"
 
-#: src/features/welcome/welcome-page.tsx:216
+#: src/features/welcome/welcome-page.tsx:211
 msgid "Fetching GPU support. This is the last step, and it only happens once."
 msgstr "GPU サポートを取得しています。これが最後のステップで、一度だけ行われます。"
 
@@ -1043,9 +1045,16 @@ msgstr "おはようございます。"
 
 #: src/features/settings/components/gpu-backend-card.tsx:55
 #: src/features/welcome/components/engine-step.tsx:349
-#: src/features/welcome/welcome-page.tsx:304
 msgid "GPU acceleration"
 msgstr "GPU アクセラレーション"
+
+#: src/features/welcome/components/download-checklist.tsx:117
+msgid "GPU support"
+msgstr "GPU サポート"
+
+#: src/features/welcome/welcome-page.tsx:208
+msgid "GPU support is downloaded. Moving transcription onto it now."
+msgstr "GPU サポートをダウンロードしました。文字起こしを GPU に切り替えています。"
 
 #: src/features/settings/components/gpu-backend-card.tsx:153
 msgid "GPU support is installed but not working."
@@ -1096,7 +1105,7 @@ msgstr "話している間ホットキーを押し続け、離すと停止しま
 msgid "Hold while speaking"
 msgstr "話している間押し続ける"
 
-#: src/features/welcome/welcome-page.tsx:510
+#: src/features/welcome/welcome-page.tsx:416
 msgid "Hold your hotkey, speak, then let go. The text is typed into whatever app you were using."
 msgstr "ホットキーを押したまま話し、離してください。テキストは使用中のアプリに入力されます。"
 
@@ -1120,7 +1129,7 @@ msgstr "音声入力の通知音の音量。"
 msgid "How the pill bar looks. Changes apply immediately."
 msgstr "インジケーターバーの見た目です。変更はすぐに反映されます。"
 
-#: src/features/welcome/welcome-page.tsx:507
+#: src/features/welcome/welcome-page.tsx:413
 msgid "How to dictate"
 msgstr "音声入力の使い方"
 
@@ -1155,8 +1164,7 @@ msgid "Install and restart"
 msgstr "インストールして再起動"
 
 #: src/features/settings/components/asr-engine-cards.tsx:324
-#: src/features/welcome/components/model-card.tsx:88
-#: src/features/welcome/welcome-page.tsx:306
+#: src/features/welcome/components/model-card.tsx:74
 msgid "Installed"
 msgstr "インストール済み"
 
@@ -1176,6 +1184,10 @@ msgstr "更新をインストール中"
 #: src/features/styles/components/style-editor-modal.tsx:137
 msgid "Instructions"
 msgstr "指示"
+
+#: src/features/welcome/components/download-checklist.tsx:101
+msgid "Interrupted"
+msgstr "中断されました"
 
 #: src/components/feedback/help-feedback-dialog.tsx:252
 msgid "Join the discussions"
@@ -1361,7 +1373,7 @@ msgstr "モデル"
 msgid "Model size"
 msgstr "モデルサイズ"
 
-#: src/features/welcome/welcome-page.tsx:528
+#: src/features/welcome/welcome-page.tsx:434
 msgid "Models are stored locally. No telemetry, no accounts."
 msgstr "モデルはローカルに保存されます。テレメトリもアカウントもありません。"
 
@@ -1541,7 +1553,7 @@ msgstr "OpenAI 互換"
 msgid "OpenAI-compatible API"
 msgstr "OpenAI 互換 API"
 
-#: src/features/welcome/components/model-card.tsx:95
+#: src/features/welcome/components/model-card.tsx:81
 msgid "Optional"
 msgstr "任意"
 
@@ -1561,7 +1573,8 @@ msgstr "出力"
 msgid "Overall footprint of the pill bar."
 msgstr "インジケーターバー全体の大きさ。"
 
-#: src/features/welcome/welcome-page.tsx:348
+#: src/features/welcome/components/download-checklist.tsx:34
+#: src/features/welcome/components/download-checklist.tsx:45
 msgid "Overall progress"
 msgstr "全体の進捗"
 
@@ -1645,9 +1658,9 @@ msgstr "配置"
 msgid "Play a short sound when dictation starts, finishes, or runs into an error."
 msgstr "音声入力の開始時・完了時・エラー時に短い音を再生します。"
 
-#: src/features/welcome/welcome-page.tsx:416
-msgid "Please keep the app open until downloads finish"
-msgstr "ダウンロードが完了するまでアプリを開いたままにしてください"
+#: src/features/welcome/welcome-page.tsx:319
+msgid "Please keep the app open until setup finishes"
+msgstr "セットアップが完了するまでアプリを開いたままにしてください"
 
 #: src/features/settings/sections/pill-section.tsx:116
 msgid "Position"
@@ -1681,7 +1694,7 @@ msgstr "ホットキーで開始し、もう一度押すと停止します。長
 msgid "Press your combo — hold Esc or click away to cancel"
 msgstr "キーの組み合わせを押してください — Esc を長押しするか、別の場所をクリックするとキャンセルします"
 
-#: src/features/welcome/welcome-page.tsx:511
+#: src/features/welcome/welcome-page.tsx:417
 msgid "Press your hotkey, speak, then press it again. The text is typed into whatever app you were using."
 msgstr "ホットキーを押して話し、もう一度押してください。テキストは使用中のアプリに入力されます。"
 
@@ -1787,7 +1800,7 @@ msgstr "置換後"
 msgid "Report a problem, suggest an idea, or just tell us how it's going."
 msgstr "問題の報告、アイデアの提案、使い心地の感想などをお寄せください。"
 
-#: src/features/welcome/components/model-card.tsx:92
+#: src/features/welcome/components/model-card.tsx:78
 msgid "Required"
 msgstr "必須"
 
@@ -1799,7 +1812,7 @@ msgstr "リセット"
 msgid "Reset position"
 msgstr "位置をリセット"
 
-#: src/features/welcome/welcome-page.tsx:317
+#: src/features/welcome/components/download-checklist.tsx:105
 msgid "Restart Lune Voice to start using your GPU."
 msgstr "GPU を使うには Lune Voice を再起動してください。"
 
@@ -1811,7 +1824,7 @@ msgstr "再起動が必要"
 msgid "Retry"
 msgstr "再試行"
 
-#: src/features/welcome/welcome-page.tsx:428
+#: src/features/welcome/welcome-page.tsx:331
 msgid "Retry download"
 msgstr "ダウンロードを再試行"
 
@@ -1881,7 +1894,7 @@ msgstr "文字起こしを検索…"
 msgid "Select all sessions on this page"
 msgstr "このページのすべてのセッションを選択"
 
-#: src/features/welcome/welcome-page.tsx:464
+#: src/features/welcome/welcome-page.tsx:370
 msgid "Select required models"
 msgstr "必要なモデルを選択"
 
@@ -1938,11 +1951,11 @@ msgstr "ホットキーを設定"
 msgid "Set the language you speak. Auto uses detection from speech."
 msgstr "話す言語を設定します。「自動検出」では音声から言語を判別します。"
 
-#: src/features/welcome/welcome-page.tsx:457
+#: src/features/welcome/welcome-page.tsx:361
 msgid "Set up GPU acceleration"
 msgstr "GPU アクセラレーションを設定"
 
-#: src/features/welcome/welcome-page.tsx:215
+#: src/features/welcome/welcome-page.tsx:210
 msgid "Setting up your GPU"
 msgstr "GPU をセットアップしています"
 
@@ -1989,9 +2002,9 @@ msgstr "サイズ"
 msgid "Size & shape"
 msgstr "サイズと形状"
 
-#: src/features/welcome/welcome-page.tsx:393
-#: src/features/welcome/welcome-page.tsx:431
-#: src/features/welcome/welcome-page.tsx:477
+#: src/features/welcome/welcome-page.tsx:299
+#: src/features/welcome/welcome-page.tsx:334
+#: src/features/welcome/welcome-page.tsx:383
 msgid "Skip for now"
 msgstr "今はスキップ"
 
@@ -2197,7 +2210,7 @@ msgstr "このコピーは自動で更新できません。{RELEASES_URL} から
 msgid "This model is in use by your current configuration. Dictation may not work until you reinstall it or pick another."
 msgstr "このモデルは現在の設定で使用中です。再インストールするか別のモデルを選択するまで、音声入力が機能しない場合があります。"
 
-#: src/features/welcome/welcome-page.tsx:213
+#: src/features/welcome/welcome-page.tsx:205
 msgid "This only happens once. You can keep using your computer in the meantime."
 msgstr "この処理は初回のみです。その間もコンピューターは通常どおり使えます。"
 
@@ -2298,6 +2311,10 @@ msgstr "文字起こしは GPU で実行されています。"
 msgid "Transcription model name, e.g. whisper-1."
 msgstr "文字起こしモデル名（例: whisper-1）。"
 
+#: src/features/welcome/components/download-checklist.tsx:104
+msgid "Transcription now runs on your GPU."
+msgstr "文字起こしは GPU で実行されるようになりました。"
+
 #: src/features/settings/components/gpu-backend-card.tsx:150
 msgid "Transcription runs on the CPU. An optional download moves it to your GPU for noticeably lower latency."
 msgstr "文字起こしは CPU で実行されます。任意のダウンロードで GPU に移すと、遅延が目に見えて小さくなります。"
@@ -2318,6 +2335,14 @@ msgstr "トリガーフレーズ"
 #: src/features/updates/update-dialog.tsx:330
 msgid "Try again"
 msgstr "再試行"
+
+#: src/features/welcome/welcome-page.tsx:207
+msgid "Turning on your GPU"
+msgstr "GPU を有効にしています"
+
+#: src/features/welcome/components/download-checklist.tsx:95
+msgid "Turning on your GPU…"
+msgstr "GPU を有効にしています…"
 
 #: src/features/settings/data/settings-data.ts:648
 msgid "Type"
@@ -2419,13 +2444,17 @@ msgstr "累計平均との比較"
 msgid "Wait {cooldown}s"
 msgstr "あと {cooldown} 秒"
 
-#: src/features/welcome/welcome-page.tsx:224
+#: src/features/welcome/components/download-checklist.tsx:93
+msgid "Waiting"
+msgstr "待機中"
+
+#: src/features/welcome/welcome-page.tsx:219
 msgid "Welcome back"
 msgstr "おかえりなさい"
 
-#: src/features/welcome/welcome-page.tsx:206
-#: src/features/welcome/welcome-page.tsx:221
-#: src/features/welcome/welcome-page.tsx:227
+#: src/features/welcome/welcome-page.tsx:198
+#: src/features/welcome/welcome-page.tsx:216
+#: src/features/welcome/welcome-page.tsx:222
 msgid "Welcome to Lune Voice"
 msgstr "Lune Voice へようこそ"
 
@@ -2525,7 +2554,7 @@ msgstr "現在のバージョンは {version} です。"
 msgid "You say"
 msgstr "話す内容"
 
-#: src/features/welcome/welcome-page.tsx:209
+#: src/features/welcome/welcome-page.tsx:201
 msgid "You're all set"
 msgstr "準備は完了です"
 
@@ -2550,8 +2579,8 @@ msgid "Your GPU is ready — use it for faster transcription."
 msgstr "GPU の準備ができています — より速い文字起こしに使いましょう。"
 
 #: src/features/welcome/components/engine-step.tsx:340
-msgid "Your GPU qualifies. Setup downloads GPU support, then a restart turns it on."
-msgstr "お使いの GPU は条件を満たしています。セットアップで GPU サポートをダウンロードし、再起動で有効になります。"
+msgid "Your GPU qualifies. Setup downloads GPU support and turns it on."
+msgstr "お使いの GPU は対応しています。セットアップで GPU サポートをダウンロードして有効にします。"
 
 #: src/features/settings/components/gpu-backend-card.tsx:141
 msgid "Your graphics driver is too old for GPU transcription. Update it and the download will appear here."
@@ -2561,7 +2590,7 @@ msgstr "グラフィックドライバーが古いため、GPU で文字起こ�
 msgid "your hotkey"
 msgstr "ホットキー"
 
-#: src/features/welcome/welcome-page.tsx:210
+#: src/features/welcome/welcome-page.tsx:202
 msgid "Your models are ready. Everything stays on this machine."
 msgstr "モデルの準備ができました。データはすべてこのマシン内に保存されます。"
 

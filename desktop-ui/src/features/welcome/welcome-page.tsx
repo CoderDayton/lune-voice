@@ -7,22 +7,20 @@ import {
   CircleAlert,
   Download,
   Keyboard,
-  Loader2,
   Mic,
   RefreshCw,
   ShieldCheck,
   Wand2,
   X,
-  Zap,
 } from 'lucide-react';
 import luneLogo from '../../assets/lune-voice-logo.png';
-import { ByteProgress } from '../../components/ui/byte-progress';
-import type { GpuInstallProgressDto } from '../../lib/backend/generated/GpuInstallProgressDto';
+import { formatBytes } from '../../lib/format-bytes';
 import { workspaceStore } from '../../store/workspace-store';
+import { DownloadChecklist } from './components/download-checklist';
 import { EngineStep } from './components/engine-step';
 import { ModelCard } from './components/model-card';
 import { ReadyChecks } from './components/ready-checks';
-import { isSetupSatisfiable } from './setup-logic';
+import { isSetupSatisfiable, setupDownloadBytes } from './setup-logic';
 import { type SetupPhase, useModelSetup } from './use-model-setup';
 
 interface WelcomePageProps {
@@ -41,11 +39,7 @@ export function WelcomePage({ onFinish }: WelcomePageProps) {
     phase,
     models,
     selected,
-    currentModel,
-    progress,
     error,
-    completed,
-    totalToDownload,
     engineBackend,
     engineWhisper,
     engineParakeet,
@@ -55,10 +49,9 @@ export function WelcomePage({ onFinish }: WelcomePageProps) {
     useGpu,
     setUseGpu,
     willInstallGpu,
-    gpuProgress,
     gpuDownloadBytes,
-    gpuInstalled,
     gpuError,
+    checklist,
     setEngineBackend,
     setEngineWhisper,
     setEngineParakeet,
@@ -73,7 +66,8 @@ export function WelcomePage({ onFinish }: WelcomePageProps) {
 
   const requiredOk = isSetupSatisfiable(asrLocalName, models, selected);
   const pending = models.filter((m) => selected.has(m.localName) && !m.ready);
-  const overallPct = totalToDownload > 0 ? Math.round((completed / totalToDownload) * 100) : 0;
+  const runBytes = setupDownloadBytes(models, selected, willInstallGpu ? gpuDownloadBytes : 0);
+  const gpuActivating = checklist?.rows.some((r) => r.id === 'gpu' && r.state === 'activating');
 
   if (phase === 'loading') {
     return (
@@ -92,13 +86,14 @@ export function WelcomePage({ onFinish }: WelcomePageProps) {
        began. Now: header, a 32px break, the body as one tight list, a 32px
        break, the action. */
     <div className="flex flex-col">
-      <Header phase={phase} requiredOk={requiredOk} pendingCount={pending.length} error={error} />
+      <Header
+        phase={phase}
+        requiredOk={requiredOk}
+        pendingCount={pending.length}
+        gpuActivating={gpuActivating === true}
+      />
 
       <div className="mt-8 flex flex-col gap-4">
-        {phase === 'downloading' && (
-          <OverallProgress completed={completed} total={totalToDownload} pct={overallPct} />
-        )}
-
         {phase === 'engine' ? (
           <EngineStep
             engineBackend={engineBackend}
@@ -115,6 +110,12 @@ export function WelcomePage({ onFinish }: WelcomePageProps) {
             onSelectLanguage={setEngineLanguage}
             onToggleGpu={setUseGpu}
           />
+        ) : checklist && phase !== 'choose' ? (
+          <DownloadChecklist
+            checklist={checklist}
+            gpuActive={gpuOffer === 'active'}
+            gpuError={gpuError}
+          />
         ) : (
           <div className="flex flex-col gap-3">
             {models.map((m) => {
@@ -128,24 +129,13 @@ export function WelcomePage({ onFinish }: WelcomePageProps) {
                   icon={modelIcon(m.localName)}
                   ready={m.ready}
                   selected={selected.has(m.localName)}
-                  active={currentModel === m.localName}
                   canToggle={!essential && phase === 'choose'}
-                  progress={currentModel === m.localName ? progress : null}
+                  sizeBytes={m.ready ? null : m.downloadBytes}
                   onToggle={() => toggleModel(m.localName)}
                 />
               );
             })}
           </div>
-        )}
-
-        {(phase === 'gpu' || gpuInstalled || gpuError) && (
-          <GpuSetupCard
-            installing={phase === 'gpu'}
-            progress={gpuProgress}
-            totalBytes={gpuDownloadBytes}
-            installed={gpuInstalled}
-            error={gpuError}
-          />
         )}
 
         {phase === 'done' && (
@@ -174,6 +164,7 @@ export function WelcomePage({ onFinish }: WelcomePageProps) {
           requiredOk={requiredOk}
           pendingCount={pending.length}
           willInstallGpu={willInstallGpu}
+          runBytes={runBytes}
           onStart={startDownload}
           onCancel={cancelDownload}
           onRetry={retry}
@@ -194,10 +185,11 @@ interface HeaderProps {
   phase: SetupPhase;
   requiredOk: boolean;
   pendingCount: number;
-  error: string | null;
+  /** The GPU plugin is downloaded and loading into the app. */
+  gpuActivating: boolean;
 }
 
-function Header({ phase, requiredOk, pendingCount, error: _error }: HeaderProps) {
+function Header({ phase, requiredOk, pendingCount, gpuActivating }: HeaderProps) {
   const { t } = useLingui();
   let title: string;
   let subtitle: string;
@@ -211,12 +203,15 @@ function Header({ phase, requiredOk, pendingCount, error: _error }: HeaderProps)
   } else if (phase === 'downloading') {
     title = t`Downloading models`;
     subtitle = t`This only happens once. You can keep using your computer in the meantime.`;
+  } else if (phase === 'gpu' && gpuActivating) {
+    title = t`Turning on your GPU`;
+    subtitle = t`GPU support is downloaded. Moving transcription onto it now.`;
   } else if (phase === 'gpu') {
     title = t`Setting up your GPU`;
     subtitle = t`Fetching GPU support. This is the last step, and it only happens once.`;
   } else if (phase === 'error') {
     title = t`Download interrupted`;
-    subtitle = t`Check your network and we'll pick up where we left off.`;
+    subtitle = t`Check your network and retry. Files that finished downloading are kept.`;
   } else if (!requiredOk) {
     title = t`Welcome to Lune Voice`;
     subtitle = t`Choose the AI models to install. Everything runs offline — no cloud, no accounts.`;
@@ -263,103 +258,13 @@ function Header({ phase, requiredOk, pendingCount, error: _error }: HeaderProps)
   );
 }
 
-interface GpuSetupCardProps {
-  installing: boolean;
-  progress: GpuInstallProgressDto | null;
-  totalBytes: number;
-  installed: boolean;
-  error: string | null;
-}
-
-function GpuSetupCard({ installing, progress, totalBytes, installed, error }: GpuSetupCardProps) {
-  const { t } = useLingui();
-
-  // Only the in-flight state tints the card. A finished install is a plain
-  // card with a coloured tile and a badge — the same treatment an installed
-  // model gets, so the two sit in one stack without one shouting.
-  const tone = installing
-    ? 'border-primary/50 bg-primary/8'
-    : 'border-surface-border bg-surface-panel';
-
-  const tile = error
-    ? 'bg-warning/15 text-warning'
-    : installed
-      ? 'bg-success/15 text-success'
-      : 'bg-primary/15 text-primary';
-
-  return (
-    <div className={`rounded-box border p-4 ${tone}`}>
-      <div className="flex items-start gap-3">
-        <span className={`setup-tile ${tile}`}>
-          {installing ? (
-            <Loader2 size={18} className="animate-spin" />
-          ) : installed ? (
-            <RefreshCw size={18} strokeWidth={1.8} />
-          ) : (
-            <Zap size={18} strokeWidth={1.8} />
-          )}
-        </span>
-        <div className="min-w-0 flex-1">
-          <div className="flex flex-wrap items-center gap-2">
-            <p className="text-sm font-medium text-content-strong">{t`GPU acceleration`}</p>
-            {installed && !installing && (
-              <span className="badge badge-xs badge-soft badge-success">{t`Installed`}</span>
-            )}
-          </div>
-          {/* `select-text` because this line can carry the backend's raw error
-              string, and the shell is `select-none`. */}
-          <p className="mt-0.5 text-xs leading-snug text-content-subtle select-text">
-            {installing
-              ? t`Downloading GPU support.`
-              : installed
-                ? // The badge beside the title already says "Installed", so
-                  // the sentence only has to carry the part the badge cannot.
-                  t`Restart Lune Voice to start using your GPU.`
-                : // The backend phrases its own failures for the user and each
-                  // one already says transcription continues on the CPU, so
-                  // rendering this line *and* the error stated it twice.
-                  (error ??
-                  t`Could not download GPU support — transcription will run on the CPU. You can retry under Settings › Models.`)}
-          </p>
-          {installing && (
-            <ByteProgress
-              downloadedBytes={progress?.downloadedBytes ?? 0}
-              totalBytes={progress?.totalBytes ?? 0}
-              fallbackTotalBytes={totalBytes}
-            />
-          )}
-        </div>
-      </div>
-    </div>
-  );
-}
-
-interface OverallProgressProps {
-  completed: number;
-  total: number;
-  pct: number;
-}
-
-function OverallProgress({ completed, total, pct }: OverallProgressProps) {
-  const { t } = useLingui();
-  return (
-    <div className="setup-card p-4">
-      <div className="mb-2 flex items-center justify-between text-xs text-content-subtle">
-        <span className="font-medium uppercase tracking-wider">{t`Overall progress`}</span>
-        <span className="tabular-nums">
-          {completed} / {total} · {pct}%
-        </span>
-      </div>
-      <progress className="progress progress-primary w-full h-2" value={completed} max={total} />
-    </div>
-  );
-}
-
 interface ActionsProps {
   phase: SetupPhase;
   requiredOk: boolean;
   pendingCount: number;
   willInstallGpu: boolean;
+  /** What the run would fetch, GPU included; `null` when unknown. */
+  runBytes: number | null;
   onStart: () => void;
   onCancel: () => void;
   onRetry: () => void;
@@ -373,6 +278,7 @@ function Actions({
   requiredOk,
   pendingCount,
   willInstallGpu,
+  runBytes,
   onStart,
   onCancel,
   onRetry,
@@ -398,11 +304,8 @@ function Actions({
 
   if (phase === 'downloading' || phase === 'gpu') {
     return (
+      // No primary button: the checklist above already shows the progress.
       <div className="flex flex-col items-center gap-2">
-        <button type="button" className="btn btn-primary btn-wide" disabled>
-          <Loader2 size={16} className="animate-spin" />
-          {t`Downloading…`}
-        </button>
         {/* Only the model queue can be stopped. The GPU plugin install is a
             single archive fetch with no cancel path, and offering a button that
             did nothing would be worse than not offering one. */}
@@ -413,7 +316,7 @@ function Actions({
           </button>
         ) : (
           <p className="text-xs text-content-subtle">
-            {t`Please keep the app open until downloads finish`}
+            {t`Please keep the app open until setup finishes`}
           </p>
         )}
       </div>
@@ -448,6 +351,7 @@ function Actions({
   // choose — the GPU plugin is downloaded by the same step, so it alone is
   // enough to have something to start even when every model is already here.
   const canStart = requiredOk && (pendingCount > 0 || willInstallGpu);
+  const size = runBytes !== null ? formatBytes(runBytes) : null;
   return (
     <div className="flex flex-col items-center gap-2">
       {canStart ? (
@@ -455,9 +359,11 @@ function Actions({
           <Download size={16} />
           {pendingCount === 0
             ? t`Set up GPU acceleration`
-            : pendingCount === 1
-              ? t`Download 1 model`
-              : t`Download ${pendingCount} models`}
+            : size !== null
+              ? t`Download ${size}`
+              : pendingCount === 1
+                ? t`Download 1 model`
+                : t`Download ${pendingCount} models`}
         </button>
       ) : !requiredOk ? (
         <button type="button" className="btn btn-primary btn-wide" disabled>

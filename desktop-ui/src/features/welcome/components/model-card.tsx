@@ -2,7 +2,7 @@
 
 import { useLingui } from '@lingui/react/macro';
 import { Check, Lock, type LucideIcon } from 'lucide-react';
-import type { DownloadProgress } from '../use-model-setup';
+import { formatBytes } from '../../../lib/format-bytes';
 
 interface ModelCardProps {
   name: string;
@@ -11,9 +11,9 @@ interface ModelCardProps {
   icon: LucideIcon;
   ready: boolean;
   selected: boolean;
-  active: boolean;
   canToggle: boolean;
-  progress: DownloadProgress | null;
+  /** What selecting it would download; `null` when installed or unknown. */
+  sizeBytes: number | null;
   onToggle: () => void;
 }
 
@@ -24,36 +24,28 @@ export function ModelCard({
   icon: Icon,
   ready,
   selected,
-  active,
   canToggle,
-  progress,
+  sizeBytes,
   onToggle,
 }: ModelCardProps) {
   const { t } = useLingui();
-  const pct =
-    progress && progress.fileCount > 0
-      ? Math.round(((progress.fileIndex + 1) / progress.fileCount) * 100)
-      : 0;
 
-  // Card chrome. Only the two *transient* states tint the card — a download
-  // in flight, and a pending selection. "Installed" does not: a green card
-  // sitting in a stack of plain ones reads as a different kind of object
-  // rather than as a finished one, and on the final screen every card is
-  // installed, so the tint carried no information at all. The green moved to
-  // the icon tile and the badge, where it still scans instantly.
-  const stateClass = active
-    ? 'border-primary/50 bg-primary/8 shadow-sm'
-    : selected && !ready
+  // Card chrome. Only a pending selection tints the card. "Installed" does
+  // not: a green card sitting in a stack of plain ones reads as a different
+  // kind of object rather than as a finished one, and on the final screen
+  // every card is installed, so the tint carried no information at all. The
+  // green moved to the icon tile and the badge, where it still scans
+  // instantly. Downloads in flight show in the setup checklist instead.
+  const stateClass =
+    selected && !ready
       ? 'border-primary/35 bg-primary/5'
       : 'border-surface-border bg-surface-panel';
 
   const iconBg = ready
     ? 'bg-success/15 text-success'
-    : active
-      ? 'bg-primary/15 text-primary'
-      : selected
-        ? 'bg-primary/10 text-primary'
-        : 'bg-surface-wash text-content-subtle';
+    : selected
+      ? 'bg-primary/10 text-primary'
+      : 'bg-surface-wash text-content-subtle';
 
   return (
     <button
@@ -68,13 +60,7 @@ export function ModelCard({
     >
       <div className="flex items-start gap-3 p-4">
         <div className={`setup-tile transition-colors ${iconBg}`}>
-          {ready ? (
-            <Check size={18} strokeWidth={2.5} />
-          ) : active ? (
-            <span className="loading loading-spinner loading-sm" />
-          ) : (
-            <Icon size={18} strokeWidth={1.6} />
-          )}
+          {ready ? <Check size={18} strokeWidth={2.5} /> : <Icon size={18} strokeWidth={1.6} />}
         </div>
 
         <div className="flex-1 min-w-0">
@@ -84,7 +70,7 @@ export function ModelCard({
                 fact about a decision already made. Showing "Required" and
                 "Installed" side by side spent two badges saying one thing:
                 this model is here and staying. */}
-            {ready && !active ? (
+            {ready ? (
               <span className="badge badge-xs badge-soft badge-success">{t`Installed`}</span>
             ) : required ? (
               <span className="badge badge-xs badge-soft gap-1 text-content-subtle">
@@ -94,27 +80,16 @@ export function ModelCard({
             ) : (
               <span className="badge badge-xs badge-soft text-content-subtle">{t`Optional`}</span>
             )}
+            {sizeBytes !== null && sizeBytes > 0 && (
+              <span className="badge badge-xs badge-soft tabular-nums text-content-subtle">
+                {formatBytes(sizeBytes)}
+              </span>
+            )}
           </div>
-
-          {active && progress ? (
-            <div className="mt-2 space-y-1">
-              <progress
-                className="progress progress-primary h-1.5 w-full"
-                value={progress.fileIndex + 1}
-                max={progress.fileCount}
-                aria-label={t`Download progress`}
-              />
-              <div className="flex items-center justify-between text-xs text-content-subtle tabular-nums">
-                <span className="truncate font-mono">{progress.fileName}</span>
-                <span className="ms-2 shrink-0 font-medium text-primary">{pct}%</span>
-              </div>
-            </div>
-          ) : (
-            <p className="mt-1 text-xs leading-snug text-content-subtle">{description}</p>
-          )}
+          <p className="mt-1 text-xs leading-snug text-content-subtle">{description}</p>
         </div>
 
-        {!ready && !active && canToggle && (
+        {!ready && canToggle && (
           <div
             className={`mt-1 flex size-5 shrink-0 items-center justify-center rounded border-2 transition-colors ${
               selected

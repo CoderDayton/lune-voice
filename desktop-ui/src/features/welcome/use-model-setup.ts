@@ -23,13 +23,17 @@ import {
 } from '../settings/data/settings-data';
 import {
   asrModelLocalName,
+  buildChecklist,
   buildInitialSelection,
+  type ChecklistRow,
   type GpuAccelerationOffer,
+  type GpuStep,
   gpuAccelerationOffer,
   hasOptionalModels,
   initialSetupEngine,
   initialWhisperModel,
   type ModelStatus,
+  type RunModel,
   relevantSetupModels,
   shouldInstallGpuDuringSetup,
 } from './setup-logic';
@@ -38,10 +42,24 @@ export type { ModelStatus };
 
 export interface DownloadProgress {
   modelName: string;
+  /** The model the download was asked for, even while its VAD transfers. */
+  localName: string;
   fileName: string;
   fileIndex: number;
   fileCount: number;
+  /** Bytes fetched so far across the whole download, VAD included. */
+  downloadedBytes: number;
+  /** The download's size; 0 when unknown. */
+  totalBytes: number;
   done: boolean;
+}
+
+/** Every download of the current run, for the setup checklist. */
+export interface SetupChecklist {
+  rows: ChecklistRow[];
+  doneBytes: number;
+  totalBytes: number;
+  settled: boolean;
 }
 
 export type SetupPhase = 'loading' | 'engine' | 'choose' | 'downloading' | 'gpu' | 'error' | 'done';
@@ -108,6 +126,10 @@ function loadSetupQueue(): SavedQueue | null {
   } catch {
     return null;
   }
+}
+
+function toRunModel(m: ModelStatus): RunModel {
+  return { localName: m.localName, name: m.name, bytes: m.downloadBytes ?? 0 };
 }
 
 function clearSetupQueue(): void {
@@ -212,6 +234,8 @@ interface ModelSetup {
    * runs on the CPU without it, and Settings can retry.
    */
   gpuError: string | null;
+  /** The downloads of the current run; `null` before a run starts. */
+  checklist: SetupChecklist | null;
   setEngineBackend: (backend: AsrBackendValue) => void;
   setEngineWhisper: (model: WhisperModelValue) => void;
   setEngineParakeet: (model: ParakeetModelValue) => void;
@@ -257,6 +281,13 @@ export function useModelSetup({ onFinish }: { onFinish: () => void }): ModelSetu
   const [gpuProgress, setGpuProgress] = useState<GpuInstallProgressDto | null>(null);
   const [gpuInstalled, setGpuInstalled] = useState(false);
   const [gpuError, setGpuError] = useState<string | null>(null);
+  // The run's models with their sizes, fixed when it starts so finished rows
+  // keep their place, and where the GPU step is. Both drive the checklist.
+  const [runModels, setRunModels] = useState<RunModel[]>([]);
+  const [gpuStep, setGpuStep] = useState<GpuStep | null>(null);
+  const [failedModel, setFailedModel] = useState<string | null>(null);
+  // Bytes of a run model already on disk when its download stopped.
+  const [keptBytes, setKeptBytes] = useState<ReadonlyMap<string, number>>(new Map());
 
   const queueRef = useRef<string[]>([]);
   const currentRef = useRef<string | null>(null);
@@ -366,17 +397,32 @@ export function useModelSetup({ onFinish }: { onFinish: () => void }): ModelSetu
     setPhase('gpu');
     setGpuError(null);
     setGpuProgress(null);
-    installGpuBackend(setGpuProgress)
+    setGpuStep('downloading');
+    installGpuBackend((p) => {
+      setGpuProgress(p);
+      // `done` arrives once the archive is unpacked. The install then loads the
+      // plugin and moves the model onto the GPU before it resolves.
+      if (p.done) setGpuStep('activating');
+    })
       .then((next) => {
         // Keep the status the rest of the flow reads in step with the install,
         // so nothing downstream still believes a download is pending.
         setGpuStatus(next);
         setGpuOffer(gpuAccelerationOffer(next.state, next.downloadAvailable));
+        // The plugin loaded but found no usable GPU. A restart would not
+        // change that, so show the backend's reason instead.
+        if (next.state === 'failed') {
+          setGpuError(next.reason);
+          setGpuStep('failed');
+          return;
+        }
         setGpuInstalled(true);
+        setGpuStep('done');
       })
       .catch((err) => {
         console.warn('[use-model-setup] GPU plugin install failed', err);
         setGpuError(String(err));
+        setGpuStep('failed');
       })
       .finally(() => {
         setGpuProgress(null);
@@ -415,9 +461,22 @@ export function useModelSetup({ onFinish }: { onFinish: () => void }): ModelSetu
       // would show an error for the thing the user just asked for.
       if (cancelledRef.current) return;
       failedRef.current = next;
+      setFailedModel(next);
       setError(String(err));
       setCurrentModel(null);
       setPhase('error');
+      // Finished files survive a failure, and a retry fetches only the rest,
+      // so the row keeps counting them.
+      const runBytes = runModels.find((m) => m.localName === next)?.bytes ?? 0;
+      invoke<ModelStatus[]>('check_model_status')
+        .then((library) => {
+          const missing = library.find((m) => m.localName === next)?.downloadBytes;
+          if (missing == null || runBytes === 0) return;
+          setKeptBytes((prev) => new Map(prev).set(next, Math.max(0, runBytes - missing)));
+        })
+        .catch(() => {
+          // Only the bar's accuracy depends on this.
+        });
     });
   });
 
@@ -431,10 +490,14 @@ export function useModelSetup({ onFinish }: { onFinish: () => void }): ModelSetu
   const beginDownload = useEffectEvent(
     (list: ModelStatus[], selection: Set<string>, gpu: boolean) => {
       failedRef.current = null;
+      setFailedModel(null);
       cancelledRef.current = false;
       wantsGpuRef.current = gpu;
 
       const pending = list.filter((m) => selection.has(m.localName) && !m.ready);
+      setRunModels(pending.map(toRunModel));
+      setKeptBytes(new Map());
+      setGpuStep(gpu ? 'queued' : null);
       if (pending.length === 0) {
         clearSetupQueue();
         if (gpu) {
@@ -483,6 +546,17 @@ export function useModelSetup({ onFinish }: { onFinish: () => void }): ModelSetu
     // with reality must not produce a bar reading "3 of 2".
     const total = Math.max(saved?.total ?? queue.length, queue.length);
     wantsGpuRef.current = saved?.wantsGpu ?? false;
+    // Models finished before the window closed are not known by name here, so
+    // the resumed list starts from what is still owed.
+    setRunModels(
+      queue.flatMap((name) => {
+        const m = list.find((x) => x.localName === name);
+        return m ? [toRunModel(m)] : [];
+      }),
+    );
+    setGpuStep(wantsGpuRef.current ? 'queued' : null);
+    setKeptBytes(new Map());
+    setFailedModel(null);
     failedRef.current = null;
     cancelledRef.current = false;
     totalRef.current = total;
@@ -606,6 +680,28 @@ export function useModelSetup({ onFinish }: { onFinish: () => void }): ModelSetu
     : false;
   const willInstallGpu = gpuDownloadOffered && useGpu;
 
+  const currentBytes =
+    progress && progress.localName === currentModel ? progress.downloadedBytes : 0;
+  const checklist: SetupChecklist | null =
+    runModels.length > 0 || gpuStep !== null
+      ? buildChecklist({
+          models: runModels,
+          finished: new Set(models.filter((m) => m.ready).map((m) => m.localName)),
+          current: currentModel,
+          currentBytes,
+          failed: failedModel,
+          kept: keptBytes,
+          gpu:
+            gpuStep === null
+              ? null
+              : {
+                  bytes: gpuStatus?.downloadBytes ?? 0,
+                  step: gpuStep,
+                  downloadedBytes: gpuProgress?.downloadedBytes ?? 0,
+                },
+        })
+      : null;
+
   const startDownload = useCallback(() => {
     beginDownload(models, selected, willInstallGpu);
   }, [models, selected, willInstallGpu]);
@@ -622,6 +718,8 @@ export function useModelSetup({ onFinish }: { onFinish: () => void }): ModelSetu
     cancelledRef.current = true;
     queueRef.current = [];
     wantsGpuRef.current = false;
+    setRunModels([]);
+    setGpuStep(null);
     clearSetupQueue();
     void backendClient.cancelModelDownload().catch((err) => {
       console.warn('[use-model-setup] cancel request failed', err);
@@ -641,6 +739,7 @@ export function useModelSetup({ onFinish }: { onFinish: () => void }): ModelSetu
       queueRef.current = [failedRef.current, ...queueRef.current];
       failedRef.current = null;
     }
+    setFailedModel(null);
     setError(null);
     setPhase('downloading');
     advance();
@@ -668,6 +767,7 @@ export function useModelSetup({ onFinish }: { onFinish: () => void }): ModelSetu
     gpuDownloadBytes: gpuStatus?.downloadBytes ?? 0,
     gpuInstalled,
     gpuError,
+    checklist,
     setEngineBackend,
     setEngineWhisper,
     setEngineParakeet,
