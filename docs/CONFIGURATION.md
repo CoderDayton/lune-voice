@@ -261,7 +261,7 @@ Only a discrete GPU counts. On a machine with just integrated graphics, transcri
 
 **GPU support is decided at runtime.** The GPU backend is a Vulkan plugin the app downloads when you ask, so a CPU-only binary can still use the GPU. You need a graphics driver with Vulkan 1.2, which you install yourself. You can see the current state in Settings → Transcription, under Use hardware acceleration, which is also where you download the plugin (or with the `gpu_backend_status` command). The GPU card during setup only appears when accepting it would change something: the state is `ready`, `needs-restart`, or `not-installed` with a published plugin for this build. If you accept it while the state is `not-installed`, setup downloads the plugin.
 
-The plugin installs into `~/.local/share/lune-voice/backends/`. Delete that folder to go back to CPU. ggml builds its device list once per run, so a newly installed plugin only works after a restart, and the app tells you so.
+The plugin installs into `~/.local/share/lune-voice/backends/`. Delete that folder and restart to go back to CPU. A newly installed plugin works right away, with no restart.
 
 See [docs/GPU_PLUGIN.md](GPU_PLUGIN.md) for how detection and installation work, and [docs/RELEASE.md](RELEASE.md) for the build matrix.
 

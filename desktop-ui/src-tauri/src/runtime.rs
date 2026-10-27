@@ -11,7 +11,7 @@ use lune_audio::{AudioConfig, AudioStream};
 use lune_core::asr::AsrSessionConfig;
 use lune_core::command::VoiceCommand;
 use lune_core::config::{
-    AsrBackendConfig, LlmBackendConfig, PillVisibility, PrivacyMode, UserSettings,
+    AsrBackendConfig, DevicePolicy, LlmBackendConfig, PillVisibility, PrivacyMode, UserSettings,
 };
 use lune_core::llm::LlmService;
 use lune_core::session::SessionEvent;
@@ -78,6 +78,7 @@ struct RuntimeInner {
     /// that reports it. One toast per fallback, not one per dictation: the
     /// condition persists until the device comes back.
     capture_fallback_unreported: std::sync::atomic::AtomicBool,
+    setup_work: SetupWork,
 }
 
 /// What the dictation pipeline is doing right now.
@@ -109,6 +110,36 @@ fn asr_backend_needs_reload(current: &AsrBackendConfig, next: &AsrBackendConfig)
 
 /// A start refused because one is already running or loading.
 const ALREADY_ACTIVE: &str = "dictation session already active";
+
+/// A start refused while a model download or GPU install runs.
+const SETUP_RUNNING: &str =
+    "Lune Voice is still setting up. Dictation works once the downloads finish.";
+
+/// Model downloads and GPU installs in flight. Dictation is refused while any
+/// run: the model it would load may be half on disk, and a GPU plugin load
+/// grows the device registry a starting session reads.
+#[derive(Default)]
+struct SetupWork(std::sync::atomic::AtomicUsize);
+
+impl SetupWork {
+    fn begin(&self) -> SetupWorkGuard<'_> {
+        self.0.fetch_add(1, Ordering::SeqCst);
+        SetupWorkGuard(self)
+    }
+
+    fn running(&self) -> bool {
+        self.0.load(Ordering::SeqCst) > 0
+    }
+}
+
+/// Ends its piece of setup work when dropped, however the work ended.
+pub struct SetupWorkGuard<'a>(&'a SetupWork);
+
+impl Drop for SetupWorkGuard<'_> {
+    fn drop(&mut self) {
+        self.0.0.fetch_sub(1, Ordering::SeqCst);
+    }
+}
 
 /// A start that abandoned itself because a stop or cancel arrived while it was
 /// still loading. Not a failure — the user got what they asked for.
@@ -439,6 +470,7 @@ impl AppRuntime {
                 app,
                 pipeline: Mutex::new(pipeline),
                 start_gate: Mutex::new(()),
+                setup_work: SetupWork::default(),
                 status: RwLock::new("ready".into()),
                 session_stream: RwLock::new(None),
                 session_stream_seq: AtomicU64::new(0),
@@ -721,6 +753,47 @@ impl AppRuntime {
             }
         };
         self.request_reload(scope).await;
+    }
+
+    /// Load a GPU plugin the installer just put in place and move the model
+    /// onto it, so the GPU works without a restart.
+    /// Callers hold a [`Self::begin_setup_work`] guard, so no new dictation
+    /// starts while this runs.
+    pub async fn activate_gpu_plugin(&self, data_dir: std::path::PathBuf) -> Result<(), String> {
+        let state = {
+            // Held across the load: building a pipeline walks ggml's backend
+            // registry, which this load is about to grow.
+            let _start_guard = self.inner.start_gate.lock().await;
+            // A session that started before the setup work began creates its
+            // decoder state after the gate, and that also walks the registry.
+            while self.inner.pipeline.lock().await.is_busy() {
+                tokio::time::sleep(Duration::from_millis(100)).await;
+            }
+            tokio::task::spawn_blocking(move || {
+                lune_asr::gpu_backend::activate_downloaded(&data_dir)
+            })
+            .await
+            .map_err(|e| format!("GPU plugin load: {e}"))?
+        };
+        let ready = matches!(state, lune_asr::gpu_backend::GpuPluginState::Ready { .. });
+        // From disk, as `eager_rebuild` reads it: the in-memory copy only
+        // refreshes on a rebuild, so a recent save may not be in it yet.
+        let paths = self.inner.pipeline.lock().await.paths.clone();
+        let on_gpu = load_settings(&paths).is_ok_and(|s| s.device != DevicePolicy::Cpu);
+        if ready && on_gpu {
+            self.request_reload(ReloadScope::Full).await;
+            if let Err(error) = self.eager_rebuild().await {
+                // The next dictation retries the build.
+                warn!(%error, "GPU plugin loaded; moving the model onto it failed");
+            }
+        }
+        Ok(())
+    }
+
+    /// Refuse dictation until the returned guard drops. Taken for every model
+    /// download and GPU install.
+    pub fn begin_setup_work(&self) -> SetupWorkGuard<'_> {
+        self.inner.setup_work.begin()
     }
 
     pub async fn eager_rebuild(&self) -> Result<(), String> {
@@ -1373,6 +1446,9 @@ impl AppRuntime {
         // concurrent allocations of the same model and can OOM the GPU. The
         // loser now waits here and takes the winner's freshly-built pipeline.
         let _start_guard = self.inner.start_gate.lock().await;
+        if self.inner.setup_work.running() {
+            return Err(SETUP_RUNNING.into());
+        }
 
         // Phase 1: claim the pipeline and decide whether a rebuild is needed
         // (short lock). Entering `Loading` here is what makes a stop or cancel
@@ -2095,10 +2171,24 @@ mod idle_unload_tests {
 mod tests {
     use super::{
         Arc, AsrRegistry, LivePipeline, PipelineState, PrewarmAction, ReloadScope, START_ABORTED,
-        StartFailureReport, asr_backend_needs_reload, classify_start_failure, cue_for_transition,
-        reconcile_prewarm, release_backend, remote_backends_denied, sanitize_error_for_frontend,
-        undelivered_message,
+        SetupWork, StartFailureReport, asr_backend_needs_reload, classify_start_failure,
+        cue_for_transition, reconcile_prewarm, release_backend, remote_backends_denied,
+        sanitize_error_for_frontend, undelivered_message,
     };
+
+    /// Dictation stays refused until the last download or GPU install ends,
+    /// however many overlap.
+    #[test]
+    fn setup_work_runs_until_every_piece_has_ended() {
+        let work = SetupWork::default();
+        assert!(!work.running());
+        let download = work.begin();
+        let gpu = work.begin();
+        drop(download);
+        assert!(work.running(), "the GPU install is still going");
+        drop(gpu);
+        assert!(!work.running());
+    }
 
     /// A dictation that sits on the clipboard is recoverable, and the user has
     /// to be told to paste it — blaming an unavailable clipboard would be wrong.

@@ -56,8 +56,8 @@ in subfolders.
 `lune_asr::gpu_backend::load_plugins` scans both, and **must run before the
 first `WhisperContext`**: ggml picks a device from the registry at context
 creation. `desktop-ui/src-tauri/src/lib.rs` calls it before the Tauri builder.
-A `OnceLock` keeps it to one load; ggml's registry has no unload, so a second
-load would register every device twice.
+A mutex-guarded record keeps each directory to one load; ggml's registry has no
+unload or duplicate check, so a second load would register every device twice.
 
 ## The archive
 
@@ -125,8 +125,8 @@ refuses.
 | `DriverOutdated` | A discrete GPU whose driver predates Vulkan 1.2 | Asks for a driver update |
 | `NotInstalled` | Discrete Vulkan 1.2 GPU, plugin missing or built against another ggml | The offer, with size |
 | `Ready` | A discrete GPU registered (`Vulkan*`) | Names the device |
-| `NeedsRestart` | Plugin installed after the registry was built | Asks for a restart |
-| `Failed` | Plugin there at startup, but no discrete GPU registered | The reason: integrated only, or no Vulkan 1.2 |
+| `NeedsRestart` | Plugin put in place after startup, not by the installer | Asks for a restart |
+| `Failed` | Plugin loaded (at startup or by the installer), but no discrete GPU registered | The reason: integrated only, or no Vulkan 1.2 |
 
 The driver check asks the system Vulkan loader for its physical devices
 (`crates/lune-asr/src/vulkan_probe.rs`), off the UI thread. A found GPU is
@@ -140,8 +140,17 @@ integrated and discrete GPUs together, so the app passes that GPU's index
 instead of letting whisper.cpp take whichever comes first, which on a laptop
 is often the integrated one.
 
-`NeedsRestart` has no `reason`: nothing is wrong, ggml just can't load mid-run.
-A fresh launch reports `Ready` or `Failed`.
+An install loads the plugin into the running app (`activate_downloaded`), then
+reloads the model on the GPU. No restart. ggml can't unload a plugin or spot a
+duplicate, so this happens at most once per run.
+
+Dictation is refused while any model download or GPU install runs
+(`AppRuntime::begin_setup_work`). The load also takes the start gate and waits
+for a session already running to end, so nothing walks the device registry
+while it grows.
+
+`NeedsRestart` is only for a plugin that appeared some other way, such as a
+manual copy. It has no `reason`: nothing is wrong.
 
 IPC: `gpu_backend_status` and `install_gpu_backend` (progress over a Tauri
 `Channel`).

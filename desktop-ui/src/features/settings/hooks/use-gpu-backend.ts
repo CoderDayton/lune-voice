@@ -19,10 +19,9 @@ export interface GpuBackendState {
 }
 
 /**
- * A finished install reports `needs-restart` rather than `ready` — ggml builds
- * its backend registry once at startup and has no unload — so the status the
- * install resolves with is the whole answer, and nothing here has to remember
- * that an install happened.
+ * The install loads the plugin into the running app before it resolves, so the
+ * status it resolves with is the whole answer, and nothing here has to
+ * remember that an install happened.
  */
 export function useGpuBackend(): GpuBackendState {
   const [status, setStatus] = useState<GpuBackendStatusDto | null>(null);

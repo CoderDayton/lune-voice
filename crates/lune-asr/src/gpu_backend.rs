@@ -101,6 +101,34 @@ fn decode_device_index(kinds: &[DeviceKind]) -> Option<i32> {
         .and_then(|i| i32::try_from(i).ok())
 }
 
+/// What ggml's backend registry holds in this process.
+#[cfg_attr(not(feature = "whisper-cpp"), allow(dead_code))]
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct Loaded {
+    /// Every compute device in the registry. Not just the ones a plugin added:
+    /// a statically linked GPU build registers its device before we run, and
+    /// it is just as real.
+    devices: Vec<(String, DeviceKind)>,
+    /// Whether the downloaded plugin is in the registry.
+    plugin_loaded: bool,
+}
+
+/// Bring a plugin installed after startup into the running registry. ggml
+/// registers a backend whenever it is loaded but has no duplicate check, so a
+/// registry that already holds the plugin is left alone. `None` when nothing
+/// was loaded.
+#[cfg_attr(not(feature = "whisper-cpp"), allow(dead_code))]
+fn activate(
+    loaded: &Loaded,
+    installed: bool,
+    load: impl FnOnce() -> Vec<(String, DeviceKind)>,
+) -> Option<Loaded> {
+    (installed && !loaded.plugin_loaded).then(|| Loaded {
+        devices: load(),
+        plugin_loaded: true,
+    })
+}
+
 /// Plugin directory the GPU download installs into.
 pub fn downloaded_plugin_dir(data_dir: &Path) -> PathBuf {
     data_dir.join(DIR_GPU_BACKEND).join("vulkan")
@@ -113,9 +141,9 @@ pub fn plugin_installed(data_dir: &Path) -> bool {
 
 /// Latching only the `true` answer is what makes this sound: within one process
 /// an installed plugin cannot become uninstalled by anything but the user
-/// deleting the directory, and even then the reported state is already
-/// [`GpuPluginState::NeedsRestart`] until the next launch. A `false` answer is
-/// never cached, so a plugin installed *after* startup is still noticed.
+/// deleting the directory, and a loaded library stays loaded regardless. A
+/// `false` answer is never cached, so a plugin installed *after* startup is
+/// still noticed.
 // Only the native backend has a `state` to answer; the stub build reports
 // `Unsupported` without ever asking.
 #[cfg(feature = "whisper-cpp")]
@@ -222,10 +250,10 @@ pub enum GpuPluginState {
     Ready {
         devices: Vec<String>,
     },
-    /// Plugin installed after this process built its backend registry. ggml has
-    /// no unload, so the device can only appear on the next launch. Nothing is
-    /// wrong — kept apart from [`Self::Failed`] so the UI can say "restart" in
-    /// the user's own language instead of surfacing a failure they don't have.
+    /// Plugin put in place after startup by something other than
+    /// [`activate_downloaded`], which is the only path that loads it live.
+    /// Nothing is wrong — kept apart from [`Self::Failed`] so the UI can say
+    /// "restart" instead of surfacing a failure the user doesn't have.
     NeedsRestart,
     Failed {
         reason: String,
@@ -239,31 +267,19 @@ pub fn gpu_driver_present() -> bool {
 #[cfg(feature = "whisper-cpp")]
 mod imp {
     use super::{
-        DeviceKind, GpuPluginState, PLUGIN_FILE, bundled_plugin_dir, downloaded_plugin_dir,
+        DeviceKind, GpuPluginState, Loaded, PLUGIN_FILE, bundled_plugin_dir, downloaded_plugin_dir,
     };
     use crate::vulkan_probe::Probe;
 
     use std::ffi::{CStr, CString};
     use std::path::Path;
-    use std::sync::OnceLock;
+    use std::sync::Mutex;
 
     use tracing::{debug, info, warn};
 
-    /// Result of the one load attempt this process makes. ggml's backend
-    /// registry is process-global with no unload, so loading twice would
-    /// register duplicate devices — hence the `OnceLock`.
-    struct Loaded {
-        /// Every compute device in ggml's registry after the load. Not just the
-        /// ones the load added: a statically linked GPU build registers its
-        /// device before we run, and it is just as real.
-        devices: Vec<(String, DeviceKind)>,
-        /// Whether the downloaded plugin was on disk when the registry was
-        /// built. A plugin that arrived later cannot register until restart,
-        /// which is what separates "restart me" from "this is broken".
-        plugin_at_load: bool,
-    }
-
-    static LOADED: OnceLock<Loaded> = OnceLock::new();
+    /// ggml's backend registry is process-global and has no duplicate check,
+    /// so every load goes through this lock and is recorded here.
+    static LOADED: Mutex<Option<Loaded>> = Mutex::new(None);
 
     /// Load every ggml backend plugin from the bundled and downloaded plugin
     /// directories, returning the compute devices that registered as a result.
@@ -279,14 +295,43 @@ mod imp {
             .collect()
     }
 
-    fn loaded(data_dir: &Path) -> &'static Loaded {
-        LOADED.get_or_init(|| {
-            let plugin_at_load = super::plugin_installed_cached(data_dir);
+    fn loaded(data_dir: &Path) -> Loaded {
+        with_loaded(data_dir, |loaded| loaded.clone())
+    }
+
+    /// Run `f` on the registry record under its lock, building the registry
+    /// on first use.
+    fn with_loaded<R>(data_dir: &Path, f: impl FnOnce(&mut Loaded) -> R) -> R {
+        let mut guard = LOADED
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        let loaded = guard.get_or_insert_with(|| {
+            let plugin_loaded = super::plugin_installed_cached(data_dir);
             Loaded {
-                plugin_at_load,
-                devices: load_once(data_dir, plugin_at_load),
+                plugin_loaded,
+                devices: load_once(data_dir, plugin_loaded),
             }
-        })
+        });
+        f(loaded)
+    }
+
+    /// Load a plugin the installer just put in place, so the GPU works without
+    /// a restart. Callers must keep model builds out while this runs: whisper
+    /// and Parakeet walk the registry when they create a context.
+    pub fn activate_downloaded(data_dir: &Path) -> GpuPluginState {
+        with_loaded(data_dir, |current| {
+            // A static ggml never loads plugins, same as `load_once`.
+            let installed = whisper_rs::whisper_rs_sys::GGML_BACKEND_DL
+                && super::plugin_installed_cached(data_dir);
+            if let Some(next) = super::activate(current, installed, || {
+                load_dir(&downloaded_plugin_dir(data_dir));
+                registered()
+            }) {
+                info!(devices = ?next.devices, "GPU backend loaded without a restart");
+                *current = next;
+            }
+        });
+        state(data_dir)
     }
 
     fn load_once(data_dir: &Path, downloaded_is_intact: bool) -> Vec<(String, DeviceKind)> {
@@ -322,20 +367,24 @@ mod imp {
                 }
                 continue;
             }
-            let Ok(path) = CString::new(dir.as_os_str().as_encoded_bytes()) else {
-                warn!(dir = %dir.display(), "plugin path is not representable as a C string");
-                continue;
-            };
-            // SAFETY: `path` is a valid NUL-terminated C string that outlives
-            // the call. ggml logs and skips any plugin it cannot load, so a
-            // broken or ABI-mismatched `.so` does not abort the process.
-            unsafe { whisper_rs::whisper_rs_sys::ggml_backend_load_all_from_path(path.as_ptr()) };
-            debug!(dir = %dir.display(), "scanned for ggml backend plugins");
+            load_dir(&dir);
         }
 
         let devices = registered();
         info!(?devices, "ggml compute devices available");
         devices
+    }
+
+    fn load_dir(dir: &Path) {
+        let Ok(path) = CString::new(dir.as_os_str().as_encoded_bytes()) else {
+            warn!(dir = %dir.display(), "plugin path is not representable as a C string");
+            return;
+        };
+        // SAFETY: `path` is a valid NUL-terminated C string that outlives
+        // the call. ggml logs and skips any plugin it cannot load, so a
+        // broken or ABI-mismatched `.so` does not abort the process.
+        unsafe { whisper_rs::whisper_rs_sys::ggml_backend_load_all_from_path(path.as_ptr()) };
+        debug!(dir = %dir.display(), "scanned for ggml backend plugins");
     }
 
     /// The ggml version this process linked, as `ggml_version()` reports it.
@@ -432,7 +481,7 @@ mod imp {
             };
         }
 
-        if !loaded.plugin_at_load {
+        if !loaded.plugin_loaded {
             return GpuPluginState::NeedsRestart;
         }
         if loaded.devices.iter().any(|(_, k)| *k == DeviceKind::Igpu) {
@@ -464,9 +513,13 @@ mod imp {
     pub fn state(_data_dir: &Path) -> GpuPluginState {
         GpuPluginState::Unsupported
     }
+
+    pub fn activate_downloaded(_data_dir: &Path) -> GpuPluginState {
+        GpuPluginState::Unsupported
+    }
 }
 
-pub use imp::{load_plugins, state};
+pub use imp::{activate_downloaded, load_plugins, state};
 
 #[cfg(feature = "whisper-cpp")]
 pub(crate) use imp::{cpu_device_registered, gpu_decode_device};
@@ -481,6 +534,91 @@ mod tests {
 
     fn dev(name: &str, kind: DeviceKind) -> (String, DeviceKind) {
         (name.to_owned(), kind)
+    }
+
+    fn startup(plugin_loaded: bool) -> Loaded {
+        Loaded {
+            devices: vec![dev("CPU", DeviceKind::Cpu)],
+            plugin_loaded,
+        }
+    }
+
+    #[test]
+    fn a_plugin_installed_after_startup_loads_into_the_running_registry() {
+        let mut calls = 0;
+        let next = activate(&startup(false), true, || {
+            calls += 1;
+            vec![dev("CPU", DeviceKind::Cpu), dev("RTX", DeviceKind::Gpu)]
+        });
+        assert_eq!(calls, 1);
+        let next = next.expect("loaded");
+        assert!(next.plugin_loaded);
+        assert_eq!(discrete_gpus(&next.devices), ["RTX"]);
+    }
+
+    #[test]
+    fn a_plugin_already_in_the_registry_is_never_loaded_twice() {
+        // ggml would register its device a second time.
+        let mut calls = 0;
+        assert_eq!(
+            activate(&startup(true), true, || {
+                calls += 1;
+                Vec::new()
+            }),
+            None
+        );
+        assert_eq!(calls, 0);
+    }
+
+    #[test]
+    fn nothing_is_loaded_until_the_installed_plugin_verifies() {
+        let mut calls = 0;
+        assert_eq!(
+            activate(&startup(false), false, || {
+                calls += 1;
+                Vec::new()
+            }),
+            None
+        );
+        assert_eq!(calls, 0);
+    }
+
+    /// Real plugin, real GPU. Needs a `GGML_BACKEND_DL` build with the CPU
+    /// backends staged (`cgs stage-runtime`) and an installed plugin:
+    /// `LUNE_GPU_PLUGIN_DIR=~/.local/share/lune-voice/backends/vulkan cargo test
+    /// -p lune-asr --features whisper-cpp -- --ignored --exact
+    /// gpu_backend::tests::a_plugin_installed_mid_run_reaches_ready`
+    #[cfg(feature = "whisper-cpp")]
+    #[test]
+    #[ignore = "needs the real GPU plugin and a Vulkan GPU"]
+    fn a_plugin_installed_mid_run_reaches_ready() {
+        let src = PathBuf::from(std::env::var("LUNE_GPU_PLUGIN_DIR").expect("LUNE_GPU_PLUGIN_DIR"));
+        let data = tempfile::tempdir().expect("tempdir");
+        assert_eq!(
+            state(data.path()),
+            GpuPluginState::NotInstalled,
+            "registry built without it"
+        );
+
+        let dest = downloaded_plugin_dir(data.path());
+        std::fs::create_dir_all(&dest).expect("create plugin dir");
+        for entry in std::fs::read_dir(&src).expect("read plugin dir") {
+            let entry = entry.expect("dir entry");
+            std::fs::copy(entry.path(), dest.join(entry.file_name())).expect("copy plugin file");
+        }
+        assert_eq!(
+            state(data.path()),
+            GpuPluginState::NeedsRestart,
+            "on disk, not loaded"
+        );
+
+        let ready = activate_downloaded(data.path());
+        assert!(matches!(ready, GpuPluginState::Ready { .. }), "{ready:?}");
+        assert_eq!(
+            activate_downloaded(data.path()),
+            ready,
+            "a second call loads nothing"
+        );
     }
 
     #[test]

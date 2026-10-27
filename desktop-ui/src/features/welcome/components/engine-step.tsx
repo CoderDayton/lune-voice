@@ -337,7 +337,7 @@ function GpuOfferCard({ offer, useGpu, downloadBytes, onToggle }: GpuOfferCardPr
       ? t`Your GPU is ready — use it for faster transcription.`
       : offer === 'needs-restart'
         ? t`Installed. Restart Lune Voice to start using your GPU.`
-        : t`Your GPU qualifies. Setup downloads GPU support, then a restart turns it on.`;
+        : t`Your GPU qualifies. Setup downloads GPU support and turns it on.`;
 
   return (
     <label className="setup-card flex cursor-pointer items-start gap-3 p-4">

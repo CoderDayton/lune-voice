@@ -139,7 +139,7 @@ The two files were uploaded to the repository in separate commits, so each `Pinn
 
 ggml's compute backends are built as `dlopen`-able plugins (`GGML_BACKEND_DL`), so the executable has no GPU dependency and starts on any machine. Two directories are scanned at startup: `<exe dir>/backends/` for the bundled CPU backends, and `<data dir>/backends/vulkan/` for the Vulkan plugin the user downloads.
 
-`load_plugins` **must run before the first `WhisperContext` or Parakeet context is created**. ggml picks a device from whatever is in the backend registry when the context is created, which is why `desktop-ui/src-tauri/src/lib.rs` calls it before the Tauri builder. A `OnceLock` makes it run only once, because the registry is global to the process and has no unload.
+`load_plugins` **must run before the first `WhisperContext` or Parakeet context is created**. ggml picks a device from whatever is in the backend registry when the context is created, which is why `desktop-ui/src-tauri/src/lib.rs` calls it before the Tauri builder. A mutex-guarded record makes it run only once, because the registry is global to the process and has no unload; the one later load is `activate_downloaded`, for a plugin the installer just put in place.
 
 On Linux each plugin carries `RUNPATH=$ORIGIN`. Setting `LD_LIBRARY_PATH` from inside the app wouldn't work, because glibc caches the search path at startup. The Vulkan plugin's only external dependency is the Vulkan loader the graphics driver installs.
 

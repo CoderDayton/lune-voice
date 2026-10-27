@@ -725,6 +725,7 @@ pub async fn download_model_cmd(
 ) -> Result<(), String> {
     require_window_access(&window, &["main"])?;
     validate_local_name(&local_name)?;
+    let _setup = runtime.begin_setup_work();
     loop {
         match claim_download(&local_name)? {
             DownloadClaim::Owned => break,
@@ -992,6 +993,7 @@ fn archive_bytes() -> u32 {
 #[tauri::command]
 pub async fn install_gpu_backend(
     window: WebviewWindow,
+    runtime: State<'_, AppRuntime>,
     on_progress: Channel<GpuInstallProgressDto>,
 ) -> Result<GpuBackendStatusDto, String> {
     require_window_access(&window, &["main"])?;
@@ -1008,6 +1010,7 @@ pub async fn install_gpu_backend(
         lune_persist::gpu_plugin::CURRENT.ok_or("There is no GPU backend for this platform.")?;
     let paths = lune_persist::AppPaths::resolve().ok_or("failed to resolve application paths")?;
     let dest = lune_asr::gpu_backend::downloaded_plugin_dir(paths.data_dir());
+    let _setup = runtime.begin_setup_work();
 
     lune_persist::gpu_plugin::install(release, &dest, |p| {
         let _ = on_progress.send(GpuInstallProgressDto {
@@ -1019,11 +1022,11 @@ pub async fn install_gpu_backend(
     .await
     .map_err(|e| e.to_string())?;
 
-    // Re-read rather than assert: the freshly installed plugin cannot register
-    // in this process (ggml's backend registry is built once at startup and has
-    // no unload), and `gpu_backend::state` is what knows that, reporting the
-    // restart-required reason. Returning a hand-rolled `not-installed` here
-    // would put the download button back in front of the user.
+    runtime
+        .activate_gpu_plugin(paths.data_dir().to_path_buf())
+        .await?;
+    // Re-read rather than assert: the load can still find no usable device,
+    // and `gpu_backend::state` is what phrases that for the user.
     current_gpu_status()
 }
 
