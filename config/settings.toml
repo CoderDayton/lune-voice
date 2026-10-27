@@ -36,10 +36,10 @@ dictation_language = "auto"
 privacy_mode = "LocalOnly"
 
 # How finalized text reaches the focused window.
-# "TypeInPlace"  — Type via uinput kernel device; works in any app. (default)
-# "Clipboard"    — Copy to clipboard + Ctrl+V paste (compositor-agnostic fallback).
+# "TypeInPlace"  — Type via uinput kernel device; works in any app.
+# "Clipboard"    — Copy to clipboard + Ctrl+V paste (compositor-agnostic fallback). (default)
 # "Both"         — Type AND copy to clipboard simultaneously.
-dictation_mode = "TypeInPlace"
+dictation_mode = "Clipboard"
 
 # How the hotkey activates dictation.
 # "Toggle"  — Press once to start, press again to stop.

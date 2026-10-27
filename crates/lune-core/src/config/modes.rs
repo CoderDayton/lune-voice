@@ -19,12 +19,12 @@ pub enum PrivacyMode {
 #[non_exhaustive]
 pub enum DictationMode {
     /// Type finalized text into focused input via wtype.
-    #[default]
     TypeInPlace,
     /// Deliver finalized text by setting the clipboard and sending a paste
     /// shortcut (the "Paste into app" method). Despite the name, this is a
     /// delivery method, not a copy-only mode; whether a copy is *kept* is the
     /// orthogonal `UserSettings::copy_to_clipboard` toggle.
+    #[default]
     Clipboard,
 }
 

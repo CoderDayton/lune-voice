@@ -69,7 +69,7 @@ device = "auto"
 language = "auto"
 dictation_language = "auto"
 privacy_mode = "LocalOnly"
-dictation_mode = "TypeInPlace"
+dictation_mode = "Clipboard"
 copy_to_clipboard = false
 activation_mode = "Toggle"
 pill_visibility = "Always"
@@ -295,14 +295,14 @@ unstyled transcript, and the reason is logged.
 `dictation_mode` picks how the text gets into your app. The separate `copy_to_clipboard` switch decides whether a copy is also left on the clipboard.
 
 ```toml
-dictation_mode = "TypeInPlace"
+dictation_mode = "Clipboard"
 copy_to_clipboard = false
 ```
 
 | Mode | Behavior |
 |------|----------|
-| `TypeInPlace` | Types the text. On Linux, short ASCII text is typed key by key through a `uinput` virtual keyboard, and text over 80 characters, multi-line text, or non-ASCII text (accents, CJK, emoji) is pasted instead, so it is fast and nothing is lost. On Windows, `enigo` types all of it. **(default)** |
-| `Clipboard` | Puts the text on the clipboard and sends the paste keystroke. |
+| `TypeInPlace` | Types the text. On Linux, short ASCII text is typed key by key through a `uinput` virtual keyboard, and text over 80 characters, multi-line text, or non-ASCII text (accents, CJK, emoji) is pasted instead, so it is fast and nothing is lost. On Windows, `enigo` types all of it. |
+| `Clipboard` | Puts the text on the clipboard and sends the paste keystroke. **(default)** |
 
 If the clipboard fails, the app types the text instead. On Linux, multi-line text is the exception: typing it would press Enter in your app, so it is not sent, and a warning is logged. It is still in history.
 
