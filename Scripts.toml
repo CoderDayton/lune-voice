@@ -193,8 +193,11 @@ BIN_DIR="target/$PROFILE"
 # first, but filtered, so a freshly recompiled build script cannot shadow the
 # real output and make this look like an unbuilt tree.
 SRC_DIR=""
-for d in $(ls -dt target/$PROFILE/build/whisper-rs-sys-*/ 2>/dev/null || true); do
-  if [ -d "$d/out/lib" ]; then SRC_DIR="$d"; break; fi
+# Pick by the age of the output itself: a build directory's own mtime does not
+# move when its build script reruns, so a stale build can look newest.
+for d in target/$PROFILE/build/whisper-rs-sys-*/; do
+  [ -d "$d/out/lib" ] || continue
+  if [ -z "$SRC_DIR" ] || [ "$d/out/lib" -nt "$SRC_DIR/out/lib" ]; then SRC_DIR="$d"; fi
 done
 
 if [ -z "$SRC_DIR" ] || [ ! -d "$SRC_DIR/out/lib" ]; then
