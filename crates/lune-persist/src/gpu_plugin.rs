@@ -52,17 +52,17 @@ const GGML_VERSION_FILE: &str = "ggml-version";
 pub const UNPUBLISHED: &str = "UNPUBLISHED";
 
 pub const VULKAN_LINUX_X86_64: GpuPluginRelease = GpuPluginRelease {
-    url: "https://github.com/CoderDayton/lune-voice/releases/download/gpu-v1/\
+    url: "https://github.com/CoderDayton/lune-voice/releases/download/gpu-v2/\
           lune-voice-gpu-vulkan-linux-x86_64.tar.gz",
-    sha256: "a512a543b835585f8380ba6769af711bba4c4abb937300eabf414a796460dcfa",
-    download_bytes: 17_448_154,
+    sha256: "94e2143a27862d3b77f88796e6b866b718815a383b80699ec43a04da75874ff9",
+    download_bytes: 13_828_696,
 };
 
 pub const VULKAN_WINDOWS_X86_64: GpuPluginRelease = GpuPluginRelease {
-    url: "https://github.com/CoderDayton/lune-voice/releases/download/gpu-v1/\
+    url: "https://github.com/CoderDayton/lune-voice/releases/download/gpu-v2/\
           lune-voice-gpu-vulkan-windows-x86_64.tar.gz",
-    sha256: "be7a6489850fa324b778b0f30b910c0db8c33d51c97ae74a0c5005eb56f10469",
-    download_bytes: 17_290_674,
+    sha256: "f1e8320b05e26ca76fff53eebd0fecff6bb297ae99f39b5349719e2cff070f85",
+    download_bytes: 13_643_654,
 };
 
 /// The release this build can install, if the platform has one.

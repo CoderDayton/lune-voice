@@ -99,7 +99,7 @@ archives and attaches them to a draft release. It installs the Vulkan SDK from
 LunarG, pinned by sha256, and refuses a tag that is already published:
 
 ```bash
-gh workflow run gpu-plugin.yml -f tag=gpu-v1
+gh workflow run gpu-plugin.yml -f tag=gpu-v3   # next unused tag
 ```
 
 Linux builds on Ubuntu 22.04, the same base as the app bundles. The run summary
