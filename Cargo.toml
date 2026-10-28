@@ -18,10 +18,11 @@ license = "GPL-3.0-or-later"
 repository = "https://github.com/CoderDayton/lune-voice"
 homepage = "https://github.com/CoderDayton/lune-voice"
 
-# Vendored fork of `whisper-rs-sys` 0.15.0, carrying whisper.cpp v1.9.4. Five
+# Vendored fork of `whisper-rs-sys` 0.15.0, carrying whisper.cpp v1.9.5 and a
+# llama.cpp subset (lune-turboquant) that supplies the one ggml both link. Five
 # files differ from upstream — `build.rs`, `src/lib.rs`, `wrapper.h`,
 # `Cargo.toml` and `whisper.cpp/src/whisper.cpp`; every change is marked
-# `LUNE FORK`.
+# `LUNE FORK`. The `llama` feature binds and links `llama` + `mtmd`.
 # Upstream pins `BUILD_SHARED_LIBS=OFF` and decides the link kind from the
 # `intel-sycl` feature, which makes ggml's dlopen-able backends
 # (`GGML_BACKEND_DL`) impossible to build. The fork routes both off that one

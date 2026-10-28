@@ -11,6 +11,8 @@ desktop-ui/src-tauri/runtime/
 
 .ralph-logs/
 models/
+# llama.cpp keeps model-architecture sources in `models/` directories.
+!vendor/whisper-rs-sys/llama.cpp/**/models/
 test_fixtures/
 CLAUDE.md
 TODO.md

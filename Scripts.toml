@@ -180,7 +180,7 @@ command = '''
 set -euo pipefail
 # Assemble the runtime layout a GGML_BACKEND_DL build needs beside the binary:
 #
-#   <bin dir>/libwhisper.so.1, libparakeet.so.1,
+#   <bin dir>/libwhisper.so.1, libparakeet.so.1, libllama.so.0, libmtmd.so.0,
 #             libggml.so.0, libggml-base.so.0                      (DT_NEEDED)
 #   <bin dir>/backends/libggml-cpu-*.so, libggml-vulkan.so       (dlopen-ed)
 #
@@ -210,6 +210,7 @@ fi
 mkdir -p "$BIN_DIR/backends" "$BIN_DIR/deps/backends"
 for dest in "$BIN_DIR" "$BIN_DIR/deps"; do
   cp -a "$SRC_DIR"/out/lib/libwhisper.so* "$SRC_DIR"/out/lib/libparakeet.so* \
+    "$SRC_DIR"/out/lib/libllama.so* "$SRC_DIR"/out/lib/libmtmd.so* \
     "$SRC_DIR"/out/lib/libggml*.so* "$dest/"
   cp -a "$SRC_DIR"/out/bin/libggml-cpu-*.so "$dest/backends/"
   if [ -e "$SRC_DIR/out/bin/libggml-vulkan.so" ]; then
@@ -282,6 +283,35 @@ command = '''
 bash scripts/release/package-all.sh "${TYPE:-all}"
 '''
 info = "Build the distributable Linux artifacts in one Ubuntu 22.04 container into release-artifacts/: .deb, .AppImage, .rpm and a portable .tar.gz (--env TYPE=all|bundles|tarball)"
+
+[scripts.local-build]
+interpreter = "bash"
+command = '''
+set -euo pipefail
+# Installer for this machine, no Docker: the portable CPU build bundled
+# natively. Links this machine's libraries, so it is for local installs only;
+# distributable artifacts come from `cgs package`.
+TYPE="${TYPE:-deb}"
+case "$TYPE" in
+  deb|appimage|rpm) ;;
+  *) echo "TYPE must be deb, appimage or rpm (got: $TYPE)" >&2; exit 1 ;;
+esac
+# bindgen needs libclang; cold builds fail without it.
+if [ -z "${LIBCLANG_PATH:-}" ] && [ -d /lib/x86_64-linux-gnu ]; then
+  export LIBCLANG_PATH=/lib/x86_64-linux-gnu
+fi
+cgs build --env PORTABLE=1 --env BUNDLE=1 --env BUNDLES="$TYPE"
+case "$TYPE" in deb) EXT=deb ;; appimage) EXT=AppImage ;; rpm) EXT=rpm ;; esac
+BUNDLE_DIR="${CARGO_TARGET_DIR:-target}/release/bundle/$TYPE"
+OUT="$(ls -t "$BUNDLE_DIR"/*."$EXT" 2>/dev/null | head -1 || true)"
+if [ -z "$OUT" ]; then
+  echo "build finished but no .$EXT found under $BUNDLE_DIR" >&2
+  exit 1
+fi
+echo "built: $(realpath "$OUT") ($(du -h "$OUT" | cut -f1))"
+'''
+info = "Build an installer for this machine without Docker (--env TYPE=deb|appimage|rpm, default deb). Local installs only; distributable artifacts are cgs package"
+requires = ["bun"]
 
 # ── CI / composite ──────────────────────────────────────────────────────────
 

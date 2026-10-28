@@ -9,20 +9,31 @@ step.
 The `whisper-rs` `*-sys` crate **compiles the native C/C++ library from source
 during `cargo build`** (CMake, a C++ toolchain, and `libclang` for bindgen). It
 is vendored under `vendor/whisper-rs-sys/` through `[patch.crates-io]`, with
-whisper.cpp v1.9.4 inside it. Three files are modified, and every change is
-marked `LUNE FORK`:
+two source trees inside it:
 
-- `build.rs` adds `GGML_BACKEND_DL` support, refreshes the compiled copy of
-  whisper.cpp whenever the vendored tree changes, and reads the 1.9 version
-  declaration.
-- `src/lib.rs` adds a lint allow for the bindgen output.
-- `whisper.cpp/src/whisper.cpp` makes language auto-detection honour
-  `audio_ctx` and reuse its encode for the first window, so `language = "auto"`
-  costs no second encoder pass.
+- `whisper.cpp/`: whisper.cpp v1.9.5 without its own `ggml/`.
+- `llama.cpp/`: a subset of the lune-turboquant llama.cpp fork (`CMakeLists.txt`,
+  `LICENSE`, `cmake`, `ggml`, `include`, `licenses`, `src`, `vendor`,
+  `tools/mtmd` minus its test media). It owns the ggml.
 
-To upgrade whisper.cpp, copy the same subset of upstream over
-`vendor/whisper-rs-sys/whisper.cpp/`, reapply the `LUNE FORK` hunk in
-`src/whisper.cpp`, and run the `whisper_lang_detect` test.
+`build.rs` builds llama.cpp first (ggml, `llama`, `mtmd`), then whisper.cpp
+with `WHISPER_USE_SYSTEM_GGML`, both installed into one prefix. So whisper,
+parakeet, llama and mtmd share one ggml. Changes are marked `LUNE FORK`:
+
+- `build.rs`: the two-project build, `GGML_BACKEND_DL` support, refreshing the
+  compiled copies when a vendored tree changes, the 1.9 version declaration.
+- `wrapper.h`, `Cargo.toml`: bind `parakeet.h`, plus `llama.h`, `mtmd.h` and
+  `mtmd-helper.h` under the `llama` feature.
+- `src/lib.rs`: a lint allow for the bindgen output.
+- `whisper.cpp/src/whisper.cpp`: language auto-detection honours `audio_ctx`
+  and reuses its encode for the first window, so `language = "auto"` costs no
+  second encoder pass.
+
+To upgrade whisper.cpp, copy the same subset of upstream over `whisper.cpp/`,
+reapply the `LUNE FORK` hunk in `src/whisper.cpp`, and run the
+`whisper_lang_detect` test. To upgrade llama.cpp, copy the same subset from the
+fork over `llama.cpp/`. Either upgrade can move the ggml version, which needs a
+new GPU plugin ([GPU plugin](GPU_PLUGIN.md)).
 
 ## Distribution model
 
@@ -99,6 +110,9 @@ cgs build --env PORTABLE=1
 
 # Installers, in a container (see Linux bundles below).
 cgs package
+
+# Installer for this machine only, no Docker. TYPE is deb (default), appimage or rpm.
+cgs local-build --env TYPE=deb
 ```
 
 Native runs, from `desktop-ui/`:
