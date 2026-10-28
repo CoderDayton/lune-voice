@@ -90,8 +90,9 @@ The script builds `ggml-vulkan`, strips it, checks its `NEEDED` list and
 A plugin only works with the ggml it was built against. ggml's load check only
 compares its backend API version, so a mismatched plugin registers and then
 crashes. The app loads the download only when its stamp matches
-`ggml_version()`, otherwise it decodes on the CPU. A whisper.cpp upgrade that
-moves ggml's version needs a rebuilt plugin under a new tag.
+`ggml_version()`, otherwise it decodes on the CPU. ggml comes from the vendored
+llama.cpp tree, so a llama.cpp upgrade that moves ggml's version needs a rebuilt
+plugin under a new tag.
 
 The **GPU plugin** workflow (`.github/workflows/gpu-plugin.yml`) builds both
 archives and attaches them to a draft release. It installs the Vulkan SDK from

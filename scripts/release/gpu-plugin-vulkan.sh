@@ -4,7 +4,8 @@ set -euo pipefail
 
 OUT="${OUT:-release-artifacts}"
 BUILD_DIR="${BUILD_DIR:-target/gpu-plugin-vulkan}"
-SRC="vendor/whisper-rs-sys/whisper.cpp"
+# ggml comes from the vendored llama.cpp tree; whisper.cpp builds against it.
+SRC="vendor/whisper-rs-sys/llama.cpp"
 
 case "$(uname -s)" in
   Linux) OS=linux; PLUGIN_FILE=libggml-vulkan.so ;;
@@ -25,12 +26,17 @@ cmake -S "$SRC" -B "$BUILD_DIR" \
   -DGGML_NATIVE=OFF \
   -DGGML_VULKAN=ON \
   -DCMAKE_PREFIX_PATH="$SDK;$SDK/lib/VulkanLoader" \
-  -DWHISPER_BUILD_TESTS=OFF \
-  -DWHISPER_BUILD_EXAMPLES=OFF \
+  -DLLAMA_BUILD_COMMON=OFF \
+  -DLLAMA_BUILD_TOOLS=OFF \
+  -DLLAMA_BUILD_APP=OFF \
+  -DLLAMA_BUILD_TESTS=OFF \
+  -DLLAMA_BUILD_EXAMPLES=OFF \
+  -DLLAMA_BUILD_SERVER=OFF \
+  -DLLAMA_CURL=OFF \
+  -DLLAMA_OPENSSL=OFF \
   -DCMAKE_POSITION_INDEPENDENT_CODE=ON \
   -DCMAKE_BUILD_WITH_INSTALL_RPATH=ON \
   -DCMAKE_INSTALL_RPATH='$ORIGIN' >/dev/null
-git checkout -- "$SRC/bindings/javascript/package.json" 2>/dev/null || true
 cmake --build "$BUILD_DIR" --config Release --target ggml-vulkan -j "${JOBS:-$(nproc)}"
 
 PLUGIN=$(find "$BUILD_DIR" -not -path '*/stage/*' -name "$PLUGIN_FILE" -type f | head -1)

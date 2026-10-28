@@ -137,24 +137,35 @@ fn main() {
 
     let out = PathBuf::from(env::var("OUT_DIR").unwrap());
     let whisper_root = out.join("whisper.cpp");
+    // LUNE FORK: ggml comes from the vendored llama.cpp tree, not whisper.cpp's
+    // own copy, so whisper, parakeet, llama and mtmd share one ggml in the
+    // process. llama.cpp is built and installed first; whisper.cpp then builds
+    // against it with `WHISPER_USE_SYSTEM_GGML`.
+    let llama_root = out.join("llama.cpp");
 
     // LUNE FORK: upstream copies the sources only when OUT_DIR has none and
     // reruns only on `wrapper.h`, so an edit to or upgrade of the vendored
-    // tree kept compiling the stale copy. Watch the tree and refresh the copy.
-    println!("cargo:rerun-if-changed=whisper.cpp");
-    if whisper_root.exists() {
-        std::fs::remove_dir_all(&whisper_root).unwrap();
+    // tree kept compiling the stale copy. Watch the trees and refresh the copies.
+    for (tree, root) in [("whisper.cpp", &whisper_root), ("llama.cpp", &llama_root)] {
+        println!("cargo:rerun-if-changed={tree}");
+        if root.exists() {
+            std::fs::remove_dir_all(root).unwrap();
+        }
+        std::fs::create_dir_all(root).unwrap();
+        fs_extra::dir::copy(format!("./{tree}"), &out, &Default::default()).unwrap_or_else(|e| {
+            panic!(
+                "Failed to copy {tree} sources into {}: {}",
+                root.display(),
+                e
+            )
+        });
     }
-    std::fs::create_dir_all(&whisper_root).unwrap();
-    fs_extra::dir::copy("./whisper.cpp", &out, &Default::default()).unwrap_or_else(|e| {
-        panic!(
-            "Failed to copy whisper sources into {}: {}",
-            whisper_root.display(),
-            e
-        )
-    });
 
     if env::var("WHISPER_DONT_GENERATE_BINDINGS").is_ok() {
+        // LUNE FORK: the bundled bindings carry no llama/mtmd symbols.
+        if cfg!(feature = "llama") {
+            panic!("the `llama` feature needs generated bindings; unset WHISPER_DONT_GENERATE_BINDINGS");
+        }
         let _: u64 = std::fs::copy("src/bindings.rs", out.join("bindings.rs"))
             .expect("Failed to copy bindings.rs");
     } else {
@@ -182,19 +193,27 @@ fn main() {
 
         #[cfg(feature = "metal")]
         {
-            bindings = bindings.header("whisper.cpp/ggml/include/ggml-metal.h");
+            bindings = bindings.header("llama.cpp/ggml/include/ggml-metal.h");
         }
         #[cfg(feature = "vulkan")]
         {
             bindings = bindings
-                .header("whisper.cpp/ggml/include/ggml-vulkan.h")
+                .header("llama.cpp/ggml/include/ggml-vulkan.h")
                 .clang_arg("-DGGML_USE_VULKAN=1");
+        }
+        // LUNE FORK
+        #[cfg(feature = "llama")]
+        {
+            bindings = bindings
+                .clang_arg("-DLUNE_LLAMA=1")
+                .clang_arg("-I./llama.cpp/include")
+                .clang_arg("-I./llama.cpp/tools/mtmd");
         }
 
         let bindings = bindings
             .clang_arg("-I./whisper.cpp/")
             .clang_arg("-I./whisper.cpp/include")
-            .clang_arg("-I./whisper.cpp/ggml/include")
+            .clang_arg("-I./llama.cpp/ggml/include")
             .parse_callbacks(Box::new(bindgen::CargoCallbacks::new()))
             .generate();
 
@@ -205,6 +224,10 @@ fn main() {
                     .expect("Couldn't write bindings!");
             }
             Err(e) => {
+                // LUNE FORK: the bundled bindings carry no llama/mtmd symbols.
+                if cfg!(feature = "llama") {
+                    panic!("Unable to generate bindings for the `llama` feature: {}", e);
+                }
                 println!("cargo:warning=Unable to generate bindings: {}", e);
                 println!("cargo:warning=Using bundled bindings.rs, which may be out of date");
                 // copy src/bindings.rs to OUT_DIR
@@ -225,158 +248,201 @@ fn main() {
     // switch has to drive the CMake define and the link kind together.
     let shared_libs = backend_dl_enabled() || cfg!(feature = "intel-sycl");
 
-    let mut config = Config::new(&whisper_root);
-
-    config
-        .profile("Release")
-        .define("BUILD_SHARED_LIBS", if shared_libs { "ON" } else { "OFF" })
-        .define("WHISPER_ALL_WARNINGS", "OFF")
-        .define("WHISPER_ALL_WARNINGS_3RD_PARTY", "OFF")
-        .define("WHISPER_BUILD_TESTS", "OFF")
-        .define("WHISPER_BUILD_EXAMPLES", "OFF")
-        .very_verbose(true)
-        .pic(true);
-
+    // LUNE FORK: llama.cpp and whisper.cpp are two CMake projects built with
+    // the same ggml settings and installed into one prefix (OUT_DIR), so the
+    // runtime layout (`out/lib`, `out/bin`) is what it was with one project.
     if cfg!(target_os = "windows") {
-        config.cxxflag("/utf-8");
         println!("cargo:rustc-link-lib=advapi32");
     }
+    let make_config = |root: &std::path::Path, build_dir: PathBuf| -> Config {
+        let mut config = Config::new(root);
 
-    if cfg!(feature = "coreml") {
-        config.define("WHISPER_COREML", "ON");
-        config.define("WHISPER_COREML_ALLOW_FALLBACK", "1");
-    }
+        config
+            .out_dir(build_dir)
+            .define("CMAKE_INSTALL_PREFIX", &out)
+            .profile("Release")
+            .define("BUILD_SHARED_LIBS", if shared_libs { "ON" } else { "OFF" })
+            .define("WHISPER_ALL_WARNINGS", "OFF")
+            .define("WHISPER_ALL_WARNINGS_3RD_PARTY", "OFF")
+            .define("WHISPER_BUILD_TESTS", "OFF")
+            .define("WHISPER_BUILD_EXAMPLES", "OFF")
+            .very_verbose(true)
+            .pic(true);
 
-    if cfg!(feature = "cuda") {
-        config.define("GGML_CUDA", "ON");
-        config.define("CMAKE_POSITION_INDEPENDENT_CODE", "ON");
-        config.define("CMAKE_CUDA_FLAGS", "-Xcompiler=-fPIC");
-    }
-
-    if cfg!(feature = "hipblas") {
-        config.define("GGML_HIP", "ON");
-        config.define("CMAKE_C_COMPILER", "hipcc");
-        config.define("CMAKE_CXX_COMPILER", "hipcc");
-        println!("cargo:rerun-if-env-changed=AMDGPU_TARGETS");
-        if let Ok(gpu_targets) = env::var("AMDGPU_TARGETS") {
-            config.define("AMDGPU_TARGETS", gpu_targets);
+        if cfg!(target_os = "windows") {
+            config.cxxflag("/utf-8");
         }
-    }
 
-    if cfg!(feature = "vulkan") {
-        config.define("GGML_VULKAN", "ON");
-        if !backend_dl_enabled() {
-            if cfg!(windows) {
-                println!("cargo:rerun-if-env-changed=VULKAN_SDK");
-                println!("cargo:rustc-link-lib=vulkan-1");
-                let vulkan_path = match env::var("VULKAN_SDK") {
-                    Ok(path) => PathBuf::from(path),
-                    Err(_) => panic!(
-                        "Please install Vulkan SDK and ensure that VULKAN_SDK env variable is set"
-                    ),
-                };
-                let vulkan_lib_path = vulkan_path.join("Lib");
-                println!("cargo:rustc-link-search={}", vulkan_lib_path.display());
-            } else if cfg!(target_os = "macos") {
-                println!("cargo:rerun-if-env-changed=VULKAN_SDK");
-                println!("cargo:rustc-link-lib=vulkan");
-                let vulkan_path = match env::var("VULKAN_SDK") {
-                    Ok(path) => PathBuf::from(path),
-                    Err(_) => panic!(
-                        "Please install Vulkan SDK and ensure that VULKAN_SDK env variable is set"
-                    ),
-                };
-                let vulkan_lib_path = vulkan_path.join("lib");
-                println!("cargo:rustc-link-search={}", vulkan_lib_path.display());
-            } else {
-                println!("cargo:rustc-link-lib=vulkan");
+        if cfg!(feature = "coreml") {
+            config.define("WHISPER_COREML", "ON");
+            config.define("WHISPER_COREML_ALLOW_FALLBACK", "1");
+        }
+
+        if cfg!(feature = "cuda") {
+            config.define("GGML_CUDA", "ON");
+            config.define("CMAKE_POSITION_INDEPENDENT_CODE", "ON");
+            config.define("CMAKE_CUDA_FLAGS", "-Xcompiler=-fPIC");
+        }
+
+        if cfg!(feature = "hipblas") {
+            config.define("GGML_HIP", "ON");
+            config.define("CMAKE_C_COMPILER", "hipcc");
+            config.define("CMAKE_CXX_COMPILER", "hipcc");
+            println!("cargo:rerun-if-env-changed=AMDGPU_TARGETS");
+            if let Ok(gpu_targets) = env::var("AMDGPU_TARGETS") {
+                config.define("AMDGPU_TARGETS", gpu_targets);
             }
         }
-    }
 
-    if cfg!(feature = "openblas") {
-        config.define("GGML_BLAS", "ON");
-        config.define("GGML_BLAS_VENDOR", "OpenBLAS");
-        if env::var("BLAS_INCLUDE_DIRS").is_err() {
-            panic!("BLAS_INCLUDE_DIRS environment variable must be set when using OpenBLAS");
+        if cfg!(feature = "vulkan") {
+            config.define("GGML_VULKAN", "ON");
+            if !backend_dl_enabled() {
+                if cfg!(windows) {
+                    println!("cargo:rerun-if-env-changed=VULKAN_SDK");
+                    println!("cargo:rustc-link-lib=vulkan-1");
+                    let vulkan_path = match env::var("VULKAN_SDK") {
+                        Ok(path) => PathBuf::from(path),
+                        Err(_) => panic!(
+                        "Please install Vulkan SDK and ensure that VULKAN_SDK env variable is set"
+                    ),
+                    };
+                    let vulkan_lib_path = vulkan_path.join("Lib");
+                    println!("cargo:rustc-link-search={}", vulkan_lib_path.display());
+                } else if cfg!(target_os = "macos") {
+                    println!("cargo:rerun-if-env-changed=VULKAN_SDK");
+                    println!("cargo:rustc-link-lib=vulkan");
+                    let vulkan_path = match env::var("VULKAN_SDK") {
+                        Ok(path) => PathBuf::from(path),
+                        Err(_) => panic!(
+                        "Please install Vulkan SDK and ensure that VULKAN_SDK env variable is set"
+                    ),
+                    };
+                    let vulkan_lib_path = vulkan_path.join("lib");
+                    println!("cargo:rustc-link-search={}", vulkan_lib_path.display());
+                } else {
+                    println!("cargo:rustc-link-lib=vulkan");
+                }
+            }
         }
-        config.define("BLAS_INCLUDE_DIRS", env::var("BLAS_INCLUDE_DIRS").unwrap());
-        println!("cargo:rerun-if-env-changed=BLAS_INCLUDE_DIRS");
-    }
 
-    if cfg!(feature = "metal") {
-        config.define("GGML_METAL", "ON");
-        config.define("GGML_METAL_NDEBUG", "ON");
-        config.define("GGML_METAL_EMBED_LIBRARY", "ON");
-    } else {
-        // Metal is enabled by default, so we need to explicitly disable it
-        config.define("GGML_METAL", "OFF");
-    }
+        if cfg!(feature = "openblas") {
+            config.define("GGML_BLAS", "ON");
+            config.define("GGML_BLAS_VENDOR", "OpenBLAS");
+            if env::var("BLAS_INCLUDE_DIRS").is_err() {
+                panic!("BLAS_INCLUDE_DIRS environment variable must be set when using OpenBLAS");
+            }
+            config.define("BLAS_INCLUDE_DIRS", env::var("BLAS_INCLUDE_DIRS").unwrap());
+            println!("cargo:rerun-if-env-changed=BLAS_INCLUDE_DIRS");
+        }
 
-    if cfg!(debug_assertions) || cfg!(feature = "force-debug") {
-        // debug builds are too slow to even remotely be usable,
-        // so we build with optimizations even in debug mode
-        config.define("CMAKE_BUILD_TYPE", "RelWithDebInfo");
-        config.cxxflag("-DWHISPER_DEBUG");
-    } else {
-        // we're in release mode, explicitly set to release mode
-        // see also https://codeberg.org/tazz4843/whisper-rs/issues/226
-        config.define("CMAKE_BUILD_TYPE", "Release");
-    }
+        if cfg!(feature = "metal") {
+            config.define("GGML_METAL", "ON");
+            config.define("GGML_METAL_NDEBUG", "ON");
+            config.define("GGML_METAL_EMBED_LIBRARY", "ON");
+        } else {
+            // Metal is enabled by default, so we need to explicitly disable it
+            config.define("GGML_METAL", "OFF");
+        }
 
-    // Allow passing any WHISPER or CMAKE compile flags
-    for (key, value) in env::vars() {
-        let is_whisper_flag =
-            key.starts_with("WHISPER_") && key != "WHISPER_DONT_GENERATE_BINDINGS";
-        let is_ggml_flag = key.starts_with("GGML_");
-        let is_cmake_flag = key.starts_with("CMAKE_");
-        if is_whisper_flag || is_ggml_flag || is_cmake_flag {
-            config.define(&key, &value);
+        if cfg!(debug_assertions) || cfg!(feature = "force-debug") {
+            // debug builds are too slow to even remotely be usable,
+            // so we build with optimizations even in debug mode
+            config.define("CMAKE_BUILD_TYPE", "RelWithDebInfo");
+            config.cxxflag("-DWHISPER_DEBUG");
+        } else {
+            // we're in release mode, explicitly set to release mode
+            // see also https://codeberg.org/tazz4843/whisper-rs/issues/226
+            config.define("CMAKE_BUILD_TYPE", "Release");
+        }
+
+        // Allow passing any WHISPER or CMAKE compile flags
+        for (key, value) in env::vars() {
+            let is_whisper_flag =
+                key.starts_with("WHISPER_") && key != "WHISPER_DONT_GENERATE_BINDINGS";
+            let is_ggml_flag = key.starts_with("GGML_");
+            let is_cmake_flag = key.starts_with("CMAKE_");
+            if is_whisper_flag || is_ggml_flag || is_cmake_flag {
+                config.define(&key, &value);
+            }
+        }
+
+        // LUNE FORK: pin the CMake variable instead of leaving it to the env
+        // passthrough above. An *unset* `GGML_BACKEND_DL` passes nothing, so a
+        // cmake build directory left over from a plugin build keeps
+        // `GGML_BACKEND_DL=ON` in its cache while `BUILD_SHARED_LIBS` flips back to
+        // OFF, and ggml aborts with "GGML_BACKEND_DL requires BUILD_SHARED_LIBS".
+        // Alternating `cgs dev` and `cgs build`/`cargo test` in one target
+        // directory hits that on every switch.
+        config.define(
+            GGML_BACKEND_DL_ENV,
+            if backend_dl_enabled() { "ON" } else { "OFF" },
+        );
+        if !backend_dl_enabled() {
+            // Per-microarchitecture CPU backends are themselves dlopen-ed plugins,
+            // so ggml rejects them without `GGML_BACKEND_DL`. Same stale-cache
+            // reasoning as above: pin it off rather than let a previous plugin
+            // build's cached `ON` fail the next static one.
+            config.define("GGML_CPU_ALL_VARIANTS", "OFF");
+        } else if target.contains("linux") {
+            // LUNE FORK: the CPU backends install to `backends/` one level below
+            // `libggml-base`, and each links against it. Without a RUNPATH they
+            // resolve only because the process has already loaded it, and any
+            // per-file dependency walk (linuxdeploy, `ldd`) fails.
+            config.define("CMAKE_INSTALL_RPATH", "$ORIGIN:$ORIGIN/..");
+        }
+
+        if cfg!(not(feature = "openmp")) {
+            config.define("GGML_OPENMP", "OFF");
+        }
+
+        if cfg!(feature = "intel-sycl") {
+            config.define("BUILD_SHARED_LIBS", "ON");
+            config.define("GGML_SYCL", "ON");
+            config.define("GGML_SYCL_TARGET", "INTEL");
+            config.define("CMAKE_C_COMPILER", "icx");
+            config.define("CMAKE_CXX_COMPILER", "icpx");
+        }
+        config
+    };
+
+    // ggml, llama and mtmd. Tools, `common` and the server stay off: only the
+    // libraries are needed.
+    // LUNE FORK: both projects install into OUT_DIR, which cargo reuses across
+    // ggml upgrades and static/shared switches. Clear the installed files so
+    // no stale library (an older soname, a `.so` beside a static build) lingers;
+    // the CMake build trees stay, so the install step just repopulates these.
+    for dir in ["lib", "lib64", "bin", "include"] {
+        let dir = out.join(dir);
+        if dir.exists() {
+            std::fs::remove_dir_all(&dir).unwrap();
         }
     }
-
-    // LUNE FORK: pin the CMake variable instead of leaving it to the env
-    // passthrough above. An *unset* `GGML_BACKEND_DL` passes nothing, so a
-    // cmake build directory left over from a plugin build keeps
-    // `GGML_BACKEND_DL=ON` in its cache while `BUILD_SHARED_LIBS` flips back to
-    // OFF, and ggml aborts with "GGML_BACKEND_DL requires BUILD_SHARED_LIBS".
-    // Alternating `cgs dev` and `cgs build`/`cargo test` in one target
-    // directory hits that on every switch.
-    config.define(
-        GGML_BACKEND_DL_ENV,
-        if backend_dl_enabled() { "ON" } else { "OFF" },
-    );
-    if !backend_dl_enabled() {
-        // Per-microarchitecture CPU backends are themselves dlopen-ed plugins,
-        // so ggml rejects them without `GGML_BACKEND_DL`. Same stale-cache
-        // reasoning as above: pin it off rather than let a previous plugin
-        // build's cached `ON` fail the next static one.
-        config.define("GGML_CPU_ALL_VARIANTS", "OFF");
-    } else if target.contains("linux") {
-        // LUNE FORK: the CPU backends install to `backends/` one level below
-        // `libggml-base`, and each links against it. Without a RUNPATH they
-        // resolve only because the process has already loaded it, and any
-        // per-file dependency walk (linuxdeploy, `ldd`) fails.
-        config.define("CMAKE_INSTALL_RPATH", "$ORIGIN:$ORIGIN/..");
+    let mut llama = make_config(&llama_root, out.join("llama"));
+    for (key, value) in [
+        ("LLAMA_BUILD_COMMON", "OFF"),
+        ("LLAMA_BUILD_TOOLS", "OFF"),
+        ("LLAMA_BUILD_MTMD", "ON"),
+        ("LLAMA_BUILD_APP", "OFF"),
+        ("LLAMA_BUILD_TESTS", "OFF"),
+        ("LLAMA_BUILD_EXAMPLES", "OFF"),
+        ("LLAMA_BUILD_SERVER", "OFF"),
+        ("LLAMA_CURL", "OFF"),
+        ("LLAMA_OPENSSL", "OFF"),
+        ("LLAMA_ALL_WARNINGS", "OFF"),
+    ] {
+        llama.define(key, value);
     }
+    llama.build();
 
-    if cfg!(not(feature = "openmp")) {
-        config.define("GGML_OPENMP", "OFF");
+    let mut config = make_config(&whisper_root, out.join("whisper"));
+    config
+        .define("WHISPER_USE_SYSTEM_GGML", "ON")
+        .define("CMAKE_PREFIX_PATH", &out);
+    config.build();
+
+    for lib in ["lib", "lib64"] {
+        add_link_search_path(&out.join(lib)).unwrap();
     }
-
-    if cfg!(feature = "intel-sycl") {
-        config.define("BUILD_SHARED_LIBS", "ON");
-        config.define("GGML_SYCL", "ON");
-        config.define("GGML_SYCL_TARGET", "INTEL");
-        config.define("CMAKE_C_COMPILER", "icx");
-        config.define("CMAKE_CXX_COMPILER", "icpx");
-    }
-
-    let destination = config.build();
-
-    add_link_search_path(&out.join("build")).unwrap();
-
-    println!("cargo:rustc-link-search=native={}", destination.display());
     // LUNE FORK: upstream keys this purely off `intel-sycl`; it has to follow
     // the actual BUILD_SHARED_LIBS value or a shared build emits `static=`
     // flags that cannot resolve against the produced `.so` files.
@@ -386,6 +452,11 @@ fn main() {
     if shared_libs {
         println!("cargo:rustc-link-lib=whisper");
         println!("cargo:rustc-link-lib=parakeet");
+        #[cfg(feature = "llama")]
+        {
+            println!("cargo:rustc-link-lib=mtmd");
+            println!("cargo:rustc-link-lib=llama");
+        }
         println!("cargo:rustc-link-lib=ggml");
         println!("cargo:rustc-link-lib=ggml-base");
         // LUNE FORK: with GGML_BACKEND_DL the CPU backend is itself a dlopen-ed
@@ -397,6 +468,11 @@ fn main() {
     } else {
         println!("cargo:rustc-link-lib=static=whisper");
         println!("cargo:rustc-link-lib=static=parakeet");
+        #[cfg(feature = "llama")]
+        {
+            println!("cargo:rustc-link-lib=static=mtmd");
+            println!("cargo:rustc-link-lib=static=llama");
+        }
         println!("cargo:rustc-link-lib=static=ggml");
         println!("cargo:rustc-link-lib=static=ggml-base");
         println!("cargo:rustc-link-lib=static=ggml-cpu");

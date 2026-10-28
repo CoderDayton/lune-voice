@@ -12,11 +12,16 @@ files, models and modified sources.
 
 ---
 
-## whisper.cpp (and ggml)
+## whisper.cpp, llama.cpp and ggml
 
 Compiled into the application when the local speech-to-text backends are
 enabled — whisper itself and the `parakeet` library from the same source tree,
 which runs the Parakeet engine. Source: https://github.com/ggerganov/whisper.cpp
+
+ggml, `llama` and `mtmd` are built from a llama.cpp fork
+(https://github.com/ggml-org/llama.cpp, with TurboQuant KV-cache types added)
+vendored at `vendor/whisper-rs-sys/llama.cpp`; whisper.cpp links that ggml.
+Same licence, `Copyright (c) 2023-2026 The ggml authors`.
 
 ```
 MIT License
@@ -51,12 +56,55 @@ listed here for completeness.
 
 **Modified.** `whisper-rs-sys` is vendored at `vendor/whisper-rs-sys` with
 five changed files, each change marked `LUNE FORK`: `build.rs` adds
-`GGML_BACKEND_DL` support and links whisper.cpp's `parakeet` library;
-`wrapper.h` and `Cargo.toml` bind and package `parakeet.h`; `src/lib.rs` adds a
-lint allow for the generated bindings; and `whisper.cpp/src/whisper.cpp` reuses
-the language-detection encode for the first decode window. The changes are
-distributed under Lune Voice's GPL-3.0-or-later licence; the rest of the
-vendored whisper.cpp source and its MIT licence are unchanged.
+`GGML_BACKEND_DL` support, builds llama.cpp first and whisper.cpp against its
+ggml, and links `parakeet` (plus `llama` and `mtmd` under the `llama` feature);
+`wrapper.h` and `Cargo.toml` bind and package `parakeet.h`, `llama.h` and the
+`mtmd` headers; `src/lib.rs` adds a lint allow for the generated bindings; and
+`whisper.cpp/src/whisper.cpp` reuses the language-detection encode for the
+first decode window. The changes are distributed under Lune Voice's
+GPL-3.0-or-later licence; the rest of the vendored whisper.cpp and llama.cpp
+source and their MIT licences are unchanged.
+
+## Libraries inside `mtmd`
+
+llama.cpp's `mtmd` library compiles in these, from `llama.cpp/vendor/`:
+
+- miniaudio — public domain or MIT-0, by David Reid.
+- stb_image — public domain or MIT, by Sean Barrett.
+- subprocess.h (sheredom) — public domain (Unlicense).
+- sha1, sha256 — public domain.
+- rotate-bits — MIT, Copyright (c) 2021 William Casarin; licence text as for
+  whisper.cpp above.
+- xxHash:
+
+```
+xxHash Library
+Copyright (c) 2012-2021 Yann Collet
+All rights reserved.
+
+BSD 2-Clause License (https://www.opensource.org/licenses/bsd-license.php)
+
+Redistribution and use in source and binary forms, with or without modification,
+are permitted provided that the following conditions are met:
+
+* Redistributions of source code must retain the above copyright notice, this
+  list of conditions and the following disclaimer.
+
+* Redistributions in binary form must reproduce the above copyright notice, this
+  list of conditions and the following disclaimer in the documentation and/or
+  other materials provided with the distribution.
+
+THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
+ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR
+ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
+(INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
+LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON
+ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+(INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
+SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+```
 
 ## Whisper GGML models
 

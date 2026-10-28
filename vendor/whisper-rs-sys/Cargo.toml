@@ -25,11 +25,9 @@ include = [
     "whisper.cpp/include/whisper.h",
     # LUNE FORK: bound by `wrapper.h` alongside whisper.h.
     "whisper.cpp/include/parakeet.h",
-    "whisper.cpp/ggml/cmake",
-    "whisper.cpp/ggml/CMakeLists.txt",
-    "whisper.cpp/ggml/src/**",
-    "whisper.cpp/ggml/include/*.h",
     "whisper.cpp/LICENSE",
+    # LUNE FORK: llama.cpp supplies ggml, llama and mtmd.
+    "llama.cpp/**",
     "src/*.rs",
     "build.rs",
     "wrapper.h",
@@ -51,6 +49,8 @@ cuda = []
 force-debug = []
 hipblas = []
 intel-sycl = []
+# LUNE FORK: bind and link llama + mtmd (LFM3-Audio).
+llama = []
 metal = []
 openblas = []
 openmp = []
