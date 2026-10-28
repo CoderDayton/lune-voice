@@ -61,9 +61,9 @@ downloaded at runtime into the models directory
 | Target | OS / arch | Backend | Cargo features | Status |
 |---|---|---|---|---|
 | Linux | Linux x86_64 | CPU (any x86-64-v2; best CPU variant picked at runtime) | `whisper-cpp` | **Supported** |
-| Linux GPU plugin | Linux x86_64, Vulkan 1.2 GPU | Vulkan, downloaded at runtime | none (built by `cgs gpu-plugin`) | **Draft** (`gpu-v2`, ggml 0.27) |
+| Linux GPU plugin | Linux x86_64, Vulkan 1.2 GPU | Vulkan, downloaded at runtime | none (built by `cgs gpu-plugin`) | **Draft** (`gpu-v2`, ggml 0.28) |
 | Windows CPU | Windows x86_64 | CPU (any x86-64-v2; best CPU variant picked at runtime) | `whisper-cpp` | **Supported** (NSIS installer) |
-| Windows GPU plugin | Windows x86_64, Vulkan 1.2 GPU | Vulkan, downloaded at runtime | none (built by `cgs gpu-plugin` on Windows) | **Draft** (`gpu-v2`, ggml 0.27) |
+| Windows GPU plugin | Windows x86_64, Vulkan 1.2 GPU | Vulkan, downloaded at runtime | none (built by `cgs gpu-plugin` on Windows) | **Draft** (`gpu-v2`, ggml 0.28) |
 
 `whisper-vulkan` (dev builds only) passes through to `whisper-rs/vulkan` and
 compiles the Vulkan backend in. The CPU feature compiles the library with no GPU
