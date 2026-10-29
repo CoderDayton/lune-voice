@@ -405,8 +405,6 @@ fn main() {
         config
     };
 
-    // ggml, llama and mtmd. Tools, `common` and the server stay off: only the
-    // libraries are needed.
     // LUNE FORK: both projects install into OUT_DIR, which cargo reuses across
     // ggml upgrades and static/shared switches. Clear the installed files so
     // no stale library (an older soname, a `.so` beside a static build) lingers;
@@ -417,22 +415,62 @@ fn main() {
             std::fs::remove_dir_all(&dir).unwrap();
         }
     }
-    let mut llama = make_config(&llama_root, out.join("llama"));
-    for (key, value) in [
-        ("LLAMA_BUILD_COMMON", "OFF"),
-        ("LLAMA_BUILD_TOOLS", "OFF"),
-        ("LLAMA_BUILD_MTMD", "ON"),
-        ("LLAMA_BUILD_APP", "OFF"),
-        ("LLAMA_BUILD_TESTS", "OFF"),
-        ("LLAMA_BUILD_EXAMPLES", "OFF"),
-        ("LLAMA_BUILD_SERVER", "OFF"),
-        ("LLAMA_CURL", "OFF"),
-        ("LLAMA_OPENSSL", "OFF"),
-        ("LLAMA_ALL_WARNINGS", "OFF"),
-    ] {
-        llama.define(key, value);
-    }
-    llama.build();
+    // LUNE FORK: with `llama`, all of llama.cpp: ggml, llama and mtmd (tools,
+    // `common` and the server stay off). Without it, only llama.cpp's `ggml/`
+    // project, with the ggml defaults llama.cpp's CMakeLists would set, so
+    // whisper.cpp gets the same ggml either way.
+    let mut ggml = if cfg!(feature = "llama") {
+        let mut llama = make_config(&llama_root, out.join("llama"));
+        for (key, value) in [
+            ("LLAMA_BUILD_COMMON", "OFF"),
+            ("LLAMA_BUILD_TOOLS", "OFF"),
+            ("LLAMA_BUILD_MTMD", "ON"),
+            ("LLAMA_BUILD_APP", "OFF"),
+            ("LLAMA_BUILD_TESTS", "OFF"),
+            ("LLAMA_BUILD_EXAMPLES", "OFF"),
+            ("LLAMA_BUILD_SERVER", "OFF"),
+            ("LLAMA_CURL", "OFF"),
+            ("LLAMA_OPENSSL", "OFF"),
+            ("LLAMA_ALL_WARNINGS", "OFF"),
+        ] {
+            llama.define(key, value);
+        }
+        llama
+    } else {
+        // Standalone ggml configures a pkg-config file whose template the fork
+        // does not carry; nothing reads the result.
+        let pc_in = llama_root.join("ggml/ggml.pc.in");
+        if !pc_in.exists() {
+            std::fs::write(
+                &pc_in,
+                "prefix=@CMAKE_INSTALL_PREFIX@\n\
+                 libdir=${prefix}/lib\n\
+                 includedir=${prefix}/include\n\n\
+                 Name: ggml\n\
+                 Description: ggml\n\
+                 Version: @GGML_VERSION@\n\
+                 Cflags: -I${includedir}\n\
+                 Libs: -L${libdir} -lggml\n",
+            )
+            .expect("write ggml.pc.in");
+        }
+        let mut ggml = make_config(&llama_root.join("ggml"), out.join("ggml"));
+        for (key, value) in [
+            ("GGML_BUILD_TESTS", "OFF"),
+            ("GGML_BUILD_EXAMPLES", "OFF"),
+            ("GGML_ALL_WARNINGS", "OFF"),
+        ] {
+            ggml.define(key, value);
+        }
+        // llama.cpp only changes these defaults, so an explicit env value wins.
+        for key in ["GGML_LLAMAFILE", "GGML_CUDA_GRAPHS"] {
+            if env::var_os(key).is_none() {
+                ggml.define(key, "ON");
+            }
+        }
+        ggml
+    };
+    ggml.build();
 
     let mut config = make_config(&whisper_root, out.join("whisper"));
     config

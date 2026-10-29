@@ -44,6 +44,8 @@ license = "Unlicense"
 repository = "https://codeberg.org/tazz4843/whisper-rs"
 
 [features]
+# LUNE FORK: on for every build that compiles whisper.cpp; shipped.
+default = ["llama"]
 coreml = []
 cuda = []
 force-debug = []

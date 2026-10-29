@@ -18,7 +18,9 @@ two source trees inside it:
 
 `build.rs` builds llama.cpp first (ggml, `llama`, `mtmd`), then whisper.cpp
 with `WHISPER_USE_SYSTEM_GGML`, both installed into one prefix. So whisper,
-parakeet, llama and mtmd share one ggml. Changes are marked `LUNE FORK`:
+parakeet, llama and mtmd share one ggml, and bundles ship all four. The `llama`
+feature is on by default; with `default-features = false` only llama.cpp's
+`ggml/` is built. Changes are marked `LUNE FORK`:
 
 - `build.rs`: the two-project build, `GGML_BACKEND_DL` support, refreshing the
   compiled copies when a vendored tree changes, the 1.9 version declaration.
