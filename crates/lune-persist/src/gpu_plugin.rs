@@ -54,15 +54,15 @@ pub const UNPUBLISHED: &str = "UNPUBLISHED";
 pub const VULKAN_LINUX_X86_64: GpuPluginRelease = GpuPluginRelease {
     url: "https://github.com/CoderDayton/lune-voice/releases/download/gpu-v2/\
           lune-voice-gpu-vulkan-linux-x86_64.tar.gz",
-    sha256: "94e2143a27862d3b77f88796e6b866b718815a383b80699ec43a04da75874ff9",
-    download_bytes: 13_828_696,
+    sha256: "12ba895becdab6cf06f727f40ad92eaa4ad958d930db0525f6621c4e45628c49",
+    download_bytes: 13_861_879,
 };
 
 pub const VULKAN_WINDOWS_X86_64: GpuPluginRelease = GpuPluginRelease {
     url: "https://github.com/CoderDayton/lune-voice/releases/download/gpu-v2/\
           lune-voice-gpu-vulkan-windows-x86_64.tar.gz",
-    sha256: "f1e8320b05e26ca76fff53eebd0fecff6bb297ae99f39b5349719e2cff070f85",
-    download_bytes: 13_643_654,
+    sha256: "844e94f4e2c87c3149561845287a3e9d5931b471f32469b91786e1f73df8c616",
+    download_bytes: 13_676_281,
 };
 
 /// The release this build can install, if the platform has one.
