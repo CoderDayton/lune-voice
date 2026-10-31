@@ -113,7 +113,7 @@ cgs build --env PORTABLE=1
 # Installers, in a container (see Linux bundles below).
 cgs package
 
-# Installer for this machine only, no Docker. TYPE is deb (default), appimage or rpm.
+# Installer for this machine only, no Docker. TYPE is deb (default), appimage, rpm or arch.
 cgs local-build --env TYPE=deb
 
 # Arch: the native build (GPU compiled in) as a .pkg.tar.zst, via makepkg and

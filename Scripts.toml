@@ -300,8 +300,12 @@ case "$TYPE" in
   *) echo "TYPE must be deb, appimage, rpm or arch (got: $TYPE)" >&2; exit 1 ;;
 esac
 # bindgen needs libclang; cold builds fail without it.
-if [ -z "${LIBCLANG_PATH:-}" ] && [ -d /lib/x86_64-linux-gnu ]; then
-  export LIBCLANG_PATH=/lib/x86_64-linux-gnu
+if [ -z "${LIBCLANG_PATH:-}" ]; then
+  if [ -d /lib/x86_64-linux-gnu ]; then
+    export LIBCLANG_PATH=/lib/x86_64-linux-gnu
+  elif [ -e /usr/lib/libclang.so ]; then
+    export LIBCLANG_PATH=/usr/lib
+  fi
 fi
 # Arch: the native build (GPU compiled in, tuned to this CPU), packaged by
 # makepkg. Tauri has no pacman bundler.
@@ -319,7 +323,7 @@ if [ "$TYPE" = arch ]; then
   rm -rf "$STAGE"
   OUT="$(ls -t "$OUT_DIR"/*.pkg.tar.zst | head -1)"
   echo "built: $OUT ($(du -h "$OUT" | cut -f1))"
-  echo "install: sudo pacman -U $OUT"
+  echo "install: paru -U $OUT"
   exit 0
 fi
 cgs build --env PORTABLE=1 --env BUNDLE=1 --env BUNDLES="$TYPE"
