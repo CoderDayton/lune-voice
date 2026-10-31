@@ -1,0 +1,23 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
+#
+# pacman's udev hook reloads the rules but does not re-trigger devices, so
+# /dev/uinput and the keyboards would keep their old permissions until reboot.
+# Same steps as the .deb/.rpm scripts (assets/udev/apply-rules.sh).
+
+_apply_rules() {
+  udevadm control --reload-rules 2>/dev/null || true
+  udevadm trigger --subsystem-match=misc --sysname-match=uinput 2>/dev/null || true
+  udevadm trigger --subsystem-match=input --property-match=ID_INPUT_KEYBOARD=1 2>/dev/null || true
+}
+
+post_install() {
+  _apply_rules
+}
+
+post_upgrade() {
+  _apply_rules
+}
+
+post_remove() {
+  _apply_rules
+}

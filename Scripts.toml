@@ -296,12 +296,31 @@ set -euo pipefail
 # distributable artifacts come from `cgs package`.
 TYPE="${TYPE:-deb}"
 case "$TYPE" in
-  deb|appimage|rpm) ;;
-  *) echo "TYPE must be deb, appimage or rpm (got: $TYPE)" >&2; exit 1 ;;
+  deb|appimage|rpm|arch) ;;
+  *) echo "TYPE must be deb, appimage, rpm or arch (got: $TYPE)" >&2; exit 1 ;;
 esac
 # bindgen needs libclang; cold builds fail without it.
 if [ -z "${LIBCLANG_PATH:-}" ] && [ -d /lib/x86_64-linux-gnu ]; then
   export LIBCLANG_PATH=/lib/x86_64-linux-gnu
+fi
+# Arch: the native build (GPU compiled in, tuned to this CPU), packaged by
+# makepkg. Tauri has no pacman bundler.
+if [ "$TYPE" = arch ]; then
+  cgs build
+  OUT_DIR="${CARGO_TARGET_DIR:-target}/release/bundle/arch"
+  mkdir -p "$OUT_DIR"
+  OUT_DIR="$(realpath "$OUT_DIR")"
+  STAGE="$(mktemp -d)"
+  cp scripts/release/arch/PKGBUILD scripts/release/arch/lune-voice.install "$STAGE/"
+  VERSION="$(sed -n 's/^  "version": "\(.*\)",$/\1/p' desktop-ui/src-tauri/tauri.conf.json)"
+  REPO="$(pwd)"
+  ( cd "$STAGE" && LUNE_REPO="$REPO" LUNE_PKGVER="${VERSION//-/_}" \
+      PKGDEST="$OUT_DIR" makepkg --force --nodeps --noconfirm )
+  rm -rf "$STAGE"
+  OUT="$(ls -t "$OUT_DIR"/*.pkg.tar.zst | head -1)"
+  echo "built: $OUT ($(du -h "$OUT" | cut -f1))"
+  echo "install: sudo pacman -U $OUT"
+  exit 0
 fi
 cgs build --env PORTABLE=1 --env BUNDLE=1 --env BUNDLES="$TYPE"
 case "$TYPE" in deb) EXT=deb ;; appimage) EXT=AppImage ;; rpm) EXT=rpm ;; esac
@@ -313,7 +332,7 @@ if [ -z "$OUT" ]; then
 fi
 echo "built: $(realpath "$OUT") ($(du -h "$OUT" | cut -f1))"
 '''
-info = "Build an installer for this machine without Docker (--env TYPE=deb|appimage|rpm, default deb). Local installs only; distributable artifacts are cgs package"
+info = "Build an installer for this machine without Docker (--env TYPE=deb|appimage|rpm|arch, default deb; arch is the native build as a .pkg.tar.zst). Local installs only; distributable artifacts are cgs package"
 requires = ["bun"]
 
 # ── CI / composite ──────────────────────────────────────────────────────────

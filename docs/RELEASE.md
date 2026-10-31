@@ -115,6 +115,10 @@ cgs package
 
 # Installer for this machine only, no Docker. TYPE is deb (default), appimage or rpm.
 cgs local-build --env TYPE=deb
+
+# Arch: the native build (GPU compiled in) as a .pkg.tar.zst, via makepkg and
+# scripts/release/arch/PKGBUILD. Output in target/release/bundle/arch/.
+cgs local-build --env TYPE=arch
 ```
 
 Native runs, from `desktop-ui/`:
