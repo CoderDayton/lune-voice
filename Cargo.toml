@@ -127,7 +127,7 @@ reqwest = { version = "0.13", features = ["json", "multipart", "stream"] }
 tar = "0.4"
 flate2 = "1.1"
 futures-util = { version = "0.3", default-features = false, features = ["std"] }
-zbus = "5"
+zbus = "6"
 evdev = "0.13"
 # `dlopen` for NVIDIA-driver detection (crates/lune-asr/src/gpu_backend.rs).
 libc = "0.2"
