@@ -26,6 +26,7 @@ export interface ModelStatusApi {
   models: ModelStatus[];
   /** Lookup by on-disk directory (`local_name`). */
   byName: Map<string, ModelStatus>;
+  diskBytes: number | null;
   loading: boolean;
   refresh: () => void;
   remove: (localName: string) => Promise<void>;
@@ -40,6 +41,7 @@ export interface ModelStatusApi {
  */
 export function useModelStatus(): ModelStatusApi {
   const [models, setModels] = useState<ModelStatus[]>([]);
+  const [diskBytes, setDiskBytes] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
   const completions = useModelDownloads().completions;
 
@@ -52,6 +54,9 @@ export function useModelStatus(): ModelStatusApi {
       .then(setModels)
       .catch((e) => console.error('check_model_status:', e))
       .finally(() => setLoading(false));
+    invoke<number>('models_disk_usage')
+      .then(setDiskBytes)
+      .catch((e) => console.error('models_disk_usage:', e));
   }, []);
 
   useEffect(() => {
@@ -79,5 +84,5 @@ export function useModelStatus(): ModelStatusApi {
 
   const byName = new Map(models.map((m) => [m.localName, m]));
 
-  return { models, byName, loading, refresh, remove };
+  return { models, byName, diskBytes, loading, refresh, remove };
 }

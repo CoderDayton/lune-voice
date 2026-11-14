@@ -58,6 +58,11 @@ msgstr "{0, plural, one {सत्र} other {सत्र}}"
 msgid "{0} / {1}"
 msgstr "{0} / {1}"
 
+#. placeholder {0}: formatBytes(installedBytes)
+#: src/features/settings/components/model-library.tsx:154
+msgid "{0} used"
+msgstr "{0} उपयोग में"
+
 #: src/features/history/components/history-table.tsx:291
 msgid "{count} selected"
 msgstr "{count} चयनित"
@@ -113,9 +118,12 @@ msgid "1 year"
 msgstr "1 साल"
 
 #: src/features/settings/components/asr-engine-cards.tsx:201
-#: src/features/settings/components/model-library.tsx:147
 msgid "25 European languages"
 msgstr "25 यूरोपीय भाषाएँ"
+
+#: src/features/settings/components/model-library.tsx:139
+msgid "25 European languages. Fast on a CPU."
+msgstr "25 यूरोपीय भाषाएँ। CPU पर तेज़।"
 
 #: src/features/settings/data/settings-data.ts:568
 msgid "30 days"
@@ -381,8 +389,8 @@ msgstr "अंतर्निहित"
 
 #: src/components/feedback/confirm-dialog.tsx:61
 #: src/features/dictionary/components/dictionary-table.tsx:113
-#: src/features/settings/components/model-library.tsx:215
-#: src/features/settings/components/model-library.tsx:371
+#: src/features/settings/components/model-library.tsx:255
+#: src/features/settings/components/model-row.tsx:90
 #: src/features/snippets/snippets-page.tsx:249
 #: src/features/styles/components/style-editor-modal.tsx:247
 msgid "Cancel"
@@ -395,6 +403,10 @@ msgstr "वर्तमान रिकॉर्डिंग रद्द कर
 #: src/features/welcome/welcome-page.tsx:373
 msgid "Cancel download"
 msgstr "डाउनलोड रद्द करें"
+
+#: src/features/settings/components/model-row.tsx:89
+msgid "Cancel download of {label}"
+msgstr "{label} का डाउनलोड रद्द करें"
 
 #: src/lib/session-format.ts:10
 msgid "Cancelled"
@@ -488,7 +500,6 @@ msgid "Clear {label}"
 msgstr "{label} साफ़ करें"
 
 #: src/features/history/components/history-table.tsx:294
-#: src/features/settings/components/model-library.tsx:159
 msgid "Clear selection"
 msgstr "चयन साफ़ करें"
 
@@ -502,7 +513,7 @@ msgstr "बंद करें"
 
 #: src/components/feedback/help-feedback-dialog.tsx:281
 #: src/features/history/components/session-detail-modal.tsx:226
-#: src/features/settings/components/model-library.tsx:381
+#: src/features/settings/components/model-library.tsx:265
 #: src/features/styles/components/style-editor-modal.tsx:238
 #: src/features/updates/update-dialog.tsx:326
 #: src/features/updates/update-dialog.tsx:338
@@ -652,8 +663,7 @@ msgstr "डार्क"
 #: src/components/feedback/confirm-dialog.tsx:72
 #: src/features/history/components/history-table.tsx:515
 #: src/features/history/components/session-detail-modal.tsx:219
-#: src/features/settings/components/model-library.tsx:334
-#: src/features/settings/components/model-library.tsx:335
+#: src/features/settings/components/model-row.tsx:161
 msgid "Delete"
 msgstr "हटाएँ"
 
@@ -667,7 +677,7 @@ msgid "Delete {0}"
 msgstr "{0} हटाएँ"
 
 #. placeholder {0}: model.name
-#: src/features/settings/components/model-library.tsx:362
+#: src/features/settings/components/model-library.tsx:246
 msgid "Delete {0}?"
 msgstr "{0} हटाएँ?"
 
@@ -675,7 +685,11 @@ msgstr "{0} हटाएँ?"
 msgid "Delete {count, plural, one {# session} other {# sessions}}?"
 msgstr "{count, plural, one {# सत्र} other {# सत्र}} हटाएँ?"
 
-#: src/features/settings/components/model-library.tsx:374
+#: src/features/settings/components/model-row.tsx:160
+msgid "Delete {label}"
+msgstr "{label} हटाएँ"
+
+#: src/features/settings/components/model-library.tsx:258
 msgid "Delete model"
 msgstr "मॉडल हटाएँ"
 
@@ -764,12 +778,12 @@ msgid "Disconnected"
 msgstr "डिस्कनेक्टेड"
 
 #: src/features/settings/components/model-library.tsx:178
-msgid "Disk usage"
-msgstr "डिस्क उपयोग"
+#~ msgid "Disk usage"
+#~ msgstr "डिस्क उपयोग"
 
 #: src/features/settings/components/model-library.tsx:225
-msgid "Dismiss"
-msgstr "खारिज करें"
+#~ msgid "Dismiss"
+#~ msgstr "खारिज करें"
 
 #: src/components/feedback/error-toast.tsx:26
 msgid "Dismiss error"
@@ -780,25 +794,29 @@ msgid "Don't save history"
 msgstr "इतिहास न सहेजें"
 
 #: src/features/settings/components/model-library.tsx:242
-msgid "Done"
-msgstr "हो गया"
+#~ msgid "Done"
+#~ msgstr "हो गया"
 
 #: src/features/history/components/history-table.tsx:509
 #: src/features/settings/components/gpu-backend-card.tsx:38
-#: src/features/settings/components/model-library.tsx:169
+#: src/features/settings/components/model-row.tsx:106
 msgid "Download"
 msgstr "डाउनलोड"
 
 #. placeholder {0}: wanted.length
 #: src/features/settings/components/model-library.tsx:172
-msgid "Download {0} selected"
-msgstr "चुने हुए {0} डाउनलोड करें"
+#~ msgid "Download {0} selected"
+#~ msgstr "चुने हुए {0} डाउनलोड करें"
 
 #. placeholder {0}: wanted.length
 #. placeholder {1}: formatBytes(wantedBytes)
 #: src/features/settings/components/model-library.tsx:171
-msgid "Download {0} selected · {1}"
-msgstr "चुने हुए {0} डाउनलोड करें · {1}"
+#~ msgid "Download {0} selected · {1}"
+#~ msgstr "चुने हुए {0} डाउनलोड करें · {1}"
+
+#: src/features/settings/components/model-row.tsx:103
+msgid "Download {label}"
+msgstr "{label} डाउनलोड करें"
 
 #: src/features/welcome/welcome-page.tsx:424
 msgid "Download {pendingCount} models"
@@ -828,6 +846,10 @@ msgstr "डाउनलोड रुक गया"
 msgid "Download progress"
 msgstr "डाउनलोड प्रगति"
 
+#: src/features/settings/components/model-row.tsx:126
+msgid "Download progress of {label}"
+msgstr "{label} की डाउनलोड प्रगति"
+
 #: src/features/history/components/session-detail-modal.tsx:134
 msgid "Download transcript"
 msgstr "ट्रांसक्रिप्ट डाउनलोड करें"
@@ -845,7 +867,6 @@ msgid "Downloading update"
 msgstr "अपडेट डाउनलोड हो रहा है"
 
 #: src/features/settings/components/gpu-backend-card.tsx:27
-#: src/features/settings/components/model-library.tsx:341
 msgid "Downloading…"
 msgstr "डाउनलोड हो रहा है…"
 
@@ -1176,7 +1197,7 @@ msgstr "जारी है"
 #: src/features/settings/components/asr-engine-cards.tsx:167
 #: src/features/settings/components/asr-engine-cards.tsx:168
 #: src/features/settings/components/installed-model-picker.tsx:57
-#: src/features/settings/components/model-library.tsx:290
+#: src/features/settings/components/model-row.tsx:51
 msgid "In use"
 msgstr "उपयोग में"
 
@@ -1196,7 +1217,7 @@ msgstr "प्लेसहोल्डर डालें"
 msgid "Install and restart"
 msgstr "इंस्टॉल करें और दोबारा चालू करें"
 
-#: src/features/settings/components/model-library.tsx:329
+#: src/features/settings/components/model-row.tsx:154
 #: src/features/welcome/components/model-card.tsx:74
 #: src/features/welcome/components/review-step.tsx:47
 msgid "Installed"
@@ -1410,6 +1431,10 @@ msgstr "मोड"
 msgid "Model"
 msgstr "मॉडल"
 
+#: src/features/settings/components/model-library.tsx:200
+msgid "Model family"
+msgstr "मॉडल परिवार"
+
 #: src/features/welcome/components/engine-step.tsx:114
 msgid "Model size"
 msgstr "मॉडल का आकार"
@@ -1453,9 +1478,12 @@ msgid "Name is too long."
 msgstr "नाम बहुत लंबा है।"
 
 #: src/features/settings/components/asr-engine-cards.tsx:192
-#: src/features/settings/components/model-library.tsx:144
 msgid "Nearly 100 languages"
 msgstr "लगभग 100 भाषाएँ"
+
+#: src/features/settings/components/model-library.tsx:138
+msgid "Nearly 100 languages. Bigger is more accurate, but slower."
+msgstr "लगभग 100 भाषाएँ। बड़ा मॉडल अधिक सटीक है, लेकिन धीमा।"
 
 #: src/features/settings/data/settings-data.ts:108
 msgid "Never"
@@ -1547,7 +1575,7 @@ msgstr "जुड़ा नहीं है"
 msgid "Not installed"
 msgstr "इंस्टॉल नहीं है"
 
-#: src/features/settings/components/model-library.tsx:181
+#: src/features/settings/components/model-library.tsx:154
 msgid "Nothing installed"
 msgstr "कुछ भी इंस्टॉल नहीं है"
 
@@ -1637,7 +1665,7 @@ msgid "Pagination"
 msgstr "पृष्ठ नेविगेशन"
 
 #: src/features/settings/components/asr-engine-cards.tsx:141
-#: src/features/settings/components/model-library.tsx:147
+#: src/features/settings/components/model-library.tsx:179
 #: src/features/settings/data/settings-data.ts:642
 #: src/features/welcome/components/engine-step.tsx:73
 msgid "Parakeet"
@@ -1793,6 +1821,10 @@ msgstr "पेशेवर"
 msgid "Question or help"
 msgstr "सवाल या मदद"
 
+#: src/features/settings/components/model-row.tsx:112
+msgid "Queued"
+msgstr "कतार में"
+
 #: src/features/shell/components/sidebar-quick-actions.tsx:89
 msgid "Quit Lune Voice"
 msgstr "Lune Voice बंद करें"
@@ -1876,7 +1908,7 @@ msgid "Restart needed"
 msgstr "दोबारा चालू करना ज़रूरी"
 
 #: src/features/overview/overview-page.tsx:338
-#: src/features/settings/components/model-library.tsx:232
+#: src/features/settings/components/model-row.tsx:144
 msgid "Retry"
 msgstr "फिर से कोशिश करें"
 
@@ -1959,8 +1991,8 @@ msgid "Search transcripts…"
 msgstr "ट्रांसक्रिप्ट खोजें…"
 
 #: src/features/settings/components/model-library.tsx:159
-msgid "Select all"
-msgstr "सभी चुनें"
+#~ msgid "Select all"
+#~ msgstr "सभी चुनें"
 
 #: src/features/history/components/history-table.tsx:177
 msgid "Select all sessions on this page"
@@ -2286,7 +2318,7 @@ msgstr "जिन शब्दों पर स्पीच इंजन सब�
 msgid "This copy can't update itself. Download the new version from {RELEASES_URL} and replace this one. Your settings, history and models are kept."
 msgstr "यह कॉपी खुद को अपडेट नहीं कर सकती। {RELEASES_URL} से नया संस्करण डाउनलोड करें और इसे बदल दें। आपकी सेटिंग्स, इतिहास और मॉडल बने रहेंगे।"
 
-#: src/features/settings/components/model-library.tsx:366
+#: src/features/settings/components/model-library.tsx:250
 msgid "This model is in use by your current configuration. Dictation may not work until you reinstall it or pick another."
 msgstr "यह मॉडल आपके मौजूदा कॉन्फ़िगरेशन द्वारा उपयोग में है। जब तक आप इसे दोबारा इंस्टॉल न करें या कोई दूसरा न चुनें, तब तक डिक्टेशन काम नहीं कर सकता।"
 
@@ -2526,7 +2558,6 @@ msgid "Wait {cooldown}s"
 msgstr "{cooldown} सेकंड रुकें"
 
 #: src/features/model-downloads/components/download-checklist.tsx:96
-#: src/features/settings/components/model-library.tsx:342
 msgid "Waiting"
 msgstr "प्रतीक्षा में"
 
@@ -2580,7 +2611,7 @@ msgid "Which screen the pill appears on."
 msgstr "संकेतक किस स्क्रीन पर दिखाई देता है।"
 
 #: src/features/settings/components/asr-engine-cards.tsx:140
-#: src/features/settings/components/model-library.tsx:144
+#: src/features/settings/components/model-library.tsx:179
 #: src/features/settings/data/settings-data.ts:641
 #: src/features/welcome/components/engine-step.tsx:67
 msgid "Whisper"

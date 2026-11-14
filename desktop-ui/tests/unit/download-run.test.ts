@@ -251,3 +251,80 @@ describe('runChecklist', () => {
     expect(list.totalBytes).toBe(200 * MB);
   });
 });
+
+describe('drop', () => {
+  test('takes a queued model off the queue without touching the one in flight', () => {
+    const t = setup();
+    t.run.start([model('a'), model('b'), model('c')]);
+    t.run.drop('b');
+    expect(t.run.state.current).toBe('a');
+    expect(t.run.state.queue).toEqual(['c']);
+    expect(t.run.state.models.map((m) => m.localName)).toEqual(['a', 'c']);
+    expect(t.cancels()).toBe(0);
+    expect(t.saved()?.pending).toEqual(['a', 'c']);
+  });
+
+  test('cancels the model in flight and starts the next once it has stopped', async () => {
+    const t = setup();
+    t.run.start([model('a'), model('b')]);
+    t.run.drop('a');
+    expect(t.cancels()).toBe(1);
+    // The backend holds its one download slot until the cancelled transfer
+    // ends, so asking for the next one sooner would be refused.
+    expect(t.calls).toEqual(['a']);
+    expect(t.run.state.current).toBeNull();
+    t.pending.get('a')?.reject(new Error('cancelled'));
+    await flush();
+    expect(t.calls).toEqual(['a', 'b']);
+    expect(t.run.state.current).toBe('b');
+    expect(t.run.state.status).toBe('running');
+    expect(t.run.state.failed).toBeNull();
+  });
+
+  test('dropping the failed model carries on with the rest', () => {
+    const t = setup();
+    t.run.start([model('a'), model('b')]);
+    t.run.onProgress({ ...t.done('a'), done: false, downloadedBytes: 1 });
+    t.pending.get('a')?.reject(new Error('disk full'));
+    return flush().then(() => {
+      expect(t.run.state.status).toBe('failed');
+      t.run.drop('a');
+      expect(t.run.state.failed).toBeNull();
+      expect(t.run.state.error).toBeNull();
+      expect(t.run.state.current).toBe('b');
+      expect(t.calls).toEqual(['a', 'b']);
+    });
+  });
+
+  test('dropping the last model ends the run quietly', () => {
+    const t = setup();
+    t.run.start([model('a')]);
+    t.run.drop('a');
+    expect(t.run.state.status).toBe('idle');
+    expect(t.saved()).toBeNull();
+  });
+
+  test('a download started right after dropping the only model waits for that transfer to stop', async () => {
+    const t = setup();
+    t.run.start([model('a')]);
+    t.run.drop('a');
+    t.run.start([model('b')]);
+    expect(t.run.state.current).toBe('b');
+    // The backend still holds its slot for `a` and would refuse `b`.
+    expect(t.calls).toEqual(['a']);
+    t.pending.get('a')?.reject(new Error('cancelled'));
+    await flush();
+    expect(t.calls).toEqual(['a', 'b']);
+    expect(t.run.state.status).toBe('running');
+    expect(t.run.state.failed).toBeNull();
+  });
+
+  test('a late progress report from the dropped model is ignored', () => {
+    const t = setup();
+    t.run.start([model('a'), model('b')]);
+    t.run.drop('a');
+    t.run.onProgress(t.done('a'));
+    expect(t.run.state.finished).toEqual([]);
+    expect(t.calls).toEqual(['a']);
+  });
+});

@@ -102,6 +102,10 @@ export function createDownloadRun(deps: DownloadDeps) {
   // Bumped whenever the run it belongs to ends, so a callback of a download
   // that was cancelled cannot report on a run started after it.
   let generation = 0;
+  let inFlight: Promise<void> = Promise.resolve();
+  // Set while a dropped transfer is still ending: the backend holds its one
+  // download slot until then and refuses any other model.
+  let draining: Promise<void> | null = null;
 
   const patch = (next: Partial<RunState>) => store.setState((s) => ({ ...s, ...next }));
   const fresh = (next: Partial<RunState> = {}): RunState => ({
@@ -127,7 +131,22 @@ export function createDownloadRun(deps: DownloadDeps) {
     // during the transfer this line is about to start.
     park();
     const mine = generation;
-    deps.download(next).catch((err) => {
+    if (draining) {
+      void draining.then(() => {
+        if (mine === generation && store.state.current === next) request(next, mine);
+      });
+      return;
+    }
+    request(next, mine);
+  }
+
+  function request(next: string, mine: number) {
+    const call = deps.download(next);
+    inFlight = call.then(
+      () => {},
+      () => {},
+    );
+    call.catch((err) => {
       // A cancel rejects the call by design; reporting that as a failed
       // download would show an error for the thing the user just asked for.
       if (mine !== generation) return;
@@ -204,6 +223,50 @@ export function createDownloadRun(deps: DownloadDeps) {
       if (!inFlight) return;
       void deps.cancel().catch(() => {
         // The backend answers a cancel with nothing the user could act on.
+      });
+    },
+
+    /**
+     * Take one model out of the run: off the queue, out of a failed state, or
+     * cancelled mid-transfer. The rest of the run carries on.
+     */
+    drop(localName: string) {
+      const s = store.state;
+      const models = s.models.filter((m) => m.localName !== localName);
+      if (s.queue.includes(localName)) {
+        patch({ models, queue: s.queue.filter((n) => n !== localName), total: s.total - 1 });
+        park();
+        return;
+      }
+      if (s.status === 'failed' && s.failed === localName) {
+        patch({ models, failed: null, error: null, status: 'running', total: s.total - 1 });
+        advance();
+        return;
+      }
+      if (s.status !== 'running' || s.current !== localName) return;
+      // The cancelled call rejects late; a new generation keeps that from
+      // failing the run.
+      generation += 1;
+      const mine = generation;
+      const ending = inFlight.then(() => {
+        if (draining === ending) draining = null;
+      });
+      draining = ending;
+      if (s.queue.length === 0) {
+        deps.storage.clear();
+        store.setState(() => fresh());
+      } else {
+        patch({ models, current: null, currentBytes: 0, total: s.total - 1 });
+        park();
+      }
+      void deps.cancel().catch(() => {
+        // Same as `cancel`: nothing the user could act on.
+      });
+      // The backend holds its one download slot until the cancelled transfer
+      // ends, so the next model waits for that.
+      void ending.then(() => {
+        const now = store.state;
+        if (mine === generation && now.status === 'running' && now.current === null) advance();
       });
     },
 

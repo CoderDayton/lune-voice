@@ -58,6 +58,11 @@ msgstr "{0, plural, one {Sitzung} other {Sitzungen}}"
 msgid "{0} / {1}"
 msgstr "{0} / {1}"
 
+#. placeholder {0}: formatBytes(installedBytes)
+#: src/features/settings/components/model-library.tsx:154
+msgid "{0} used"
+msgstr "{0} belegt"
+
 #: src/features/history/components/history-table.tsx:291
 msgid "{count} selected"
 msgstr "{count} ausgewählt"
@@ -113,9 +118,12 @@ msgid "1 year"
 msgstr "1 Jahr"
 
 #: src/features/settings/components/asr-engine-cards.tsx:201
-#: src/features/settings/components/model-library.tsx:147
 msgid "25 European languages"
 msgstr "25 europäische Sprachen"
+
+#: src/features/settings/components/model-library.tsx:139
+msgid "25 European languages. Fast on a CPU."
+msgstr "25 europäische Sprachen. Schnell auf der CPU."
 
 #: src/features/settings/data/settings-data.ts:568
 msgid "30 days"
@@ -381,8 +389,8 @@ msgstr "Integriert"
 
 #: src/components/feedback/confirm-dialog.tsx:61
 #: src/features/dictionary/components/dictionary-table.tsx:113
-#: src/features/settings/components/model-library.tsx:215
-#: src/features/settings/components/model-library.tsx:371
+#: src/features/settings/components/model-library.tsx:255
+#: src/features/settings/components/model-row.tsx:90
 #: src/features/snippets/snippets-page.tsx:249
 #: src/features/styles/components/style-editor-modal.tsx:247
 msgid "Cancel"
@@ -395,6 +403,10 @@ msgstr "Aktuelle Aufnahme abbrechen"
 #: src/features/welcome/welcome-page.tsx:373
 msgid "Cancel download"
 msgstr "Download abbrechen"
+
+#: src/features/settings/components/model-row.tsx:89
+msgid "Cancel download of {label}"
+msgstr "Download von {label} abbrechen"
 
 #: src/lib/session-format.ts:10
 msgid "Cancelled"
@@ -488,7 +500,6 @@ msgid "Clear {label}"
 msgstr "{label} löschen"
 
 #: src/features/history/components/history-table.tsx:294
-#: src/features/settings/components/model-library.tsx:159
 msgid "Clear selection"
 msgstr "Auswahl aufheben"
 
@@ -502,7 +513,7 @@ msgstr "schließen"
 
 #: src/components/feedback/help-feedback-dialog.tsx:281
 #: src/features/history/components/session-detail-modal.tsx:226
-#: src/features/settings/components/model-library.tsx:381
+#: src/features/settings/components/model-library.tsx:265
 #: src/features/styles/components/style-editor-modal.tsx:238
 #: src/features/updates/update-dialog.tsx:326
 #: src/features/updates/update-dialog.tsx:338
@@ -652,8 +663,7 @@ msgstr "Dunkel"
 #: src/components/feedback/confirm-dialog.tsx:72
 #: src/features/history/components/history-table.tsx:515
 #: src/features/history/components/session-detail-modal.tsx:219
-#: src/features/settings/components/model-library.tsx:334
-#: src/features/settings/components/model-library.tsx:335
+#: src/features/settings/components/model-row.tsx:161
 msgid "Delete"
 msgstr "Löschen"
 
@@ -667,7 +677,7 @@ msgid "Delete {0}"
 msgstr "{0} löschen"
 
 #. placeholder {0}: model.name
-#: src/features/settings/components/model-library.tsx:362
+#: src/features/settings/components/model-library.tsx:246
 msgid "Delete {0}?"
 msgstr "{0} löschen?"
 
@@ -675,7 +685,11 @@ msgstr "{0} löschen?"
 msgid "Delete {count, plural, one {# session} other {# sessions}}?"
 msgstr "{count, plural, one {# Sitzung} other {# Sitzungen}} löschen?"
 
-#: src/features/settings/components/model-library.tsx:374
+#: src/features/settings/components/model-row.tsx:160
+msgid "Delete {label}"
+msgstr "{label} löschen"
+
+#: src/features/settings/components/model-library.tsx:258
 msgid "Delete model"
 msgstr "Modell löschen"
 
@@ -764,12 +778,12 @@ msgid "Disconnected"
 msgstr "Getrennt"
 
 #: src/features/settings/components/model-library.tsx:178
-msgid "Disk usage"
-msgstr "Speicherbelegung"
+#~ msgid "Disk usage"
+#~ msgstr "Speicherbelegung"
 
 #: src/features/settings/components/model-library.tsx:225
-msgid "Dismiss"
-msgstr "Verwerfen"
+#~ msgid "Dismiss"
+#~ msgstr "Verwerfen"
 
 #: src/components/feedback/error-toast.tsx:26
 msgid "Dismiss error"
@@ -780,25 +794,29 @@ msgid "Don't save history"
 msgstr "Verlauf nicht speichern"
 
 #: src/features/settings/components/model-library.tsx:242
-msgid "Done"
-msgstr "Fertig"
+#~ msgid "Done"
+#~ msgstr "Fertig"
 
 #: src/features/history/components/history-table.tsx:509
 #: src/features/settings/components/gpu-backend-card.tsx:38
-#: src/features/settings/components/model-library.tsx:169
+#: src/features/settings/components/model-row.tsx:106
 msgid "Download"
 msgstr "Herunterladen"
 
 #. placeholder {0}: wanted.length
 #: src/features/settings/components/model-library.tsx:172
-msgid "Download {0} selected"
-msgstr "{0} ausgewählte herunterladen"
+#~ msgid "Download {0} selected"
+#~ msgstr "{0} ausgewählte herunterladen"
 
 #. placeholder {0}: wanted.length
 #. placeholder {1}: formatBytes(wantedBytes)
 #: src/features/settings/components/model-library.tsx:171
-msgid "Download {0} selected · {1}"
-msgstr "{0} ausgewählte herunterladen · {1}"
+#~ msgid "Download {0} selected · {1}"
+#~ msgstr "{0} ausgewählte herunterladen · {1}"
+
+#: src/features/settings/components/model-row.tsx:103
+msgid "Download {label}"
+msgstr "{label} herunterladen"
 
 #: src/features/welcome/welcome-page.tsx:424
 msgid "Download {pendingCount} models"
@@ -828,6 +846,10 @@ msgstr "Download unterbrochen"
 msgid "Download progress"
 msgstr "Download-Fortschritt"
 
+#: src/features/settings/components/model-row.tsx:126
+msgid "Download progress of {label}"
+msgstr "Downloadfortschritt von {label}"
+
 #: src/features/history/components/session-detail-modal.tsx:134
 msgid "Download transcript"
 msgstr "Transkript herunterladen"
@@ -845,7 +867,6 @@ msgid "Downloading update"
 msgstr "Update wird heruntergeladen"
 
 #: src/features/settings/components/gpu-backend-card.tsx:27
-#: src/features/settings/components/model-library.tsx:341
 msgid "Downloading…"
 msgstr "Wird heruntergeladen…"
 
@@ -1176,7 +1197,7 @@ msgstr "Läuft"
 #: src/features/settings/components/asr-engine-cards.tsx:167
 #: src/features/settings/components/asr-engine-cards.tsx:168
 #: src/features/settings/components/installed-model-picker.tsx:57
-#: src/features/settings/components/model-library.tsx:290
+#: src/features/settings/components/model-row.tsx:51
 msgid "In use"
 msgstr "Wird verwendet"
 
@@ -1196,7 +1217,7 @@ msgstr "Platzhalter einfügen"
 msgid "Install and restart"
 msgstr "Installieren und neu starten"
 
-#: src/features/settings/components/model-library.tsx:329
+#: src/features/settings/components/model-row.tsx:154
 #: src/features/welcome/components/model-card.tsx:74
 #: src/features/welcome/components/review-step.tsx:47
 msgid "Installed"
@@ -1410,6 +1431,10 @@ msgstr "Modus"
 msgid "Model"
 msgstr "Modell"
 
+#: src/features/settings/components/model-library.tsx:200
+msgid "Model family"
+msgstr "Modellfamilie"
+
 #: src/features/welcome/components/engine-step.tsx:114
 msgid "Model size"
 msgstr "Modellgröße"
@@ -1453,9 +1478,12 @@ msgid "Name is too long."
 msgstr "Der Name ist zu lang."
 
 #: src/features/settings/components/asr-engine-cards.tsx:192
-#: src/features/settings/components/model-library.tsx:144
 msgid "Nearly 100 languages"
 msgstr "Fast 100 Sprachen"
+
+#: src/features/settings/components/model-library.tsx:138
+msgid "Nearly 100 languages. Bigger is more accurate, but slower."
+msgstr "Fast 100 Sprachen. Größer ist genauer, aber langsamer."
 
 #: src/features/settings/data/settings-data.ts:108
 msgid "Never"
@@ -1547,7 +1575,7 @@ msgstr "nicht verbunden"
 msgid "Not installed"
 msgstr "Nicht installiert"
 
-#: src/features/settings/components/model-library.tsx:181
+#: src/features/settings/components/model-library.tsx:154
 msgid "Nothing installed"
 msgstr "Nichts installiert"
 
@@ -1637,7 +1665,7 @@ msgid "Pagination"
 msgstr "Seitennavigation"
 
 #: src/features/settings/components/asr-engine-cards.tsx:141
-#: src/features/settings/components/model-library.tsx:147
+#: src/features/settings/components/model-library.tsx:179
 #: src/features/settings/data/settings-data.ts:642
 #: src/features/welcome/components/engine-step.tsx:73
 msgid "Parakeet"
@@ -1793,6 +1821,10 @@ msgstr "Professionell"
 msgid "Question or help"
 msgstr "Frage oder Hilfe"
 
+#: src/features/settings/components/model-row.tsx:112
+msgid "Queued"
+msgstr "In der Warteschlange"
+
 #: src/features/shell/components/sidebar-quick-actions.tsx:89
 msgid "Quit Lune Voice"
 msgstr "Lune Voice beenden"
@@ -1876,7 +1908,7 @@ msgid "Restart needed"
 msgstr "Neustart erforderlich"
 
 #: src/features/overview/overview-page.tsx:338
-#: src/features/settings/components/model-library.tsx:232
+#: src/features/settings/components/model-row.tsx:144
 msgid "Retry"
 msgstr "Erneut versuchen"
 
@@ -1959,8 +1991,8 @@ msgid "Search transcripts…"
 msgstr "Transkripte durchsuchen…"
 
 #: src/features/settings/components/model-library.tsx:159
-msgid "Select all"
-msgstr "Alle auswählen"
+#~ msgid "Select all"
+#~ msgstr "Alle auswählen"
 
 #: src/features/history/components/history-table.tsx:177
 msgid "Select all sessions on this page"
@@ -2286,7 +2318,7 @@ msgstr "Die Wörter, bei denen die Erkennung am unsichersten ist, werden mit Ihr
 msgid "This copy can't update itself. Download the new version from {RELEASES_URL} and replace this one. Your settings, history and models are kept."
 msgstr "Diese Kopie kann sich nicht selbst aktualisieren. Laden Sie die neue Version von {RELEASES_URL} herunter und ersetzen Sie diese. Ihre Einstellungen, Ihr Verlauf und Ihre Modelle bleiben erhalten."
 
-#: src/features/settings/components/model-library.tsx:366
+#: src/features/settings/components/model-library.tsx:250
 msgid "This model is in use by your current configuration. Dictation may not work until you reinstall it or pick another."
 msgstr "Dieses Modell wird von Ihrer aktuellen Konfiguration verwendet. Das Diktat funktioniert möglicherweise erst wieder, wenn Sie es neu installieren oder ein anderes wählen."
 
@@ -2526,7 +2558,6 @@ msgid "Wait {cooldown}s"
 msgstr "Noch {cooldown} s"
 
 #: src/features/model-downloads/components/download-checklist.tsx:96
-#: src/features/settings/components/model-library.tsx:342
 msgid "Waiting"
 msgstr "Wartet"
 
@@ -2580,7 +2611,7 @@ msgid "Which screen the pill appears on."
 msgstr "Auf welchem Bildschirm die Anzeige erscheint."
 
 #: src/features/settings/components/asr-engine-cards.tsx:140
-#: src/features/settings/components/model-library.tsx:144
+#: src/features/settings/components/model-library.tsx:179
 #: src/features/settings/data/settings-data.ts:641
 #: src/features/welcome/components/engine-step.tsx:67
 msgid "Whisper"

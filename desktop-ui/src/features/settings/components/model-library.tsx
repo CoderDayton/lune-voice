@@ -1,18 +1,23 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 import { useLingui } from '@lingui/react/macro';
-import { AlertTriangle, Check, Clock, Download, Loader2, Trash2 } from 'lucide-react';
-import { type ReactNode, type RefObject, useEffect, useId, useRef, useState } from 'react';
+import { AlertTriangle, Loader2 } from 'lucide-react';
+import { type RefObject, useEffect, useId, useRef, useState } from 'react';
 import { backendClient } from '../../../lib/backend/client';
 import { formatBytes } from '../../../lib/format-bytes';
-import { DownloadChecklist } from '../../model-downloads/components/download-checklist';
-import { runChecklist } from '../../model-downloads/download-run';
 import { modelDownloads, useModelDownloads } from '../../model-downloads/model-downloads';
 import { localizeText, parakeetModels, whisperModels } from '../data/settings-data';
 import type { ModelStatusApi } from '../hooks/use-model-status';
-import { SettingsBlock, SettingsRow } from './section';
+import { ModelRow, type RowState } from './model-row';
 
 type LocalModel = (typeof whisperModels)[number] | (typeof parakeetModels)[number];
+
+type FamilyId = 'whisper' | 'parakeet';
+
+const FAMILIES: { id: FamilyId; models: readonly LocalModel[] }[] = [
+  { id: 'whisper', models: whisperModels },
+  { id: 'parakeet', models: parakeetModels },
+];
 
 interface DeleteTarget {
   localName: string;
@@ -48,50 +53,56 @@ function useResumeDownloads(status: ModelStatusApi) {
 }
 
 /**
- * Every on-device model in one place: tick the ones you want and download them
- * together, watch the shared download checklist while they come in, and delete
- * the ones you no longer need. Which installed model is used is picked on the
- * Transcription page.
+ * Every on-device model, one family per tab so the page keeps one height.
+ * Each row downloads, shows its own progress, and deletes. Which installed
+ * model is used is picked on the Transcription page.
  */
 export function ModelLibrary({ status }: { status: ModelStatusApi }) {
   const { t, i18n } = useLingui();
   const run = useModelDownloads();
-  const [picked, setPicked] = useState<ReadonlySet<string>>(new Set());
+  const [picked, setPicked] = useState<FamilyId | null>(null);
   const [deleting, setDeleting] = useState<DeleteTarget | null>(null);
   const dialogRef = useRef<HTMLDialogElement>(null);
+  const panelId = useId();
   useResumeDownloads(status);
 
-  const label = (m: LocalModel) => localizeText(i18n, m.label);
   const info = (m: LocalModel) => status.byName.get(m.localName);
   const isReady = (m: LocalModel) => info(m)?.ready ?? false;
+  const inUse = (m: LocalModel) => (info(m)?.inUse ?? false) && isReady(m);
   const bytesOf = (m: LocalModel) => info(m)?.downloadBytes ?? 0;
-  const queued = (m: LocalModel) =>
-    run.status === 'running' && run.models.some((r) => r.localName === m.localName);
-  const selectable = (m: LocalModel) => !isReady(m) && !queued(m);
+  const label = (m: LocalModel) => localizeText(i18n, m.label);
 
-  const all: LocalModel[] = [...whisperModels, ...parakeetModels];
-  const missing = all.filter(selectable);
-  const wanted = missing.filter((m) => picked.has(m.localName));
-  const wantedBytes = wanted.reduce((sum, m) => sum + bytesOf(m), 0);
-  const allPicked = missing.length > 0 && wanted.length === missing.length;
+  const inRun = (m: LocalModel) =>
+    (run.status === 'running' || run.status === 'failed') &&
+    run.models.some((r) => r.localName === m.localName);
 
-  const toggle = (localName: string) =>
-    setPicked((prev) => {
-      const next = new Set(prev);
-      if (next.has(localName)) next.delete(localName);
-      else next.add(localName);
-      return next;
-    });
+  const stateOf = (m: LocalModel): RowState => {
+    if (isReady(m)) return { kind: 'installed' };
+    if (run.failed === m.localName && run.error) return { kind: 'failed', error: run.error };
+    if (run.current === m.localName) {
+      const total = run.models.find((r) => r.localName === m.localName)?.bytes || bytesOf(m);
+      return { kind: 'downloading', done: run.currentBytes, total };
+    }
+    if (inRun(m)) return { kind: 'queued' };
+    return { kind: 'available' };
+  };
 
-  function downloadPicked() {
-    modelDownloads.start(
-      wanted.map((m) => ({
-        localName: m.localName,
-        name: info(m)?.name ?? label(m),
-        bytes: bytesOf(m),
-      })),
-    );
-    setPicked(new Set());
+  const family = picked ?? FAMILIES.find((f) => f.models.some(inUse))?.id ?? FAMILIES[0].id;
+  const shown = FAMILIES.find((f) => f.id === family) ?? FAMILIES[0];
+
+  const installedBytes =
+    status.diskBytes ??
+    status.models.reduce((sum, m) => sum + (m.ready && m.sizeBytes != null ? m.sizeBytes : 0), 0);
+
+  function download(m: LocalModel) {
+    // A start outside a running run replaces it; carry over what a failure
+    // left queued so those rows are not silently dropped.
+    const queued =
+      run.status === 'failed' ? run.models.filter((r) => run.queue.includes(r.localName)) : [];
+    modelDownloads.start([
+      ...queued,
+      { localName: m.localName, name: info(m)?.name ?? label(m), bytes: bytesOf(m) },
+    ]);
   }
 
   function closeDelete() {
@@ -104,85 +115,55 @@ export function ModelLibrary({ status }: { status: ModelStatusApi }) {
     closeDelete();
   }
 
-  const stateOf = (m: LocalModel): RowState =>
-    isReady(m)
-      ? 'installed'
-      : run.current === m.localName
-        ? 'downloading'
-        : queued(m)
-          ? 'waiting'
-          : 'available';
-
-  const row = (m: LocalModel) => {
-    const inUse = (info(m)?.inUse ?? false) && isReady(m);
-    return (
-      <ModelRow
-        key={m.value}
-        label={label(m)}
-        description={m.description === undefined ? '' : localizeText(i18n, m.description)}
-        size={bytesOf(m) > 0 ? formatBytes(bytesOf(m)) : m.size}
-        state={stateOf(m)}
-        inUse={inUse}
-        checked={picked.has(m.localName)}
-        onToggle={() => toggle(m.localName)}
-        onDelete={() => {
-          setDeleting({ localName: m.localName, name: label(m), inUse });
-          dialogRef.current?.showModal();
-        }}
-      />
-    );
-  };
-
-  const installedBytes = status.models.reduce(
-    (sum, m) => sum + (m.ready && m.sizeBytes != null ? m.sizeBytes : 0),
-    0,
+  const row = (m: LocalModel) => (
+    <ModelRow
+      key={m.value}
+      label={label(m)}
+      description={m.description === undefined ? '' : localizeText(i18n, m.description)}
+      size={bytesOf(m) > 0 ? formatBytes(bytesOf(m)) : m.size}
+      state={stateOf(m)}
+      inUse={inUse(m)}
+      onDownload={() => download(m)}
+      onCancel={() => modelDownloads.drop(m.localName)}
+      onRetry={() => modelDownloads.retry()}
+      onDelete={() => {
+        setDeleting({ localName: m.localName, name: label(m), inUse: inUse(m) });
+        dialogRef.current?.showModal();
+      }}
+    />
   );
+
+  const familyLabel = useFamilyLabels();
+  const familyNote: Record<FamilyId, string> = {
+    whisper: t`Nearly 100 languages. Bigger is more accurate, but slower.`,
+    parakeet: t`25 European languages. Fast on a CPU.`,
+  };
 
   return (
     <>
-      {run.status !== 'idle' && <RunPanel run={run} />}
-      <SettingsBlock label={t`Whisper`} description={t`Nearly 100 languages`}>
-        <ModelList>{whisperModels.map(row)}</ModelList>
-      </SettingsBlock>
-      <SettingsBlock label={t`Parakeet`} description={t`25 European languages`}>
-        <ModelList>{parakeetModels.map(row)}</ModelList>
-      </SettingsBlock>
-      {!status.loading && missing.length > 0 && (
-        <div className="flex flex-wrap items-center justify-between gap-3 rounded-box border border-surface-border bg-surface-card px-5 py-3">
-          <button
-            type="button"
-            className="btn btn-ghost btn-sm"
-            onClick={() =>
-              setPicked(allPicked ? new Set() : new Set(missing.map((m) => m.localName)))
-            }
-          >
-            {allPicked ? t`Clear selection` : t`Select all`}
-          </button>
-          <button
-            type="button"
-            className="btn btn-primary btn-sm gap-1.5"
-            disabled={wanted.length === 0}
-            onClick={downloadPicked}
-          >
-            <Download size={14} />
-            {wanted.length === 0
-              ? t`Download`
-              : wantedBytes > 0
-                ? t`Download ${wanted.length} selected · ${formatBytes(wantedBytes)}`
-                : t`Download ${wanted.length} selected`}
-          </button>
-        </div>
-      )}
-      {!status.loading && (
-        <SettingsRow
-          label={t`Disk usage`}
-          control={
-            <span className="text-sm font-medium tabular-nums text-content">
-              {installedBytes > 0 ? formatBytes(installedBytes) : t`Nothing installed`}
-            </span>
-          }
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <FamilyTabs
+          selected={family}
+          panelId={panelId}
+          onSelect={setPicked}
+          busy={(f) => f.models.some((m) => run.current === m.localName)}
+          inUse={(f) => f.models.some(inUse)}
         />
-      )}
+        {!status.loading || installedBytes > 0 ? (
+          <span className="text-sm tabular-nums text-content-muted">
+            {installedBytes > 0 ? t`${formatBytes(installedBytes)} used` : t`Nothing installed`}
+          </span>
+        ) : null}
+      </div>
+      <div
+        id={panelId}
+        role="tabpanel"
+        aria-label={familyLabel[family]}
+        className="flex flex-col gap-2"
+      >
+        <p className="text-sm text-content-subtle">{familyNote[family]}</p>
+        <div className="model-list">{shown.models.map(row)}</div>
+      </div>
       <DeleteModelDialog
         dialogRef={dialogRef}
         model={deleting}
@@ -193,154 +174,57 @@ export function ModelLibrary({ status }: { status: ModelStatusApi }) {
   );
 }
 
-/** The shared download checklist, with the controls its state calls for. */
-function RunPanel({ run }: { run: ReturnType<typeof useModelDownloads> }) {
+function useFamilyLabels(): Record<FamilyId, string> {
   const { t } = useLingui();
-  return (
-    <div className="flex flex-col gap-3">
-      <DownloadChecklist checklist={runChecklist(run, null)} />
-      {run.status === 'failed' && (
-        <div role="alert" className="alert alert-warning alert-soft gap-2 text-sm select-text">
-          <AlertTriangle size={16} className="shrink-0" />
-          <span>{run.error}</span>
-        </div>
-      )}
-      <div className="flex justify-end gap-2">
-        {run.status === 'running' && (
-          <button
-            type="button"
-            className="btn btn-soft btn-sm"
-            onClick={() => modelDownloads.cancel()}
-          >
-            {t`Cancel`}
-          </button>
-        )}
-        {run.status === 'failed' && (
-          <>
-            <button
-              type="button"
-              className="btn btn-soft btn-sm"
-              onClick={() => modelDownloads.dismiss()}
-            >
-              {t`Dismiss`}
-            </button>
-            <button
-              type="button"
-              className="btn btn-primary btn-sm"
-              onClick={() => modelDownloads.retry()}
-            >
-              {t`Retry`}
-            </button>
-          </>
-        )}
-        {run.status === 'settled' && (
-          <button
-            type="button"
-            className="btn btn-soft btn-sm"
-            onClick={() => modelDownloads.dismiss()}
-          >
-            {t`Done`}
-          </button>
-        )}
-      </div>
-    </div>
-  );
+  return { whisper: t`Whisper`, parakeet: t`Parakeet` };
 }
 
-function ModelList({ children }: { children: ReactNode }) {
-  return (
-    <div className="flex flex-col divide-y divide-surface-border overflow-hidden rounded-box border border-surface-border bg-surface-card">
-      {children}
-    </div>
-  );
+type Family = (typeof FAMILIES)[number];
+
+interface FamilyTabsProps {
+  selected: FamilyId;
+  panelId: string;
+  onSelect: (id: FamilyId) => void;
+  /** A download of one of its models is in flight. */
+  busy: (f: Family) => boolean;
+  inUse: (f: Family) => boolean;
 }
 
-type RowState = 'installed' | 'available' | 'waiting' | 'downloading';
-
-interface ModelRowProps {
-  label: string;
-  description: string;
-  size: string;
-  state: RowState;
-  inUse: boolean;
-  checked: boolean;
-  onToggle: () => void;
-  onDelete: () => void;
-}
-
-function ModelRow({
-  label,
-  description,
-  size,
-  state,
-  inUse,
-  checked,
-  onToggle,
-  onDelete,
-}: ModelRowProps) {
+/** Same look as the engine tabs on the Transcription page. */
+function FamilyTabs({ selected, panelId, onSelect, busy, inUse }: FamilyTabsProps) {
   const { t } = useLingui();
-  const id = useId();
-  const available = state === 'available';
-
-  const text = (
-    <>
-      <span className="flex flex-wrap items-baseline gap-x-2 text-base font-medium text-content-strong">
-        {label}
-        <span className="text-sm font-normal tabular-nums text-content-muted">{size}</span>
-        {inUse && <span className="text-xs font-medium text-primary">{t`In use`}</span>}
-      </span>
-      <span className="text-sm text-content-muted">{description}</span>
-    </>
-  );
-
+  const labels = useFamilyLabels();
   return (
     <div
-      className={`flex items-center gap-4 border-s-2 px-5 py-4 transition-colors duration-fast ${
-        inUse ? 'border-s-primary bg-primary/12' : 'border-s-transparent hover:bg-surface-hover'
-      }`}
+      role="tablist"
+      aria-label={t`Model family`}
+      className="inline-flex w-fit flex-wrap gap-1 rounded-field border border-surface-border bg-surface-inset p-1"
     >
-      <span className="flex size-5 shrink-0 items-center justify-center">
-        {available ? (
-          <input
-            id={id}
-            type="checkbox"
-            className="checkbox checkbox-primary checkbox-sm"
-            checked={checked}
-            onChange={onToggle}
-          />
-        ) : state === 'installed' ? (
-          <Check size={16} strokeWidth={2.5} className="text-success" />
-        ) : state === 'downloading' ? (
-          <Loader2 size={16} className="animate-spin text-primary" />
-        ) : (
-          <Clock size={16} className="text-content-subtle" />
-        )}
-      </span>
-      {available ? (
-        <label htmlFor={id} className="flex min-w-0 flex-1 cursor-pointer flex-col gap-0.5">
-          {text}
-        </label>
-      ) : (
-        <div className="flex min-w-0 flex-1 flex-col gap-0.5">{text}</div>
-      )}
-      <span className="flex min-w-24 shrink-0 items-center justify-end gap-1 text-sm font-medium">
-        {state === 'installed' && (
-          <>
-            <span className="text-success">{t`Installed`}</span>
-            <button
-              type="button"
-              className="btn btn-ghost btn-sm btn-square text-content-muted hover:text-error"
-              onClick={onDelete}
-              aria-label={t`Delete`}
-              title={t`Delete`}
-            >
-              <Trash2 size={14} />
-            </button>
-          </>
-        )}
-        {state === 'downloading' && <span className="text-primary">{t`Downloading…`}</span>}
-        {state === 'waiting' && <span className="text-content-muted">{t`Waiting`}</span>}
-      </span>
+      {FAMILIES.map((f) => {
+        const on = f.id === selected;
+        return (
+          <button
+            key={f.id}
+            type="button"
+            role="tab"
+            aria-selected={on}
+            aria-controls={panelId}
+            onClick={() => onSelect(f.id)}
+            className={`inline-flex items-center gap-2 rounded-[calc(var(--radius-field)-3px)] px-4 py-2 text-sm transition-colors duration-fast ${
+              on
+                ? 'bg-surface-elevated font-medium text-content-strong shadow-sm ring-1 ring-surface-border-strong'
+                : 'text-content hover:text-content-strong'
+            }`}
+          >
+            {labels[f.id]}
+            {busy(f) ? (
+              <Loader2 size={12} className="animate-spin text-primary" aria-hidden />
+            ) : (
+              inUse(f) && <span className="size-1.5 rounded-full bg-primary" aria-hidden />
+            )}
+          </button>
+        );
+      })}
     </div>
   );
 }

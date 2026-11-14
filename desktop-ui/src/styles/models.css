@@ -1,0 +1,30 @@
+/* SPDX-License-Identifier: GPL-3.0-or-later */
+
+/* ── Model library ─────────────────────────────────────────────────────
+   One bordered list per family. Each row is a two-column grid: text on the
+   left, a fixed-width action column on the right, so every button, progress
+   bar and status lines up down the list and a row never changes height when
+   its download starts. */
+
+@utility model-list {
+  @apply flex flex-col divide-y divide-surface-border overflow-hidden rounded-box border border-surface-border bg-surface-card;
+}
+
+@utility model-row {
+  @apply grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-6 gap-y-3 border-s-2 border-s-transparent px-5 py-4 transition-colors;
+  transition-duration: var(--duration-fast);
+
+  &:hover {
+    @apply bg-surface-hover;
+  }
+
+  &[data-in-use] {
+    @apply border-s-primary bg-primary/12;
+  }
+}
+
+/* Wide enough for the progress bar plus its cancel button; the content sits
+   at the end so short actions still align with long ones. */
+@utility model-row-action {
+  @apply flex min-h-9 min-w-48 items-center justify-end gap-2;
+}

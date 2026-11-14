@@ -15,7 +15,7 @@ pub use db::{
 pub use error::{PersistError, PersistResult};
 pub use hub::{
     DownloadProgress, LlmUnavailable, ModelRole, ModelSpec, ModelStatus, check_model_status,
-    delete_model, download_model, has_required_models, styling_llm_readiness,
+    delete_model, download_model, has_required_models, models_disk_usage, styling_llm_readiness,
 };
 pub use paths::AppPaths;
 pub use settings::{LoadedSettings, SettingsStore};

@@ -489,6 +489,7 @@ pub fn run() {
             pill::list_monitors,
             commands::list_audio_input_devices,
             commands::check_model_status,
+            commands::models_disk_usage,
             commands::required_models_ready,
             commands::download_model_cmd,
             commands::delete_model_cmd,

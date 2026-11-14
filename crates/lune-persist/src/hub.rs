@@ -396,13 +396,35 @@ pub fn delete_model(models_dir: &Path, local_name: &str) -> PersistResult<bool> 
         )));
     }
     let dir = models_dir.join(local_name);
-    if dir.is_dir() {
-        std::fs::remove_dir_all(&dir)?;
-        info!(local_name, "model deleted");
-        Ok(true)
-    } else {
-        Ok(false)
+    if !dir.is_dir() {
+        return Ok(false);
     }
+    std::fs::remove_dir_all(&dir)?;
+    info!(local_name, "model deleted");
+    if known
+        .iter()
+        .any(|s| s.local_name() == local_name && brings_vad(s))
+    {
+        let still_used = known
+            .iter()
+            .any(|s| brings_vad(s) && models_dir.join(s.local_name()).is_dir());
+        let vad_dir = models_dir.join(model_dirs::DIR_WHISPER_VAD);
+        if !still_used && vad_dir.is_dir() {
+            std::fs::remove_dir_all(&vad_dir)?;
+            info!(
+                local_name = model_dirs::DIR_WHISPER_VAD,
+                "unused VAD deleted"
+            );
+        }
+    }
+    Ok(true)
+}
+
+pub fn models_disk_usage(models_dir: &Path) -> u64 {
+    ModelSpec::all()
+        .iter()
+        .filter_map(|s| installed_size_bytes(models_dir, s.local_name()))
+        .sum()
 }
 
 /// Download a single model by local_name. Calls `on_progress` for each file.
@@ -1429,6 +1451,35 @@ mod tests {
         std::fs::write(dir.join("x"), b"x").unwrap();
         assert!(delete_model(tmp.path(), ParakeetModel::TdtV3Q8.dir()).unwrap());
         assert!(!dir.exists());
+    }
+
+    fn put(models_dir: &Path, dir: &str, bytes: usize) -> PathBuf {
+        let d = models_dir.join(dir);
+        std::fs::create_dir_all(&d).unwrap();
+        std::fs::write(d.join("f"), vec![0u8; bytes]).unwrap();
+        d
+    }
+
+    #[test]
+    fn the_vad_goes_with_the_last_speech_model_of_either_engine() {
+        let tmp = tempfile::tempdir().unwrap();
+        let vad = put(tmp.path(), model_dirs::DIR_WHISPER_VAD, 1);
+        put(tmp.path(), WhisperModel::Small.dir(), 1);
+        put(tmp.path(), ParakeetModel::TdtV3Q8.dir(), 1);
+
+        delete_model(tmp.path(), WhisperModel::Small.dir()).unwrap();
+        assert!(vad.exists(), "Parakeet still shares it");
+        delete_model(tmp.path(), ParakeetModel::TdtV3Q8.dir()).unwrap();
+        assert!(!vad.exists());
+    }
+
+    #[test]
+    fn disk_usage_counts_the_hidden_vad() {
+        let tmp = tempfile::tempdir().unwrap();
+        put(tmp.path(), model_dirs::DIR_WHISPER_VAD, 10);
+        put(tmp.path(), WhisperModel::Base.dir(), 100);
+        put(tmp.path(), "not-a-model", 5);
+        assert_eq!(models_disk_usage(tmp.path()), 110);
     }
 
     #[test]

@@ -58,6 +58,11 @@ msgstr "{0, plural, zero {جلسة} one {جلسة} two {جلسة} few {جلسا�
 msgid "{0} / {1}"
 msgstr "{0} / {1}"
 
+#. placeholder {0}: formatBytes(installedBytes)
+#: src/features/settings/components/model-library.tsx:154
+msgid "{0} used"
+msgstr "{0} مستخدمة"
+
 #: src/features/history/components/history-table.tsx:291
 msgid "{count} selected"
 msgstr "تم تحديد {count}"
@@ -113,9 +118,12 @@ msgid "1 year"
 msgstr "سنة واحدة"
 
 #: src/features/settings/components/asr-engine-cards.tsx:201
-#: src/features/settings/components/model-library.tsx:147
 msgid "25 European languages"
 msgstr "25 لغة أوروبية"
+
+#: src/features/settings/components/model-library.tsx:139
+msgid "25 European languages. Fast on a CPU."
+msgstr "25 لغة أوروبية. سريع على المعالج المركزي."
 
 #: src/features/settings/data/settings-data.ts:568
 msgid "30 days"
@@ -381,8 +389,8 @@ msgstr "مدمج"
 
 #: src/components/feedback/confirm-dialog.tsx:61
 #: src/features/dictionary/components/dictionary-table.tsx:113
-#: src/features/settings/components/model-library.tsx:215
-#: src/features/settings/components/model-library.tsx:371
+#: src/features/settings/components/model-library.tsx:255
+#: src/features/settings/components/model-row.tsx:90
 #: src/features/snippets/snippets-page.tsx:249
 #: src/features/styles/components/style-editor-modal.tsx:247
 msgid "Cancel"
@@ -395,6 +403,10 @@ msgstr "إلغاء التسجيل الحالي"
 #: src/features/welcome/welcome-page.tsx:373
 msgid "Cancel download"
 msgstr "إلغاء التنزيل"
+
+#: src/features/settings/components/model-row.tsx:89
+msgid "Cancel download of {label}"
+msgstr "إلغاء تنزيل {label}"
 
 #: src/lib/session-format.ts:10
 msgid "Cancelled"
@@ -488,7 +500,6 @@ msgid "Clear {label}"
 msgstr "مسح {label}"
 
 #: src/features/history/components/history-table.tsx:294
-#: src/features/settings/components/model-library.tsx:159
 msgid "Clear selection"
 msgstr "مسح التحديد"
 
@@ -502,7 +513,7 @@ msgstr "إغلاق"
 
 #: src/components/feedback/help-feedback-dialog.tsx:281
 #: src/features/history/components/session-detail-modal.tsx:226
-#: src/features/settings/components/model-library.tsx:381
+#: src/features/settings/components/model-library.tsx:265
 #: src/features/styles/components/style-editor-modal.tsx:238
 #: src/features/updates/update-dialog.tsx:326
 #: src/features/updates/update-dialog.tsx:338
@@ -652,8 +663,7 @@ msgstr "داكن"
 #: src/components/feedback/confirm-dialog.tsx:72
 #: src/features/history/components/history-table.tsx:515
 #: src/features/history/components/session-detail-modal.tsx:219
-#: src/features/settings/components/model-library.tsx:334
-#: src/features/settings/components/model-library.tsx:335
+#: src/features/settings/components/model-row.tsx:161
 msgid "Delete"
 msgstr "حذف"
 
@@ -667,7 +677,7 @@ msgid "Delete {0}"
 msgstr "حذف {0}"
 
 #. placeholder {0}: model.name
-#: src/features/settings/components/model-library.tsx:362
+#: src/features/settings/components/model-library.tsx:246
 msgid "Delete {0}?"
 msgstr "هل تريد حذف {0}؟"
 
@@ -675,7 +685,11 @@ msgstr "هل تريد حذف {0}؟"
 msgid "Delete {count, plural, one {# session} other {# sessions}}?"
 msgstr "حذف {count, plural, zero {# جلسة} one {جلسة واحدة} two {جلستين} few {# جلسات} many {# جلسة} other {# جلسة}}؟"
 
-#: src/features/settings/components/model-library.tsx:374
+#: src/features/settings/components/model-row.tsx:160
+msgid "Delete {label}"
+msgstr "حذف {label}"
+
+#: src/features/settings/components/model-library.tsx:258
 msgid "Delete model"
 msgstr "حذف النموذج"
 
@@ -764,12 +778,12 @@ msgid "Disconnected"
 msgstr "غير متصل"
 
 #: src/features/settings/components/model-library.tsx:178
-msgid "Disk usage"
-msgstr "استخدام القرص"
+#~ msgid "Disk usage"
+#~ msgstr "استخدام القرص"
 
 #: src/features/settings/components/model-library.tsx:225
-msgid "Dismiss"
-msgstr "تجاهل"
+#~ msgid "Dismiss"
+#~ msgstr "تجاهل"
 
 #: src/components/feedback/error-toast.tsx:26
 msgid "Dismiss error"
@@ -780,25 +794,29 @@ msgid "Don't save history"
 msgstr "عدم حفظ السجل"
 
 #: src/features/settings/components/model-library.tsx:242
-msgid "Done"
-msgstr "تم"
+#~ msgid "Done"
+#~ msgstr "تم"
 
 #: src/features/history/components/history-table.tsx:509
 #: src/features/settings/components/gpu-backend-card.tsx:38
-#: src/features/settings/components/model-library.tsx:169
+#: src/features/settings/components/model-row.tsx:106
 msgid "Download"
 msgstr "تنزيل"
 
 #. placeholder {0}: wanted.length
 #: src/features/settings/components/model-library.tsx:172
-msgid "Download {0} selected"
-msgstr "تنزيل {0} المحدد"
+#~ msgid "Download {0} selected"
+#~ msgstr "تنزيل {0} المحدد"
 
 #. placeholder {0}: wanted.length
 #. placeholder {1}: formatBytes(wantedBytes)
 #: src/features/settings/components/model-library.tsx:171
-msgid "Download {0} selected · {1}"
-msgstr "تنزيل {0} المحدد · {1}"
+#~ msgid "Download {0} selected · {1}"
+#~ msgstr "تنزيل {0} المحدد · {1}"
+
+#: src/features/settings/components/model-row.tsx:103
+msgid "Download {label}"
+msgstr "تنزيل {label}"
 
 #: src/features/welcome/welcome-page.tsx:424
 msgid "Download {pendingCount} models"
@@ -828,6 +846,10 @@ msgstr "تمت مقاطعة التنزيل"
 msgid "Download progress"
 msgstr "تقدم التنزيل"
 
+#: src/features/settings/components/model-row.tsx:126
+msgid "Download progress of {label}"
+msgstr "تقدم تنزيل {label}"
+
 #: src/features/history/components/session-detail-modal.tsx:134
 msgid "Download transcript"
 msgstr "تنزيل النص"
@@ -845,7 +867,6 @@ msgid "Downloading update"
 msgstr "جارٍ تنزيل التحديث"
 
 #: src/features/settings/components/gpu-backend-card.tsx:27
-#: src/features/settings/components/model-library.tsx:341
 msgid "Downloading…"
 msgstr "جارٍ التنزيل…"
 
@@ -1176,7 +1197,7 @@ msgstr "قيد التنفيذ"
 #: src/features/settings/components/asr-engine-cards.tsx:167
 #: src/features/settings/components/asr-engine-cards.tsx:168
 #: src/features/settings/components/installed-model-picker.tsx:57
-#: src/features/settings/components/model-library.tsx:290
+#: src/features/settings/components/model-row.tsx:51
 msgid "In use"
 msgstr "قيد الاستخدام"
 
@@ -1196,7 +1217,7 @@ msgstr "إدراج عنصر نائب"
 msgid "Install and restart"
 msgstr "التثبيت وإعادة التشغيل"
 
-#: src/features/settings/components/model-library.tsx:329
+#: src/features/settings/components/model-row.tsx:154
 #: src/features/welcome/components/model-card.tsx:74
 #: src/features/welcome/components/review-step.tsx:47
 msgid "Installed"
@@ -1410,6 +1431,10 @@ msgstr "الوضع"
 msgid "Model"
 msgstr "النموذج"
 
+#: src/features/settings/components/model-library.tsx:200
+msgid "Model family"
+msgstr "فئة النموذج"
+
 #: src/features/welcome/components/engine-step.tsx:114
 msgid "Model size"
 msgstr "حجم النموذج"
@@ -1453,9 +1478,12 @@ msgid "Name is too long."
 msgstr "الاسم طويل جدًا."
 
 #: src/features/settings/components/asr-engine-cards.tsx:192
-#: src/features/settings/components/model-library.tsx:144
 msgid "Nearly 100 languages"
 msgstr "قرابة 100 لغة"
+
+#: src/features/settings/components/model-library.tsx:138
+msgid "Nearly 100 languages. Bigger is more accurate, but slower."
+msgstr "قرابة 100 لغة. الأكبر أدق لكنه أبطأ."
 
 #: src/features/settings/data/settings-data.ts:108
 msgid "Never"
@@ -1547,7 +1575,7 @@ msgstr "غير متصل"
 msgid "Not installed"
 msgstr "غير مثبت"
 
-#: src/features/settings/components/model-library.tsx:181
+#: src/features/settings/components/model-library.tsx:154
 msgid "Nothing installed"
 msgstr "لا شيء مثبَّت"
 
@@ -1637,7 +1665,7 @@ msgid "Pagination"
 msgstr "ترقيم الصفحات"
 
 #: src/features/settings/components/asr-engine-cards.tsx:141
-#: src/features/settings/components/model-library.tsx:147
+#: src/features/settings/components/model-library.tsx:179
 #: src/features/settings/data/settings-data.ts:642
 #: src/features/welcome/components/engine-step.tsx:73
 msgid "Parakeet"
@@ -1793,6 +1821,10 @@ msgstr "مهني"
 msgid "Question or help"
 msgstr "سؤال أو مساعدة"
 
+#: src/features/settings/components/model-row.tsx:112
+msgid "Queued"
+msgstr "في قائمة الانتظار"
+
 #: src/features/shell/components/sidebar-quick-actions.tsx:89
 msgid "Quit Lune Voice"
 msgstr "إنهاء Lune Voice"
@@ -1876,7 +1908,7 @@ msgid "Restart needed"
 msgstr "يلزم إعادة التشغيل"
 
 #: src/features/overview/overview-page.tsx:338
-#: src/features/settings/components/model-library.tsx:232
+#: src/features/settings/components/model-row.tsx:144
 msgid "Retry"
 msgstr "إعادة المحاولة"
 
@@ -1959,8 +1991,8 @@ msgid "Search transcripts…"
 msgstr "البحث في النصوص…"
 
 #: src/features/settings/components/model-library.tsx:159
-msgid "Select all"
-msgstr "تحديد الكل"
+#~ msgid "Select all"
+#~ msgstr "تحديد الكل"
 
 #: src/features/history/components/history-table.tsx:177
 msgid "Select all sessions on this page"
@@ -2286,7 +2318,7 @@ msgstr "تُقارَن الكلمات التي يقل تأكّد أداة الت
 msgid "This copy can't update itself. Download the new version from {RELEASES_URL} and replace this one. Your settings, history and models are kept."
 msgstr "لا تستطيع هذه النسخة تحديث نفسها. نزّل الإصدار الجديد من {RELEASES_URL} واستبدل به هذه النسخة. ستبقى إعداداتك وسجلك ونماذجك كما هي."
 
-#: src/features/settings/components/model-library.tsx:366
+#: src/features/settings/components/model-library.tsx:250
 msgid "This model is in use by your current configuration. Dictation may not work until you reinstall it or pick another."
 msgstr "هذا النموذج قيد الاستخدام في إعدادك الحالي. قد لا يعمل الإملاء حتى تعيد تثبيته أو تختار غيره."
 
@@ -2526,7 +2558,6 @@ msgid "Wait {cooldown}s"
 msgstr "انتظر {cooldown} ثانية"
 
 #: src/features/model-downloads/components/download-checklist.tsx:96
-#: src/features/settings/components/model-library.tsx:342
 msgid "Waiting"
 msgstr "في الانتظار"
 
@@ -2580,7 +2611,7 @@ msgid "Which screen the pill appears on."
 msgstr "الشاشة التي يظهر عليها المؤشر."
 
 #: src/features/settings/components/asr-engine-cards.tsx:140
-#: src/features/settings/components/model-library.tsx:144
+#: src/features/settings/components/model-library.tsx:179
 #: src/features/settings/data/settings-data.ts:641
 #: src/features/welcome/components/engine-step.tsx:67
 msgid "Whisper"

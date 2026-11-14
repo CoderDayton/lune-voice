@@ -58,6 +58,11 @@ msgstr "{0, plural, other {セッション}}"
 msgid "{0} / {1}"
 msgstr "{0} / {1}"
 
+#. placeholder {0}: formatBytes(installedBytes)
+#: src/features/settings/components/model-library.tsx:154
+msgid "{0} used"
+msgstr "{0} 使用中"
+
 #: src/features/history/components/history-table.tsx:291
 msgid "{count} selected"
 msgstr "{count} 件選択中"
@@ -113,9 +118,12 @@ msgid "1 year"
 msgstr "1 年"
 
 #: src/features/settings/components/asr-engine-cards.tsx:201
-#: src/features/settings/components/model-library.tsx:147
 msgid "25 European languages"
 msgstr "ヨーロッパの 25 言語"
+
+#: src/features/settings/components/model-library.tsx:139
+msgid "25 European languages. Fast on a CPU."
+msgstr "ヨーロッパの25言語。CPU でも高速。"
 
 #: src/features/settings/data/settings-data.ts:568
 msgid "30 days"
@@ -381,8 +389,8 @@ msgstr "組み込み"
 
 #: src/components/feedback/confirm-dialog.tsx:61
 #: src/features/dictionary/components/dictionary-table.tsx:113
-#: src/features/settings/components/model-library.tsx:215
-#: src/features/settings/components/model-library.tsx:371
+#: src/features/settings/components/model-library.tsx:255
+#: src/features/settings/components/model-row.tsx:90
 #: src/features/snippets/snippets-page.tsx:249
 #: src/features/styles/components/style-editor-modal.tsx:247
 msgid "Cancel"
@@ -395,6 +403,10 @@ msgstr "現在の録音をキャンセル"
 #: src/features/welcome/welcome-page.tsx:373
 msgid "Cancel download"
 msgstr "ダウンロードを中止"
+
+#: src/features/settings/components/model-row.tsx:89
+msgid "Cancel download of {label}"
+msgstr "{label} のダウンロードをキャンセル"
 
 #: src/lib/session-format.ts:10
 msgid "Cancelled"
@@ -488,7 +500,6 @@ msgid "Clear {label}"
 msgstr "{label}をクリア"
 
 #: src/features/history/components/history-table.tsx:294
-#: src/features/settings/components/model-library.tsx:159
 msgid "Clear selection"
 msgstr "選択を解除"
 
@@ -502,7 +513,7 @@ msgstr "閉じる"
 
 #: src/components/feedback/help-feedback-dialog.tsx:281
 #: src/features/history/components/session-detail-modal.tsx:226
-#: src/features/settings/components/model-library.tsx:381
+#: src/features/settings/components/model-library.tsx:265
 #: src/features/styles/components/style-editor-modal.tsx:238
 #: src/features/updates/update-dialog.tsx:326
 #: src/features/updates/update-dialog.tsx:338
@@ -652,8 +663,7 @@ msgstr "ダーク"
 #: src/components/feedback/confirm-dialog.tsx:72
 #: src/features/history/components/history-table.tsx:515
 #: src/features/history/components/session-detail-modal.tsx:219
-#: src/features/settings/components/model-library.tsx:334
-#: src/features/settings/components/model-library.tsx:335
+#: src/features/settings/components/model-row.tsx:161
 msgid "Delete"
 msgstr "削除"
 
@@ -667,7 +677,7 @@ msgid "Delete {0}"
 msgstr "{0}を削除"
 
 #. placeholder {0}: model.name
-#: src/features/settings/components/model-library.tsx:362
+#: src/features/settings/components/model-library.tsx:246
 msgid "Delete {0}?"
 msgstr "{0} を削除しますか？"
 
@@ -675,7 +685,11 @@ msgstr "{0} を削除しますか？"
 msgid "Delete {count, plural, one {# session} other {# sessions}}?"
 msgstr "{count, plural, other {# 件のセッション}}を削除しますか？"
 
-#: src/features/settings/components/model-library.tsx:374
+#: src/features/settings/components/model-row.tsx:160
+msgid "Delete {label}"
+msgstr "{label} を削除"
+
+#: src/features/settings/components/model-library.tsx:258
 msgid "Delete model"
 msgstr "モデルを削除"
 
@@ -764,12 +778,12 @@ msgid "Disconnected"
 msgstr "切断"
 
 #: src/features/settings/components/model-library.tsx:178
-msgid "Disk usage"
-msgstr "ディスク使用量"
+#~ msgid "Disk usage"
+#~ msgstr "ディスク使用量"
 
 #: src/features/settings/components/model-library.tsx:225
-msgid "Dismiss"
-msgstr "閉じる"
+#~ msgid "Dismiss"
+#~ msgstr "閉じる"
 
 #: src/components/feedback/error-toast.tsx:26
 msgid "Dismiss error"
@@ -780,25 +794,29 @@ msgid "Don't save history"
 msgstr "履歴を保存しない"
 
 #: src/features/settings/components/model-library.tsx:242
-msgid "Done"
-msgstr "完了"
+#~ msgid "Done"
+#~ msgstr "完了"
 
 #: src/features/history/components/history-table.tsx:509
 #: src/features/settings/components/gpu-backend-card.tsx:38
-#: src/features/settings/components/model-library.tsx:169
+#: src/features/settings/components/model-row.tsx:106
 msgid "Download"
 msgstr "ダウンロード"
 
 #. placeholder {0}: wanted.length
 #: src/features/settings/components/model-library.tsx:172
-msgid "Download {0} selected"
-msgstr "選択した{0}件をダウンロード"
+#~ msgid "Download {0} selected"
+#~ msgstr "選択した{0}件をダウンロード"
 
 #. placeholder {0}: wanted.length
 #. placeholder {1}: formatBytes(wantedBytes)
 #: src/features/settings/components/model-library.tsx:171
-msgid "Download {0} selected · {1}"
-msgstr "選択した{0}件をダウンロード · {1}"
+#~ msgid "Download {0} selected · {1}"
+#~ msgstr "選択した{0}件をダウンロード · {1}"
+
+#: src/features/settings/components/model-row.tsx:103
+msgid "Download {label}"
+msgstr "{label} をダウンロード"
 
 #: src/features/welcome/welcome-page.tsx:424
 msgid "Download {pendingCount} models"
@@ -828,6 +846,10 @@ msgstr "ダウンロードが中断されました"
 msgid "Download progress"
 msgstr "ダウンロード進行状況"
 
+#: src/features/settings/components/model-row.tsx:126
+msgid "Download progress of {label}"
+msgstr "{label} のダウンロード進行状況"
+
 #: src/features/history/components/session-detail-modal.tsx:134
 msgid "Download transcript"
 msgstr "文字起こしをダウンロード"
@@ -845,7 +867,6 @@ msgid "Downloading update"
 msgstr "更新をダウンロード中"
 
 #: src/features/settings/components/gpu-backend-card.tsx:27
-#: src/features/settings/components/model-library.tsx:341
 msgid "Downloading…"
 msgstr "ダウンロード中…"
 
@@ -1176,7 +1197,7 @@ msgstr "進行中"
 #: src/features/settings/components/asr-engine-cards.tsx:167
 #: src/features/settings/components/asr-engine-cards.tsx:168
 #: src/features/settings/components/installed-model-picker.tsx:57
-#: src/features/settings/components/model-library.tsx:290
+#: src/features/settings/components/model-row.tsx:51
 msgid "In use"
 msgstr "使用中"
 
@@ -1196,7 +1217,7 @@ msgstr "プレースホルダーを挿入"
 msgid "Install and restart"
 msgstr "インストールして再起動"
 
-#: src/features/settings/components/model-library.tsx:329
+#: src/features/settings/components/model-row.tsx:154
 #: src/features/welcome/components/model-card.tsx:74
 #: src/features/welcome/components/review-step.tsx:47
 msgid "Installed"
@@ -1410,6 +1431,10 @@ msgstr "モード"
 msgid "Model"
 msgstr "モデル"
 
+#: src/features/settings/components/model-library.tsx:200
+msgid "Model family"
+msgstr "モデルの種類"
+
 #: src/features/welcome/components/engine-step.tsx:114
 msgid "Model size"
 msgstr "モデルサイズ"
@@ -1453,9 +1478,12 @@ msgid "Name is too long."
 msgstr "名前が長すぎます。"
 
 #: src/features/settings/components/asr-engine-cards.tsx:192
-#: src/features/settings/components/model-library.tsx:144
 msgid "Nearly 100 languages"
 msgstr "約 100 言語"
+
+#: src/features/settings/components/model-library.tsx:138
+msgid "Nearly 100 languages. Bigger is more accurate, but slower."
+msgstr "約100言語。大きいほど正確ですが遅くなります。"
 
 #: src/features/settings/data/settings-data.ts:108
 msgid "Never"
@@ -1547,7 +1575,7 @@ msgstr "未接続"
 msgid "Not installed"
 msgstr "インストールされていません"
 
-#: src/features/settings/components/model-library.tsx:181
+#: src/features/settings/components/model-library.tsx:154
 msgid "Nothing installed"
 msgstr "何もインストールされていません"
 
@@ -1637,7 +1665,7 @@ msgid "Pagination"
 msgstr "ページネーション"
 
 #: src/features/settings/components/asr-engine-cards.tsx:141
-#: src/features/settings/components/model-library.tsx:147
+#: src/features/settings/components/model-library.tsx:179
 #: src/features/settings/data/settings-data.ts:642
 #: src/features/welcome/components/engine-step.tsx:73
 msgid "Parakeet"
@@ -1793,6 +1821,10 @@ msgstr "ビジネス"
 msgid "Question or help"
 msgstr "質問・ヘルプ"
 
+#: src/features/settings/components/model-row.tsx:112
+msgid "Queued"
+msgstr "待機中"
+
 #: src/features/shell/components/sidebar-quick-actions.tsx:89
 msgid "Quit Lune Voice"
 msgstr "Lune Voice を終了"
@@ -1876,7 +1908,7 @@ msgid "Restart needed"
 msgstr "再起動が必要"
 
 #: src/features/overview/overview-page.tsx:338
-#: src/features/settings/components/model-library.tsx:232
+#: src/features/settings/components/model-row.tsx:144
 msgid "Retry"
 msgstr "再試行"
 
@@ -1959,8 +1991,8 @@ msgid "Search transcripts…"
 msgstr "文字起こしを検索…"
 
 #: src/features/settings/components/model-library.tsx:159
-msgid "Select all"
-msgstr "すべて選択"
+#~ msgid "Select all"
+#~ msgstr "すべて選択"
 
 #: src/features/history/components/history-table.tsx:177
 msgid "Select all sessions on this page"
@@ -2286,7 +2318,7 @@ msgstr "認識の確信度が低い単語を、辞書と語彙で照合します
 msgid "This copy can't update itself. Download the new version from {RELEASES_URL} and replace this one. Your settings, history and models are kept."
 msgstr "このコピーは自動で更新できません。{RELEASES_URL} から新しいバージョンをダウンロードして、このコピーと置き換えてください。設定、履歴、モデルはそのまま残ります。"
 
-#: src/features/settings/components/model-library.tsx:366
+#: src/features/settings/components/model-library.tsx:250
 msgid "This model is in use by your current configuration. Dictation may not work until you reinstall it or pick another."
 msgstr "このモデルは現在の設定で使用中です。再インストールするか別のモデルを選択するまで、音声入力が機能しない場合があります。"
 
@@ -2526,7 +2558,6 @@ msgid "Wait {cooldown}s"
 msgstr "あと {cooldown} 秒"
 
 #: src/features/model-downloads/components/download-checklist.tsx:96
-#: src/features/settings/components/model-library.tsx:342
 msgid "Waiting"
 msgstr "待機中"
 
@@ -2580,7 +2611,7 @@ msgid "Which screen the pill appears on."
 msgstr "インジケーターを表示するモニター。"
 
 #: src/features/settings/components/asr-engine-cards.tsx:140
-#: src/features/settings/components/model-library.tsx:144
+#: src/features/settings/components/model-library.tsx:179
 #: src/features/settings/data/settings-data.ts:641
 #: src/features/welcome/components/engine-step.tsx:67
 msgid "Whisper"

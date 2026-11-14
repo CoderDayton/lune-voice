@@ -575,6 +575,17 @@ pub async fn check_model_status(
     })
     .await
 }
+
+#[tauri::command]
+pub async fn models_disk_usage(window: WebviewWindow) -> Result<u64, String> {
+    require_window_access(&window, &["main"])?;
+    run_persist("measure model disk usage", || {
+        let paths = lune_persist::AppPaths::resolve().ok_or("resolve application paths")?;
+        Ok(lune_persist::models_disk_usage(&paths.models_dir()))
+    })
+    .await
+}
+
 /// Whether every local model the *active* configuration needs is on disk.
 ///
 /// This is the question first-run has to answer, and it is not the same as
