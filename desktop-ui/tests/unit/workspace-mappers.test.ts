@@ -204,6 +204,19 @@ describe("workspace mappers", () => {
     expect(mapWorkspaceSettings(off).brandCasing).toBe(false);
   });
 
+  test("spoken numbers are on unless the backend says otherwise", () => {
+    const missing = { settings: makeBackendSettings() } as WorkspaceSnapshot;
+    expect(mapWorkspaceSettings(missing).spokenNumbers).toBe(true);
+
+    const off = {
+      settings: { ...makeBackendSettings(), spokenNumbers: false },
+    } as WorkspaceSnapshot;
+    expect(mapWorkspaceSettings(off).spokenNumbers).toBe(false);
+    expect(settingsToSaveInput({ ...DEFAULT_SETTINGS, spokenNumbers: false }).spokenNumbers).toBe(
+      false,
+    );
+  });
+
   // ── settingsToSaveInput ─────────────────────────────────────────────
 
   test("brand casing is sent back to the backend", () => {

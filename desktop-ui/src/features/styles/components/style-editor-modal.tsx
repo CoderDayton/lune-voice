@@ -13,13 +13,13 @@ const INSTRUCTIONS_WARN_FRACTION = 0.93;
 type ToggleKey = 'keybinds' | 'titleAbbreviations' | 'autoCapitalization';
 
 /** A style's brand casing is on, off, or unset (follows the Settings switch). */
-function brandCasingChoice(value: boolean | null): 'inherit' | 'on' | 'off' {
+function inheritChoice(value: boolean | null): 'inherit' | 'on' | 'off' {
   if (value === true) return 'on';
   if (value === false) return 'off';
   return 'inherit';
 }
 
-function brandCasingFromChoice(choice: string): boolean | null {
+function fromInheritChoice(choice: string): boolean | null {
   if (choice === 'on') return true;
   if (choice === 'off') return false;
   return null;
@@ -43,6 +43,7 @@ interface StyleEditorModalProps {
   formatting: FormatTogglesDto;
   onFormattingChange: (key: ToggleKey, value: boolean) => void;
   onBrandCasingChange: (value: boolean | null) => void;
+  onSpokenNumbersChange: (value: boolean | null) => void;
   onClose: () => void;
   onSave: () => void;
   onRefreshExamples: () => void;
@@ -67,6 +68,7 @@ export function StyleEditorModal({
   formatting,
   onFormattingChange,
   onBrandCasingChange,
+  onSpokenNumbersChange,
   onClose,
   onSave,
   onRefreshExamples,
@@ -182,10 +184,26 @@ export function StyleEditorModal({
                 </span>
                 <select
                   className="select select-sm w-auto"
-                  value={brandCasingChoice(formatting.brandCasing)}
+                  value={inheritChoice(formatting.brandCasing)}
                   disabled={isViewOnly}
-                  onChange={(e) => onBrandCasingChange(brandCasingFromChoice(e.target.value))}
+                  onChange={(e) => onBrandCasingChange(fromInheritChoice(e.target.value))}
                   aria-label={t`Brand casing`}
+                >
+                  <option value="inherit">{t`Follow Settings`}</option>
+                  <option value="on">{t`On`}</option>
+                  <option value="off">{t`Off`}</option>
+                </select>
+              </label>
+              <label className="flex items-center justify-between gap-3 px-3 py-2">
+                <span className="text-sm text-content-default">
+                  {t`Numbers as digits ("thirty four" → "34")`}
+                </span>
+                <select
+                  className="select select-sm w-auto"
+                  value={inheritChoice(formatting.spokenNumbers)}
+                  disabled={isViewOnly}
+                  onChange={(e) => onSpokenNumbersChange(fromInheritChoice(e.target.value))}
+                  aria-label={t`Numbers as digits`}
                 >
                   <option value="inherit">{t`Follow Settings`}</option>
                   <option value="on">{t`On`}</option>

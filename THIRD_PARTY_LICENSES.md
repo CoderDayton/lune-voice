@@ -12,6 +12,7 @@ covered in THIRD_PARTY_NOTICES.md.
 
 Used by:
 
+- clm-itn 0.1.0
 - hound 3.5.1
 
 ````text

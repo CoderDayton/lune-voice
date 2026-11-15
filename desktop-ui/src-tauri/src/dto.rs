@@ -274,6 +274,8 @@ pub struct FormatTogglesDto {
     /// Null follows the global `brandCasing` setting.
     #[serde(default)]
     pub brand_casing: Option<bool>,
+    #[serde(default)]
+    pub spoken_numbers: Option<bool>,
 }
 
 impl Default for FormatTogglesDto {
@@ -289,6 +291,7 @@ impl From<lune_core::config::FormatToggles> for FormatTogglesDto {
             title_abbreviations: f.title_abbreviations,
             auto_capitalization: f.auto_capitalization,
             brand_casing: f.brand_casing,
+            spoken_numbers: f.spoken_numbers,
         }
     }
 }
@@ -300,6 +303,7 @@ impl From<FormatTogglesDto> for lune_core::config::FormatToggles {
             title_abbreviations: d.title_abbreviations,
             auto_capitalization: d.auto_capitalization,
             brand_casing: d.brand_casing,
+            spoken_numbers: d.spoken_numbers,
         }
     }
 }
@@ -332,6 +336,7 @@ pub struct WorkspaceSnapshot {
     pub dictionary: Vec<DictionaryItemDto>,
     pub snippets: Vec<SnippetItemDto>,
     pub style_presets: Vec<StylePresetDto>,
+    pub default_formatting: FormatTogglesDto,
     pub stats: SessionStatsDto,
 }
 
@@ -428,6 +433,8 @@ pub struct SettingsCoreDto {
     /// Capitalize known names ("github" -> "GitHub"). A style can override it.
     #[serde(default = "default_true_dto")]
     pub brand_casing: bool,
+    #[serde(default = "default_true_dto")]
+    pub spoken_numbers: bool,
     /// How long to keep dictation history, in days. `None` disables history.
     pub session_history_days: Option<u32>,
     /// Paste-shortcut selection strategy for the output stage.

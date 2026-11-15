@@ -525,14 +525,23 @@ const FILLERS: &[&str] = &[
 /// English-only; the caller language-gates. Runs on the always-on text (fast
 /// path + LLM input) so fillers are gone whether or not the LLM pass runs.
 pub fn strip_fillers(text: &str) -> String {
+    strip_fillers_with(text, |_, _| false)
+}
+
+fn strip_fillers_with(text: &str, hold: impl Fn(&[&str], usize) -> bool) -> String {
     if !is_latin(text) {
         return text.to_owned();
     }
+    let toks: Vec<&str> = text.split_whitespace().collect();
     let mut kept: Vec<std::borrow::Cow<str>> = Vec::new();
-    for tok in text.split_whitespace() {
+    for (i, &tok) in toks.iter().enumerate() {
         let core = word_core(tok);
         if !FILLERS.contains(&core.to_ascii_lowercase().as_str()) {
             kept.push(tok.into());
+            continue;
+        }
+        if hold(&toks, i) {
+            kept.push(tok.replacen(core, "um", 1).into());
             continue;
         }
         let mark = tok.rsplit(core).next().unwrap_or_default();
@@ -1101,8 +1110,8 @@ fn word_core(word: &str) -> &str {
 
 /// Deterministic shaping of a corrected transcript, applied in a fixed order:
 /// English-only de-fusing and filler stripping, wrapping-quote removal,
-/// punctuation and casing normalization, then English-only mid-sentence
-/// de-casing.
+/// punctuation and casing normalization, English-only mid-sentence de-casing,
+/// then spoken numbers to digits (last, so the end mark is already placed).
 ///
 /// `strip_wrapping_quotes` must run before `normalize_with`: normalize appends
 /// terminal punctuation outside a closing quote (`"…".`), and the strip, which
@@ -1112,24 +1121,233 @@ fn word_core(word: &str) -> &str {
 /// English-only passes rely on English capitalization and frequency tables, and
 /// on "um" being a filler, which it is not in every language.
 pub fn shape(text: &str, lang: &str, fmt: &FormatToggles) -> String {
+    shape_keeping(text, lang, fmt, &[])
+}
+
+pub fn shape_keeping(text: &str, lang: &str, fmt: &FormatToggles, keep: &[&str]) -> String {
     let english = lang == "English";
     let text = if english {
-        strip_false_starts(&strip_fillers(&defuse_inconsistent(text)))
+        strip_false_starts(&strip_fillers_outside_numbers(&defuse_inconsistent(text)))
     } else {
         text.to_owned()
     };
     let text = strip_wrapping_quotes(&text);
     let text = normalize_with(&text, fmt).text;
-    if english {
+    let text = if english {
         decase_common_words(&text)
     } else {
         text
+    };
+    let text = if fmt.resolve_spoken_numbers(true) {
+        spoken_numbers_to_digits(&text, lang, keep)
+    } else {
+        text
+    };
+    if english { strip_fillers(&text) } else { text }
+}
+
+const EN_NUMBER_WORDS: &[&str] = &[
+    "zero",
+    "oh",
+    "one",
+    "two",
+    "three",
+    "four",
+    "five",
+    "six",
+    "seven",
+    "eight",
+    "nine",
+    "ten",
+    "eleven",
+    "twelve",
+    "thirteen",
+    "fourteen",
+    "fifteen",
+    "sixteen",
+    "seventeen",
+    "eighteen",
+    "nineteen",
+    "twenty",
+    "thirty",
+    "forty",
+    "fifty",
+    "sixty",
+    "seventy",
+    "eighty",
+    "ninety",
+    "hundred",
+    "thousand",
+    "million",
+    "billion",
+    "trillion",
+    "point",
+];
+
+fn is_en_number_word(tok: &str) -> bool {
+    let core = word_core(tok).to_ascii_lowercase();
+    !core.is_empty() && core.split('-').all(|p| EN_NUMBER_WORDS.contains(&p))
+}
+
+fn is_filler(tok: &str) -> bool {
+    FILLERS.contains(&word_core(tok).to_ascii_lowercase().as_str())
+}
+
+fn strip_fillers_outside_numbers(text: &str) -> String {
+    strip_fillers_with(text, |toks, i| {
+        i > 0
+            && is_en_number_word(toks[i - 1])
+            && toks[i + 1..]
+                .iter()
+                .find(|t| !is_filler(t))
+                .is_some_and(|t| is_en_number_word(t))
+    })
+}
+
+fn kept_ranges(text: &str, keep: &[&str]) -> Vec<(usize, usize)> {
+    let is_word = |c: char| c.is_alphanumeric();
+    let mut ranges: Vec<(usize, usize)> = Vec::new();
+    for k in keep.iter().map(|k| k.trim()).filter(|k| !k.is_empty()) {
+        for (s, _) in text.char_indices() {
+            let e = s + k.len();
+            if e > text.len() || !text.is_char_boundary(e) || !text[s..e].eq_ignore_ascii_case(k) {
+                continue;
+            }
+            let before_ok = text[..s].chars().next_back().is_none_or(|c| !is_word(c));
+            let after_ok = text[e..].chars().next().is_none_or(|c| !is_word(c));
+            if before_ok && after_ok {
+                ranges.push((s, e));
+            }
+        }
     }
+    ranges.sort_unstable();
+    let mut merged: Vec<(usize, usize)> = Vec::with_capacity(ranges.len());
+    for (s, e) in ranges {
+        match merged.last_mut() {
+            Some(last) if s <= last.1 => last.1 = last.1.max(e),
+            _ => merged.push((s, e)),
+        }
+    }
+    merged
+}
+
+fn spoken_numbers_to_digits(text: &str, lang: &str, keep: &[&str]) -> String {
+    let normalizer = match lang {
+        "English" => clm_itn::Normalizer::english(),
+        "Spanish" => clm_itn::Normalizer::spanish(),
+        "Portuguese" => clm_itn::Normalizer::portuguese(),
+        "German" => clm_itn::Normalizer::german(),
+        _ => return text.to_owned(),
+    }
+    .without(clm_itn::Setting::Noon);
+    let mut out = String::with_capacity(text.len());
+    let mut at = 0;
+    for (s, e) in kept_ranges(text, keep) {
+        normalizer.normalize_into(&text[at..s], &mut out);
+        out.push_str(&text[s..e]);
+        at = e;
+    }
+    normalizer.normalize_into(&text[at..], &mut out);
+    out
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn shape_writes_spoken_numbers_as_digits_when_on() {
+        let on = FormatToggles::default();
+        assert_eq!(
+            shape("it costs twenty five dollars", "English", &on),
+            "It costs $25."
+        );
+        assert_eq!(
+            shape("twenty five people came", "English", &on),
+            "25 people came."
+        );
+        let off = FormatToggles {
+            spoken_numbers: Some(false),
+            ..FormatToggles::default()
+        };
+        assert_eq!(
+            shape("it costs twenty five dollars", "English", &off),
+            "It costs twenty five dollars."
+        );
+    }
+
+    #[test]
+    fn shape_keeps_point_as_a_noun_at_a_sentence_start() {
+        let fmt = FormatToggles::default();
+        assert_eq!(
+            shape("point five of the plan is cost", "English", &fmt),
+            "Point five of the plan is cost."
+        );
+        assert_eq!(
+            shape("about point five percent", "English", &fmt),
+            "About 0.5%."
+        );
+    }
+
+    #[test]
+    fn shape_keeps_the_hour_of_twelve_noon() {
+        let fmt = FormatToggles::default();
+        assert_eq!(
+            shape("lunch is at twelve noon", "English", &fmt),
+            "Lunch is at 12 noon."
+        );
+    }
+
+    #[test]
+    fn shape_keeps_numbers_split_by_a_filler_as_words() {
+        let fmt = FormatToggles::default();
+        assert_eq!(
+            shape("we need twenty um five chairs", "English", &fmt),
+            "We need twenty five chairs."
+        );
+        assert_eq!(
+            shape("we need twenty, um, five chairs", "English", &fmt),
+            "We need twenty, five chairs."
+        );
+        assert_eq!(
+            shape(
+                "twenty five people and twenty um five chairs",
+                "English",
+                &fmt
+            ),
+            "25 people and twenty five chairs."
+        );
+    }
+
+    #[test]
+    fn shape_keeping_leaves_dictionary_spans_as_written() {
+        let fmt = FormatToggles::default();
+        assert_eq!(
+            shape_keeping(
+                "we went to the Twenty One Club for twenty five dollars",
+                "English",
+                &fmt,
+                &["Twenty One Club"],
+            ),
+            "We went to the Twenty One Club for $25."
+        );
+    }
+
+    #[test]
+    fn shape_follows_an_explicit_spoken_numbers_choice() {
+        let unset = FormatToggles::default();
+        assert_eq!(unset.spoken_numbers, None);
+        assert_eq!(shape("twenty five people", "English", &unset), "25 people.");
+    }
+
+    #[test]
+    fn shape_leaves_numbers_as_words_without_itn_tables() {
+        let fmt = FormatToggles::default();
+        assert_eq!(
+            shape("vingt cinq personnes", "French", &fmt),
+            "Vingt cinq personnes."
+        );
+    }
 
     #[test]
     fn shape_strips_wrapping_quotes_before_punctuating() {
@@ -1608,6 +1826,7 @@ mod tests {
             title_abbreviations: false,
             auto_capitalization: false,
             brand_casing: Some(false),
+            spoken_numbers: Some(false),
         };
         assert_eq!(
             normalize_with("set the hotkey to Super H", &off).text,

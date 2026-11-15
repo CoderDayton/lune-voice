@@ -67,12 +67,17 @@ pub struct FormatToggles {
     /// Apply canonical brand casing: "github" -> "GitHub", "iphone" -> "iPhone".
     /// `None` follows the global setting; `Some` overrides it for this style.
     pub brand_casing: Option<bool>,
+    pub spoken_numbers: Option<bool>,
 }
 
 impl FormatToggles {
     /// Whether brand casing applies, given the global setting.
     pub fn resolve_brand_casing(&self, global: bool) -> bool {
         self.brand_casing.unwrap_or(global)
+    }
+
+    pub fn resolve_spoken_numbers(&self, global: bool) -> bool {
+        self.spoken_numbers.unwrap_or(global)
     }
 }
 
@@ -83,6 +88,7 @@ impl Default for FormatToggles {
             title_abbreviations: true,
             auto_capitalization: true,
             brand_casing: None,
+            spoken_numbers: None,
         }
     }
 }
@@ -340,6 +346,19 @@ mod tests {
     fn builtin_styles_follow_the_global_brand_casing() {
         for preset in StylePreset::all_builtin() {
             assert_eq!(preset.formatting.brand_casing, None, "{}", preset.id);
+        }
+    }
+
+    #[test]
+    fn spoken_numbers_follow_the_global_setting_unless_the_style_sets_it() {
+        let unset: FormatToggles = serde_json::from_str(r#"{"keybinds":true}"#).unwrap();
+        assert_eq!(unset.spoken_numbers, None);
+        assert!(unset.resolve_spoken_numbers(true));
+        assert!(!unset.resolve_spoken_numbers(false));
+        let off: FormatToggles = serde_json::from_str(r#"{"spoken_numbers":false}"#).unwrap();
+        assert!(!off.resolve_spoken_numbers(true));
+        for preset in StylePreset::all_builtin() {
+            assert_eq!(preset.formatting.spoken_numbers, None, "{}", preset.id);
         }
     }
 }

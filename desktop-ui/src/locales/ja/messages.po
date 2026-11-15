@@ -31,7 +31,7 @@ msgid "(clipboard contents)"
 msgstr "（クリップボードの内容）"
 
 #. placeholder {0}: presets.length
-#: src/features/styles/styles-page.tsx:277
+#: src/features/styles/styles-page.tsx:271
 msgid "{0, plural, one {# preset} other {# presets}}"
 msgstr "{0, plural, other {# 件のプリセット}}"
 
@@ -155,7 +155,7 @@ msgstr "操作"
 msgid "Active"
 msgstr "アクティブ"
 
-#: src/features/styles/components/style-hero.tsx:36
+#: src/features/styles/components/style-hero.tsx:38
 msgid "Active style"
 msgstr "アクティブスタイル"
 
@@ -292,7 +292,7 @@ msgstr "音声アクティビティ"
 msgid "Audio feedback played as dictation starts, finishes, or errors."
 msgstr "音声入力の開始・完了・エラー時に再生される音声フィードバック。"
 
-#: src/features/styles/components/style-editor-modal.tsx:79
+#: src/features/styles/components/style-editor-modal.tsx:81
 msgid "Auto-capitalize sentences"
 msgstr "文頭を自動的に大文字にする"
 
@@ -358,15 +358,15 @@ msgstr "左下"
 msgid "Bottom right"
 msgstr "右下"
 
-#: src/features/styles/components/style-editor-modal.tsx:188
+#: src/features/styles/components/style-editor-modal.tsx:190
 msgid "Brand casing"
 msgstr "ブランド表記"
 
-#: src/features/styles/components/style-editor-modal.tsx:181
+#: src/features/styles/components/style-editor-modal.tsx:183
 msgid "Brand casing (\"github\" → \"GitHub\")"
 msgstr "ブランド表記（「github」→「GitHub」）"
 
-#: src/features/styles/components/style-hero.tsx:27
+#: src/features/styles/components/style-hero.tsx:29
 msgid "Brands"
 msgstr "ブランド"
 
@@ -382,7 +382,7 @@ msgstr "未解決の issue を見る"
 msgid "Bug report"
 msgstr "バグ報告"
 
-#: src/features/styles/components/style-hero.tsx:39
+#: src/features/styles/components/style-hero.tsx:41
 #: src/features/styles/components/style-preset-card.tsx:67
 msgid "Built-in"
 msgstr "組み込み"
@@ -392,7 +392,7 @@ msgstr "組み込み"
 #: src/features/settings/components/model-library.tsx:255
 #: src/features/settings/components/model-row.tsx:90
 #: src/features/snippets/snippets-page.tsx:249
-#: src/features/styles/components/style-editor-modal.tsx:247
+#: src/features/styles/components/style-editor-modal.tsx:265
 msgid "Cancel"
 msgstr "キャンセル"
 
@@ -417,7 +417,7 @@ msgstr "キャンセル済み"
 msgid "Capitalize known names"
 msgstr "固有名詞の表記を補正"
 
-#: src/features/styles/components/style-hero.tsx:25
+#: src/features/styles/components/style-hero.tsx:26
 msgid "Capitals"
 msgstr "大文字"
 
@@ -507,14 +507,14 @@ msgstr "選択を解除"
 msgid "Clear workplace communication"
 msgstr "職場での明確なやり取り"
 
-#: src/features/styles/components/style-editor-modal.tsx:264
+#: src/features/styles/components/style-editor-modal.tsx:282
 msgid "close"
 msgstr "閉じる"
 
 #: src/components/feedback/help-feedback-dialog.tsx:281
 #: src/features/history/components/session-detail-modal.tsx:226
 #: src/features/settings/components/model-library.tsx:265
-#: src/features/styles/components/style-editor-modal.tsx:238
+#: src/features/styles/components/style-editor-modal.tsx:256
 #: src/features/updates/update-dialog.tsx:326
 #: src/features/updates/update-dialog.tsx:338
 msgid "Close"
@@ -594,8 +594,8 @@ msgstr "角"
 msgid "Correction"
 msgstr "修正"
 
-#: src/features/settings/sections/transcription-section.tsx:147
-#: src/features/settings/sections/transcription-section.tsx:162
+#: src/features/settings/sections/transcription-section.tsx:160
+#: src/features/settings/sections/transcription-section.tsx:175
 msgid "Correction sensitivity"
 msgstr "修正の感度"
 
@@ -635,11 +635,11 @@ msgstr "クラッシュまたはフリーズ"
 msgid "Create a snippet"
 msgstr "スニペットを作成"
 
-#: src/features/styles/styles-page.tsx:312
+#: src/features/styles/styles-page.tsx:306
 msgid "Create new style"
 msgstr "新しいスタイルを作成"
 
-#: src/features/styles/components/style-editor-modal.tsx:100
+#: src/features/styles/components/style-editor-modal.tsx:102
 msgid "Create style"
 msgstr "スタイルを作成"
 
@@ -714,15 +714,15 @@ msgstr "この修正を削除しますか？"
 msgid "Delete?"
 msgstr "削除しますか？"
 
-#: src/features/styles/components/style-editor-modal.tsx:154
+#: src/features/styles/components/style-editor-modal.tsx:156
 msgid "Describe how text should be formatted. E.g., \"Use bullet points. Keep sentences short. Avoid jargon.\""
 msgstr "テキストの整形方法を記述します。例:「箇条書きを使う。文は短く。専門用語は避ける。」"
 
-#: src/features/styles/components/style-editor-modal.tsx:122
+#: src/features/styles/components/style-editor-modal.tsx:124
 msgid "Description"
 msgstr "説明"
 
-#: src/features/styles/components/style-editor-modal.tsx:132
+#: src/features/styles/components/style-editor-modal.tsx:134
 msgid "Description is too long."
 msgstr "説明が長すぎます。"
 
@@ -738,7 +738,7 @@ msgstr "話している言語を検出します"
 msgid "Detects the spoken language each session."
 msgstr "セッションごとに話した言語を検出します。"
 
-#: src/features/styles/components/style-editor-modal.tsx:163
+#: src/features/styles/components/style-editor-modal.tsx:165
 msgid "Deterministic fixes applied before any AI styling."
 msgstr "AI によるスタイル調整の前に適用される、ルールベースの修正。"
 
@@ -870,7 +870,7 @@ msgstr "更新をダウンロード中"
 msgid "Downloading…"
 msgstr "ダウンロード中…"
 
-#: src/features/styles/components/style-editor-modal.tsx:241
+#: src/features/styles/components/style-editor-modal.tsx:259
 msgid "Duplicate"
 msgstr "複製"
 
@@ -878,7 +878,7 @@ msgstr "複製"
 msgid "Duration"
 msgstr "録音時間"
 
-#: src/features/styles/components/style-editor-modal.tsx:112
+#: src/features/styles/components/style-editor-modal.tsx:114
 msgid "e.g. Meeting notes"
 msgstr "例: 会議メモ"
 
@@ -890,7 +890,7 @@ msgstr "端からの距離"
 msgid "Edge distance in pixels"
 msgstr "端からの距離（ピクセル）"
 
-#: src/features/styles/components/style-hero.tsx:53
+#: src/features/styles/components/style-hero.tsx:55
 #: src/features/styles/components/style-preset-card.tsx:107
 msgid "Edit"
 msgstr "編集"
@@ -906,7 +906,7 @@ msgstr "{0}を編集"
 msgid "Edit snippet"
 msgstr "スニペットを編集"
 
-#: src/features/styles/components/style-editor-modal.tsx:100
+#: src/features/styles/components/style-editor-modal.tsx:102
 msgid "Edit style"
 msgstr "スタイルを編集"
 
@@ -919,7 +919,7 @@ msgstr "「{spokenTrigger}」を編集中"
 msgid "Empty session"
 msgstr "空のセッション"
 
-#: src/features/styles/styles-page.tsx:246
+#: src/features/styles/styles-page.tsx:240
 msgid "Enable styling"
 msgstr "スタイル調整を有効にする"
 
@@ -938,11 +938,11 @@ msgstr "Lune Voice を開く"
 msgid "Evens out the microphone level before transcription. Helps quiet mics and noisy rooms."
 msgstr "文字起こしの前にマイクの音量を整えます。音量の小さいマイクや騒がしい部屋で役立ちます。"
 
-#: src/features/styles/components/style-editor-modal.tsx:225
+#: src/features/styles/components/style-editor-modal.tsx:243
 msgid "Examples are out of date since you edited the prompt."
 msgstr "プロンプトを編集したため、サンプルが古くなっています。"
 
-#: src/features/styles/components/style-editor-modal.tsx:202
+#: src/features/styles/components/style-editor-modal.tsx:220
 msgid "Examples teach the styling engine your style. Regenerate them after editing the prompt."
 msgstr "サンプルはスタイル調整エンジンにあなたのスタイルを学習させます。プロンプトを編集したら再生成してください。"
 
@@ -982,7 +982,7 @@ msgstr "GPU サポートを取得しています。これが最後のステッ�
 msgid "Fetching Lune Voice {version}. Keep the app open until it finishes."
 msgstr "Lune Voice {version} をダウンロードしています。完了するまでアプリを開いたままにしてください。"
 
-#: src/features/styles/components/style-editor-modal.tsx:199
+#: src/features/styles/components/style-editor-modal.tsx:217
 msgid "Few-shot examples"
 msgstr "Few-shot サンプル"
 
@@ -1006,7 +1006,8 @@ msgstr "スニペットを絞り込む…"
 msgid "Fix recognizer errors with your dictionary and known vocabulary, on your device. It uses per-word confidence and statistical patterns — no AI model, and it never rewrites what you said."
 msgstr "認識エラーを、お使いのデバイス上で辞書と既知の語彙を使って修正します。単語ごとの信頼度と統計的パターンを利用します — AI モデルは使わず、あなたが話した内容を書き換えることは決してありません。"
 
-#: src/features/styles/components/style-editor-modal.tsx:190
+#: src/features/styles/components/style-editor-modal.tsx:192
+#: src/features/styles/components/style-editor-modal.tsx:208
 msgid "Follow Settings"
 msgstr "設定に従う"
 
@@ -1026,8 +1027,8 @@ msgstr "インジケーターをドラッグした位置を破棄し、既定の
 msgid "Formal"
 msgstr "フォーマル"
 
-#: src/features/styles/components/style-editor-modal.tsx:161
-#: src/features/styles/components/style-hero.tsx:60
+#: src/features/styles/components/style-editor-modal.tsx:163
+#: src/features/styles/components/style-hero.tsx:62
 msgid "Formatting"
 msgstr "書式設定"
 
@@ -1061,8 +1062,8 @@ msgstr "一般"
 msgid "General feedback"
 msgstr "全般的なご意見"
 
-#: src/features/styles/components/style-editor-modal.tsx:220
-#: src/features/styles/components/style-editor-modal.tsx:256
+#: src/features/styles/components/style-editor-modal.tsx:238
+#: src/features/styles/components/style-editor-modal.tsx:274
 msgid "Generating examples…"
 msgstr "サンプルを生成中…"
 
@@ -1240,7 +1241,7 @@ msgstr "インストールするとアプリが置き換えられて再起動し
 msgid "Installing update"
 msgstr "更新をインストール中"
 
-#: src/features/styles/components/style-editor-modal.tsx:137
+#: src/features/styles/components/style-editor-modal.tsx:139
 msgid "Instructions"
 msgstr "指示"
 
@@ -1281,7 +1282,7 @@ msgstr "キーボードアクセス"
 msgid "Keyboard shortcuts"
 msgstr "キーボードショートカット"
 
-#: src/features/styles/components/style-editor-modal.tsx:77
+#: src/features/styles/components/style-editor-modal.tsx:79
 msgid "Keyboard shortcuts (\"Super H\" → \"Super+H\")"
 msgstr "キーボードショートカット（「Super H」→「Super+H」）"
 
@@ -1469,11 +1470,11 @@ msgstr "その他"
 msgid "Multilingual · runs on-device"
 msgstr "多言語対応 · オンデバイスで動作"
 
-#: src/features/styles/components/style-editor-modal.tsx:107
+#: src/features/styles/components/style-editor-modal.tsx:109
 msgid "Name"
 msgstr "名前"
 
-#: src/features/styles/components/style-editor-modal.tsx:118
+#: src/features/styles/components/style-editor-modal.tsx:120
 msgid "Name is too long."
 msgstr "名前が長すぎます。"
 
@@ -1583,13 +1584,28 @@ msgstr "何もインストールされていません"
 msgid "Nothing installed yet."
 msgstr "まだ何もインストールされていません。"
 
+#: src/features/styles/components/style-hero.tsx:28
+msgid "Numbers"
+msgstr "数字"
+
+#: src/features/settings/sections/transcription-section.tsx:146
+#: src/features/settings/sections/transcription-section.tsx:154
+#: src/features/styles/components/style-editor-modal.tsx:206
+msgid "Numbers as digits"
+msgstr "数を数字で表記"
+
+#: src/features/styles/components/style-editor-modal.tsx:199
+msgid "Numbers as digits (\"thirty four\" → \"34\")"
+msgstr "数を数字で表記（「thirty four」→「34」）"
+
 #: src/features/settings/data/settings-data.ts:147
 msgid "NVIDIA Parakeet on-device. Much faster than Whisper on a CPU, for 25 European languages."
 msgstr "NVIDIA Parakeet をオンデバイスで実行。CPU では Whisper よりはるかに高速で、ヨーロッパの 25 言語に対応します。"
 
 #: src/features/settings/data/settings-data.ts:169
 #: src/features/settings/data/settings-data.ts:556
-#: src/features/styles/components/style-editor-modal.tsx:192
+#: src/features/styles/components/style-editor-modal.tsx:194
+#: src/features/styles/components/style-editor-modal.tsx:210
 msgid "Off"
 msgstr "オフ"
 
@@ -1606,11 +1622,12 @@ msgstr "公式な書簡や文書"
 msgid "Offline"
 msgstr "オフライン"
 
-#: src/features/styles/components/style-editor-modal.tsx:191
+#: src/features/styles/components/style-editor-modal.tsx:193
+#: src/features/styles/components/style-editor-modal.tsx:209
 msgid "On"
 msgstr "オン"
 
-#: src/features/styles/components/style-editor-modal.tsx:126
+#: src/features/styles/components/style-editor-modal.tsx:128
 msgid "One-line summary shown on the card"
 msgstr "カードに表示される 1 行の概要"
 
@@ -1843,7 +1860,7 @@ msgstr "最近のセッション"
 msgid "Recording mode"
 msgstr "録音モード"
 
-#: src/features/styles/components/style-editor-modal.tsx:220
+#: src/features/styles/components/style-editor-modal.tsx:238
 msgid "Refresh few-shot examples"
 msgstr "Few-shot サンプルを更新"
 
@@ -1928,7 +1945,7 @@ msgstr "確認"
 msgid "Review your setup"
 msgstr "セットアップの確認"
 
-#: src/features/styles/styles-page.tsx:248
+#: src/features/styles/styles-page.tsx:242
 msgid "Rewrite each transcript in a chosen style. When off, the raw transcript is delivered as-is."
 msgstr "各文字起こしを選択したスタイルで書き換えます。オフの場合、生の文字起こしがそのまま出力されます。"
 
@@ -1945,7 +1962,7 @@ msgid "Runs whisper.cpp on-device. Choose a model size below."
 msgstr "whisper.cpp をオンデバイスで実行します。下でモデルサイズを選んでください。"
 
 #: src/features/dictionary/components/dictionary-table.tsx:122
-#: src/features/styles/components/style-editor-modal.tsx:256
+#: src/features/styles/components/style-editor-modal.tsx:274
 msgid "Save"
 msgstr "保存"
 
@@ -2039,7 +2056,7 @@ msgstr "指定した OpenAI 互換エンドポイントに文字起こしを送�
 msgid "Session details"
 msgstr "セッション詳細"
 
-#: src/store/workspace-store.ts:208
+#: src/store/workspace-store.ts:211
 msgid "Session timed out — backend may be unresponsive"
 msgstr "セッションがタイムアウトしました — バックエンドが応答していない可能性があります"
 
@@ -2072,7 +2089,7 @@ msgid "Settings sections"
 msgstr "設定セクション"
 
 #: src/features/settings/sections/dictation-section.tsx:71
-#: src/features/styles/components/style-hero.tsx:24
+#: src/features/styles/components/style-hero.tsx:25
 msgid "Shortcuts"
 msgstr "ショートカット"
 
@@ -2241,7 +2258,7 @@ msgstr "スタイル調整はオフです。サンプルを生成する前に、
 msgid "Styling model name, e.g. gpt-4o-mini."
 msgstr "スタイル調整用のモデル名（例: gpt-4o-mini）。"
 
-#: src/features/styles/styles-page.tsx:275
+#: src/features/styles/styles-page.tsx:269
 msgid "Switch style"
 msgstr "スタイルを切り替え"
 
@@ -2310,7 +2327,7 @@ msgstr "マイクは使用中です"
 msgid "The model stays in memory. Every dictation starts instantly."
 msgstr "モデルはメモリに残ります。毎回すぐに音声入力を始められます。"
 
-#: src/features/settings/sections/transcription-section.tsx:148
+#: src/features/settings/sections/transcription-section.tsx:161
 msgid "The words the recognizer is least sure about are checked against your dictionary and vocabulary. Higher checks more words; lower trusts the raw transcription."
 msgstr "認識の確信度が低い単語を、辞書と語彙で照合します。高くするとより多くの単語を照合し、低くすると認識結果をそのまま信頼します。"
 
@@ -2344,11 +2361,11 @@ msgstr "この音声入力セッションと文字起こしを完全に削除し
 msgid "Time"
 msgstr "時刻"
 
-#: src/features/styles/components/style-editor-modal.tsx:78
+#: src/features/styles/components/style-editor-modal.tsx:80
 msgid "Title abbreviations (\"Mister\" → \"Mr.\")"
 msgstr "敬称の略記（「Mister」→「Mr.」）"
 
-#: src/features/styles/components/style-hero.tsx:26
+#: src/features/styles/components/style-hero.tsx:27
 msgid "Titles"
 msgstr "敬称"
 
@@ -2472,7 +2489,7 @@ msgstr "アプリに入力"
 msgid "Types as"
 msgstr "入力される内容"
 
-#: src/store/workspace-store.ts:685
+#: src/store/workspace-store.ts:688
 msgid "Unable to reach the desktop backend."
 msgstr "デスクトップのバックエンドに接続できません。"
 
@@ -2519,7 +2536,7 @@ msgstr "{activeDevice} を使用中です。設定 › 音声入力 で変更で
 msgid "Vertical"
 msgstr "縦向き"
 
-#: src/features/styles/components/style-hero.tsx:49
+#: src/features/styles/components/style-hero.tsx:51
 #: src/features/styles/components/style-preset-card.tsx:102
 msgid "View"
 msgstr "表示"
@@ -2532,7 +2549,7 @@ msgstr "すべて見る"
 msgid "View source"
 msgstr "ソースコードを見る"
 
-#: src/features/styles/components/style-editor-modal.tsx:100
+#: src/features/styles/components/style-editor-modal.tsx:102
 msgid "View style"
 msgstr "スタイルを表示"
 
@@ -2643,6 +2660,10 @@ msgstr "WPM"
 msgid "Write names like GitHub and iPhone the way their owners do. Turn this off to keep the recognizer's own capitals. A style can override this."
 msgstr "GitHub や iPhone などの名前を、提供元の表記どおりに書きます。オフにすると、音声認識の大文字小文字をそのまま使います。スタイルごとに上書きできます。"
 
+#: src/features/settings/sections/transcription-section.tsx:147
+msgid "Write spoken numbers as digits: \"twenty five dollars\" becomes \"$25\". Works in English, Spanish, Portuguese and German. A style can override this."
+msgstr "話した数を数字で書きます。「twenty five dollars」は「$25」になります。英語、スペイン語、ポルトガル語、ドイツ語に対応しています。スタイルごとに上書きできます。"
+
 #: src/features/styles/builtin-styles.ts:18
 msgid "Writing"
 msgstr "文章"
@@ -2699,7 +2720,7 @@ msgstr "ホットキー"
 msgid "Your models are ready. Everything stays on this machine."
 msgstr "モデルの準備ができました。データはすべてこのマシン内に保存されます。"
 
-#: src/features/styles/styles-page.tsx:314
+#: src/features/styles/styles-page.tsx:308
 msgid "Your own formatting preset"
 msgstr "独自の書式プリセット"
 

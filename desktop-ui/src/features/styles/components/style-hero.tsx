@@ -20,10 +20,12 @@ export function StyleHero({ preset, onEdit, onView }: StyleHeroProps) {
   const Icon = styleIcon(preset);
   const fmt = preset.formatting;
   const globalBrandCasing = useStore(workspaceStore, (s) => s.settings.brandCasing);
+  const globalSpokenNumbers = useStore(workspaceStore, (s) => s.settings.spokenNumbers);
   const chips = [
     { on: fmt.keybinds, label: t`Shortcuts` },
     { on: fmt.autoCapitalization, label: t`Capitals` },
     { on: fmt.titleAbbreviations, label: t`Titles` },
+    { on: fmt.spokenNumbers ?? globalSpokenNumbers, label: t`Numbers` },
     { on: fmt.brandCasing ?? globalBrandCasing, label: t`Brands` },
   ];
 

@@ -16,7 +16,7 @@ import {
   updateCustomStyle,
   workspaceStore,
 } from '../../store/workspace-store';
-import type { StylePreset } from '../../store/workspace-types';
+import { FALLBACK_FORMATTING, type StylePreset } from '../../store/workspace-types';
 import { presetDescription, presetName } from './builtin-styles';
 import { StyleEditorModal } from './components/style-editor-modal';
 import { StyleHero } from './components/style-hero';
@@ -40,13 +40,6 @@ interface ModalState {
   llmReason: MessageDescriptor | null;
 }
 
-const DEFAULT_FORMATTING: FormatTogglesDto = {
-  keybinds: true,
-  titleAbbreviations: true,
-  autoCapitalization: true,
-  brandCasing: null,
-};
-
 const CLOSED_MODAL: ModalState = {
   open: false,
   mode: 'create',
@@ -54,7 +47,7 @@ const CLOSED_MODAL: ModalState = {
   name: '',
   description: '',
   instructions: '',
-  formatting: DEFAULT_FORMATTING,
+  formatting: FALLBACK_FORMATTING,
   saving: false,
   generating: false,
   refreshing: false,
@@ -67,6 +60,7 @@ export function StylesPage() {
   const { t, i18n } = useLingui();
   const activePreset = useStore(workspaceStore, (s) => s.settings.stylePreset);
   const presets = useStore(workspaceStore, (s) => s.stylePresets);
+  const defaultFormatting = useStore(workspaceStore, (s) => s.defaultFormatting);
   const loading = useStore(workspaceStore, (s) => s.runtime.loading);
   // Read the current styling-provider fields for readiness checks. Read from
   // the store at call time (not via a subscription) so checks always see the
@@ -94,7 +88,7 @@ export function StylesPage() {
       name: preset ? presetName(i18n, preset) : '',
       description: preset ? presetDescription(i18n, preset) : '',
       instructions: preset?.instructions ?? '',
-      formatting: preset?.formatting ?? DEFAULT_FORMATTING,
+      formatting: preset?.formatting ?? defaultFormatting,
       fewShotDirty: preset?.fewShotDirty ?? false,
     });
     requestAnimationFrame(() => {
@@ -335,6 +329,9 @@ export function StylesPage() {
         formatting={modal.formatting}
         onBrandCasingChange={(value) =>
           setModal((m) => ({ ...m, formatting: { ...m.formatting, brandCasing: value } }))
+        }
+        onSpokenNumbersChange={(value) =>
+          setModal((m) => ({ ...m, formatting: { ...m.formatting, spokenNumbers: value } }))
         }
         onFormattingChange={(key, value) =>
           setModal((m) => ({ ...m, formatting: { ...m.formatting, [key]: value } }))

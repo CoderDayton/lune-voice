@@ -142,6 +142,19 @@ export function TranscriptionSection({
             />
           }
         />
+        <SettingsRow
+          label={t`Numbers as digits`}
+          description={t`Write spoken numbers as digits: "twenty five dollars" becomes "$25". Works in English, Spanish, Portuguese and German. A style can override this.`}
+          control={
+            <input
+              type="checkbox"
+              className="toggle toggle-primary"
+              checked={settings.spokenNumbers}
+              onChange={() => void saveWorkspaceSetting('spokenNumbers', !settings.spokenNumbers)}
+              aria-label={t`Numbers as digits`}
+            />
+          }
+        />
         {hasWordConfidence && (
           <SettingsRow
             label={t`Correction sensitivity`}

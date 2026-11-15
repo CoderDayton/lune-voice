@@ -644,8 +644,16 @@ fn correct_and_format(
         heuristic_flag_risk,
         fmt.resolve_brand_casing(true),
     );
-    let text_after_heuristic =
-        lune_dict::formatting::shape(&heuristic_result.corrected_text, detected_lang, fmt);
+    let dict_spans: Vec<&str> = dict_replacements
+        .iter()
+        .map(|m| m.replacement.as_str())
+        .collect();
+    let text_after_heuristic = lune_dict::formatting::shape_keeping(
+        &heuristic_result.corrected_text,
+        detected_lang,
+        fmt,
+        &dict_spans,
+    );
 
     // Words the corrector could neither resolve nor confidently preserve —
     // surfaced in the gate UI and the reason the correction pass runs. They are
@@ -793,7 +801,11 @@ async fn process_and_deliver(
         .as_ref()
         .map(|p| p.formatting)
         .unwrap_or_default();
-    fmt.brand_casing = Some(fmt.resolve_brand_casing(settings.read().await.brand_casing));
+    {
+        let s = settings.read().await;
+        fmt.brand_casing = Some(fmt.resolve_brand_casing(s.brand_casing));
+        fmt.spoken_numbers = Some(fmt.resolve_spoken_numbers(s.spoken_numbers));
+    }
     let wants_styling = style_preset.is_some();
     // Deterministic correction + formatting + bypass-gate, as one span so a
     // single dictation request shows its shaping cost end-to-end.
@@ -2105,6 +2117,26 @@ mod tests {
 
         assert_eq!(run(true), "We drove to Home Depot.");
         assert_eq!(run(false), "We drove to home depot.");
+    }
+
+    #[test]
+    fn correct_and_format_keeps_numbers_inside_dictionary_replacements() {
+        lune_dict::lexicon::warm();
+        let heuristic = LexicalGate::new();
+        let pipeline = PipelineConfig::default();
+        let text = "we went to the twenty one club for twenty five dollars";
+        let segments = vec![make_segment(text, false)];
+        let dict = [lune_dict::DictMatch {
+            matched: "twenty one club".to_owned(),
+            replacement: "Twenty One Club".to_owned(),
+            fuzzy: false,
+        }];
+        let fmt = lune_core::config::FormatToggles::default();
+        let shaped = correct_and_format(text, &segments, &dict, &heuristic, &pipeline, &fmt, false);
+        assert_eq!(
+            shaped.text_after_heuristic,
+            "We went to the Twenty One Club for $25."
+        );
     }
 
     #[tokio::test]

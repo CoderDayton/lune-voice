@@ -9,6 +9,7 @@ workspace = true
 
 [dependencies]
 bincode = { version = "2", features = ["serde"] }
+clm-itn = { git = "https://github.com/CoderDayton/clm-itn", rev = "e226c9503e48327d7184a54ade5eb9fd6eec946b" }
 lune-core.workspace = true
 serde.workspace = true
 tracing.workspace = true

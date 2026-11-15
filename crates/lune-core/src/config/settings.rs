@@ -266,6 +266,8 @@ pub struct UserSettings {
     /// A style's own `formatting.brand_casing` overrides this when set.
     #[serde(default = "default_true")]
     pub brand_casing: bool,
+    #[serde(default = "default_true")]
+    pub spoken_numbers: bool,
 }
 
 fn default_true() -> bool {
@@ -374,6 +376,7 @@ impl Default for UserSettings {
             start_minimized: false,
             check_updates_on_launch: false,
             brand_casing: true,
+            spoken_numbers: true,
         }
     }
 }
@@ -1001,6 +1004,9 @@ model = "LargeV4"
         assert!(settings.brand_casing);
         let off: UserSettings = toml::from_str("brand_casing = false\n").unwrap();
         assert!(!off.brand_casing);
+        assert!(settings.spoken_numbers);
+        let off: UserSettings = toml::from_str("spoken_numbers = false\n").unwrap();
+        assert!(!off.spoken_numbers);
     }
 
     #[test]

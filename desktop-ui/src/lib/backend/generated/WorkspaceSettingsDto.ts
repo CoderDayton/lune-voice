@@ -68,7 +68,7 @@ checkUpdatesOnLaunch: boolean,
 /**
  * Capitalize known names ("github" -> "GitHub"). A style can override it.
  */
-brandCasing: boolean, 
+brandCasing: boolean, spokenNumbers: boolean, 
 /**
  * How long to keep dictation history, in days. `None` disables history.
  */

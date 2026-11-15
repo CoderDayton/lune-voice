@@ -15,11 +15,12 @@ use lune_persist::{
 use crate::dto::{
     ActivationModeDto, AgcModeDto, AsrBackendTypeDto, CreateCustomStyleInput,
     CreateDictionaryEntryInput, DevicePolicyDto, DictationModeDto, DictionaryItemDto,
-    HistoryItemDto, HistoryPageDto, LlmBackendTypeDto, ParakeetModelDto, PillAnchorDto,
-    PillCornerDto, PillOrientationDto, PillSizeDto, PillVisibilityDto, PlatformCapabilitiesDto,
-    PrivacyModeDto, SaveSnippetInput, SaveWorkspaceSettingsInput, SessionStatsDto, SettingsCoreDto,
-    SnippetItemDto, StylePresetDto, TerminalModeDto, UpdateCustomStyleInput,
-    UpdateDictionaryEntryInput, WhisperModelDto, WorkspaceSettingsDto, WorkspaceSnapshot,
+    FormatTogglesDto, HistoryItemDto, HistoryPageDto, LlmBackendTypeDto, ParakeetModelDto,
+    PillAnchorDto, PillCornerDto, PillOrientationDto, PillSizeDto, PillVisibilityDto,
+    PlatformCapabilitiesDto, PrivacyModeDto, SaveSnippetInput, SaveWorkspaceSettingsInput,
+    SessionStatsDto, SettingsCoreDto, SnippetItemDto, StylePresetDto, TerminalModeDto,
+    UpdateCustomStyleInput, UpdateDictionaryEntryInput, WhisperModelDto, WorkspaceSettingsDto,
+    WorkspaceSnapshot,
 };
 
 /// Page size ceiling for `list_history_page`, which is what the History tab
@@ -735,6 +736,7 @@ fn build_snapshot(
         dictionary,
         snippets,
         style_presets,
+        default_formatting: FormatTogglesDto::default(),
         stats,
     })
 }
@@ -892,6 +894,7 @@ fn settings_to_dto(settings: &UserSettings) -> WorkspaceSettingsDto {
             start_minimized: settings.start_minimized,
             check_updates_on_launch: settings.check_updates_on_launch,
             brand_casing: settings.brand_casing,
+            spoken_numbers: settings.spoken_numbers,
             session_history_days: settings.session_history_days,
             terminal_mode: terminal_mode_to_dto(settings.terminal_mode),
             privacy_mode: privacy_mode_to_dto(settings.privacy_mode),
@@ -1041,6 +1044,7 @@ fn apply_settings_dto(
     settings.start_minimized = input.start_minimized;
     settings.check_updates_on_launch = input.check_updates_on_launch;
     settings.brand_casing = input.brand_casing;
+    settings.spoken_numbers = input.spoken_numbers;
     settings.terminal_mode = terminal_mode_from_dto(input.terminal_mode);
     settings.privacy_mode = privacy_mode_from_dto(input.privacy_mode);
     validate_history_days(input.session_history_days)?;
@@ -1773,6 +1777,19 @@ mod tests {
         apply_settings_dto(&mut settings, input, &mut db).unwrap();
         assert!(!settings.brand_casing);
         assert!(!settings_to_dto(&settings).core.brand_casing);
+    }
+
+    #[test]
+    fn spoken_numbers_round_trips_through_the_settings_dto() {
+        let mut settings = UserSettings::default();
+        let mut db = Database::open_in_memory().expect("db");
+        assert!(settings_to_dto(&settings).core.spoken_numbers);
+
+        let mut input = default_save_input();
+        input.core.spoken_numbers = false;
+        apply_settings_dto(&mut settings, input, &mut db).unwrap();
+        assert!(!settings.spoken_numbers);
+        assert!(!settings_to_dto(&settings).core.spoken_numbers);
     }
 
     #[test]

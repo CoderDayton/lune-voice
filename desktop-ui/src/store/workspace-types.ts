@@ -61,6 +61,7 @@ export interface WorkspaceSettings {
   checkUpdatesOnLaunch: boolean;
   /** Capitalize known names ("github" → "GitHub"). A style can override it. */
   brandCasing: boolean;
+  spokenNumbers: boolean;
   sessionHistoryDays: number | null;
   terminalMode: TerminalModeValue;
   privacyMode: PrivacyModeValue;
@@ -147,9 +148,18 @@ export interface WorkspaceState {
   historyLoading: boolean;
   sessionTotals: SessionTotals;
   stylePresets: StylePreset[];
+  defaultFormatting: FormatTogglesDto;
   settings: WorkspaceSettings;
   runtime: WorkspaceRuntimeState;
 }
+
+export const FALLBACK_FORMATTING: FormatTogglesDto = {
+  keybinds: true,
+  titleAbbreviations: true,
+  autoCapitalization: true,
+  brandCasing: null,
+  spokenNumbers: null,
+};
 
 export const DEFAULT_SETTINGS: WorkspaceSettings = {
   activationMode: 'Toggle',
@@ -183,6 +193,7 @@ export const DEFAULT_SETTINGS: WorkspaceSettings = {
   startMinimized: false,
   checkUpdatesOnLaunch: false,
   brandCasing: true,
+  spokenNumbers: true,
   sessionHistoryDays: 30,
   terminalMode: 'Auto',
   privacyMode: 'LocalOnly',

@@ -31,12 +31,14 @@ function renderModal(
   brandCasing: boolean | null,
   onBrandCasingChange: (value: boolean | null) => void = () => {},
   mode: 'edit' | 'view' = 'edit',
+  onSpokenNumbersChange: (value: boolean | null) => void = () => {},
 ) {
   const formatting: FormatTogglesDto = {
     keybinds: true,
     titleAbbreviations: true,
     autoCapitalization: true,
     brandCasing,
+    spokenNumbers: null,
   };
   const view = render(
     <I18nProvider i18n={i18n}>
@@ -58,6 +60,7 @@ function renderModal(
         formatting={formatting}
         onFormattingChange={() => {}}
         onBrandCasingChange={onBrandCasingChange}
+        onSpokenNumbersChange={onSpokenNumbersChange}
         onClose={() => {}}
         onSave={() => {}}
         onRefreshExamples={() => {}}
@@ -67,6 +70,22 @@ function renderModal(
   );
   return view.getByLabelText('Brand casing') as HTMLSelectElement;
 }
+
+describe('StyleEditorModal spoken numbers', () => {
+  test('follows Settings by default and reports the chosen value', () => {
+    const seen: (boolean | null)[] = [];
+    renderModal(null, () => {}, 'edit', (value) => seen.push(value));
+    const select = document.querySelector(
+      'select[aria-label="Numbers as digits"]',
+    ) as HTMLSelectElement;
+    expect(select.value).toBe('inherit');
+
+    fireEvent.change(select, { target: { value: 'off' } });
+    fireEvent.change(select, { target: { value: 'inherit' } });
+
+    expect(seen).toEqual([false, null]);
+  });
+});
 
 describe('StyleEditorModal brand casing', () => {
   test('shows follow, on and off for the three stored values', () => {

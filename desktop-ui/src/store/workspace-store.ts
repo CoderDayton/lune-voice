@@ -15,6 +15,7 @@ import {
 import {
   DEFAULT_RUNTIME,
   DEFAULT_SETTINGS,
+  FALLBACK_FORMATTING,
   type HistorySession,
   type WorkspaceRuntimeState,
   type WorkspaceSettings,
@@ -53,6 +54,7 @@ export const workspaceStore = new Store<WorkspaceState>({
     secondsToday: 0,
   },
   stylePresets: [],
+  defaultFormatting: FALLBACK_FORMATTING,
   settings: { ...DEFAULT_SETTINGS },
   runtime: { ...DEFAULT_RUNTIME },
 });
@@ -131,6 +133,7 @@ export const workspaceActions = {
       dictionaryEntries: snapshot.dictionary.map(mapDictionaryEntry),
       snippets: snapshot.snippets ?? [],
       stylePresets: snapshot.stylePresets ?? [],
+      defaultFormatting: snapshot.defaultFormatting ?? s.defaultFormatting,
       historySessions: snapshot.history
         .filter((entry) => entry.transcript)
         .map(mapHistoryEntry)

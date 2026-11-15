@@ -56,6 +56,7 @@ function createMockSnapshot(): WorkspaceSnapshot {
       startMinimized: false,
       checkUpdatesOnLaunch: false,
       brandCasing: true,
+      spokenNumbers: true,
       sessionHistoryDays: 30,
       terminalMode: 'Auto',
       privacyMode: 'LocalOnly',
@@ -121,6 +122,13 @@ function createMockSnapshot(): WorkspaceSnapshot {
         body: '## Meeting — {date}\n\nAttendees:\n- ',
       },
     ],
+    defaultFormatting: {
+      keybinds: true,
+      titleAbbreviations: true,
+      autoCapitalization: true,
+      brandCasing: null,
+      spokenNumbers: null,
+    },
     stats: {
       sessions: 0,
       words: 0,
@@ -142,6 +150,7 @@ function createMockSnapshot(): WorkspaceSnapshot {
           titleAbbreviations: true,
           autoCapitalization: true,
           brandCasing: null,
+          spokenNumbers: null,
         },
       },
       {
@@ -156,6 +165,7 @@ function createMockSnapshot(): WorkspaceSnapshot {
           titleAbbreviations: true,
           autoCapitalization: true,
           brandCasing: null,
+          spokenNumbers: null,
         },
       },
       {
@@ -170,6 +180,7 @@ function createMockSnapshot(): WorkspaceSnapshot {
           titleAbbreviations: true,
           autoCapitalization: true,
           brandCasing: null,
+          spokenNumbers: null,
         },
       },
       {
@@ -184,6 +195,7 @@ function createMockSnapshot(): WorkspaceSnapshot {
           titleAbbreviations: true,
           autoCapitalization: true,
           brandCasing: null,
+          spokenNumbers: null,
         },
       },
       {
@@ -198,6 +210,7 @@ function createMockSnapshot(): WorkspaceSnapshot {
           titleAbbreviations: true,
           autoCapitalization: true,
           brandCasing: null,
+          spokenNumbers: null,
         },
       },
     ],

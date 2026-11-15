@@ -31,7 +31,7 @@ msgid "(clipboard contents)"
 msgstr "(क्लिपबोर्ड की सामग्री)"
 
 #. placeholder {0}: presets.length
-#: src/features/styles/styles-page.tsx:277
+#: src/features/styles/styles-page.tsx:271
 msgid "{0, plural, one {# preset} other {# presets}}"
 msgstr "{0, plural, one {# प्रीसेट} other {# प्रीसेट}}"
 
@@ -155,7 +155,7 @@ msgstr "कार्रवाई"
 msgid "Active"
 msgstr "सक्रिय"
 
-#: src/features/styles/components/style-hero.tsx:36
+#: src/features/styles/components/style-hero.tsx:38
 msgid "Active style"
 msgstr "सक्रिय शैली"
 
@@ -292,7 +292,7 @@ msgstr "ऑडियो गतिविधि"
 msgid "Audio feedback played as dictation starts, finishes, or errors."
 msgstr "डिक्टेशन शुरू होने, पूरा होने या त्रुटि होने पर बजने वाली ऑडियो प्रतिक्रिया।"
 
-#: src/features/styles/components/style-editor-modal.tsx:79
+#: src/features/styles/components/style-editor-modal.tsx:81
 msgid "Auto-capitalize sentences"
 msgstr "वाक्यों का पहला अक्षर अपने-आप बड़ा करें"
 
@@ -358,15 +358,15 @@ msgstr "नीचे बाएँ"
 msgid "Bottom right"
 msgstr "नीचे दाएँ"
 
-#: src/features/styles/components/style-editor-modal.tsx:188
+#: src/features/styles/components/style-editor-modal.tsx:190
 msgid "Brand casing"
 msgstr "ब्रांड नामों के बड़े-छोटे अक्षर"
 
-#: src/features/styles/components/style-editor-modal.tsx:181
+#: src/features/styles/components/style-editor-modal.tsx:183
 msgid "Brand casing (\"github\" → \"GitHub\")"
 msgstr "ब्रांड नामों के बड़े-छोटे अक्षर (\"github\" → \"GitHub\")"
 
-#: src/features/styles/components/style-hero.tsx:27
+#: src/features/styles/components/style-hero.tsx:29
 msgid "Brands"
 msgstr "ब्रांड्स"
 
@@ -382,7 +382,7 @@ msgstr "खुले इशू देखें"
 msgid "Bug report"
 msgstr "बग रिपोर्ट"
 
-#: src/features/styles/components/style-hero.tsx:39
+#: src/features/styles/components/style-hero.tsx:41
 #: src/features/styles/components/style-preset-card.tsx:67
 msgid "Built-in"
 msgstr "अंतर्निहित"
@@ -392,7 +392,7 @@ msgstr "अंतर्निहित"
 #: src/features/settings/components/model-library.tsx:255
 #: src/features/settings/components/model-row.tsx:90
 #: src/features/snippets/snippets-page.tsx:249
-#: src/features/styles/components/style-editor-modal.tsx:247
+#: src/features/styles/components/style-editor-modal.tsx:265
 msgid "Cancel"
 msgstr "रद्द करें"
 
@@ -417,7 +417,7 @@ msgstr "रद्द"
 msgid "Capitalize known names"
 msgstr "जाने-पहचाने नामों के बड़े-छोटे अक्षर सही करें"
 
-#: src/features/styles/components/style-hero.tsx:25
+#: src/features/styles/components/style-hero.tsx:26
 msgid "Capitals"
 msgstr "बड़े अक्षर"
 
@@ -507,14 +507,14 @@ msgstr "चयन साफ़ करें"
 msgid "Clear workplace communication"
 msgstr "कार्यस्थल पर साफ़ संवाद"
 
-#: src/features/styles/components/style-editor-modal.tsx:264
+#: src/features/styles/components/style-editor-modal.tsx:282
 msgid "close"
 msgstr "बंद करें"
 
 #: src/components/feedback/help-feedback-dialog.tsx:281
 #: src/features/history/components/session-detail-modal.tsx:226
 #: src/features/settings/components/model-library.tsx:265
-#: src/features/styles/components/style-editor-modal.tsx:238
+#: src/features/styles/components/style-editor-modal.tsx:256
 #: src/features/updates/update-dialog.tsx:326
 #: src/features/updates/update-dialog.tsx:338
 msgid "Close"
@@ -594,8 +594,8 @@ msgstr "कोने"
 msgid "Correction"
 msgstr "सुधार"
 
-#: src/features/settings/sections/transcription-section.tsx:147
-#: src/features/settings/sections/transcription-section.tsx:162
+#: src/features/settings/sections/transcription-section.tsx:160
+#: src/features/settings/sections/transcription-section.tsx:175
 msgid "Correction sensitivity"
 msgstr "सुधार संवेदनशीलता"
 
@@ -635,11 +635,11 @@ msgstr "क्रैश या फ़्रीज़"
 msgid "Create a snippet"
 msgstr "स्निपेट बनाएँ"
 
-#: src/features/styles/styles-page.tsx:312
+#: src/features/styles/styles-page.tsx:306
 msgid "Create new style"
 msgstr "नई शैली बनाएँ"
 
-#: src/features/styles/components/style-editor-modal.tsx:100
+#: src/features/styles/components/style-editor-modal.tsx:102
 msgid "Create style"
 msgstr "शैली बनाएँ"
 
@@ -714,15 +714,15 @@ msgstr "यह शब्द-सुधार हटाएँ?"
 msgid "Delete?"
 msgstr "हटाएँ?"
 
-#: src/features/styles/components/style-editor-modal.tsx:154
+#: src/features/styles/components/style-editor-modal.tsx:156
 msgid "Describe how text should be formatted. E.g., \"Use bullet points. Keep sentences short. Avoid jargon.\""
 msgstr "बताएँ कि टेक्स्ट को कैसे फ़ॉर्मैट किया जाए। उदाहरण: \"बुलेट पॉइंट इस्तेमाल करें। वाक्य छोटे रखें। भारी-भरकम शब्दों से बचें।\""
 
-#: src/features/styles/components/style-editor-modal.tsx:122
+#: src/features/styles/components/style-editor-modal.tsx:124
 msgid "Description"
 msgstr "विवरण"
 
-#: src/features/styles/components/style-editor-modal.tsx:132
+#: src/features/styles/components/style-editor-modal.tsx:134
 msgid "Description is too long."
 msgstr "विवरण बहुत लंबा है।"
 
@@ -738,7 +738,7 @@ msgstr "आपकी बोली गई भाषा पहचानता ह�
 msgid "Detects the spoken language each session."
 msgstr "हर सत्र में बोली गई भाषा पहचानता है।"
 
-#: src/features/styles/components/style-editor-modal.tsx:163
+#: src/features/styles/components/style-editor-modal.tsx:165
 msgid "Deterministic fixes applied before any AI styling."
 msgstr "AI स्टाइलिंग से पहले लागू होने वाले नियम-आधारित सुधार।"
 
@@ -870,7 +870,7 @@ msgstr "अपडेट डाउनलोड हो रहा है"
 msgid "Downloading…"
 msgstr "डाउनलोड हो रहा है…"
 
-#: src/features/styles/components/style-editor-modal.tsx:241
+#: src/features/styles/components/style-editor-modal.tsx:259
 msgid "Duplicate"
 msgstr "डुप्लिकेट बनाएँ"
 
@@ -878,7 +878,7 @@ msgstr "डुप्लिकेट बनाएँ"
 msgid "Duration"
 msgstr "अवधि"
 
-#: src/features/styles/components/style-editor-modal.tsx:112
+#: src/features/styles/components/style-editor-modal.tsx:114
 msgid "e.g. Meeting notes"
 msgstr "जैसे मीटिंग नोट्स"
 
@@ -890,7 +890,7 @@ msgstr "किनारे से दूरी"
 msgid "Edge distance in pixels"
 msgstr "किनारे से दूरी, पिक्सेल में"
 
-#: src/features/styles/components/style-hero.tsx:53
+#: src/features/styles/components/style-hero.tsx:55
 #: src/features/styles/components/style-preset-card.tsx:107
 msgid "Edit"
 msgstr "संपादित करें"
@@ -906,7 +906,7 @@ msgstr "{0} संपादित करें"
 msgid "Edit snippet"
 msgstr "स्निपेट संपादित करें"
 
-#: src/features/styles/components/style-editor-modal.tsx:100
+#: src/features/styles/components/style-editor-modal.tsx:102
 msgid "Edit style"
 msgstr "शैली संपादित करें"
 
@@ -919,7 +919,7 @@ msgstr "“{spokenTrigger}” संपादित किया जा रह�
 msgid "Empty session"
 msgstr "ख़ाली सत्र"
 
-#: src/features/styles/styles-page.tsx:246
+#: src/features/styles/styles-page.tsx:240
 msgid "Enable styling"
 msgstr "स्टाइलिंग सक्षम करें"
 
@@ -938,11 +938,11 @@ msgstr "Lune Voice खोलें"
 msgid "Evens out the microphone level before transcription. Helps quiet mics and noisy rooms."
 msgstr "ट्रांसक्रिप्शन से पहले माइक्रोफ़ोन का स्तर संतुलित करता है। धीमे माइक और शोर वाले कमरों में मदद करता है।"
 
-#: src/features/styles/components/style-editor-modal.tsx:225
+#: src/features/styles/components/style-editor-modal.tsx:243
 msgid "Examples are out of date since you edited the prompt."
 msgstr "प्रॉम्प्ट संपादित करने के बाद से उदाहरण पुराने हो चुके हैं।"
 
-#: src/features/styles/components/style-editor-modal.tsx:202
+#: src/features/styles/components/style-editor-modal.tsx:220
 msgid "Examples teach the styling engine your style. Regenerate them after editing the prompt."
 msgstr "उदाहरण स्टाइलिंग इंजन को आपकी शैली सिखाते हैं। प्रॉम्प्ट संपादित करने के बाद उन्हें दोबारा जनरेट करें।"
 
@@ -982,7 +982,7 @@ msgstr "GPU सपोर्ट प्राप्त किया जा रह�
 msgid "Fetching Lune Voice {version}. Keep the app open until it finishes."
 msgstr "Lune Voice {version} डाउनलोड हो रहा है। पूरा होने तक ऐप खुला रखें।"
 
-#: src/features/styles/components/style-editor-modal.tsx:199
+#: src/features/styles/components/style-editor-modal.tsx:217
 msgid "Few-shot examples"
 msgstr "फ़्यू-शॉट उदाहरण"
 
@@ -1006,7 +1006,8 @@ msgstr "स्निपेट फ़िल्टर करें…"
 msgid "Fix recognizer errors with your dictionary and known vocabulary, on your device. It uses per-word confidence and statistical patterns — no AI model, and it never rewrites what you said."
 msgstr "अपने डिवाइस पर ही, अपनी शब्दावली और जाने-पहचाने शब्दों की मदद से स्पीच इंजन की गलतियाँ ठीक करें। यह हर शब्द के भरोसे के स्तर और सांख्यिकीय पैटर्न का उपयोग करता है — कोई AI मॉडल नहीं, और यह आपकी कही बात को कभी दोबारा नहीं लिखता।"
 
-#: src/features/styles/components/style-editor-modal.tsx:190
+#: src/features/styles/components/style-editor-modal.tsx:192
+#: src/features/styles/components/style-editor-modal.tsx:208
 msgid "Follow Settings"
 msgstr "सेटिंग्स के अनुसार"
 
@@ -1026,8 +1027,8 @@ msgstr "आपने संकेतक को जहाँ खींचा थ�
 msgid "Formal"
 msgstr "औपचारिक"
 
-#: src/features/styles/components/style-editor-modal.tsx:161
-#: src/features/styles/components/style-hero.tsx:60
+#: src/features/styles/components/style-editor-modal.tsx:163
+#: src/features/styles/components/style-hero.tsx:62
 msgid "Formatting"
 msgstr "फ़ॉर्मैटिंग"
 
@@ -1061,8 +1062,8 @@ msgstr "सामान्य"
 msgid "General feedback"
 msgstr "सामान्य फ़ीडबैक"
 
-#: src/features/styles/components/style-editor-modal.tsx:220
-#: src/features/styles/components/style-editor-modal.tsx:256
+#: src/features/styles/components/style-editor-modal.tsx:238
+#: src/features/styles/components/style-editor-modal.tsx:274
 msgid "Generating examples…"
 msgstr "उदाहरण बनाए जा रहे हैं…"
 
@@ -1240,7 +1241,7 @@ msgstr "इंस्टॉल करने पर ऐप बदल जाता 
 msgid "Installing update"
 msgstr "अपडेट इंस्टॉल हो रहा है"
 
-#: src/features/styles/components/style-editor-modal.tsx:137
+#: src/features/styles/components/style-editor-modal.tsx:139
 msgid "Instructions"
 msgstr "निर्देश"
 
@@ -1281,7 +1282,7 @@ msgstr "कीबोर्ड एक्सेस"
 msgid "Keyboard shortcuts"
 msgstr "कीबोर्ड शॉर्टकट"
 
-#: src/features/styles/components/style-editor-modal.tsx:77
+#: src/features/styles/components/style-editor-modal.tsx:79
 msgid "Keyboard shortcuts (\"Super H\" → \"Super+H\")"
 msgstr "कीबोर्ड शॉर्टकट (\"Super H\" → \"Super+H\")"
 
@@ -1469,11 +1470,11 @@ msgstr "अधिक"
 msgid "Multilingual · runs on-device"
 msgstr "बहुभाषी · डिवाइस पर चलता है"
 
-#: src/features/styles/components/style-editor-modal.tsx:107
+#: src/features/styles/components/style-editor-modal.tsx:109
 msgid "Name"
 msgstr "नाम"
 
-#: src/features/styles/components/style-editor-modal.tsx:118
+#: src/features/styles/components/style-editor-modal.tsx:120
 msgid "Name is too long."
 msgstr "नाम बहुत लंबा है।"
 
@@ -1583,13 +1584,28 @@ msgstr "कुछ भी इंस्टॉल नहीं है"
 msgid "Nothing installed yet."
 msgstr "अभी तक कुछ इंस्टॉल नहीं है।"
 
+#: src/features/styles/components/style-hero.tsx:28
+msgid "Numbers"
+msgstr "संख्याएँ"
+
+#: src/features/settings/sections/transcription-section.tsx:146
+#: src/features/settings/sections/transcription-section.tsx:154
+#: src/features/styles/components/style-editor-modal.tsx:206
+msgid "Numbers as digits"
+msgstr "संख्याएँ अंकों में"
+
+#: src/features/styles/components/style-editor-modal.tsx:199
+msgid "Numbers as digits (\"thirty four\" → \"34\")"
+msgstr "संख्याएँ अंकों में (\"thirty four\" → \"34\")"
+
 #: src/features/settings/data/settings-data.ts:147
 msgid "NVIDIA Parakeet on-device. Much faster than Whisper on a CPU, for 25 European languages."
 msgstr "डिवाइस पर NVIDIA Parakeet। CPU पर Whisper से कहीं तेज़, 25 यूरोपीय भाषाओं के लिए।"
 
 #: src/features/settings/data/settings-data.ts:169
 #: src/features/settings/data/settings-data.ts:556
-#: src/features/styles/components/style-editor-modal.tsx:192
+#: src/features/styles/components/style-editor-modal.tsx:194
+#: src/features/styles/components/style-editor-modal.tsx:210
 msgid "Off"
 msgstr "बंद"
 
@@ -1606,11 +1622,12 @@ msgstr "आधिकारिक पत्राचार और दस्ता
 msgid "Offline"
 msgstr "ऑफ़लाइन"
 
-#: src/features/styles/components/style-editor-modal.tsx:191
+#: src/features/styles/components/style-editor-modal.tsx:193
+#: src/features/styles/components/style-editor-modal.tsx:209
 msgid "On"
 msgstr "चालू"
 
-#: src/features/styles/components/style-editor-modal.tsx:126
+#: src/features/styles/components/style-editor-modal.tsx:128
 msgid "One-line summary shown on the card"
 msgstr "कार्ड पर दिखने वाला एक पंक्ति का सारांश"
 
@@ -1843,7 +1860,7 @@ msgstr "हाल के सत्र"
 msgid "Recording mode"
 msgstr "रिकॉर्डिंग मोड"
 
-#: src/features/styles/components/style-editor-modal.tsx:220
+#: src/features/styles/components/style-editor-modal.tsx:238
 msgid "Refresh few-shot examples"
 msgstr "फ़्यू-शॉट उदाहरण रिफ़्रेश करें"
 
@@ -1928,7 +1945,7 @@ msgstr "समीक्षा"
 msgid "Review your setup"
 msgstr "अपने सेटअप की समीक्षा करें"
 
-#: src/features/styles/styles-page.tsx:248
+#: src/features/styles/styles-page.tsx:242
 msgid "Rewrite each transcript in a chosen style. When off, the raw transcript is delivered as-is."
 msgstr "प्रत्येक ट्रांसक्रिप्ट को चुनी गई शैली में दोबारा लिखें। बंद होने पर कच्चा ट्रांसक्रिप्ट ज्यों-का-त्यों दिया जाता है।"
 
@@ -1945,7 +1962,7 @@ msgid "Runs whisper.cpp on-device. Choose a model size below."
 msgstr "whisper.cpp को डिवाइस पर चलाता है। नीचे मॉडल का आकार चुनें।"
 
 #: src/features/dictionary/components/dictionary-table.tsx:122
-#: src/features/styles/components/style-editor-modal.tsx:256
+#: src/features/styles/components/style-editor-modal.tsx:274
 msgid "Save"
 msgstr "सहेजें"
 
@@ -2039,7 +2056,7 @@ msgstr "आपके द्वारा तय किए गए OpenAI-संग
 msgid "Session details"
 msgstr "सत्र विवरण"
 
-#: src/store/workspace-store.ts:208
+#: src/store/workspace-store.ts:211
 msgid "Session timed out — backend may be unresponsive"
 msgstr "सत्र का समय समाप्त — बैकएंड शायद जवाब नहीं दे रहा"
 
@@ -2072,7 +2089,7 @@ msgid "Settings sections"
 msgstr "सेटिंग्स अनुभाग"
 
 #: src/features/settings/sections/dictation-section.tsx:71
-#: src/features/styles/components/style-hero.tsx:24
+#: src/features/styles/components/style-hero.tsx:25
 msgid "Shortcuts"
 msgstr "शॉर्टकट"
 
@@ -2241,7 +2258,7 @@ msgstr "स्टाइलिंग बंद है। उदाहरण ब�
 msgid "Styling model name, e.g. gpt-4o-mini."
 msgstr "स्टाइलिंग मॉडल का नाम, जैसे gpt-4o-mini।"
 
-#: src/features/styles/styles-page.tsx:275
+#: src/features/styles/styles-page.tsx:269
 msgid "Switch style"
 msgstr "शैली बदलें"
 
@@ -2310,7 +2327,7 @@ msgstr "माइक्रोफ़ोन उपयोग में है"
 msgid "The model stays in memory. Every dictation starts instantly."
 msgstr "मॉडल मेमोरी में रहता है। हर डिक्टेशन तुरंत शुरू होता है।"
 
-#: src/features/settings/sections/transcription-section.tsx:148
+#: src/features/settings/sections/transcription-section.tsx:161
 msgid "The words the recognizer is least sure about are checked against your dictionary and vocabulary. Higher checks more words; lower trusts the raw transcription."
 msgstr "जिन शब्दों पर स्पीच इंजन सबसे कम आश्वस्त होता है, उन्हें आपकी शब्दावली और जाने-पहचाने शब्दों से मिलाया जाता है। ज़्यादा पर अधिक शब्द जाँचे जाते हैं; कम पर कच्चे ट्रांसक्रिप्शन पर भरोसा किया जाता है।"
 
@@ -2344,11 +2361,11 @@ msgstr "इससे यह डिक्टेशन सत्र और इस�
 msgid "Time"
 msgstr "समय"
 
-#: src/features/styles/components/style-editor-modal.tsx:78
+#: src/features/styles/components/style-editor-modal.tsx:80
 msgid "Title abbreviations (\"Mister\" → \"Mr.\")"
 msgstr "उपाधियों के संक्षिप्त रूप (\"Mister\" → \"Mr.\")"
 
-#: src/features/styles/components/style-hero.tsx:26
+#: src/features/styles/components/style-hero.tsx:27
 msgid "Titles"
 msgstr "उपाधियाँ"
 
@@ -2472,7 +2489,7 @@ msgstr "ऐप में टाइप करें"
 msgid "Types as"
 msgstr "ऐसे टाइप होता है"
 
-#: src/store/workspace-store.ts:685
+#: src/store/workspace-store.ts:688
 msgid "Unable to reach the desktop backend."
 msgstr "डेस्कटॉप बैकएंड तक नहीं पहुँचा जा सका।"
 
@@ -2519,7 +2536,7 @@ msgstr "{activeDevice} इस्तेमाल हो रहा है। इ�
 msgid "Vertical"
 msgstr "लंबवत"
 
-#: src/features/styles/components/style-hero.tsx:49
+#: src/features/styles/components/style-hero.tsx:51
 #: src/features/styles/components/style-preset-card.tsx:102
 msgid "View"
 msgstr "देखें"
@@ -2532,7 +2549,7 @@ msgstr "सभी देखें"
 msgid "View source"
 msgstr "सोर्स कोड देखें"
 
-#: src/features/styles/components/style-editor-modal.tsx:100
+#: src/features/styles/components/style-editor-modal.tsx:102
 msgid "View style"
 msgstr "शैली देखें"
 
@@ -2643,6 +2660,10 @@ msgstr "WPM"
 msgid "Write names like GitHub and iPhone the way their owners do. Turn this off to keep the recognizer's own capitals. A style can override this."
 msgstr "GitHub और iPhone जैसे नाम वैसे ही लिखें जैसे उनके निर्माता लिखते हैं। स्पीच इंजन के अपने बड़े-छोटे अक्षर रखने के लिए इसे बंद करें। कोई शैली इसे बदल सकती है।"
 
+#: src/features/settings/sections/transcription-section.tsx:147
+msgid "Write spoken numbers as digits: \"twenty five dollars\" becomes \"$25\". Works in English, Spanish, Portuguese and German. A style can override this."
+msgstr "बोली गई संख्याओं को अंकों में लिखें: \"twenty five dollars\" बन जाता है \"$25\"। अंग्रेज़ी, स्पेनिश, पुर्तगाली और जर्मन में काम करता है। कोई स्टाइल इसे बदल सकती है।"
+
 #: src/features/styles/builtin-styles.ts:18
 msgid "Writing"
 msgstr "लेखन"
@@ -2699,7 +2720,7 @@ msgstr "आपकी हॉटकी"
 msgid "Your models are ready. Everything stays on this machine."
 msgstr "आपके मॉडल तैयार हैं। सब कुछ इसी मशीन पर रहता है।"
 
-#: src/features/styles/styles-page.tsx:314
+#: src/features/styles/styles-page.tsx:308
 msgid "Your own formatting preset"
 msgstr "आपका अपना फ़ॉर्मैटिंग प्रीसेट"
 

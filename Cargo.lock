@@ -786,6 +786,11 @@ dependencies = [
 ]
 
 [[package]]
+name = "clm-itn"
+version = "0.1.0"
+source = "git+https://github.com/CoderDayton/clm-itn?rev=e226c9503e48327d7184a54ade5eb9fd6eec946b#e226c9503e48327d7184a54ade5eb9fd6eec946b"
+
+[[package]]
 name = "cmake"
 version = "0.1.58"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3136,6 +3141,7 @@ name = "lune-dict"
 version = "0.1.0"
 dependencies = [
  "bincode",
+ "clm-itn",
  "lune-core",
  "serde",
  "tracing",
