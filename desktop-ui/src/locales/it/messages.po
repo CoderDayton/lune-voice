@@ -777,14 +777,6 @@ msgstr "Scarta la bozza corrente e torna allo stato inattivo. Fai clic sulla com
 msgid "Disconnected"
 msgstr "Disconnesso"
 
-#: src/features/settings/components/model-library.tsx:178
-#~ msgid "Disk usage"
-#~ msgstr "Utilizzo del disco"
-
-#: src/features/settings/components/model-library.tsx:225
-#~ msgid "Dismiss"
-#~ msgstr "Ignora"
-
 #: src/components/feedback/error-toast.tsx:26
 msgid "Dismiss error"
 msgstr "Ignora errore"
@@ -793,26 +785,11 @@ msgstr "Ignora errore"
 msgid "Don't save history"
 msgstr "Non salvare la cronologia"
 
-#: src/features/settings/components/model-library.tsx:242
-#~ msgid "Done"
-#~ msgstr "Fatto"
-
 #: src/features/history/components/history-table.tsx:509
 #: src/features/settings/components/gpu-backend-card.tsx:38
 #: src/features/settings/components/model-row.tsx:106
 msgid "Download"
 msgstr "Scarica"
-
-#. placeholder {0}: wanted.length
-#: src/features/settings/components/model-library.tsx:172
-#~ msgid "Download {0} selected"
-#~ msgstr "Scarica {0} selezionati"
-
-#. placeholder {0}: wanted.length
-#. placeholder {1}: formatBytes(wantedBytes)
-#: src/features/settings/components/model-library.tsx:171
-#~ msgid "Download {0} selected · {1}"
-#~ msgstr "Scarica {0} selezionati · {1}"
 
 #: src/features/settings/components/model-row.tsx:103
 msgid "Download {label}"
@@ -2006,10 +1983,6 @@ msgstr "Cerca trascrizioni"
 #: src/features/history/components/history-table.tsx:131
 msgid "Search transcripts…"
 msgstr "Cerca trascrizioni…"
-
-#: src/features/settings/components/model-library.tsx:159
-#~ msgid "Select all"
-#~ msgstr "Seleziona tutto"
 
 #: src/features/history/components/history-table.tsx:177
 msgid "Select all sessions on this page"

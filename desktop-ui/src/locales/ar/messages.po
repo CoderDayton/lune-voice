@@ -777,14 +777,6 @@ msgstr "تجاهل المسودة الحالية والعودة إلى وضع ا
 msgid "Disconnected"
 msgstr "غير متصل"
 
-#: src/features/settings/components/model-library.tsx:178
-#~ msgid "Disk usage"
-#~ msgstr "استخدام القرص"
-
-#: src/features/settings/components/model-library.tsx:225
-#~ msgid "Dismiss"
-#~ msgstr "تجاهل"
-
 #: src/components/feedback/error-toast.tsx:26
 msgid "Dismiss error"
 msgstr "إغلاق رسالة الخطأ"
@@ -793,26 +785,11 @@ msgstr "إغلاق رسالة الخطأ"
 msgid "Don't save history"
 msgstr "عدم حفظ السجل"
 
-#: src/features/settings/components/model-library.tsx:242
-#~ msgid "Done"
-#~ msgstr "تم"
-
 #: src/features/history/components/history-table.tsx:509
 #: src/features/settings/components/gpu-backend-card.tsx:38
 #: src/features/settings/components/model-row.tsx:106
 msgid "Download"
 msgstr "تنزيل"
-
-#. placeholder {0}: wanted.length
-#: src/features/settings/components/model-library.tsx:172
-#~ msgid "Download {0} selected"
-#~ msgstr "تنزيل {0} المحدد"
-
-#. placeholder {0}: wanted.length
-#. placeholder {1}: formatBytes(wantedBytes)
-#: src/features/settings/components/model-library.tsx:171
-#~ msgid "Download {0} selected · {1}"
-#~ msgstr "تنزيل {0} المحدد · {1}"
 
 #: src/features/settings/components/model-row.tsx:103
 msgid "Download {label}"
@@ -2006,10 +1983,6 @@ msgstr "البحث في النصوص"
 #: src/features/history/components/history-table.tsx:131
 msgid "Search transcripts…"
 msgstr "البحث في النصوص…"
-
-#: src/features/settings/components/model-library.tsx:159
-#~ msgid "Select all"
-#~ msgstr "تحديد الكل"
 
 #: src/features/history/components/history-table.tsx:177
 msgid "Select all sessions on this page"

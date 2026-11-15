@@ -777,14 +777,6 @@ msgstr "放弃当前草稿并返回空闲状态。点击按键绑定即可更改
 msgid "Disconnected"
 msgstr "已断开连接"
 
-#: src/features/settings/components/model-library.tsx:178
-#~ msgid "Disk usage"
-#~ msgstr "磁盘使用情况"
-
-#: src/features/settings/components/model-library.tsx:225
-#~ msgid "Dismiss"
-#~ msgstr "忽略"
-
 #: src/components/feedback/error-toast.tsx:26
 msgid "Dismiss error"
 msgstr "关闭错误提示"
@@ -793,26 +785,11 @@ msgstr "关闭错误提示"
 msgid "Don't save history"
 msgstr "不保存历史"
 
-#: src/features/settings/components/model-library.tsx:242
-#~ msgid "Done"
-#~ msgstr "完成"
-
 #: src/features/history/components/history-table.tsx:509
 #: src/features/settings/components/gpu-backend-card.tsx:38
 #: src/features/settings/components/model-row.tsx:106
 msgid "Download"
 msgstr "下载"
-
-#. placeholder {0}: wanted.length
-#: src/features/settings/components/model-library.tsx:172
-#~ msgid "Download {0} selected"
-#~ msgstr "下载所选的 {0} 个"
-
-#. placeholder {0}: wanted.length
-#. placeholder {1}: formatBytes(wantedBytes)
-#: src/features/settings/components/model-library.tsx:171
-#~ msgid "Download {0} selected · {1}"
-#~ msgstr "下载所选的 {0} 个 · {1}"
 
 #: src/features/settings/components/model-row.tsx:103
 msgid "Download {label}"
@@ -2006,10 +1983,6 @@ msgstr "搜索转写结果"
 #: src/features/history/components/history-table.tsx:131
 msgid "Search transcripts…"
 msgstr "搜索转写结果…"
-
-#: src/features/settings/components/model-library.tsx:159
-#~ msgid "Select all"
-#~ msgstr "全选"
 
 #: src/features/history/components/history-table.tsx:177
 msgid "Select all sessions on this page"

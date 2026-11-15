@@ -777,14 +777,6 @@ msgstr "मौजूदा ड्राफ़्ट हटाकर निष्
 msgid "Disconnected"
 msgstr "डिस्कनेक्टेड"
 
-#: src/features/settings/components/model-library.tsx:178
-#~ msgid "Disk usage"
-#~ msgstr "डिस्क उपयोग"
-
-#: src/features/settings/components/model-library.tsx:225
-#~ msgid "Dismiss"
-#~ msgstr "खारिज करें"
-
 #: src/components/feedback/error-toast.tsx:26
 msgid "Dismiss error"
 msgstr "त्रुटि ख़ारिज करें"
@@ -793,26 +785,11 @@ msgstr "त्रुटि ख़ारिज करें"
 msgid "Don't save history"
 msgstr "इतिहास न सहेजें"
 
-#: src/features/settings/components/model-library.tsx:242
-#~ msgid "Done"
-#~ msgstr "हो गया"
-
 #: src/features/history/components/history-table.tsx:509
 #: src/features/settings/components/gpu-backend-card.tsx:38
 #: src/features/settings/components/model-row.tsx:106
 msgid "Download"
 msgstr "डाउनलोड"
-
-#. placeholder {0}: wanted.length
-#: src/features/settings/components/model-library.tsx:172
-#~ msgid "Download {0} selected"
-#~ msgstr "चुने हुए {0} डाउनलोड करें"
-
-#. placeholder {0}: wanted.length
-#. placeholder {1}: formatBytes(wantedBytes)
-#: src/features/settings/components/model-library.tsx:171
-#~ msgid "Download {0} selected · {1}"
-#~ msgstr "चुने हुए {0} डाउनलोड करें · {1}"
 
 #: src/features/settings/components/model-row.tsx:103
 msgid "Download {label}"
@@ -2006,10 +1983,6 @@ msgstr "ट्रांसक्रिप्ट खोजें"
 #: src/features/history/components/history-table.tsx:131
 msgid "Search transcripts…"
 msgstr "ट्रांसक्रिप्ट खोजें…"
-
-#: src/features/settings/components/model-library.tsx:159
-#~ msgid "Select all"
-#~ msgstr "सभी चुनें"
 
 #: src/features/history/components/history-table.tsx:177
 msgid "Select all sessions on this page"

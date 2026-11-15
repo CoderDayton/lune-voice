@@ -777,14 +777,6 @@ msgstr "Discard the current draft and return to idle. Click the binding to chang
 msgid "Disconnected"
 msgstr "Disconnected"
 
-#: src/features/settings/components/model-library.tsx:178
-#~ msgid "Disk usage"
-#~ msgstr "Disk usage"
-
-#: src/features/settings/components/model-library.tsx:225
-#~ msgid "Dismiss"
-#~ msgstr "Dismiss"
-
 #: src/components/feedback/error-toast.tsx:26
 msgid "Dismiss error"
 msgstr "Dismiss error"
@@ -793,26 +785,11 @@ msgstr "Dismiss error"
 msgid "Don't save history"
 msgstr "Don't save history"
 
-#: src/features/settings/components/model-library.tsx:242
-#~ msgid "Done"
-#~ msgstr "Done"
-
 #: src/features/history/components/history-table.tsx:509
 #: src/features/settings/components/gpu-backend-card.tsx:38
 #: src/features/settings/components/model-row.tsx:106
 msgid "Download"
 msgstr "Download"
-
-#. placeholder {0}: wanted.length
-#: src/features/settings/components/model-library.tsx:172
-#~ msgid "Download {0} selected"
-#~ msgstr "Download {0} selected"
-
-#. placeholder {0}: wanted.length
-#. placeholder {1}: formatBytes(wantedBytes)
-#: src/features/settings/components/model-library.tsx:171
-#~ msgid "Download {0} selected · {1}"
-#~ msgstr "Download {0} selected · {1}"
 
 #: src/features/settings/components/model-row.tsx:103
 msgid "Download {label}"
@@ -2006,10 +1983,6 @@ msgstr "Search transcripts"
 #: src/features/history/components/history-table.tsx:131
 msgid "Search transcripts…"
 msgstr "Search transcripts…"
-
-#: src/features/settings/components/model-library.tsx:159
-#~ msgid "Select all"
-#~ msgstr "Select all"
 
 #: src/features/history/components/history-table.tsx:177
 msgid "Select all sessions on this page"

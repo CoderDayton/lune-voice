@@ -777,14 +777,6 @@ msgstr "Abandonne la dictée en cours et revient au repos. Cliquez sur le raccou
 msgid "Disconnected"
 msgstr "Déconnecté"
 
-#: src/features/settings/components/model-library.tsx:178
-#~ msgid "Disk usage"
-#~ msgstr "Espace disque utilisé"
-
-#: src/features/settings/components/model-library.tsx:225
-#~ msgid "Dismiss"
-#~ msgstr "Ignorer"
-
 #: src/components/feedback/error-toast.tsx:26
 msgid "Dismiss error"
 msgstr "Ignorer l'erreur"
@@ -793,26 +785,11 @@ msgstr "Ignorer l'erreur"
 msgid "Don't save history"
 msgstr "Ne pas enregistrer l'historique"
 
-#: src/features/settings/components/model-library.tsx:242
-#~ msgid "Done"
-#~ msgstr "Terminé"
-
 #: src/features/history/components/history-table.tsx:509
 #: src/features/settings/components/gpu-backend-card.tsx:38
 #: src/features/settings/components/model-row.tsx:106
 msgid "Download"
 msgstr "Télécharger"
-
-#. placeholder {0}: wanted.length
-#: src/features/settings/components/model-library.tsx:172
-#~ msgid "Download {0} selected"
-#~ msgstr "Télécharger {0} sélectionnés"
-
-#. placeholder {0}: wanted.length
-#. placeholder {1}: formatBytes(wantedBytes)
-#: src/features/settings/components/model-library.tsx:171
-#~ msgid "Download {0} selected · {1}"
-#~ msgstr "Télécharger {0} sélectionnés · {1}"
 
 #: src/features/settings/components/model-row.tsx:103
 msgid "Download {label}"
@@ -2006,10 +1983,6 @@ msgstr "Rechercher des transcriptions"
 #: src/features/history/components/history-table.tsx:131
 msgid "Search transcripts…"
 msgstr "Rechercher des transcriptions…"
-
-#: src/features/settings/components/model-library.tsx:159
-#~ msgid "Select all"
-#~ msgstr "Tout sélectionner"
 
 #: src/features/history/components/history-table.tsx:177
 msgid "Select all sessions on this page"
