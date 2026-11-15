@@ -168,8 +168,9 @@ never moves focus. The transcript is in history either way.
 
 **Digits where you wanted words:** turn off **Numbers as digits** in
 Settings → Transcription → Correction (`spoken_numbers = false`), or set it to
-Off for one style in the style editor. A lone `one` to `nine` already stays a
-word.
+Off for one style in the style editor. A lone digit word becomes a digit
+(`eight years` → `8 years`) unless it reads as a word (`one of them`,
+`no one`).
 
 **Words where you expected digits:**
 

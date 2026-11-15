@@ -1239,6 +1239,7 @@ fn spoken_numbers_to_digits(text: &str, lang: &str, keep: &[&str]) -> String {
         "German" => clm_itn::Normalizer::german(),
         _ => return text.to_owned(),
     }
+    .with(clm_itn::Setting::SingleDigits)
     .without(clm_itn::Setting::Noon);
     let mut out = String::with_capacity(text.len());
     let mut at = 0;
@@ -1273,6 +1274,15 @@ mod tests {
         assert_eq!(
             shape("it costs twenty five dollars", "English", &off),
             "It costs twenty five dollars."
+        );
+    }
+
+    #[test]
+    fn shape_writes_a_lone_digit_word_as_a_digit() {
+        let fmt = FormatToggles::default();
+        assert_eq!(
+            shape("we waited eight years", "English", &fmt),
+            "We waited 8 years."
         );
     }
 

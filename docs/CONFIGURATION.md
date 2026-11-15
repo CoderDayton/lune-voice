@@ -435,7 +435,7 @@ A style can override the global setting. Each style's `formatting.brand_casing` 
 
 ### Spoken Numbers
 
-`spoken_numbers` (default `true`) writes spoken numbers as digits with [clm-itn](https://github.com/CoderDayton/clm-itn): `twenty five people` → `25 people`, `five thirty pm` → `5:30 pm`, `five dollars` → `$5`, `fifty percent` → `50%`. A lone `one` to `nine` stays a word (`one of them`, `eight years`), and `twelve noon` keeps its hour (`12 noon`). It covers English, Spanish, Portuguese and German; other languages are left alone.
+`spoken_numbers` (default `true`) writes spoken numbers as digits with [clm-itn](https://github.com/CoderDayton/clm-itn): `twenty five people` → `25 people`, `five thirty pm` → `5:30 pm`, `five dollars` → `$5`, `fifty percent` → `50%`. A lone digit word is written as a digit too (`eight years` → `8 years`), except where it reads as a word (`one of them`, `no one`, `one day`), and `twelve noon` keeps its hour (`12 noon`). It covers English, Spanish, Portuguese and German; other languages are left alone.
 
 Two things stay as spoken on purpose. Your dictionary's replacements are kept as written (`Twenty One Club` stays words). A number interrupted by a filler (`twenty um five`) stays words, because the pause may be a correction.
 
