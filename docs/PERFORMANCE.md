@@ -38,6 +38,7 @@ After-speech wait = poll_final (Silero endpoint trim + whisper.cpp decode) + opt
 - **Recording** happens while you speak.
 - **Model load** happens once at startup, and the loaded model is shared by every session. The exception is `model_idle_unload_minutes` (off by default): it frees the model after a quiet period, so the next hotkey press pays for the reload. On `Medium` that is ~160 ms if the file is still in the OS cache, ~750 ms if not.
 - **Dictionary correction** is an in-memory string pass and costs next to nothing.
+- **Spoken numbers to digits** (clm-itn) is a table lookup. clm-itn's own bench (`cargo bench --bench clm-bench`, one pinned core) puts a short utterance at p99 under 1 µs.
 
 ### Bottleneck Analysis
 

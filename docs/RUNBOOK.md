@@ -164,6 +164,27 @@ never moves focus. The transcript is in history either way.
 
 ---
 
+## Numbers come out wrong
+
+**Digits where you wanted words:** turn off **Numbers as digits** in
+Settings → Transcription → Correction (`spoken_numbers = false`), or set it to
+Off for one style in the style editor. A lone `one` to `nine` already stays a
+word.
+
+**Words where you expected digits:**
+
+- The style's choice wins over the global switch. Check that the style is not
+  set to Off.
+- Only English, Spanish, Portuguese and German are converted. Other dictation
+  languages keep numbers as words.
+- Text a dictionary entry wrote is kept as written, numbers included.
+- In English, a filler inside a number (`twenty um five`) keeps that number as words.
+
+The pass is described in
+[Configuration → Spoken Numbers](CONFIGURATION.md#spoken-numbers).
+
+---
+
 ## Styling makes dictation slow or hangs
 
 Styling is a call to your LLM endpoint, so it is only as fast as that endpoint.

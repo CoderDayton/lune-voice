@@ -11,7 +11,7 @@ Local dictation for Linux and Windows.
 
 </div>
 
-Speech-to-text runs on your machine with Whisper or Parakeet. A dictionary fixes names and jargon, and a formatter handles punctuation, capitals and filler words. You can also have an LLM restyle the text. That's off by default, and it works with a local model too.
+Speech-to-text runs on your machine with Whisper or Parakeet. A dictionary fixes names and jargon, and a formatter handles punctuation, capitals and filler words, and writes spoken numbers as digits. You can also have an LLM restyle the text. That's off by default, and it works with a local model too.
 
 ```
 mic → Whisper / Parakeet → dictionary + formatting → (styling) → paste
