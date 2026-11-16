@@ -7,4 +7,4 @@ export type FormatTogglesDto = { keybinds: boolean, titleAbbreviations: boolean,
 /**
  * Null follows the global `brandCasing` setting.
  */
-brandCasing: boolean | null, spokenNumbers: boolean | null, };
+brandCasing: boolean | null, spokenNumbers: boolean | null, singleDigits: boolean | null, };

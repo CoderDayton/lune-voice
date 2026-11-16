@@ -81,6 +81,7 @@ export function mapWorkspaceSettings(snapshot: WorkspaceSnapshot): WorkspaceSett
       snapshot.settings.checkUpdatesOnLaunch ?? DEFAULT_SETTINGS.checkUpdatesOnLaunch,
     brandCasing: snapshot.settings.brandCasing ?? DEFAULT_SETTINGS.brandCasing,
     spokenNumbers: snapshot.settings.spokenNumbers ?? DEFAULT_SETTINGS.spokenNumbers,
+    singleDigits: snapshot.settings.singleDigits ?? DEFAULT_SETTINGS.singleDigits,
     // No `??` fallback: `null` is the "Don't save history" choice, not a
     // missing value. Coercing it to the default would show the retention
     // select as "30 days" and silently re-enable history on the next save.
@@ -159,6 +160,7 @@ export function settingsToSaveInput(settings: WorkspaceSettings): SaveWorkspaceS
     checkUpdatesOnLaunch: settings.checkUpdatesOnLaunch,
     brandCasing: settings.brandCasing,
     spokenNumbers: settings.spokenNumbers,
+    singleDigits: settings.singleDigits,
     sessionHistoryDays: settings.sessionHistoryDays,
     terminalMode: settings.terminalMode,
     privacyMode: settings.privacyMode,

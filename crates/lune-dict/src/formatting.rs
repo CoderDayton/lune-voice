@@ -1139,7 +1139,7 @@ pub fn shape_keeping(text: &str, lang: &str, fmt: &FormatToggles, keep: &[&str])
         text
     };
     let text = if fmt.resolve_spoken_numbers(true) {
-        spoken_numbers_to_digits(&text, lang, keep)
+        spoken_numbers_to_digits(&text, lang, keep, fmt.resolve_single_digits(false))
     } else {
         text
     };
@@ -1231,7 +1231,7 @@ fn kept_ranges(text: &str, keep: &[&str]) -> Vec<(usize, usize)> {
     merged
 }
 
-fn spoken_numbers_to_digits(text: &str, lang: &str, keep: &[&str]) -> String {
+fn spoken_numbers_to_digits(text: &str, lang: &str, keep: &[&str], single_digits: bool) -> String {
     let normalizer = match lang {
         "English" => clm_itn::Normalizer::english(),
         "Spanish" => clm_itn::Normalizer::spanish(),
@@ -1239,8 +1239,12 @@ fn spoken_numbers_to_digits(text: &str, lang: &str, keep: &[&str]) -> String {
         "German" => clm_itn::Normalizer::german(),
         _ => return text.to_owned(),
     }
-    .with(clm_itn::Setting::SingleDigits)
     .without(clm_itn::Setting::Noon);
+    let normalizer = if single_digits {
+        normalizer.with(clm_itn::Setting::SingleDigits)
+    } else {
+        normalizer
+    };
     let mut out = String::with_capacity(text.len());
     let mut at = 0;
     for (s, e) in kept_ranges(text, keep) {
@@ -1278,12 +1282,22 @@ mod tests {
     }
 
     #[test]
-    fn shape_writes_a_lone_digit_word_as_a_digit() {
-        let fmt = FormatToggles::default();
+    fn shape_writes_a_lone_digit_word_as_a_digit_only_with_single_digits() {
+        let unset = FormatToggles::default();
         assert_eq!(
-            shape("we waited eight years", "English", &fmt),
-            "We waited 8 years."
+            shape("it does two things", "English", &unset),
+            "It does two things."
         );
+        let on = FormatToggles {
+            single_digits: Some(true),
+            ..FormatToggles::default()
+        };
+        assert_eq!(
+            shape("it does two things", "English", &on),
+            "It does 2 things."
+        );
+        assert_eq!(shape("one thing first", "English", &on), "One thing first.");
+        assert_eq!(shape("twenty five people", "English", &unset), "25 people.");
     }
 
     #[test]
@@ -1837,6 +1851,7 @@ mod tests {
             auto_capitalization: false,
             brand_casing: Some(false),
             spoken_numbers: Some(false),
+            single_digits: Some(false),
         };
         assert_eq!(
             normalize_with("set the hotkey to Super H", &off).text,

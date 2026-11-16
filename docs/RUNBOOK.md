@@ -168,14 +168,15 @@ never moves focus. The transcript is in history either way.
 
 **Digits where you wanted words:** turn off **Numbers as digits** in
 Settings → Transcription → Correction (`spoken_numbers = false`), or set it to
-Off for one style in the style editor. A lone digit word becomes a digit
-(`eight years` → `8 years`) unless it reads as a word (`one of them`,
-`no one`).
+Off for one style in the style editor. If only lone digits bother you
+(`does 2 things`), turn off **Single digits too** (`single_digits = false`)
+instead.
 
 **Words where you expected digits:**
 
 - The style's choice wins over the global switch. Check that the style is not
   set to Off.
+- A lone `zero` to `nine` stays a word unless **Single digits too** is on.
 - Only English, Spanish, Portuguese and German are converted. Other dictation
   languages keep numbers as words.
 - Text a dictionary entry wrote is kept as written, numbers included.

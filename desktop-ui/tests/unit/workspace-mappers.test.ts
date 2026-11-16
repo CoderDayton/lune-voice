@@ -217,6 +217,17 @@ describe("workspace mappers", () => {
     );
   });
 
+  test("single digits are off unless the backend says otherwise", () => {
+    const missing = { settings: makeBackendSettings() } as WorkspaceSnapshot;
+    expect(mapWorkspaceSettings(missing).singleDigits).toBe(false);
+
+    const on = {
+      settings: { ...makeBackendSettings(), singleDigits: true },
+    } as WorkspaceSnapshot;
+    expect(mapWorkspaceSettings(on).singleDigits).toBe(true);
+    expect(settingsToSaveInput({ ...DEFAULT_SETTINGS, singleDigits: true }).singleDigits).toBe(true);
+  });
+
   // ── settingsToSaveInput ─────────────────────────────────────────────
 
   test("brand casing is sent back to the backend", () => {

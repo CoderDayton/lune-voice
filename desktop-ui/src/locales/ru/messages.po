@@ -222,6 +222,10 @@ msgstr "Разрешить"
 msgid "Allow remote services"
 msgstr "Разрешить удалённые сервисы"
 
+#: src/features/settings/sections/transcription-section.tsx:160
+msgid "Also write a lone number word as a digit: \"two things\" becomes \"2 things\". Off keeps zero to nine as words. A style can override this."
+msgstr "Записывает цифрой и одиночное число: «two things» становится «2 things». Если выключено, числа от нуля до девяти остаются словами. Стиль может переопределить эту настройку."
+
 #: src/features/settings/data/settings-data.ts:106
 msgid "Always"
 msgstr "Всегда"
@@ -292,7 +296,7 @@ msgstr "Звуковая активность"
 msgid "Audio feedback played as dictation starts, finishes, or errors."
 msgstr "Звуковой отклик при запуске, завершении или ошибке диктовки."
 
-#: src/features/styles/components/style-editor-modal.tsx:81
+#: src/features/styles/components/style-editor-modal.tsx:87
 msgid "Auto-capitalize sentences"
 msgstr "Заглавная буква в начале предложений"
 
@@ -358,11 +362,11 @@ msgstr "Снизу слева"
 msgid "Bottom right"
 msgstr "Снизу справа"
 
-#: src/features/styles/components/style-editor-modal.tsx:190
+#: src/features/styles/components/style-editor-modal.tsx:196
 msgid "Brand casing"
 msgstr "Регистр брендов"
 
-#: src/features/styles/components/style-editor-modal.tsx:183
+#: src/features/styles/components/style-editor-modal.tsx:189
 msgid "Brand casing (\"github\" → \"GitHub\")"
 msgstr "Регистр брендов («github» → «GitHub»)"
 
@@ -392,7 +396,7 @@ msgstr "Встроенный"
 #: src/features/settings/components/model-library.tsx:255
 #: src/features/settings/components/model-row.tsx:90
 #: src/features/snippets/snippets-page.tsx:249
-#: src/features/styles/components/style-editor-modal.tsx:265
+#: src/features/styles/components/style-editor-modal.tsx:287
 msgid "Cancel"
 msgstr "Отмена"
 
@@ -507,14 +511,14 @@ msgstr "Снять выделение"
 msgid "Clear workplace communication"
 msgstr "Ясное рабочее общение"
 
-#: src/features/styles/components/style-editor-modal.tsx:282
+#: src/features/styles/components/style-editor-modal.tsx:304
 msgid "close"
 msgstr "закрыть"
 
 #: src/components/feedback/help-feedback-dialog.tsx:281
 #: src/features/history/components/session-detail-modal.tsx:226
 #: src/features/settings/components/model-library.tsx:265
-#: src/features/styles/components/style-editor-modal.tsx:256
+#: src/features/styles/components/style-editor-modal.tsx:278
 #: src/features/updates/update-dialog.tsx:326
 #: src/features/updates/update-dialog.tsx:338
 msgid "Close"
@@ -594,8 +598,8 @@ msgstr "Углы"
 msgid "Correction"
 msgstr "Исправление"
 
-#: src/features/settings/sections/transcription-section.tsx:160
-#: src/features/settings/sections/transcription-section.tsx:175
+#: src/features/settings/sections/transcription-section.tsx:173
+#: src/features/settings/sections/transcription-section.tsx:188
 msgid "Correction sensitivity"
 msgstr "Чувствительность исправления"
 
@@ -639,7 +643,7 @@ msgstr "Создать фрагмент"
 msgid "Create new style"
 msgstr "Создать новый стиль"
 
-#: src/features/styles/components/style-editor-modal.tsx:102
+#: src/features/styles/components/style-editor-modal.tsx:108
 msgid "Create style"
 msgstr "Создать стиль"
 
@@ -714,15 +718,15 @@ msgstr "Удалить это исправление?"
 msgid "Delete?"
 msgstr "Удалить?"
 
-#: src/features/styles/components/style-editor-modal.tsx:156
+#: src/features/styles/components/style-editor-modal.tsx:162
 msgid "Describe how text should be formatted. E.g., \"Use bullet points. Keep sentences short. Avoid jargon.\""
 msgstr "Опишите, как должен быть отформатирован текст. Например: «Используйте пункты списка. Делайте предложения короткими. Избегайте жаргона»."
 
-#: src/features/styles/components/style-editor-modal.tsx:124
+#: src/features/styles/components/style-editor-modal.tsx:130
 msgid "Description"
 msgstr "Описание"
 
-#: src/features/styles/components/style-editor-modal.tsx:134
+#: src/features/styles/components/style-editor-modal.tsx:140
 msgid "Description is too long."
 msgstr "Описание слишком длинное."
 
@@ -738,7 +742,7 @@ msgstr "Определяет язык, на котором вы говорите
 msgid "Detects the spoken language each session."
 msgstr "Определяет язык речи в каждой сессии."
 
-#: src/features/styles/components/style-editor-modal.tsx:165
+#: src/features/styles/components/style-editor-modal.tsx:171
 msgid "Deterministic fixes applied before any AI styling."
 msgstr "Детерминированные исправления, которые применяются до любой ИИ-стилизации."
 
@@ -847,7 +851,7 @@ msgstr "Загрузка обновления"
 msgid "Downloading…"
 msgstr "Загрузка…"
 
-#: src/features/styles/components/style-editor-modal.tsx:259
+#: src/features/styles/components/style-editor-modal.tsx:281
 msgid "Duplicate"
 msgstr "Дублировать"
 
@@ -855,7 +859,7 @@ msgstr "Дублировать"
 msgid "Duration"
 msgstr "Продолжительность"
 
-#: src/features/styles/components/style-editor-modal.tsx:114
+#: src/features/styles/components/style-editor-modal.tsx:120
 msgid "e.g. Meeting notes"
 msgstr "Например: заметки о встрече"
 
@@ -883,7 +887,7 @@ msgstr "Изменить {0}"
 msgid "Edit snippet"
 msgstr "Изменить фрагмент"
 
-#: src/features/styles/components/style-editor-modal.tsx:102
+#: src/features/styles/components/style-editor-modal.tsx:108
 msgid "Edit style"
 msgstr "Изменить стиль"
 
@@ -915,11 +919,11 @@ msgstr "Перейти в Lune Voice"
 msgid "Evens out the microphone level before transcription. Helps quiet mics and noisy rooms."
 msgstr "Выравнивает уровень микрофона перед расшифровкой. Помогает с тихими микрофонами и шумными комнатами."
 
-#: src/features/styles/components/style-editor-modal.tsx:243
+#: src/features/styles/components/style-editor-modal.tsx:265
 msgid "Examples are out of date since you edited the prompt."
 msgstr "Примеры устарели после того, как вы изменили промпт."
 
-#: src/features/styles/components/style-editor-modal.tsx:220
+#: src/features/styles/components/style-editor-modal.tsx:242
 msgid "Examples teach the styling engine your style. Regenerate them after editing the prompt."
 msgstr "Примеры обучают движок стилизации вашему стилю. Сгенерируйте их заново после изменения промпта."
 
@@ -959,7 +963,7 @@ msgstr "Загружаем поддержку GPU. Это последний ш�
 msgid "Fetching Lune Voice {version}. Keep the app open until it finishes."
 msgstr "Загружается Lune Voice {version}. Не закрывайте приложение до завершения."
 
-#: src/features/styles/components/style-editor-modal.tsx:217
+#: src/features/styles/components/style-editor-modal.tsx:239
 msgid "Few-shot examples"
 msgstr "Обучающие примеры"
 
@@ -983,8 +987,9 @@ msgstr "Фильтр фрагментов…"
 msgid "Fix recognizer errors with your dictionary and known vocabulary, on your device. It uses per-word confidence and statistical patterns — no AI model, and it never rewrites what you said."
 msgstr "Исправляет ошибки распознавания с помощью вашего словаря и известной лексики — прямо на устройстве. Использует пословную уверенность и статистические закономерности — без модели ИИ, и никогда не переписывает сказанное вами."
 
-#: src/features/styles/components/style-editor-modal.tsx:192
-#: src/features/styles/components/style-editor-modal.tsx:208
+#: src/features/styles/components/style-editor-modal.tsx:198
+#: src/features/styles/components/style-editor-modal.tsx:214
+#: src/features/styles/components/style-editor-modal.tsx:230
 msgid "Follow Settings"
 msgstr "Как в настройках"
 
@@ -1004,7 +1009,7 @@ msgstr "Забыть, куда вы перетащили индикатор, и 
 msgid "Formal"
 msgstr "Официальный"
 
-#: src/features/styles/components/style-editor-modal.tsx:163
+#: src/features/styles/components/style-editor-modal.tsx:169
 #: src/features/styles/components/style-hero.tsx:62
 msgid "Formatting"
 msgstr "Форматирование"
@@ -1039,8 +1044,8 @@ msgstr "Общие"
 msgid "General feedback"
 msgstr "Общий отзыв"
 
-#: src/features/styles/components/style-editor-modal.tsx:238
-#: src/features/styles/components/style-editor-modal.tsx:274
+#: src/features/styles/components/style-editor-modal.tsx:260
+#: src/features/styles/components/style-editor-modal.tsx:296
 msgid "Generating examples…"
 msgstr "Создание примеров…"
 
@@ -1218,7 +1223,7 @@ msgstr "При установке приложение заменяется и �
 msgid "Installing update"
 msgstr "Установка обновления"
 
-#: src/features/styles/components/style-editor-modal.tsx:139
+#: src/features/styles/components/style-editor-modal.tsx:145
 msgid "Instructions"
 msgstr "Инструкции"
 
@@ -1259,7 +1264,7 @@ msgstr "Доступ к клавиатуре"
 msgid "Keyboard shortcuts"
 msgstr "Сочетания клавиш"
 
-#: src/features/styles/components/style-editor-modal.tsx:79
+#: src/features/styles/components/style-editor-modal.tsx:85
 msgid "Keyboard shortcuts (\"Super H\" → \"Super+H\")"
 msgstr "Сочетания клавиш («Super H» → «Super+H»)"
 
@@ -1447,11 +1452,11 @@ msgstr "Ещё"
 msgid "Multilingual · runs on-device"
 msgstr "Многоязычная · работает на устройстве"
 
-#: src/features/styles/components/style-editor-modal.tsx:109
+#: src/features/styles/components/style-editor-modal.tsx:115
 msgid "Name"
 msgstr "Название"
 
-#: src/features/styles/components/style-editor-modal.tsx:120
+#: src/features/styles/components/style-editor-modal.tsx:126
 msgid "Name is too long."
 msgstr "Название слишком длинное."
 
@@ -1567,11 +1572,11 @@ msgstr "Числа"
 
 #: src/features/settings/sections/transcription-section.tsx:146
 #: src/features/settings/sections/transcription-section.tsx:154
-#: src/features/styles/components/style-editor-modal.tsx:206
+#: src/features/styles/components/style-editor-modal.tsx:212
 msgid "Numbers as digits"
 msgstr "Числа цифрами"
 
-#: src/features/styles/components/style-editor-modal.tsx:199
+#: src/features/styles/components/style-editor-modal.tsx:205
 msgid "Numbers as digits (\"thirty four\" → \"34\")"
 msgstr "Числа цифрами («thirty four» → «34»)"
 
@@ -1581,8 +1586,9 @@ msgstr "NVIDIA Parakeet на устройстве. На процессоре н�
 
 #: src/features/settings/data/settings-data.ts:169
 #: src/features/settings/data/settings-data.ts:556
-#: src/features/styles/components/style-editor-modal.tsx:194
-#: src/features/styles/components/style-editor-modal.tsx:210
+#: src/features/styles/components/style-editor-modal.tsx:200
+#: src/features/styles/components/style-editor-modal.tsx:216
+#: src/features/styles/components/style-editor-modal.tsx:232
 msgid "Off"
 msgstr "Выключено"
 
@@ -1599,12 +1605,13 @@ msgstr "Официальная переписка и документы"
 msgid "Offline"
 msgstr "Офлайн"
 
-#: src/features/styles/components/style-editor-modal.tsx:193
-#: src/features/styles/components/style-editor-modal.tsx:209
+#: src/features/styles/components/style-editor-modal.tsx:199
+#: src/features/styles/components/style-editor-modal.tsx:215
+#: src/features/styles/components/style-editor-modal.tsx:231
 msgid "On"
 msgstr "Включено"
 
-#: src/features/styles/components/style-editor-modal.tsx:128
+#: src/features/styles/components/style-editor-modal.tsx:134
 msgid "One-line summary shown on the card"
 msgstr "Краткое описание в одну строку для карточки"
 
@@ -1837,7 +1844,7 @@ msgstr "Недавние сессии"
 msgid "Recording mode"
 msgstr "Режим записи"
 
-#: src/features/styles/components/style-editor-modal.tsx:238
+#: src/features/styles/components/style-editor-modal.tsx:260
 msgid "Refresh few-shot examples"
 msgstr "Обновить обучающие примеры"
 
@@ -1939,7 +1946,7 @@ msgid "Runs whisper.cpp on-device. Choose a model size below."
 msgstr "Запускает whisper.cpp на устройстве. Выберите размер модели ниже."
 
 #: src/features/dictionary/components/dictionary-table.tsx:122
-#: src/features/styles/components/style-editor-modal.tsx:274
+#: src/features/styles/components/style-editor-modal.tsx:296
 msgid "Save"
 msgstr "Сохранить"
 
@@ -2083,6 +2090,16 @@ msgstr "Показаны {start}–{end} из {visibleCount} сессий"
 #: src/features/settings/data/settings-data.ts:443
 msgid "Simulates keystrokes one character at a time. Works where paste is blocked."
 msgstr "Имитирует нажатия клавиш посимвольно. Работает там, где вставка запрещена."
+
+#: src/features/settings/sections/transcription-section.tsx:159
+#: src/features/settings/sections/transcription-section.tsx:167
+#: src/features/styles/components/style-editor-modal.tsx:228
+msgid "Single digits too"
+msgstr "Одиночные цифры тоже"
+
+#: src/features/styles/components/style-editor-modal.tsx:221
+msgid "Single digits too (\"two things\" → \"2 things\")"
+msgstr "Одиночные цифры тоже («two things» → «2 things»)"
 
 #: src/features/settings/components/hotkey-utils.ts:166
 msgid "Single letter keys require at least one modifier (Ctrl, Shift, Alt, or Meta)."
@@ -2300,7 +2317,7 @@ msgstr "Микрофон занят"
 msgid "The model stays in memory. Every dictation starts instantly."
 msgstr "Модель остаётся в памяти. Каждая диктовка начинается мгновенно."
 
-#: src/features/settings/sections/transcription-section.tsx:161
+#: src/features/settings/sections/transcription-section.tsx:174
 msgid "The words the recognizer is least sure about are checked against your dictionary and vocabulary. Higher checks more words; lower trusts the raw transcription."
 msgstr "Слова, в которых распознаватель менее всего уверен, сверяются с вашим словарём и лексикой. Выше — проверяется больше слов; ниже — больше доверия исходной расшифровке."
 
@@ -2334,7 +2351,7 @@ msgstr "Эта сессия диктовки и её расшифровка бу
 msgid "Time"
 msgstr "Время"
 
-#: src/features/styles/components/style-editor-modal.tsx:80
+#: src/features/styles/components/style-editor-modal.tsx:86
 msgid "Title abbreviations (\"Mister\" → \"Mr.\")"
 msgstr "Сокращение обращений («Mister» → «Mr.»)"
 
@@ -2522,7 +2539,7 @@ msgstr "Посмотреть все"
 msgid "View source"
 msgstr "Посмотреть исходный код"
 
-#: src/features/styles/components/style-editor-modal.tsx:102
+#: src/features/styles/components/style-editor-modal.tsx:108
 msgid "View style"
 msgstr "Посмотреть стиль"
 

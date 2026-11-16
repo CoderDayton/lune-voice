@@ -895,6 +895,7 @@ fn settings_to_dto(settings: &UserSettings) -> WorkspaceSettingsDto {
             check_updates_on_launch: settings.check_updates_on_launch,
             brand_casing: settings.brand_casing,
             spoken_numbers: settings.spoken_numbers,
+            single_digits: settings.single_digits,
             session_history_days: settings.session_history_days,
             terminal_mode: terminal_mode_to_dto(settings.terminal_mode),
             privacy_mode: privacy_mode_to_dto(settings.privacy_mode),
@@ -1045,6 +1046,7 @@ fn apply_settings_dto(
     settings.check_updates_on_launch = input.check_updates_on_launch;
     settings.brand_casing = input.brand_casing;
     settings.spoken_numbers = input.spoken_numbers;
+    settings.single_digits = input.single_digits;
     settings.terminal_mode = terminal_mode_from_dto(input.terminal_mode);
     settings.privacy_mode = privacy_mode_from_dto(input.privacy_mode);
     validate_history_days(input.session_history_days)?;
@@ -1790,6 +1792,19 @@ mod tests {
         apply_settings_dto(&mut settings, input, &mut db).unwrap();
         assert!(!settings.spoken_numbers);
         assert!(!settings_to_dto(&settings).core.spoken_numbers);
+    }
+
+    #[test]
+    fn single_digits_round_trips_through_the_settings_dto() {
+        let mut settings = UserSettings::default();
+        let mut db = Database::open_in_memory().expect("db");
+        assert!(!settings_to_dto(&settings).core.single_digits);
+
+        let mut input = default_save_input();
+        input.core.single_digits = true;
+        apply_settings_dto(&mut settings, input, &mut db).unwrap();
+        assert!(settings.single_digits);
+        assert!(settings_to_dto(&settings).core.single_digits);
     }
 
     #[test]

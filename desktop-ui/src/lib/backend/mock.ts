@@ -57,6 +57,7 @@ function createMockSnapshot(): WorkspaceSnapshot {
       checkUpdatesOnLaunch: false,
       brandCasing: true,
       spokenNumbers: true,
+      singleDigits: false,
       sessionHistoryDays: 30,
       terminalMode: 'Auto',
       privacyMode: 'LocalOnly',
@@ -128,6 +129,7 @@ function createMockSnapshot(): WorkspaceSnapshot {
       autoCapitalization: true,
       brandCasing: null,
       spokenNumbers: null,
+      singleDigits: null,
     },
     stats: {
       sessions: 0,
@@ -151,6 +153,7 @@ function createMockSnapshot(): WorkspaceSnapshot {
           autoCapitalization: true,
           brandCasing: null,
           spokenNumbers: null,
+          singleDigits: null,
         },
       },
       {
@@ -166,6 +169,7 @@ function createMockSnapshot(): WorkspaceSnapshot {
           autoCapitalization: true,
           brandCasing: null,
           spokenNumbers: null,
+          singleDigits: null,
         },
       },
       {
@@ -181,6 +185,7 @@ function createMockSnapshot(): WorkspaceSnapshot {
           autoCapitalization: true,
           brandCasing: null,
           spokenNumbers: null,
+          singleDigits: null,
         },
       },
       {
@@ -196,6 +201,7 @@ function createMockSnapshot(): WorkspaceSnapshot {
           autoCapitalization: true,
           brandCasing: null,
           spokenNumbers: null,
+          singleDigits: null,
         },
       },
       {
@@ -211,6 +217,7 @@ function createMockSnapshot(): WorkspaceSnapshot {
           autoCapitalization: true,
           brandCasing: null,
           spokenNumbers: null,
+          singleDigits: null,
         },
       },
     ],

@@ -796,7 +796,7 @@ async fn process_and_deliver(
         let replacements = dict.scan(&text_after_commands);
         (entries, replacements)
     };
-    // A style's own brand-casing choice wins; otherwise the global setting.
+    // A style's own brand-casing and number choices win; otherwise the global settings.
     let mut fmt = style_preset
         .as_ref()
         .map(|p| p.formatting)
@@ -805,6 +805,7 @@ async fn process_and_deliver(
         let s = settings.read().await;
         fmt.brand_casing = Some(fmt.resolve_brand_casing(s.brand_casing));
         fmt.spoken_numbers = Some(fmt.resolve_spoken_numbers(s.spoken_numbers));
+        fmt.single_digits = Some(fmt.resolve_single_digits(s.single_digits));
     }
     let wants_styling = style_preset.is_some();
     // Deterministic correction + formatting + bypass-gate, as one span so a

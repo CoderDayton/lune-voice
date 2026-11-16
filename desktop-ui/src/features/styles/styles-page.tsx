@@ -333,6 +333,9 @@ export function StylesPage() {
         onSpokenNumbersChange={(value) =>
           setModal((m) => ({ ...m, formatting: { ...m.formatting, spokenNumbers: value } }))
         }
+        onSingleDigitsChange={(value) =>
+          setModal((m) => ({ ...m, formatting: { ...m.formatting, singleDigits: value } }))
+        }
         onFormattingChange={(key, value) =>
           setModal((m) => ({ ...m, formatting: { ...m.formatting, [key]: value } }))
         }

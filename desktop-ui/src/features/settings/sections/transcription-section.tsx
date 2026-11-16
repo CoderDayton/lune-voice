@@ -155,6 +155,19 @@ export function TranscriptionSection({
             />
           }
         />
+        <SettingsRow
+          label={t`Single digits too`}
+          description={t`Also write a lone number word as a digit: "two things" becomes "2 things". Off keeps zero to nine as words. A style can override this.`}
+          control={
+            <input
+              type="checkbox"
+              className="toggle toggle-primary"
+              checked={settings.singleDigits}
+              onChange={() => void saveWorkspaceSetting('singleDigits', !settings.singleDigits)}
+              aria-label={t`Single digits too`}
+            />
+          }
+        />
         {hasWordConfidence && (
           <SettingsRow
             label={t`Correction sensitivity`}

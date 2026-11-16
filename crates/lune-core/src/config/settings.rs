@@ -268,6 +268,8 @@ pub struct UserSettings {
     pub brand_casing: bool,
     #[serde(default = "default_true")]
     pub spoken_numbers: bool,
+    #[serde(default)]
+    pub single_digits: bool,
 }
 
 fn default_true() -> bool {
@@ -377,6 +379,7 @@ impl Default for UserSettings {
             check_updates_on_launch: false,
             brand_casing: true,
             spoken_numbers: true,
+            single_digits: false,
         }
     }
 }
@@ -1007,6 +1010,9 @@ model = "LargeV4"
         assert!(settings.spoken_numbers);
         let off: UserSettings = toml::from_str("spoken_numbers = false\n").unwrap();
         assert!(!off.spoken_numbers);
+        assert!(!settings.single_digits);
+        let on: UserSettings = toml::from_str("single_digits = true\n").unwrap();
+        assert!(on.single_digits);
     }
 
     #[test]

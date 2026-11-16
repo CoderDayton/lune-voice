@@ -46,7 +46,7 @@ When each setting takes effect:
 | Tier | When Applied | Fields |
 |------|-------------|--------|
 | **Hot** | On save | `hotkey`, `activation_mode`, `model_idle_unload_minutes`, `input_device`, `sound_cues_enabled`, `sound_cue_volume`, every `pill_*` field |
-| **Warm** | Next session start, when the pipeline rebuilds | `asr_backend`, `llm_backend`, `device`, `privacy_mode`, `default_style`, `language`, `dictation_language`, `agc_mode`, `brand_casing`, `spoken_numbers`, `dictation_mode`, `copy_to_clipboard`, `session_history_days` (it decides whether a dictation is recorded at all) |
+| **Warm** | Next session start, when the pipeline rebuilds | `asr_backend`, `llm_backend`, `device`, `privacy_mode`, `default_style`, `language`, `dictation_language`, `agc_mode`, `brand_casing`, `spoken_numbers`, `single_digits`, `dictation_mode`, `copy_to_clipboard`, `session_history_days` (it decides whether a dictation is recorded at all) |
 | **Cold** | Next app start | `terminal_mode`, `start_minimized`, `check_updates_on_launch` |
 
 Every change is written to disk right away. After saving, the app reloads the settings from disk, so what you see is what was stored.
@@ -97,6 +97,7 @@ start_minimized = false
 check_updates_on_launch = false
 brand_casing = true
 spoken_numbers = true
+single_digits = false
 
 [asr_backend]
 type = "WhisperCpp"
@@ -435,11 +436,13 @@ A style can override the global setting. Each style's `formatting.brand_casing` 
 
 ### Spoken Numbers
 
-`spoken_numbers` (default `true`) writes spoken numbers as digits with [clm-itn](https://github.com/CoderDayton/clm-itn): `twenty five people` → `25 people`, `five thirty pm` → `5:30 pm`, `five dollars` → `$5`, `fifty percent` → `50%`. A lone digit word is written as a digit too (`eight years` → `8 years`), except where it reads as a word (`one of them`, `no one`, `one day`), and `twelve noon` keeps its hour (`12 noon`). It covers English, Spanish, Portuguese and German; other languages are left alone.
+`spoken_numbers` (default `true`) writes spoken numbers as digits with [clm-itn](https://github.com/CoderDayton/clm-itn): `twenty five people` → `25 people`, `five thirty pm` → `5:30 pm`, `five dollars` → `$5`, `fifty percent` → `50%`. A lone `zero` to `nine` stays a word (`it does two things`), and `twelve noon` keeps its hour (`12 noon`). It covers English, Spanish, Portuguese and German; other languages are left alone.
 
 Two things stay as spoken on purpose. Your dictionary's replacements are kept as written (`Twenty One Club` stays words). A number interrupted by a filler (`twenty um five`) stays words, because the pause may be a correction.
 
-A style can override the global setting. Each style's `formatting.spoken_numbers` is `true`, `false`, or unset, and unset follows `spoken_numbers`. Built-in presets leave it unset. In the app, the global switch is **Numbers as digits** in Settings → Transcription → Correction, and the per-style choice is in the style editor. Where it runs: [Dictionary Application](ARCHITECTURE.md#3-dictionary-application).
+A style can override the global setting. Each style's `formatting.spoken_numbers` is `true`, `false`, or unset, and unset follows `spoken_numbers`. Built-in presets leave it unset. In the app, the global switch is **Numbers as digits** in Settings → Transcription → Correction, and the per-style choice is in the style editor.
+
+`single_digits` (default `false`) writes a lone digit word as a digit too: `it does two things` → `it does 2 things`. A word that reads as a word stays one even then (`one of them`, `no one`, `one day`). It does nothing while numbers are off. A style overrides it the same way, through `formatting.single_digits`; in the app it is **Single digits too**, under **Numbers as digits**. Where it runs: [Dictionary Application](ARCHITECTURE.md#3-dictionary-application).
 
 ### Prompt Structure
 

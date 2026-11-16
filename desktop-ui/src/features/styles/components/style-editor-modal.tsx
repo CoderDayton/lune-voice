@@ -2,10 +2,12 @@
 
 import type { MessageDescriptor } from '@lingui/core';
 import { useLingui } from '@lingui/react/macro';
+import { useStore } from '@tanstack/react-store';
 import { Copy, RefreshCw } from 'lucide-react';
 import type { RefObject } from 'react';
 import { byteLength, LIMITS } from '../../../lib/backend/generated/limits';
 import type { FormatTogglesDto } from '../../../lib/backend/types';
+import { workspaceStore } from '../../../store/workspace-store';
 
 /** Fraction of the instructions budget at which the counter turns amber. */
 const INSTRUCTIONS_WARN_FRACTION = 0.93;
@@ -44,6 +46,7 @@ interface StyleEditorModalProps {
   onFormattingChange: (key: ToggleKey, value: boolean) => void;
   onBrandCasingChange: (value: boolean | null) => void;
   onSpokenNumbersChange: (value: boolean | null) => void;
+  onSingleDigitsChange: (value: boolean | null) => void;
   onClose: () => void;
   onSave: () => void;
   onRefreshExamples: () => void;
@@ -69,12 +72,15 @@ export function StyleEditorModal({
   onFormattingChange,
   onBrandCasingChange,
   onSpokenNumbersChange,
+  onSingleDigitsChange,
   onClose,
   onSave,
   onRefreshExamples,
   onDuplicate,
 }: StyleEditorModalProps) {
   const { t, i18n } = useLingui();
+  const globalSpokenNumbers = useStore(workspaceStore, (s) => s.settings.spokenNumbers);
+  const numbersOn = formatting.spokenNumbers ?? globalSpokenNumbers;
   const formatToggleRows: { key: ToggleKey; label: string }[] = [
     { key: 'keybinds', label: t`Keyboard shortcuts ("Super H" → "Super+H")` },
     { key: 'titleAbbreviations', label: t`Title abbreviations ("Mister" → "Mr.")` },
@@ -204,6 +210,22 @@ export function StyleEditorModal({
                   disabled={isViewOnly}
                   onChange={(e) => onSpokenNumbersChange(fromInheritChoice(e.target.value))}
                   aria-label={t`Numbers as digits`}
+                >
+                  <option value="inherit">{t`Follow Settings`}</option>
+                  <option value="on">{t`On`}</option>
+                  <option value="off">{t`Off`}</option>
+                </select>
+              </label>
+              <label className="flex items-center justify-between gap-3 px-3 py-2">
+                <span className="text-sm text-content-default">
+                  {t`Single digits too ("two things" → "2 things")`}
+                </span>
+                <select
+                  className="select select-sm w-auto"
+                  value={inheritChoice(formatting.singleDigits)}
+                  disabled={isViewOnly || !numbersOn}
+                  onChange={(e) => onSingleDigitsChange(fromInheritChoice(e.target.value))}
+                  aria-label={t`Single digits too`}
                 >
                   <option value="inherit">{t`Follow Settings`}</option>
                   <option value="on">{t`On`}</option>

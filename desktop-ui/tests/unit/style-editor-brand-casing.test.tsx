@@ -8,6 +8,7 @@ import { cleanup, fireEvent, render } from '@testing-library/react';
 import { createRef } from 'react';
 import { StyleEditorModal } from '../../src/features/styles/components/style-editor-modal';
 import type { FormatTogglesDto } from '../../src/lib/backend/types';
+import { workspaceStore } from '../../src/store/workspace-store';
 
 i18n.load('en', {});
 i18n.activate('en');
@@ -32,13 +33,16 @@ function renderModal(
   onBrandCasingChange: (value: boolean | null) => void = () => {},
   mode: 'edit' | 'view' = 'edit',
   onSpokenNumbersChange: (value: boolean | null) => void = () => {},
+  onSingleDigitsChange: (value: boolean | null) => void = () => {},
+  spokenNumbers: boolean | null = null,
 ) {
   const formatting: FormatTogglesDto = {
     keybinds: true,
     titleAbbreviations: true,
     autoCapitalization: true,
     brandCasing,
-    spokenNumbers: null,
+    spokenNumbers,
+    singleDigits: null,
   };
   const view = render(
     <I18nProvider i18n={i18n}>
@@ -61,6 +65,7 @@ function renderModal(
         onFormattingChange={() => {}}
         onBrandCasingChange={onBrandCasingChange}
         onSpokenNumbersChange={onSpokenNumbersChange}
+        onSingleDigitsChange={onSingleDigitsChange}
         onClose={() => {}}
         onSave={() => {}}
         onRefreshExamples={() => {}}
@@ -84,6 +89,42 @@ describe('StyleEditorModal spoken numbers', () => {
     fireEvent.change(select, { target: { value: 'inherit' } });
 
     expect(seen).toEqual([false, null]);
+  });
+});
+
+describe('StyleEditorModal single digits', () => {
+  const singleDigitsSelect = () =>
+    document.querySelector('select[aria-label="Single digits too"]') as HTMLSelectElement;
+
+  test('follows Settings by default and reports the chosen value', () => {
+    const seen: (boolean | null)[] = [];
+    renderModal(null, () => {}, 'edit', () => {}, (value) => seen.push(value));
+    expect(singleDigitsSelect().value).toBe('inherit');
+
+    fireEvent.change(singleDigitsSelect(), { target: { value: 'on' } });
+    fireEvent.change(singleDigitsSelect(), { target: { value: 'inherit' } });
+
+    expect(seen).toEqual([true, null]);
+  });
+
+  test('is disabled while the style turns numbers off', () => {
+    renderModal(null, () => {}, 'edit', () => {}, () => {}, false);
+    expect(singleDigitsSelect().disabled).toBe(true);
+  });
+
+  test('is disabled while the style follows Settings and numbers are off there', () => {
+    const setNumbers = (spokenNumbers: boolean) =>
+      workspaceStore.setState((s) => ({ ...s, settings: { ...s.settings, spokenNumbers } }));
+    setNumbers(false);
+    try {
+      renderModal(null);
+      expect(singleDigitsSelect().disabled).toBe(true);
+      cleanup();
+      renderModal(null, () => {}, 'edit', () => {}, () => {}, true);
+      expect(singleDigitsSelect().disabled).toBe(false);
+    } finally {
+      setNumbers(true);
+    }
   });
 });
 

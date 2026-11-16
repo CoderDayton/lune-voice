@@ -276,6 +276,8 @@ pub struct FormatTogglesDto {
     pub brand_casing: Option<bool>,
     #[serde(default)]
     pub spoken_numbers: Option<bool>,
+    #[serde(default)]
+    pub single_digits: Option<bool>,
 }
 
 impl Default for FormatTogglesDto {
@@ -292,6 +294,7 @@ impl From<lune_core::config::FormatToggles> for FormatTogglesDto {
             auto_capitalization: f.auto_capitalization,
             brand_casing: f.brand_casing,
             spoken_numbers: f.spoken_numbers,
+            single_digits: f.single_digits,
         }
     }
 }
@@ -304,6 +307,7 @@ impl From<FormatTogglesDto> for lune_core::config::FormatToggles {
             auto_capitalization: d.auto_capitalization,
             brand_casing: d.brand_casing,
             spoken_numbers: d.spoken_numbers,
+            single_digits: d.single_digits,
         }
     }
 }
@@ -435,6 +439,8 @@ pub struct SettingsCoreDto {
     pub brand_casing: bool,
     #[serde(default = "default_true_dto")]
     pub spoken_numbers: bool,
+    #[serde(default)]
+    pub single_digits: bool,
     /// How long to keep dictation history, in days. `None` disables history.
     pub session_history_days: Option<u32>,
     /// Paste-shortcut selection strategy for the output stage.

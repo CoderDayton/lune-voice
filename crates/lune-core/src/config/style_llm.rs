@@ -53,8 +53,8 @@ Output: Hey, just checking in on the deploy. Did the migration finish? If not, w
 
 /// Per-style toggles for the deterministic formatting transforms that run in
 /// the correction path, before and independently of the LLM styling pass. All
-/// default on; a style can switch any of them off. `brand_casing` is the
-/// exception: unset, it follows the global `UserSettings::brand_casing`.
+/// default on; a style can switch any of them off. The `Option` fields are the
+/// exceptions: unset, each follows the `UserSettings` field of the same name.
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(default)]
 pub struct FormatToggles {
@@ -68,6 +68,7 @@ pub struct FormatToggles {
     /// `None` follows the global setting; `Some` overrides it for this style.
     pub brand_casing: Option<bool>,
     pub spoken_numbers: Option<bool>,
+    pub single_digits: Option<bool>,
 }
 
 impl FormatToggles {
@@ -79,6 +80,10 @@ impl FormatToggles {
     pub fn resolve_spoken_numbers(&self, global: bool) -> bool {
         self.spoken_numbers.unwrap_or(global)
     }
+
+    pub fn resolve_single_digits(&self, global: bool) -> bool {
+        self.single_digits.unwrap_or(global)
+    }
 }
 
 impl Default for FormatToggles {
@@ -89,6 +94,7 @@ impl Default for FormatToggles {
             auto_capitalization: true,
             brand_casing: None,
             spoken_numbers: None,
+            single_digits: None,
         }
     }
 }
@@ -359,6 +365,19 @@ mod tests {
         assert!(!off.resolve_spoken_numbers(true));
         for preset in StylePreset::all_builtin() {
             assert_eq!(preset.formatting.spoken_numbers, None, "{}", preset.id);
+        }
+    }
+
+    #[test]
+    fn single_digits_follow_the_global_setting_unless_the_style_sets_it() {
+        let unset: FormatToggles = serde_json::from_str(r#"{"keybinds":true}"#).unwrap();
+        assert_eq!(unset.single_digits, None);
+        assert!(!unset.resolve_single_digits(false));
+        assert!(unset.resolve_single_digits(true));
+        let on: FormatToggles = serde_json::from_str(r#"{"single_digits":true}"#).unwrap();
+        assert!(on.resolve_single_digits(false));
+        for preset in StylePreset::all_builtin() {
+            assert_eq!(preset.formatting.single_digits, None, "{}", preset.id);
         }
     }
 }

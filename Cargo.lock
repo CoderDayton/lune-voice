@@ -779,7 +779,7 @@ dependencies = [
 [[package]]
 name = "clm-itn"
 version = "0.1.0"
-source = "git+https://github.com/CoderDayton/clm-itn?rev=e226c9503e48327d7184a54ade5eb9fd6eec946b#e226c9503e48327d7184a54ade5eb9fd6eec946b"
+source = "git+https://github.com/CoderDayton/clm-itn?rev=88c74bb7c3bd1d58b1dde871a5268f6cc5af7129#88c74bb7c3bd1d58b1dde871a5268f6cc5af7129"
 
 [[package]]
 name = "cmake"
