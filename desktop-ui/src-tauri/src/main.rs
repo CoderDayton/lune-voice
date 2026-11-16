@@ -70,7 +70,25 @@ fn install_panic_hook() {
     }));
 }
 
+fn version_requested(args: impl Iterator<Item = std::ffi::OsString>) -> bool {
+    args.skip(1).any(|a| a == "--version" || a == "-V")
+}
+
+#[cfg(windows)]
+fn attach_parent_console() {
+    use windows_sys::Win32::System::Console::{ATTACH_PARENT_PROCESS, AttachConsole};
+    // SAFETY: takes no pointers; failing (no parent console) only leaves stdout detached.
+    unsafe { AttachConsole(ATTACH_PARENT_PROCESS) };
+}
+
 fn main() {
+    if version_requested(std::env::args_os()) {
+        #[cfg(windows)]
+        attach_parent_console();
+        println!("lune-voice {}", env!("CARGO_PKG_VERSION"));
+        return;
+    }
+
     // No WebKitGTK rendering overrides. `WEBKIT_DISABLE_DMABUF_RENDERER` +
     // `__NV_DISABLE_EXPLICIT_SYNC` used to be set here to coax an alpha channel
     // out of the pill overlay's webview on the Nvidia driver; they cost the
@@ -107,4 +125,25 @@ fn main() {
 
     install_panic_hook();
     lune_ui::run();
+}
+
+#[cfg(test)]
+mod tests {
+    use super::version_requested;
+
+    fn args(list: &[&str]) -> impl Iterator<Item = std::ffi::OsString> {
+        list.iter()
+            .map(std::ffi::OsString::from)
+            .collect::<Vec<_>>()
+            .into_iter()
+    }
+
+    #[test]
+    fn version_flag_is_recognized_after_the_program_name() {
+        assert!(version_requested(args(&["lune-voice", "--version"])));
+        assert!(version_requested(args(&["lune-voice", "-V"])));
+        assert!(!version_requested(args(&["lune-voice"])));
+        assert!(!version_requested(args(&["lune-voice", "--verbose"])));
+        assert!(!version_requested(args(&["--version"])));
+    }
 }
