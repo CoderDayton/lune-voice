@@ -51,7 +51,7 @@ case "$(uname -s)" in
     *) windows=0 markers=(lib/libggml-base.so lib64/libggml-base.so) ;;
 esac
 out="" marker=""
-for d in "$TARGET_DIR"/release/build/whisper-rs-sys-*/out; do
+for d in "$TARGET_DIR"/release/build/whisper-rs-sys{-*,/*}/out; do
     for m in "${markers[@]}"; do
         [[ -e "$d/$m" ]] || continue
         if [[ -z "$out" || "$d/$m" -nt "$out/$marker" ]]; then out="$d" marker="$m"; fi
@@ -59,7 +59,7 @@ for d in "$TARGET_DIR"/release/build/whisper-rs-sys-*/out; do
 done
 if [[ -z "$out" ]]; then
     echo "ERROR: no shared whisper-rs-sys build under $TARGET_DIR/release/build" >&2
-    for d in "$TARGET_DIR"/release/build/whisper-rs-sys-*/out; do
+    for d in "$TARGET_DIR"/release/build/whisper-rs-sys{-*,/*}/out; do
         echo "--- $d" >&2
         find "$d" -maxdepth 4 -name '*ggml-base*' -not -path '*/llama.cpp/*' -not -path '*/whisper.cpp/*' >&2 || true
     done
