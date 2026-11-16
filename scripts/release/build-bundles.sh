@@ -47,18 +47,25 @@ echo "==> Pass 1: compile ($FEATURES, RUSTFLAGS=\"$RUSTFLAGS\")"
 # The newest whisper-rs-sys build output that holds shared libraries. Cargo can
 # keep several; an older one may be a static build.
 case "$(uname -s)" in
-    MINGW* | MSYS* | CYGWIN*) windows=1 marker="bin/ggml-base.dll" ;;
-    *) windows=0 marker="lib/libggml-base.so" ;;
+    MINGW* | MSYS* | CYGWIN*) windows=1 markers=(bin/ggml-base.dll) ;;
+    *) windows=0 markers=(lib/libggml-base.so lib64/libggml-base.so) ;;
 esac
-out=""
+out="" marker=""
 for d in "$TARGET_DIR"/release/build/whisper-rs-sys-*/out; do
-    [[ -e "$d/$marker" ]] || continue
-    if [[ -z "$out" || "$d/$marker" -nt "$out/$marker" ]]; then out="$d"; fi
+    for m in "${markers[@]}"; do
+        [[ -e "$d/$m" ]] || continue
+        if [[ -z "$out" || "$d/$m" -nt "$out/$marker" ]]; then out="$d" marker="$m"; fi
+    done
 done
 if [[ -z "$out" ]]; then
     echo "ERROR: no shared whisper-rs-sys build under $TARGET_DIR/release/build" >&2
+    for d in "$TARGET_DIR"/release/build/whisper-rs-sys-*/out; do
+        echo "--- $d" >&2
+        find "$d" -maxdepth 4 -name '*ggml-base*' -not -path '*/llama.cpp/*' -not -path '*/whisper.cpp/*' >&2 || true
+    done
     exit 1
 fi
+libdir="${marker%%/*}"
 
 echo "==> Staging ggml runtime from $out"
 rm -rf "$RUNTIME"
@@ -75,11 +82,11 @@ else
     # other names are symlinks, which bundles do not keep.
     for lib in libwhisper libparakeet libllama libmtmd libggml libggml-base; do
         sonames=()
-        for f in "$out/lib/$lib".so.*; do
+        for f in "$out/$libdir/$lib".so.*; do
             [[ "$(basename "$f")" =~ ^$lib\.so\.[0-9]+$ ]] && sonames+=("$f")
         done
         if [[ ${#sonames[@]} -ne 1 ]]; then
-            echo "ERROR: expected one $lib.so.N in $out/lib, found ${#sonames[@]}" >&2
+            echo "ERROR: expected one $lib.so.N in $out/$libdir, found ${#sonames[@]}" >&2
             exit 1
         fi
         cp -L "${sonames[0]}" "$RUNTIME/"
