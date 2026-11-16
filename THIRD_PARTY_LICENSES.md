@@ -1355,6 +1355,7 @@ Used by:
 
 - audio-codec-algorithms 0.8.1
 - aws-lc-sys 0.46.0
+- constant_time_eq 0.6.1
 - dunce 1.0.5
 - ryu 1.0.23
 - sync_wrapper 1.0.2
@@ -3284,7 +3285,7 @@ DEALINGS IN THE SOFTWARE.
 
 Used by:
 
-- libsqlite3-sys 0.38.2
+- libsqlite3-sys 0.39.1
 
 ````text
 Copyright (c) 2014 The rusqlite developers
@@ -6488,9 +6489,7 @@ DEALINGS IN THE SOFTWARE.
 Used by:
 
 - serde_spanned 1.1.2
-- toml 0.9.12+spec-1.1.0
 - toml 1.1.8+spec-1.1.0
-- toml_datetime 0.7.5+spec-1.1.0
 - toml_datetime 1.1.2+spec-1.1.0
 - toml_edit 0.19.15
 - toml_edit 0.20.2
@@ -7283,13 +7282,10 @@ SOFTWARE.
 Used by:
 
 - darling 0.20.11
-- darling 0.21.3
 - darling 0.24.1
 - darling_core 0.20.11
-- darling_core 0.21.3
 - darling_core 0.24.1
 - darling_macro 0.20.11
-- darling_macro 0.21.3
 - darling_macro 0.24.1
 
 ````text
@@ -8228,6 +8224,7 @@ Used by:
 - brotli-decompressor 6.2.0
 - chrono 0.4.45
 - dasp_sample 0.11.0
+- diesel_attribute_parser 0.1.0
 - dlopen2 0.8.2
 - dlopen2_derive 0.4.3
 - dpi 0.1.2
@@ -8243,7 +8240,7 @@ Used by:
 - tauri-plugin-notification 2.7.0
 - tauri-plugin-opener 2.7.2
 - tauri-plugin-single-instance 2.5.4
-- tauri-plugin-updater 2.14.0
+- tauri-plugin-updater 2.14.1
 - tauri-winrt-notification 0.8.1
 - ts-rs-macros 12.0.1
 - ts-rs 12.0.1
@@ -8602,7 +8599,7 @@ Used by:
 - adler2 2.0.1
 - anyhow 1.0.104
 - async-channel 2.5.0
-- async-executor 1.14.0
+- async-executor 1.14.1
 - async-io 2.6.0
 - async-lock 3.4.2
 - async-process 2.5.0
@@ -8657,6 +8654,7 @@ Used by:
 - thiserror-impl 2.0.21
 - thiserror 1.0.69
 - thiserror 2.0.21
+- typed-path 0.13.0
 - typeid 1.0.3
 - unicode-ident 1.0.27
 - x11-dl 2.21.0
@@ -8728,7 +8726,6 @@ DEALINGS IN THE SOFTWARE.
 Used by:
 
 - winnow 0.5.40
-- winnow 0.7.15
 - winnow 1.0.4
 
 ````text
@@ -8847,13 +8844,14 @@ THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLI
 
 Used by:
 
-- diesel 2.3.14
-- diesel_derives 2.3.10
-- diesel_migrations 2.3.2
-- diesel_table_macro_syntax 0.3.0
-- dsl_auto_type 0.2.0
-- migrations_internals 2.3.0
-- migrations_macros 2.3.1
+- diesel 2.4.0
+- diesel_derives 2.4.0
+- diesel_migrations 2.4.0
+- diesel_table_macro_syntax 0.4.0
+- dsl_auto_type 0.3.0
+- migrations_internals 2.4.0
+- migrations_macros 2.4.0
+- sqlstate 0.2.0
 
 ````text
 The MIT License (MIT)
@@ -8952,6 +8950,7 @@ SOFTWARE.
 Used by:
 
 - tracing-core 0.1.36
+- zip 9.6.0
 
 ````text
 The MIT License (MIT)
@@ -8976,39 +8975,6 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 
-````
-
-### MIT License
-
-Used by:
-
-- zip 4.6.1
-
-````text
-The MIT License (MIT)
-
-Copyright (c) 2014 Mathijs van de Nes
-
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to deal
-in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, and to permit persons to whom the Software is
-furnished to do so, subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in all
-copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-SOFTWARE.
-
-Some files in the "tests/data" subdirectory of this repository are under other
-licences; see files named LICENSE.*.txt for details.
 ````
 
 ### MIT License
@@ -12916,7 +12882,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ````
 
-### seroval 1.6.3
+### seroval 1.6.11
 
 License: MIT
 Source: https://github.com/lxsmnsyc/seroval
