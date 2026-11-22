@@ -64,6 +64,7 @@ First release, for Linux and Windows.
 - Sound cues on start, stop, and error, with a volume slider and an off switch
 - Tray menu: open the app or Settings, start dictation, and copy the last dictation. Start minimized to the tray
 - Sidebar quick actions: theme, keyboard shortcuts, check for updates, help and feedback, quit
+- `lune-voice --version` (or `-V`) prints the version and exits without starting the app
 - Light, dark or system theme
 - Licence, warranty and source-code notice in Settings → General
 - Interface in 12 languages: Arabic, Chinese, English, French, German, Hindi, Italian, Japanese, Korean, Portuguese, Russian and Spanish, with the layout mirrored right to left for Arabic. Keyboard-navigable with visible focus rings
