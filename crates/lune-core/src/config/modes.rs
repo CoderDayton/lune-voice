@@ -16,7 +16,7 @@ pub enum PrivacyMode {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
 #[non_exhaustive]
 pub enum DictationMode {
-    /// Type finalized text into focused input via wtype.
+    /// Type finalized text into the focused input.
     TypeInPlace,
     /// Deliver finalized text by setting the clipboard and sending a paste
     /// shortcut (the "Paste into app" method). Despite the name, this is a

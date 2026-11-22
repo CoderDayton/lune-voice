@@ -82,17 +82,18 @@ Needs cmake and the [LunarG Vulkan SDK](https://vulkan.lunarg.com/sdk/home)
 (for `glslc` and the SPIR-V headers), with `VULKAN_SDK` set: source the SDK's
 `setup-env.sh` on Linux. On Windows, run it from Git Bash in an MSVC shell.
 
-The script builds `ggml-vulkan`, strips it, checks its `NEEDED` list and
-`RUNPATH=$ORIGIN` (Linux), writes the `ggml-version` stamp from
-`ggml/CMakeLists.txt`, refuses any extra file, and writes the tarball and
-`.sha256` into `release-artifacts/`.
+The script builds the vendored `ggml/` (`vendor/whisper-rs-sys/llama.cpp/ggml/`)
+as a subproject of a small stub CMake project with `GGML_VULKAN=ON`, strips
+`ggml-vulkan`, checks its `NEEDED` list and `RUNPATH=$ORIGIN` (Linux), writes
+the `ggml-version` stamp from `ggml/CMakeLists.txt`, refuses any extra file, and
+writes the tarball and `.sha256` into `release-artifacts/`.
 
 A plugin only works with the ggml it was built against. ggml's load check only
 compares its backend API version, so a mismatched plugin registers and then
 crashes. The app loads the download only when its stamp matches
 `ggml_version()`, otherwise it decodes on the CPU. ggml comes from the vendored
-llama.cpp tree, so a llama.cpp upgrade that moves ggml's version needs a rebuilt
-plugin under a new tag.
+`ggml/` tree that whisper.cpp and parakeet link, so a ggml upgrade that moves
+its version needs a rebuilt plugin under a new tag.
 
 The **GPU plugin** workflow (`.github/workflows/gpu-plugin.yml`) builds both
 archives and attaches them to a draft release. It installs the Vulkan SDK from

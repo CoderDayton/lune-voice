@@ -58,7 +58,7 @@ Every change is written to disk right away. After saving, the app reloads the se
 Settings are persisted as TOML at `~/.config/lune-voice/settings.toml` on Linux
 and `%APPDATA%\lune-voice\settings.toml` on Windows.
 
-If the file is missing or can't be parsed, the app uses the defaults and logs a warning. Bad settings never crash it.
+A missing file means the defaults. A file that can't be parsed is renamed to `settings.toml.bad-<unix seconds>` next to it, the app starts on the defaults, and the next save writes a fresh file. A value this build doesn't recognize (an enum name from a newer version, say) falls back to that field's default and leaves the rest of the file alone. Bad settings never crash the app. Saves are atomic and one lock covers every load-modify-save, so two changes made at once can't overwrite each other.
 
 ### Full Default Configuration
 
@@ -91,7 +91,8 @@ sound_cue_volume = 1.0
 session_history_days = 30
 # model_idle_unload_minutes is optional. Leave it out to keep the model loaded.
 # input_device is optional. Leave it out to use the system default input. The
-# value is a name from the mic picker.
+# value is a name from the mic picker, matched exactly as written. A device
+# that is no longer present falls back to the system default.
 agc_mode = "auto"
 start_minimized = false
 check_updates_on_launch = false
@@ -123,7 +124,7 @@ Model files live in the app's model directory. The settings file stores which mo
 
 ### WhisperCpp (Local, default)
 
-The default. Runs whisper.cpp locally through `whisper-rs`, using GGML models downloaded from `ggerganov/whisper.cpp`.
+The default. Runs whisper.cpp locally through `whisper-rs`, using GGML models downloaded from `ggerganov/whisper.cpp`. The language handed to whisper is the primary subtag of `dictation_language`, so `pt-BR` is decoded as `pt`.
 
 ```toml
 [asr_backend]
@@ -261,7 +262,7 @@ Only a discrete GPU counts. On a machine with just integrated graphics, transcri
 
 **GPU support is decided at runtime.** The GPU backend is a Vulkan plugin the app downloads when you ask, so a CPU-only binary can still use the GPU. You need a graphics driver with Vulkan 1.2, which you install yourself. You can see the current state in Settings → Transcription, under Use hardware acceleration, which is also where you download the plugin (or with the `gpu_backend_status` command). The GPU step in the setup wizard (engine, GPU, extra models, review) only appears when accepting it would change something: the state is `ready`, `needs-restart`, or `not-installed` with a published plugin for this build. If you accept it while the state is `not-installed`, setup downloads the plugin, but only from the review step, so nothing starts until you've picked everything.
 
-The plugin installs into `~/.local/share/lune-voice/backends/`. Delete that folder and restart to go back to CPU. A newly installed plugin works right away, with no restart.
+The plugin installs into `~/.local/share/lune-voice/backends/vulkan/`. Delete that folder and restart to go back to CPU. A newly installed plugin works right away, with no restart.
 
 See [docs/GPU_PLUGIN.md](GPU_PLUGIN.md) for how detection and installation work, and [docs/RELEASE.md](RELEASE.md) for the build matrix.
 
@@ -534,8 +535,11 @@ Each session record contains:
 | `ended_at` | datetime | Session end timestamp (null if the app crashed) |
 | `style` | string | Style preset ID used |
 | `backend` | enum | ASR backend type (`WhisperCpp` / `ParakeetCpp` / `OpenAiCompatible`) |
-| `status` | enum | `Active`, `Completed`, `Failed(reason)`, or `Cancelled` |
+| `status` | enum | `Active`, `Completed`, `Failed(reason)`, or `Cancelled`. A dictation whose final text could not be handed to delivery is `Failed` |
 | `transcript` | string | Final styled transcript (null if empty) |
+| `word_count` | integer | Words in the transcript; the Sessions overview sums it |
+
+History holds sessions and their transcripts, nothing else: there is no store of raw-versus-final text pairs or of your edits.
 
 Database location: `~/.local/share/lune-voice/lune.db` on Linux, `%APPDATA%\lune-voice\lune.db` on Windows.
 
@@ -568,9 +572,9 @@ These go in the `[pipeline]` section of `settings.toml` (`PipelineOverrides`). E
 
 | Parameter | Default | Effect | Tradeoff |
 |-----------|---------|--------|----------|
-| `word_confidence_threshold` | 0.50 (whisper.cpp, Parakeet) | Words below this count as uncertain. Only uncertain single words can get a near-miss dictionary fix | Higher allows more near-miss fixes |
-| `max_speech_secs` | 300 (local Whisper and Parakeet), 120 (remote) | Ends the session after this many seconds of audio | Higher allows longer dictations |
-| `llm_timeout_secs` | 30 | Uses the unstyled text if styling takes longer than this | Lower caps the worst-case wait |
+| `word_confidence_threshold` | 0.50 (whisper.cpp, Parakeet); unset for remote | Words below this count as uncertain. Only uncertain single words can get a near-miss dictionary fix. `0.0`–`1.0`; a value outside it is clamped | Higher allows more near-miss fixes |
+| `max_speech_secs` | 300 (local Whisper and Parakeet), 120 (remote) | Ends the session after this many seconds of audio. `1`–`600`; a value outside it is clamped | Higher allows longer dictations |
+| `llm_timeout_secs` | 30 | Uses the unstyled text if styling takes longer than this. `1`–`300`; `0` and anything above 300 become 300, so there is no unbounded call | Lower caps the worst-case wait |
 
 There are no VAD timing settings. The hotkey decides when you start and stop, and the VAD only trims silence at the ends.
 

@@ -20,9 +20,17 @@ the pipeline and the crate layout.
 
 ## Before you open a pull request
 
-`cgs ci` runs fmt, clippy with `-D warnings`, `cargo check` and the Rust tests.
-The pre-commit hook runs those plus the DTO drift check, biome and the frontend
-tests.
+`cgs ci` runs fmt, clippy with `-D warnings`, `cargo check` and the Rust tests
+(`cgs test` also runs the benchmark helpers: `cargo test -p lune-voice
+--examples`). Two hooks run the rest of the gate:
+
+- **pre-commit**: fmt (check only), the SPDX check, `cargo check`, clippy and
+  the Rust unit tests, the DTO drift check, biome and the frontend tests.
+- **pre-push**: clippy over all targets, the full Rust test suite, the frontend
+  build, and `cargo audit` when it is installed.
+
+Benchmarks run through `cgs bench --env TYPE=<name>`. There is no default type;
+`cgs show` lists them.
 
 - **Tests first.** A bug fix starts with a test that reproduces it.
 - **DTOs.** After changing a Rust DTO, run `cargo test -p lune-ui` and commit

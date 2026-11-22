@@ -36,7 +36,7 @@ cargo install cargo-script
 git clone https://github.com/CoderDayton/lune-voice
 cd lune-voice
 cgs dev       # run with hot reload
-cgs package   # build the installers
+cgs package   # build the installers (runs in a container)
 ```
 
 The full requirements and build matrix are in [docs/RELEASE.md](docs/RELEASE.md). Run `cgs show` for every script.

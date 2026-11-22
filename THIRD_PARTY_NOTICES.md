@@ -14,13 +14,17 @@ files, models and modified sources.
 
 ## whisper.cpp, llama.cpp and ggml
 
-Compiled into the application when the local speech-to-text backends are
-enabled — whisper itself and the `parakeet` library from the same source tree,
-which runs the Parakeet engine. Source: https://github.com/ggerganov/whisper.cpp
+Built into the application when the local speech-to-text backends are
+enabled: whisper itself and the `parakeet` library from the same source tree,
+which runs the Parakeet engine. Release bundles ship them as shared libraries
+(`libwhisper`, `libparakeet`, `libggml`, `libggml-base` and the CPU backend
+plugins). Source: https://github.com/ggerganov/whisper.cpp
 
 ggml is built from the `ggml/` directory of a llama.cpp fork
-(https://github.com/ggml-org/llama.cpp, with TurboQuant KV-cache types added)
-vendored at `vendor/whisper-rs-sys/llama.cpp`; whisper.cpp links that ggml.
+(https://github.com/ggml-org/llama.cpp, with TurboQuant KV-cache types added).
+Only that directory and the fork's `LICENSE` are vendored, at
+`vendor/whisper-rs-sys/llama.cpp`; no llama or mtmd code is included.
+whisper.cpp links that ggml.
 Same licence, `Copyright (c) 2023-2026 The ggml authors`.
 
 ```
@@ -61,7 +65,7 @@ links `parakeet`; `wrapper.h` and `Cargo.toml` bind and package `parakeet.h`;
 `src/lib.rs` adds a lint allow for the generated bindings; and
 `whisper.cpp/src/whisper.cpp` reuses the language-detection encode for the
 first decode window. The changes are distributed under Lune Voice's
-GPL-3.0-or-later licence; the rest of the vendored whisper.cpp and llama.cpp
+GPL-3.0-or-later licence; the rest of the vendored whisper.cpp and ggml
 source and their MIT licences are unchanged.
 
 ## Whisper GGML models

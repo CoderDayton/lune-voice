@@ -27,7 +27,7 @@ After-speech wait = poll_final (Silero endpoint trim + whisper.cpp decode) + opt
 
 | Stage | Cost profile | Notes |
 |-------|-------------|-------|
-| Audio flush | Negligible | Tail flush after hotkey release: one audio period (about 20 ms on PulseAudio), capped at 200 ms |
+| Audio flush | Negligible | After the stop, the session asks the capture callback to flush and polls every 3 ms for its acknowledgement. The callback answers on its next period (about 20 ms on PulseAudio), and the wait is capped at 200 ms |
 | whisper.cpp decode (`poll_final`) | **Primary fixed cost** | Batch decode of the full utterance; scales with audio length and model size |
 | Silero VAD | Small, separate stage | Trims silence from the start and end before decode, and keeps the pauses inside speech because whisper reads them as punctuation. This is a separate pass, not whisper's in-decode `enable_vad` |
 | LLM styling | Varies; skipped when no style is selected | One completion call to your OpenAI-compatible endpoint. It is plain async HTTP, so it doesn't block anything else |
@@ -60,8 +60,7 @@ After-speech wait = poll_final (Silero endpoint trim + whisper.cpp decode) + opt
 
 | Type | Measures |
 |---|---|
-| `agc` | PCEN AGC frontend |
-| `transcribe` | Whole capture → AGC → VAD → whisper (+ styling) pipeline on a WAV/f32/dir (`--env WAV=`) |
+| `transcribe` | Whole capture → AGC → Silero trim → whisper (+ styling) pipeline on a WAV/f32/dir (`--env WAV=`) |
 | `pipeline` / `stages` / `latency` | Real pipeline, per-stage timings, session latency |
 | `domain` / `punctuation` / `dict` / `snippets` | Output-quality A/Bs |
 | `leadin` | Opening-word errors on short utterances per lead-in policy (`--env LUNE_BENCH_DIR=` for your own `.wav` + `.txt` clips) |
@@ -83,7 +82,8 @@ baseline. Targets that use a model compile whisper.cpp and need the model on dis
 | Technique | Location | Impact |
 |-----------|----------|--------|
 | **Global mimalloc allocator** | `desktop-ui/src-tauri/src/main.rs` | Replaces glibc malloc. Small allocations are faster and memory fragments less, across the desktop shell and the pipeline crates |
-| **whisper.cpp audio buffer reuse** | `crates/lune-asr/src/backend/whisper_cpp.rs` | The per-session `Vec<f32>` audio buffer is pre-allocated for 30 s of audio (`Vec::with_capacity(16_000 * 30)`) and cleared, not freed, after each `poll_final`. Recording up to that length allocates nothing |
+| **whisper.cpp audio buffer reuse** | `crates/lune-asr/src/backend/whisper_cpp.rs` | The per-session `Vec<f32>` audio buffer is pre-allocated for 30 s of audio (`Vec::with_capacity(16_000 * 30)`) and cleared, not freed, after each `poll_final`. Recording up to that length allocates nothing, and a decode that fails clears the buffer too |
+| **Capture callback buffer reuse** | `crates/lune-audio/src/capture.rs` | The audio callback keeps its downmix, resample-input and output buffers between blocks. Per block it allocates nothing; the only allocation is the `Vec` for each finished 80 ms chunk |
 | **Corrector single-buffer output** | `crates/lune-dict/src/corrector.rs` | Builds the corrected text directly into a sized `String` instead of a `Vec<String>` + `join(" ")` |
 | **Output buffer preallocation** | `crates/lune-llm/src/prompt.rs` | `fix_all_number_spaces` sizes its output buffer to the input length (`String::with_capacity(input.len())`) before filling |
 
@@ -92,6 +92,7 @@ baseline. Targets that use a model compile whisper.cpp and need the model on dis
 | Technique | Location | Impact |
 |-----------|----------|--------|
 | **O(1) risk lookup in corrector** | `crates/lune-dict/src/corrector.rs` | Risk positions are indexed in a `HashMap`, so each word costs an O(1) lookup instead of a linear scan over the risk list |
+| **Windowed-sinc resampler** | `crates/lune-audio/src/capture.rs` | When the device doesn't record at 16 kHz, `rubato`'s `Async::new_sinc` (128 taps) converts in the audio callback. The filtering runs per sample on the capture thread, so it is not part of the after-speech wait. Its cost is not benchmarked here; a device that already records at 16 kHz skips it |
 | **PCEN AGC frontend** | `crates/lune-audio/src/pcen.rs`, `crates/lune-voice/src/capture.rs` | Gain control through `MicAgc`, set by `agc_mode`. `auto` (default, `crates/lune-audio/src/auto_gain.rs`) measures the whole clip at stop and leaves clean audio within 3 dB of the target alone; everything else gets PCEN. `always` runs PCEN on every frame |
 
 ### Concurrency

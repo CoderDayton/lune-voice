@@ -38,7 +38,7 @@ The runtime pipeline uses interchangeable backends:
 | LLM       | OpenAI-compatible (remote), disabled           | remote API               | HTTP                            |
 
 
-The native ASR backend compiles its C/C++ library from source at build time through a `*-sys` crate. GPU support is decided at **runtime**: ggml's compute backends are built as `dlopen`-able plugins (`GGML_BACKEND_DL`), so the Vulkan backend is downloaded on request instead of linked in. See [docs/GPU_PLUGIN.md](GPU_PLUGIN.md). The styling LLM is remote only; point it at Ollama, llama-server, LM Studio, or a hosted API. See [docs/RELEASE.md](RELEASE.md) for the full build matrix.
+The native ASR backends compile their C/C++ libraries from source at build time through the vendored `whisper-rs-sys` crate. Its `llama.cpp/` directory holds only `ggml/`, which whisper.cpp and parakeet link; there is no llama or mtmd code in the tree. GPU support is decided at **runtime**: ggml's compute backends are built as `dlopen`-able plugins (`GGML_BACKEND_DL`), so the Vulkan backend is downloaded on request instead of linked in. See [docs/GPU_PLUGIN.md](GPU_PLUGIN.md). The styling LLM is remote only; point it at Ollama, llama-server, LM Studio, or a hosted API. See [docs/RELEASE.md](RELEASE.md) for the full build matrix.
 
 Backends are chosen in one place, through registries and DTO mappers. The desktop UI never builds model paths or backend structs itself. It sends typed settings and gets snapshots back.
 
@@ -48,10 +48,10 @@ Backends are chosen in one place, through registries and DTO mappers. The deskto
 
 ```
 lune-core (types, config, errors)
-├─ lune-audio (mic, resample, ringbuf, pcen, auto_gain)
+├─ lune-audio (mic capture, sinc resample, ring buffer, pcen, auto_gain)
 ├─ lune-asr (whisper.cpp, parakeet, openai remote, registry)
 ├─ lune-llm (openai remote, null passthrough, style pipeline, prompt, few-shot)
-├─ lune-dict (corrector, vocab, voice commands)
+├─ lune-dict (corrector, vocab, formatting, voice commands, snippets)
 └─ lune-persist (settings.toml, sqlite, model hub)
      └─ lune-voice (session, capture + AGC, delivery, sound cues)
           └─ desktop-ui/src-tauri (tauri IPC, hotkey, backend registry wiring, pill, persistence bridge)
@@ -65,7 +65,7 @@ Each crate has one job. `lune-core` defines shared types and traits but has no r
 
 ### 1. Audio Capture
 
-**Crate:** `lune-audio` | **File:** `crates/lune-audio/src/lib.rs`  
+**Crate:** `lune-audio` | **Files:** `crates/lune-audio/src/capture.rs`, `devices.rs`  
 **Orchestration:** `crates/lune-voice/src/capture.rs`
 
 - Uses `cpal` for microphone access. Host choice lives in `crates/lune-audio/src/devices.rs` and nowhere else:
@@ -74,19 +74,20 @@ Each crate has one job. `lune-core` defines shared types and traits but has no r
 - The picker and the device that opens both go through `enumerate_input_devices`, so they can't disagree. There is one entry per display name:
   - **Pulse:** sources read from the server (`crates/lune-audio/src/pulse.rs`), minus sink monitors (`monitor_of_sink_index`). Recording streams aren't sources, so a filter's input side never shows up, but its output source does. cpal keeps its Pulse device type private, so this information comes from a second, short-lived client of the same crate. That client opens its own socket and shuts it down if the server doesn't answer within 2 s, so a stuck server leaves no thread behind
   - **ALSA:** one card-backed capture route per name. ALSA lists one PCM per *route*, so without this, 4 microphones would show up as 29 identical-looking entries next to `null` and `pipewire`
-- A saved `input_device` matches a display name first, then a source's ALSA name (`"{alsa.card_name}, {alsa.name}"`, the name the ALSA host shows). At startup, a setting that matched the second way is rewritten to the current name (`persistence::migrate_input_device`), but only if the settings file parsed, and only if the saved name looks like an ALSA name (it contains `", "`), so most launches skip the device listing. The lookup gives up after 3 s and keeps the saved name. The rewrite only goes one way: with no Pulse server, the ALSA host doesn't know source names, so capture uses the system default and says so. A device is identified by its display name, so two mics with the same name are one picker entry
+- A saved `input_device` is matched against those display names (`resolve_input_device`). A name that is no longer present falls back to the system default, and the stream reports it through `fell_back` so the app can say so. A device is identified by its display name, so two mics with the same name are one picker entry
 - Pulse capture asks for a fixed 20 ms period (`capture_buffer_size`). Left to the server, a recording stream's fragment defaults to about 2 s, and the first audio arrives 2 s after the stream opens
-- Delivers 16 kHz mono PCM in 80 ms chunks (1280 samples). Most hardware records at 44.1 or 48 kHz, so a `rubato` async resampler converts to 16 kHz whenever the device's rate differs
-- `MicAgc` applies the `agc_mode` setting. `always` runs PCEN on each frame as it streams. `auto` (default) holds the clip until stop, measures it (`lune_audio::auto_gain`), then runs full PCEN if it is more than 3 dB off the target level. Near the target it leaves clean audio alone and ramps PCEN up as SNR drops from 20 to 10 dB. The level meter shows the signal after PCEN in both modes, so a quiet mic still moves the bar
-- Chunks go to the ASR backend through `push_audio` as they arrive, or all at once at stop under `auto`. Every backend decodes the whole clip at `poll_final`, so that costs no latency. No VAD runs at this stage
+- Delivers 16 kHz mono PCM in 80 ms chunks (1280 samples). The sample rate, chunk length and ring capacity are constants; `AudioConfig` carries only the preferred `input_device`
+- Multi-channel input is averaged to mono, unless one channel carries far more energy or the channels are uncorrelated, in which case the strongest channel is used. Most hardware records at 44.1 or 48 kHz, so whenever the device's rate differs a `rubato` windowed-sinc resampler (`Async::new_sinc`, 128 taps, in `capture.rs`) converts to 16 kHz. It runs in the audio callback, which reuses its buffers between blocks; the resampler is reset after a flush
+- `MicAgc` applies the `agc_mode` setting. `off` passes audio through. `always` runs PCEN on each frame as it streams. `auto` (default) holds the clip until stop, measures it (`lune_audio::auto_gain`), then runs full PCEN if it is more than 3 dB off the target level. Near the target it leaves clean audio alone and ramps PCEN up as SNR drops from 20 to 10 dB. The level meter shows the signal after PCEN in both modes, so a quiet mic still moves the bar
+- The session loop polls the ring every 10 ms with `AudioPull::try_next_chunk`. Chunks go to the ASR backend through `push_audio` as they arrive, or all at once at stop under `auto`. Every backend decodes the whole clip at `poll_final`, so that costs no latency. No VAD runs at this stage
 - The session loop handles Stop, Cancel, deadline and max-speech signals and ends the capture loop when one arrives
-- After Stop, the producer is asked to flush and the session waits for it to acknowledge, up to 200 ms, so it hands over the chunk it still holds (up to ~80 ms, which is the end of the last word), then the AGC's leftover partial frame (or, under `auto`, the whole held clip). Then `poll_final` decodes the buffer
+- After Stop, the producer is asked to flush and the session polls every 3 ms for its acknowledgement, up to 200 ms (a warning is logged if none comes, and the last word may be clipped). The producer then hands over the chunk it still holds (up to ~80 ms, which is the end of the last word), then the AGC's leftover partial frame (or, under `auto`, the whole held clip). Then `poll_final` decodes the buffer
 
 ### 2. ASR
 
 **Crate:** `lune-asr`
 
-Both backends implement the same `AsrBackend` trait, so the session code never checks which one it has.
+All three backends implement the same `AsrBackend` trait, so the session code never checks which one it has.
 
 #### 2a. WhisperCpp (local, default)
 
@@ -95,12 +96,12 @@ Both backends implement the same `AsrBackend` trait, so the session code never c
 The `WhisperCppBackend` wraps `whisper-rs`, which vendors and compiles `whisper.cpp`:
 
 - The `WhisperContext` (model weights) is loaded **once** when the backend is built and shared by every session. Each session gets a `WhisperState`, a decode context that allocates its own KV-cache and compute buffers.
-- `push_audio` appends PCM to a per-session buffer sized for 30 s of audio. It grows once for longer utterances, and is cleared without freeing after each decode.
+- `push_audio` appends PCM to a per-session buffer sized for 30 s of audio. It grows once for longer utterances. It is cleared without freeing after every `poll_final`, including one that fails, so a repeat poll can't decode the same audio twice.
 - `poll_final` decodes the whole buffer at once with **beam search** (beam size 5), whisper.cpp's accuracy-first setting. There is only one decode per utterance, so the extra compute is worth it.
 - **Silero trim:** when the VAD model is there (`models/whisper-vad-silero/ggml-silero-v5.1.2.bin`), `poll_final` first runs `WhisperVadContext::segments_from_samples` over the buffer and decodes only the span from the first speech segment to the last. Pauses inside that span are kept, because whisper uses them to place punctuation. whisper.cpp's built-in `enable_vad` is **not** used on purpose: it glues speech together and removes those pauses, which gives run-on sentences. The VAD always runs on the CPU, because Silero is tiny and a GPU VAD context crashes at init. If the model file is missing, a warning is logged and the whole buffer is decoded.
 - **Splitting at pauses:** a trimmed span longer than 28 s is cut in the middle of a pause between two speech segments, and each piece is decoded on its own (`plan_chunks`). Left alone, whisper works in 30 s windows and decodes the leftover separately, and a leftover of a second or less comes back as made-up text ("Thank you."). Each cut leaves at least 3 s on both sides and prefers the longest pause in the back half of the window, so every piece keeps its pauses whole. A stretch with no pause is decoded in one piece.
 - **Per-token confidence:** whisper reports a probability for each token. `poll_final` turns them into `AsrSegment::confidence` (mean) and `min_token_confidence` (minimum), leaving out special tokens. The capture layer drops segments whose mean is below `GARBAGE_DROP_THRESHOLD` (0.25) before the session sees them.
-- Language: the `language` field from `AsrSessionConfig` goes to `set_language`. `None` means `"auto"`, so whisper detects it from the audio. With several pieces, the first one detects the language and the rest reuse it.
+- Language: the `language` field from `AsrSessionConfig` goes to `set_language` as its primary subtag (`pt-BR` becomes `pt`, `whisper_language`). `None` means `"auto"`, so whisper detects it from the audio. With several pieces, the first one detects the language and the rest reuse it.
 
 Four GGML model sizes are available, all from `ggerganov/whisper.cpp`:
 
@@ -164,8 +165,10 @@ If you don't accept that, put the endpoint behind HTTPS (a reverse proxy with a 
 
 Once the ASR segments are in, the session runs a fixed, rule-based text pass:
 
-1. Voice commands are removed from the text (the whole utterance must match).
-2. The corrector (`LexicalGate::correct_with_risk_threshold` in `corrector.rs`, called from `correct_and_format` in `session.rs`) rewrites the transcript in three ways:
+1. Voice commands and snippets. `VoiceCommandRouter` has two parametric commands and no fixed ones: `switch to <style>` (or `switch preset to`) and `insert <snippet>` (or `expand snippet`). A command only matches at the very start of the utterance, needs at least one argument word, and consumes the whole utterance.
+   - `switch to` changes the style for this session and emits `CommandDetected`. If no style has that name, the utterance is dictated as ordinary text and no event is emitted.
+   - `insert <name>`, or an utterance that is exactly a snippet's trigger phrase, delivers the snippet's rendered body as is, with no correction or styling. With no matching snippet, the utterance is dictated.
+2. Formatting toggles are resolved once per dictation into `lune_dict::formatting::ResolvedFormat`: a style's own choice wins, otherwise the global setting applies. The correction and formatting below run in a blocking section (`blocking_db`, which uses `block_in_place`) so they don't hold an async worker. The corrector (`LexicalGate::correct_with_risk_threshold` in `corrector.rs`, called from `correct_and_format` in `session.rs`) rewrites the transcript in three ways:
    - **Your dictionary.** Exact matches always apply. A phrase of several words, or a word with punctuation such as `node.js` or `c++`, matches whole words exactly as written. A single word of four or more characters can also match with one edit, but only when `FUZZY_DICT_RISK_GATE` allows it, and never on a word the lexicon knows or a word with a digit in it.
    - **Bundled vocabulary.** Exact, case-insensitive matches get their capitals fixed. There is no fuzzy guessing here.
    - **`ALWAYS_REPLACE`.** A built-in table of common mishearings and their fixes.
@@ -265,13 +268,14 @@ Spotting a terminal does different things on each platform. On Linux it picks th
 ```
 Idle
   |
-  | start()
+  | start()      inserts the history row (full dictation, history on)
   v
 Active      audio flowing, ASR buffering
   |
-  | stop() / cancel() / audio closed
+  | stop() / cancel() / time or speech limit / audio lost
   v
-Teardown    poll final ASR, apply dictionary, style, finalize DB
+Teardown    flush tail, poll final ASR, commands and snippets,
+            correct + format, style, hand off text, finalize DB
   |
   v
 Stopped     SessionEvent::Stopped emitted
@@ -281,16 +285,17 @@ Only one session can be active at a time (`Arc<Mutex<Option<ActiveHandle>>>` enf
 
 **Teardown sequence:**
 
-1. Stop or cancel clears out the pending recording control messages.
-2. Unless the session was cancelled, the final ASR segments are collected (one decode, through `poll_final`).
-3. An empty session ends with no transcript.
-4. Voice commands are handled before the dictionary runs.
-5. Dictionary seed and `StylePipeline` run on the transcript.
-6. Final text is emitted, delivered, and persisted.
+1. The capture loop ends on Stop, Cancel, the wall-clock deadline, the max-speech limit, or 5 s without audio (which fails the session).
+2. Unless the session was cancelled, the producer is flushed (see [Audio Capture](#1-audio-capture)), `Processing` is emitted, and the final ASR segments are collected (one decode, through `poll_final`). The decode is raced against a Cancel and a ceiling of 180 s plus the clip's length.
+3. `end_session` runs. An error from it is logged and does not fail a session whose transcript was produced.
+4. An empty result ends the session with no transcript. It is recorded as failed only when ASR reported an error and never succeeded.
+5. Voice commands and snippets are handled first (see [Dictionary Application](#3-dictionary-application)).
+6. Correction and formatting run, then the dictionary seed and `StylePipeline` when a style is selected.
+7. `FinalizedText` is sent on the event channel, the history row is closed with the transcript, and `Stopped` follows.
 
-Cancellation is checked before styling and again before the final output. Cancelling during styling marks the session cancelled and skips `FinalizedText`.
+Cancellation is checked after command routing, before styling, and again before the final output. Cancelling during styling marks the session cancelled and skips `FinalizedText`.
 
-The final events are sent with a timeout, so a stuck listener can't hang the teardown. If an `Error` event was dropped, the `Stopped` that follows carries `error_dropped`, so the listener still reports the session as failed.
+The final events are sent with a timeout, so a stuck listener can't hang the teardown. If an `Error` event was dropped, the `Stopped` that follows carries `error_dropped`, so the listener still reports the session as failed. The same holds when `FinalizedText` itself can't be handed over: the session is recorded as failed, and `Stopped` carries `error_dropped`.
 
 ---
 
@@ -318,7 +323,7 @@ The desktop app doesn't read logs or poll for session state. It uses typed Tauri
 | `update_dictionary_entry`                                                                           | `main`         | Edit a dictionary entry in place                                                                                                                                                                                                                                                                        |
 | `save_snippet` / `delete_snippet`                                                                   | `main`         | Snippet management                                                                                                                                                                                                                                                                                      |
 | `create_custom_style` / `update_custom_style` / `delete_custom_style` / `generate_style_examples`   | `main`         | Custom style presets                                                                                                                                                                                                                                                                                    |
-| `list_audio_input_devices`                                                                          | `main`         | Input device picker                                                                                                                                                                                                                                                                                     |
+| `list_audio_input_devices`                                                                          | `main`         | Input device picker. Runs off the main thread, because listing devices can wait on the audio server                                                                                                                                                                                                     |
 | `start_trigger_capture`                                                                             | `main`         | Capture-only session for the snippet voice-trigger recorder (transcript streamed back, nothing typed, no history row)                                                                                                                                                                                   |
 | `check_model_status` / `models_disk_usage` / `download_model_cmd` / `delete_model_cmd`              | `main`         | Model management. `models_disk_usage` sums every model directory, the hidden VAD included                                                                                                                                                                                                               |
 | `required_models_ready`                                                                             | `main`         | Whether the configured ASR backend has what it needs on disk. It is the same check the pipeline uses, so setup and runtime can't disagree                                                                                                                                                               |
@@ -393,8 +398,8 @@ Tauri async runtime (tokio multi_thread)
 tokio blocking pool (block_in_place / spawn_blocking)
 |-- whisper.cpp inference (WhisperContext shared; per-session WhisperState via Mutex)
 |-- Parakeet inference (one context + one reused decoder state behind a Mutex)
-|-- spellcheck / dictionary work
-`-- persistence I/O (run_persist, pill settings)
+|-- dictionary scan, correction and formatting (blocking_db)
+`-- persistence I/O (run_persist, pill settings, device and uinput checks)
 
 dedicated OS threads
 |-- delivery thread (uinput / IBus / clipboard)
@@ -423,9 +428,17 @@ plugin unpack use `spawn_blocking`. The session code can't, because its
 into a spawned task. It uses `block_in_place` instead: the same handoff, no
 `Send` requirement, and no extra cancellation point in `start`.
 
-The audio callback runs on cpal's own high-priority thread and writes into a
-lock-free ring buffer that the session loop reads. The real-time path never
-allocates or takes a lock.
+The audio callback runs on cpal's own audio thread. It downmixes, resamples
+and frames the audio in buffers it reuses between blocks, and allocates only
+the `Vec` for each finished 80 ms chunk. It pushes into a bounded crossbeam
+ring that the session loop reads; a full ring evicts the oldest chunk instead
+of blocking the callback.
+
+Settings and the database are shared across those threads. Every settings
+load-modify-save goes through `SettingsStore::update`, which holds one
+process-wide lock, so two writers can't overwrite each other. Database
+migrations, the word-count backfill and file-permission tightening run once
+per process for each database file; the pragmas run on every open.
 
 ---
 
@@ -436,13 +449,14 @@ allocates or takes a lock.
 
 lune-audio (cpal)
   |
-  | AudioChunk polled via AudioPull::try_next_chunk (PCM, 16 kHz mono f32, post-AGC)
+  | AudioChunk polled via AudioPull::try_next_chunk (PCM, 16 kHz mono f32)
   v
 Session task (capture.rs)
   |
-  |-- push_audio → ASR buffer accumulates
-  |-- [stop signal] → poll_final → Silero endpoint trim → whisper.cpp decode
-  |-- voice command routing
+  |-- MicAgc (PCEN, per agc_mode) → push_audio → ASR buffer accumulates
+  |-- [stop signal] → flush ack → poll_final → Silero endpoint trim → ASR decode
+  |-- voice command and snippet routing
+  |-- correction + formatting (ResolvedFormat)
   |-- apply_dictionary_seed
   |-- StylePipeline::transform (LLM styling, optional)
   `-- FinalizedText

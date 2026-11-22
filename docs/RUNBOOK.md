@@ -73,6 +73,10 @@ and the banner stays; the usual cause is a missing model (Settings → Models).
 Dictation is refused, without a red status, while a download or GPU install
 is running.
 
+A session is also recorded as failed when its final text can't be handed to
+delivery (`finalized text was not handed to delivery` at WARN). History still
+holds the text.
+
 ## Dictation produces no text
 
 Work down this list:
@@ -97,6 +101,9 @@ Work down this list:
    - `host=PulseAudio` plus a WARN ending in `listing every input cpal reports
      instead` means the server answered cpal but not the picker's own query.
      The picker then lists every input cpal sees, including sink monitors.
+   - `capture flush not acknowledged; the last word may be clipped` at WARN
+     means the audio callback didn't answer the stop-time flush within 200 ms,
+     so the end of the last word may be missing.
 3. **Everything thrown out as non-speech.** Look for `dropping non-speech
    segment` or `dropping garbage segment` at WARN. This is usually a mic gain
    problem. Raise the input level in the system mixer, or set **Adaptive gain
@@ -161,6 +168,15 @@ process` at capture time.
 
 **Recovery:** start dictation with the hotkey instead of the pill. The hotkey
 never moves focus. The transcript is in history either way.
+
+---
+
+## "Switch to ..." or "insert ..." was typed as text
+
+Both are commands only at the very start of an utterance, and only when the
+name after them exists. `switch to <name>` with no style of that name, and
+`insert <name>` with no snippet of that name, are dictated as ordinary text.
+Check the spelling of the style or snippet in Settings.
 
 ---
 
@@ -253,8 +269,8 @@ rm -rf ~/.local/share/lune-voice/backends/
 ## Database is corrupt
 
 A corrupt database is reported at startup instead of crashing the app. It holds
-history and custom styles, **not** settings, models, or dictionary defaults, so
-throwing it away loses history but not your configuration.
+history, your dictionary entries, snippets and custom styles, **not** settings
+or models, so throwing it away loses those but not your configuration.
 
 ```sh
 # Inspect first.

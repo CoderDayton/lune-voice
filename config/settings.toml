@@ -1,6 +1,10 @@
 # lune-voice configuration
 #
-# Location: ~/.config/lune-voice/settings.toml
+# Location: ~/.config/lune-voice/settings.toml (%APPDATA%\lune-voice\ on Windows)
+#
+# This sample shows the main keys. Every setting, with its default and allowed
+# values, is in docs/CONFIGURATION.md. A value the app doesn't recognize falls
+# back to that key's default.
 #
 # In TOML, all top-level keys must appear before any [section] headers.
 
@@ -34,18 +38,19 @@ dictation_language = "auto"
 privacy_mode = "LocalOnly"
 
 # How finalized text reaches the focused window.
-# "TypeInPlace"  — Type via uinput kernel device; works in any app.
-# "Clipboard"    — Copy to clipboard + Ctrl+V paste (compositor-agnostic fallback). (default)
+# "TypeInPlace"  — Type the text. On Linux, short ASCII text goes through a uinput
+#                  virtual keyboard; long, multi-line or non-ASCII text is pasted.
+# "Clipboard"    — Copy to clipboard + paste keystroke. (default)
 dictation_mode = "Clipboard"
 
 # How the hotkey activates dictation.
-# "Toggle"  — Press once to start, press again to stop.
-# "Hold"    — Hold key to dictate, release to stop. (default)
+# "Toggle"  — Press once to start, press again to stop. (default)
+# "Hold"    — Hold key to dictate, release to stop.
 activation_mode = "Hold"
 
 # When to show the floating dictation pill overlay.
-# "Always"        — Show whenever the service is ready.
-# "WhenDictating" — Show only while a session is active. (default)
+# "Always"        — Show whenever the service is ready. (default)
+# "WhenDictating" — Show only while a session is active.
 # "Never"         — Don't show the pill.
 pill_visibility = "WhenDictating"
 
@@ -130,20 +135,20 @@ type = "Disabled"
 # recommended default. Uncomment to override.
 #
 # [pipeline]
-# word_confidence_threshold = 0.65   # Below this, words flagged "uncertain" → LLM
-# max_speech_secs = 60               # Auto-stop after N seconds of speech
-# adaptive_vad = false               # Adapt VAD thresholds to ambient noise
-# llm_timeout_secs = 8               # Drop LLM correction if it exceeds this
-# speech_threshold = 0.50            # VAD speech-onset probability
-# speech_threshold_end = 0.30        # VAD speech-end probability (hysteresis)
+# word_confidence_threshold = 0.65   # 0.0-1.0. Words below this count as uncertain
+#                                    # and may get a near-miss dictionary fix
+#                                    # (default 0.50 for local backends)
+# max_speech_secs = 60               # 1-600. Auto-stop after N seconds of audio
+#                                    # (default 300 local, 120 remote)
+# llm_timeout_secs = 8               # 1-300. Use the unstyled text if styling takes
+#                                    # longer than this (default 30)
 
 
 # ── Hotkeys ───────────────────────────────────────────────────────────────────
 #
-# These are NOT registered as system hotkeys by lune-voice itself.
-# Register them in your compositor pointing to `lune-voice toggle` / `lune-voice cancel`:
-#   COSMIC: Settings → Keyboard → Custom Shortcuts
-#   KDE:    System Settings → Shortcuts → Custom Shortcuts
+# Global: the app grabs them itself (evdev on Linux, a low-level keyboard hook
+# on Windows), so no desktop shortcut is needed. Record a combination in
+# Settings instead of editing it here.
 #
 # Valid modifiers: "Ctrl", "Shift", "Alt", "Meta"
 #

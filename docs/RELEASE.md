@@ -29,10 +29,12 @@ parakeet share one ggml, and bundles ship `libwhisper`, `libparakeet`,
   second encoder pass.
 
 To upgrade whisper.cpp, copy the same subset of upstream over `whisper.cpp/`,
-reapply the `LUNE FORK` hunk in `src/whisper.cpp`, and run the
-`whisper_lang_detect` test. To upgrade ggml, copy `ggml/` from the fork over
-`llama.cpp/ggml/`. Either upgrade can move the ggml version, which needs a
-new GPU plugin ([GPU plugin](GPU_PLUGIN.md)).
+reapply the `LUNE FORK` hunks in `src/whisper.cpp`, and run the
+`whisper_lang_detect` test (ignored by default; the command and the model it
+needs are in the header of `crates/lune-asr/tests/whisper_lang_detect.rs`). To
+upgrade ggml, copy `ggml/` and `LICENSE` from the fork over `llama.cpp/`.
+Either upgrade can move the ggml version, which needs a new GPU plugin
+([GPU plugin](GPU_PLUGIN.md)).
 
 ## Distribution model
 
@@ -480,9 +482,10 @@ disk before you rolled back.
 
    Versions newer than anything in the old build's `crates/lune-persist/migrations/`
    mean the database is ahead of the binary. Migrations that only add things
-   (every one shipped so far) are fine, since the old code ignores the new
-   columns. If the old build won't start, revert the extra migrations instead
-   of deleting the database:
+   are fine, since the old code ignores the new columns. A migration that drops
+   a table or column is not: its `down.sql` recreates the structure empty, so
+   the dropped data stays gone. If the old build won't start, revert the extra
+   migrations instead of deleting the database:
 
    ```sh
    diesel migration revert --migration-dir crates/lune-persist/migrations
