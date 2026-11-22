@@ -6,15 +6,9 @@ import type { RegisterableHotkey } from '@tanstack/react-hotkeys';
 import type { LucideIcon } from 'lucide-react';
 import { BookText, Clock, House, Paintbrush, ScrollText, Settings } from 'lucide-react';
 
-export type NavigationGroupLabel = 'Workspace' | 'System';
+type NavigationGroupLabel = 'Workspace' | 'System';
 
-export type NavigationRoute =
-  | '/'
-  | '/history'
-  | '/dictionary'
-  | '/snippets'
-  | '/styles'
-  | '/settings';
+type NavigationRoute = '/' | '/history' | '/dictionary' | '/snippets' | '/styles' | '/settings';
 
 /** Single source of truth for the nav hotkeys: `useAppShortcuts` registers
  *  them and the sidebar rail renders them, so hint and binding can't drift.
@@ -110,7 +104,7 @@ export const navigationItems: NavigationItem[] = [
   },
 ];
 
-export interface NavigationGroup {
+interface NavigationGroup {
   label: NavigationGroupLabel;
   name: MessageDescriptor;
   items: NavigationItem[];

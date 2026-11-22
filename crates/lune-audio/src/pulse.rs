@@ -12,7 +12,6 @@ pub(crate) struct Source {
     pub name: String,
     pub description: String,
     pub is_monitor: bool,
-    pub legacy_alsa_name: Option<String>,
 }
 
 pub(crate) fn list_sources() -> Result<Vec<Source>, String> {
@@ -58,12 +57,6 @@ fn query_sources(socket: UnixStream, cookie: Option<Vec<u8>>) -> Result<Vec<Sour
 }
 
 fn source_from_info(info: &pulseaudio::protocol::SourceInfo) -> Source {
-    let prop = |key: &str| {
-        info.props
-            .iter()
-            .find(|(k, _)| k.to_bytes() == key.as_bytes())
-            .map(|(_, v)| String::from_utf8_lossy(v).trim_end_matches('\0').to_owned())
-    };
     let name = info.name.to_string_lossy().into_owned();
     Source {
         description: info
@@ -71,17 +64,8 @@ fn source_from_info(info: &pulseaudio::protocol::SourceInfo) -> Source {
             .as_ref()
             .map_or_else(|| name.clone(), |d| d.to_string_lossy().into_owned()),
         is_monitor: info.monitor_of_sink_index.is_some(),
-        legacy_alsa_name: legacy_alsa_name(
-            prop("alsa.card_name").as_deref(),
-            prop("alsa.name").as_deref(),
-        ),
         name,
     }
-}
-
-pub(crate) fn legacy_alsa_name(card_name: Option<&str>, pcm_name: Option<&str>) -> Option<String> {
-    let (card, pcm) = (card_name?, pcm_name?);
-    (!card.is_empty() && !pcm.is_empty()).then(|| format!("{card}, {pcm}"))
 }
 
 pub(crate) fn usable_source_indices(
@@ -147,41 +131,36 @@ mod tests {
         assert!(closed, "the client socket was left open");
     }
 
-    fn source(name: &str, description: &str, is_monitor: bool, legacy: Option<&str>) -> Source {
+    fn source(name: &str, description: &str, is_monitor: bool) -> Source {
         Source {
             name: name.into(),
             description: description.into(),
             is_monitor,
-            legacy_alsa_name: legacy.map(Into::into),
         }
     }
 
     fn real_pipewire_pulse_sources() -> Vec<Source> {
         vec![
-            source("deepfilter_source_mv6", "DeepFilter Shure MV6", false, None),
+            source("deepfilter_source_mv6", "DeepFilter Shure MV6", false),
             source(
                 "alsa_output.usb-Shure_Inc_Shure_MV6_MV6_6-01.analog-stereo.monitor",
                 "Monitor of Shure MV6 Analog Stereo",
                 true,
-                Some("Shure MV6, USB Audio"),
             ),
             source(
                 "alsa_input.usb-Shure_Inc_Shure_MV6_MV6_6-01.mono-fallback",
                 "Shure MV6 Mono",
                 false,
-                Some("Shure MV6, USB Audio"),
             ),
             source(
                 "alsa_output.usb-FiiO_DigiHug_USB_Audio-01.analog-stereo.monitor",
                 "Monitor of Fiio E10 Analog Stereo",
                 true,
-                Some("DigiHug USB Audio, USB Audio"),
             ),
             source(
                 "alsa_input.usb-FiiO_DigiHug_USB_Audio-01.analog-stereo",
                 "Fiio E10 Analog Stereo",
                 false,
-                Some("DigiHug USB Audio, USB Audio"),
             ),
         ]
     }
@@ -205,35 +184,16 @@ mod tests {
 
     #[test]
     fn usable_sources_keep_the_first_source_for_a_shared_description() {
-        let sources = vec![
-            source("a", "USB Mic", false, None),
-            source("b", "USB Mic", false, None),
-        ];
+        let sources = vec![source("a", "USB Mic", false), source("b", "USB Mic", false)];
         assert_eq!(usable_source_indices(&sources, |_| true), [0]);
     }
 
     #[test]
     fn usable_sources_skip_a_source_cpal_cannot_open_before_deduplicating() {
         let sources = vec![
-            source("gone", "USB Mic", false, None),
-            source("b", "USB Mic", false, None),
+            source("gone", "USB Mic", false),
+            source("b", "USB Mic", false),
         ];
         assert_eq!(usable_source_indices(&sources, |s| s.name != "gone"), [1]);
-    }
-
-    #[test]
-    fn legacy_alsa_name_joins_card_and_pcm_names() {
-        assert_eq!(
-            legacy_alsa_name(Some("Shure MV6"), Some("USB Audio")).as_deref(),
-            Some("Shure MV6, USB Audio")
-        );
-    }
-
-    #[test]
-    fn legacy_alsa_name_needs_both_parts() {
-        assert_eq!(legacy_alsa_name(None, Some("USB Audio")), None);
-        assert_eq!(legacy_alsa_name(Some("Shure MV6"), None), None);
-        assert_eq!(legacy_alsa_name(Some(""), Some("USB Audio")), None);
-        assert_eq!(legacy_alsa_name(Some("Shure MV6"), Some("")), None);
     }
 }

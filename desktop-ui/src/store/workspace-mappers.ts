@@ -29,7 +29,6 @@ export function mapHistoryEntry(entry: HistoryItemDto): HistorySession | null {
   return {
     id: entry.id,
     startedAt: entry.startedAt,
-    endedAt: entry.endedAt,
     transcript: entry.transcript,
     backend: entry.backend,
     style: entry.style,

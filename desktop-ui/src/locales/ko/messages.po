@@ -346,7 +346,7 @@ msgstr "최고 정확도. 터보 디코더로 속도도 유지합니다."
 msgid "Bigger is more accurate, but slower"
 msgstr "클수록 정확하지만 느립니다"
 
-#: src/features/shell/config/navigation.ts:88
+#: src/features/shell/config/navigation.ts:82
 msgid "Blocks of text Lune Voice types when you speak their trigger phrase"
 msgstr "트리거 문구를 말하면 Lune Voice가 입력하는 텍스트 블록"
 
@@ -374,7 +374,7 @@ msgstr "브랜드 표기(\"github\" → \"GitHub\")"
 msgid "Brands"
 msgstr "브랜드"
 
-#: src/features/shell/config/navigation.ts:70
+#: src/features/shell/config/navigation.ts:64
 msgid "Browse and search past dictations"
 msgstr "지난 받아쓰기 보기 및 검색"
 
@@ -603,7 +603,7 @@ msgstr "교정"
 msgid "Correction sensitivity"
 msgstr "교정 민감도"
 
-#: src/features/shell/config/navigation.ts:79
+#: src/features/shell/config/navigation.ts:73
 msgid "Corrections Lune Voice applies every time you dictate"
 msgstr "받아쓰기할 때마다 Lune Voice가 적용하는 교정"
 
@@ -1014,7 +1014,7 @@ msgstr "격식체"
 msgid "Formatting"
 msgstr "서식"
 
-#: src/features/shell/config/navigation.ts:97
+#: src/features/shell/config/navigation.ts:91
 msgid "Formatting presets for your text"
 msgstr "텍스트 서식 프리셋"
 
@@ -1145,7 +1145,7 @@ msgstr "말하는 동안 누르고 있기"
 msgid "Hold your hotkey, speak, then let go. The text is typed into whatever app you were using."
 msgstr "단축키를 누른 채 말한 뒤 손을 떼세요. 사용 중이던 앱에 텍스트가 입력됩니다."
 
-#: src/features/shell/config/navigation.ts:60
+#: src/features/shell/config/navigation.ts:54
 msgid "Home"
 msgstr "홈"
 
@@ -1184,7 +1184,7 @@ msgstr "진행 중"
 msgid "In use"
 msgstr "사용 중"
 
-#: src/features/shell/config/navigation.ts:105
+#: src/features/shell/config/navigation.ts:99
 msgid "Input, output, models, and shortcuts"
 msgstr "입력, 출력, 모델, 단축키"
 
@@ -1433,7 +1433,7 @@ msgstr "모델"
 msgid "Models are stored locally. No telemetry, no accounts."
 msgstr "모델은 로컬에 저장됩니다. 원격 측정도, 계정도 없습니다."
 
-#: src/features/shell/config/navigation.ts:109
+#: src/features/shell/config/navigation.ts:103
 msgid "Models, shortcuts, output"
 msgstr "모델, 단축키, 출력"
 
@@ -2036,11 +2036,11 @@ msgstr "직접 설정한 OpenAI 호환 엔드포인트로 텍스트를 보냅니
 msgid "Session details"
 msgstr "세션 세부 정보"
 
-#: src/store/workspace-store.ts:211
+#: src/store/workspace-store.ts:210
 msgid "Session timed out — backend may be unresponsive"
 msgstr "세션이 시간 초과되었습니다 — 백엔드가 응답하지 않을 수 있습니다"
 
-#: src/features/shell/config/navigation.ts:69
+#: src/features/shell/config/navigation.ts:63
 msgid "Sessions"
 msgstr "세션"
 
@@ -2060,7 +2060,7 @@ msgstr "GPU 가속 설정"
 msgid "Setting up your GPU"
 msgstr "GPU를 설정하는 중"
 
-#: src/features/shell/config/navigation.ts:104
+#: src/features/shell/config/navigation.ts:98
 msgid "Settings"
 msgstr "설정"
 
@@ -2136,7 +2136,7 @@ msgstr "다운로드와 메모리가 더 작고, 정확도는 약간 낮습니�
 msgid "Snippet text"
 msgstr "스니펫 텍스트"
 
-#: src/features/shell/config/navigation.ts:87
+#: src/features/shell/config/navigation.ts:81
 msgid "Snippets"
 msgstr "스니펫"
 
@@ -2228,7 +2228,7 @@ msgstr "이 기기에 저장됨"
 msgid "Style"
 msgstr "스타일"
 
-#: src/features/shell/config/navigation.ts:96
+#: src/features/shell/config/navigation.ts:90
 msgid "Styles"
 msgstr "스타일"
 
@@ -2261,7 +2261,7 @@ msgid "Switch to light theme"
 msgstr "밝은 테마로 전환"
 
 #: src/features/settings/sections/appearance-section.tsx:26
-#: src/features/shell/config/navigation.ts:121
+#: src/features/shell/config/navigation.ts:115
 msgid "System"
 msgstr "시스템"
 
@@ -2479,7 +2479,7 @@ msgstr "앱에 입력"
 msgid "Types as"
 msgstr "입력되는 내용"
 
-#: src/store/workspace-store.ts:688
+#: src/store/workspace-store.ts:646
 msgid "Unable to reach the desktop backend."
 msgstr "데스크톱 백엔드에 연결할 수 없습니다."
 
@@ -2547,7 +2547,7 @@ msgstr "스타일 보기"
 msgid "Visibility"
 msgstr "표시"
 
-#: src/features/shell/config/navigation.ts:78
+#: src/features/shell/config/navigation.ts:72
 msgid "Vocabulary"
 msgstr "어휘"
 
@@ -2638,7 +2638,7 @@ msgstr "단어"
 msgid "Words"
 msgstr "단어"
 
-#: src/features/shell/config/navigation.ts:120
+#: src/features/shell/config/navigation.ts:114
 msgid "Workspace"
 msgstr "작업 공간"
 
@@ -2682,7 +2682,7 @@ msgstr "최신 상태입니다"
 msgid "Your API key. Leave it blank to keep the saved key — or if the endpoint runs on your own machine or network and needs none."
 msgstr "API 키입니다. 저장된 키를 그대로 쓰려면, 또는 엔드포인트가 내 컴퓨터나 네트워크에서 실행되어 키가 필요 없다면 비워 두세요."
 
-#: src/features/shell/config/navigation.ts:61
+#: src/features/shell/config/navigation.ts:55
 msgid "Your dictation at a glance"
 msgstr "받아쓰기 한눈에 보기"
 

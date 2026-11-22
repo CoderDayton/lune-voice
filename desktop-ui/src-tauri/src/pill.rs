@@ -400,12 +400,10 @@ pub(crate) fn persist_pill_position() {
 
 fn write_pill_position(pos: Option<lune_core::config::PillPosition>) -> Result<(), String> {
     let paths = lune_persist::AppPaths::resolve().ok_or("resolve application paths")?;
-    let store = lune_persist::SettingsStore::new(paths.settings_file());
-    let mut settings = store.load().map_err(|e| format!("load settings: {e}"))?;
-    settings.pill_position = pos;
-    store
-        .save(&settings)
-        .map_err(|e| format!("save settings: {e}"))
+    crate::persistence::update_settings(&paths, |settings| {
+        settings.pill_position = pos;
+        Ok(())
+    })
 }
 
 // ── Visibility ──────────────────────────────────────────────────────────

@@ -117,12 +117,6 @@ pub trait AsrBackend: Send + Sync {
         let _ = session;
         Ok(())
     }
-
-    /// Optional hint: expected maximum number of segments per `poll_final`
-    /// call. Callers may use this to pre-allocate buffers.
-    fn segment_capacity_hint(&self) -> usize {
-        4
-    }
 }
 
 #[cfg(test)]

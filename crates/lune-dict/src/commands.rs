@@ -22,13 +22,8 @@ pub struct RouteResult {
 /// What remains is two parametric commands, `"switch to <preset>"` and
 /// `"insert <snippet>"`, which match when the utterance *begins* with the exact
 /// command words and has at least one more word; the remainder is the argument.
-/// Callers may register their own exact-match phrases with [`Self::add_custom`],
-/// which are recognized only when they are the entire utterance, compared
-/// word-for-word and ignoring case and surrounding punctuation.
-pub struct VoiceCommandRouter {
-    /// User-defined phrase → command mappings, stored as normalized word lists.
-    custom: Vec<(Vec<String>, VoiceCommand)>,
-}
+#[derive(Default)]
+pub struct VoiceCommandRouter;
 
 #[derive(Copy, Clone)]
 enum ParametricKind {
@@ -47,7 +42,7 @@ static PARAMETRIC_PREFIXES: &[(&str, ParametricKind)] = &[
 
 /// The reserved prefix a trigger phrase starts with, if any.
 ///
-/// A trigger beginning with one of these can never fire: `route_inner` claims
+/// A trigger beginning with one of these can never fire: `route_full` claims
 /// the prefix at the start of the utterance and treats the remainder as the
 /// command's argument, so `"insert my signature"` is routed as "insert the
 /// snippet named *my signature*" and never matches the trigger itself. Callers
@@ -62,75 +57,33 @@ pub fn reserved_trigger_prefix(trigger: &str) -> Option<&'static str> {
 
 impl VoiceCommandRouter {
     pub fn new() -> Self {
-        Self { custom: Vec::new() }
+        Self
     }
 
-    pub fn add_custom(&mut self, phrase: impl Into<String>, command: VoiceCommand) {
-        let words = normalize_words(&phrase.into());
-        if !words.is_empty() {
-            self.custom.push((words, command));
-        }
-    }
-
-    /// Route `text`, returning the detected command (if the whole utterance is
-    /// one) and the remaining dictation text.
-    pub fn route(&self, text: &str) -> RouteResult {
-        self.route_inner(text, false)
-    }
-
-    /// Full route, including parametric commands.
+    /// Route `text`, returning the detected command (if the utterance is one)
+    /// and the remaining dictation text.
     pub fn route_full(&self, text: &str) -> RouteResult {
-        self.route_inner(text, true)
-    }
-
-    fn route_inner(&self, text: &str, parametric: bool) -> RouteResult {
         let words = normalize_words(text);
-        let passthrough = || RouteResult {
-            commands: Vec::new(),
-            remaining: text.trim().to_string(),
-        };
-        if words.is_empty() {
-            return passthrough();
-        }
-
-        // Parametric: the utterance must begin with the exact command words and
-        // carry at least one argument word after them.
-        if parametric {
-            for &(prefix, kind) in PARAMETRIC_PREFIXES {
-                let pre: Vec<&str> = prefix.split_whitespace().collect();
-                if words.len() > pre.len()
-                    && words[..pre.len()].iter().zip(&pre).all(|(w, p)| w == p)
-                {
-                    let arg = words[pre.len()..].join(" ");
-                    let cmd = match kind {
-                        ParametricKind::SwitchStyle => VoiceCommand::SwitchStyle(arg),
-                        ParametricKind::InsertSnippet => VoiceCommand::InsertSnippet(arg),
-                    };
-                    return RouteResult {
-                        commands: vec![cmd],
-                        remaining: String::new(),
-                    };
-                }
-            }
-        }
-
-        // Custom commands: the whole utterance must equal the command.
-        for (phrase, cmd) in &self.custom {
-            if words == *phrase {
+        // The utterance must begin with the exact command words and carry at
+        // least one argument word after them.
+        for &(prefix, kind) in PARAMETRIC_PREFIXES {
+            let pre: Vec<&str> = prefix.split_whitespace().collect();
+            if words.len() > pre.len() && words[..pre.len()].iter().zip(&pre).all(|(w, p)| w == p) {
+                let arg = words[pre.len()..].join(" ");
+                let cmd = match kind {
+                    ParametricKind::SwitchStyle => VoiceCommand::SwitchStyle(arg),
+                    ParametricKind::InsertSnippet => VoiceCommand::InsertSnippet(arg),
+                };
                 return RouteResult {
-                    commands: vec![cmd.clone()],
+                    commands: vec![cmd],
                     remaining: String::new(),
                 };
             }
         }
-
-        passthrough()
-    }
-}
-
-impl Default for VoiceCommandRouter {
-    fn default() -> Self {
-        Self::new()
+        RouteResult {
+            commands: Vec::new(),
+            remaining: text.trim().to_string(),
+        }
     }
 }
 
@@ -202,7 +155,7 @@ mod tests {
     #[test]
     fn no_phrase_is_a_command_on_its_own() {
         // There are no fixed builtins left: an utterance is only ever a command
-        // if it starts with a parametric prefix or matches a custom phrase.
+        // if it starts with a parametric prefix.
         for utterance in ["scratch that", "stop dictation", "new line", "list item"] {
             let r = router().route_full(utterance);
             assert!(
@@ -266,18 +219,5 @@ mod tests {
         let r = router().route_full("hello world how are you");
         assert!(r.commands.is_empty());
         assert_eq!(r.remaining, "hello world how are you");
-    }
-
-    #[test]
-    fn custom_command_exact_only() {
-        let mut r = VoiceCommandRouter::new();
-        r.add_custom("send message", VoiceCommand::SwitchStyle("formal".into()));
-        assert!(
-            r.route_full("send message")
-                .commands
-                .contains(&VoiceCommand::SwitchStyle("formal".into()))
-        );
-        // Not the whole utterance → not a command.
-        assert!(r.route_full("please send message now").commands.is_empty());
     }
 }

@@ -23,10 +23,6 @@ pub struct OpenAiAsrConfig {
     /// Base per-request deadline (default 30 s). Each request adds its clip's
     /// duration to it.
     pub timeout: Duration,
-    /// Minimum PCM samples buffered before triggering a request.
-    ///
-    /// Defaults to 0.5 s at 16 kHz = 8000 samples.
-    pub min_samples_before_request: usize,
 }
 
 impl Default for OpenAiAsrConfig {
@@ -36,7 +32,6 @@ impl Default for OpenAiAsrConfig {
             api_key: RedactedString::new(""),
             model: "whisper-1".into(),
             timeout: Duration::from_secs(30),
-            min_samples_before_request: 8000, // 0.5 s @ 16 kHz
         }
     }
 }
@@ -63,10 +58,9 @@ pub struct OpenAiAsrSession {
 /// audio as 16-bit PCM WAV.
 ///
 /// On transient failures, retries per [`lune_core::retry`], the policy the
-/// styling LLM client shares. An opportunistic flush that still fails re-buffers
-/// the audio with a WARN log; a forced flush (`poll_final`, the batch
-/// pipeline's one transcription shot) propagates the error so the session
-/// reports a failure instead of a silent "no speech detected".
+/// styling LLM client shares. A request that still fails re-buffers the audio
+/// and propagates the error, so the session reports a failure instead of a
+/// silent "no speech detected".
 #[derive(Debug)]
 pub struct OpenAiCompatibleAsrBackend {
     client: reqwest::Client,
@@ -150,7 +144,7 @@ impl AsrBackend for OpenAiCompatibleAsrBackend {
     }
 
     async fn poll_final(&self, session: &Self::SessionHandle) -> Result<Vec<AsrSegment>> {
-        self.flush_audio(session, true).await?;
+        self.flush_audio(session).await?;
         let mut state = lock_err(session.state.lock())?;
         Ok(std::mem::take(&mut state.pending))
     }
@@ -163,9 +157,8 @@ impl AsrBackend for OpenAiCompatibleAsrBackend {
 }
 
 impl OpenAiCompatibleAsrBackend {
-    async fn flush_audio(&self, session: &OpenAiAsrSession, force: bool) -> Result<()> {
-        let samples_len = lock_err(session.state.lock())?.audio_buf.len();
-        if samples_len == 0 || (!force && samples_len < self.config.min_samples_before_request) {
+    async fn flush_audio(&self, session: &OpenAiAsrSession) -> Result<()> {
+        if lock_err(session.state.lock())?.audio_buf.is_empty() {
             return Ok(());
         }
 
@@ -197,13 +190,10 @@ impl OpenAiCompatibleAsrBackend {
                     pcm.append(&mut state.audio_buf);
                     state.audio_buf = pcm;
                 }
-                // A forced flush is the utterance's only transcription shot:
-                // swallowing the failure surfaces upstream as "no speech
-                // detected". Propagate it so the session reports the error.
-                if force {
-                    drop(state);
-                    return Err(e);
-                }
+                // This is the utterance's only transcription shot: swallowing
+                // the failure surfaces upstream as "no speech detected".
+                drop(state);
+                return Err(e);
             }
         }
 
@@ -610,7 +600,6 @@ mod tests {
         let config = OpenAiAsrConfig {
             base_url: "http://127.0.0.1:1/v1".parse().unwrap(),
             timeout: Duration::from_millis(100),
-            min_samples_before_request: 0, // trigger immediately
             ..Default::default()
         };
         let backend = OpenAiCompatibleAsrBackend::new(config).unwrap();
@@ -670,7 +659,6 @@ mod tests {
         let config = OpenAiAsrConfig {
             base_url: format!("http://127.0.0.1:{port}/v1").parse().unwrap(),
             timeout: Duration::from_millis(200),
-            min_samples_before_request: 0,
             ..Default::default()
         };
         let backend = OpenAiCompatibleAsrBackend::new(config).unwrap();
@@ -695,7 +683,6 @@ mod tests {
         let config = OpenAiAsrConfig {
             base_url: "http://127.0.0.1:1/v1".parse().unwrap(),
             timeout: Duration::from_millis(100),
-            min_samples_before_request: usize::MAX,
             ..Default::default()
         };
         let backend = OpenAiCompatibleAsrBackend::new(config).unwrap();

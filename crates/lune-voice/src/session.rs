@@ -19,6 +19,7 @@ use lune_core::session::{DictationSession, SessionEvent, SessionStatus};
 use lune_dict::UserDictionary;
 use lune_dict::commands::VoiceCommandRouter;
 use lune_dict::corrector::LexicalGate;
+use lune_dict::formatting::ResolvedFormat;
 use lune_persist::{Database, PersistResult};
 
 use crate::redact::Transcript;
@@ -156,29 +157,7 @@ impl<A: AsrBackend + 'static> SessionManager<A> {
         // the static registry.
         let style_preset: Option<Arc<StylePreset>> = match current_style_id {
             None => None,
-            Some(id) => match builtin_registry().get(&id) {
-                Some(preset) => Some(preset),
-                None => {
-                    let loaded = {
-                        let mut db = self.persist.lock().await;
-                        blocking_db(|| db.get_custom_style(&id))
-                    };
-                    match loaded {
-                        Ok(found) => found.map(|s| Arc::new(s.preset)),
-                        Err(e) => {
-                            // A genuine DB/deserialize error is not the same as a
-                            // missing style — surface it, then degrade to no styling
-                            // (optional) rather than failing the whole session.
-                            tracing::warn!(
-                                style = %id,
-                                error = %e,
-                                "failed to load custom style from database; delivering unstyled transcript"
-                            );
-                            None
-                        }
-                    }
-                }
-            },
+            Some(id) => resolve_style(&self.persist, &id).await,
         };
 
         // Hold the active lock across persist + spawn and only assign
@@ -259,7 +238,7 @@ impl<A: AsrBackend + 'static> SessionManager<A> {
                 .await;
                 let _ =
                     send_bounded(&event_tx_guard, SessionEvent::Stopped { error_dropped }).await;
-                clear_active(&active_arc_guard, &idle_notify_guard).await;
+                clear_active(&active_arc_guard, &idle_notify_guard, session_id).await;
                 if let Some(persist) = panicked_row_to_close {
                     finalize_panicked_session(session_id, persist).await;
                 }
@@ -347,9 +326,17 @@ fn drain_processing_controls(
     }
 }
 
-async fn clear_active(active_arc: &Arc<Mutex<Option<ActiveHandle>>>, idle_notify: &Notify) {
-    active_arc.lock().await.take();
-    idle_notify.notify_waiters();
+async fn clear_active(
+    active_arc: &Arc<Mutex<Option<ActiveHandle>>>,
+    idle_notify: &Notify,
+    session_id: Uuid,
+) {
+    let mut active = active_arc.lock().await;
+    if active.as_ref().is_some_and(|h| h.session_id == session_id) {
+        active.take();
+        drop(active);
+        idle_notify.notify_waiters();
+    }
 }
 
 /// Upper bound on a session event send. The channel is generously sized
@@ -370,7 +357,6 @@ fn event_name(event: &SessionEvent) -> &'static str {
         SessionEvent::Processing => "Processing",
         SessionEvent::AudioLevel(_) => "AudioLevel",
         SessionEvent::CommandDetected { .. } => "CommandDetected",
-        SessionEvent::GateDecision { .. } => "GateDecision",
         SessionEvent::Error(_) => "Error",
         SessionEvent::Warning(_) => "Warning",
         SessionEvent::Stopped { .. } => "Stopped",
@@ -506,7 +492,6 @@ async fn run_session<A: AsrBackend + 'static>(
         &deps.config.pipeline,
         agc_mode,
         input_device,
-        asr.segment_capacity_hint(),
         &deps.event_tx,
         &mut control_rx,
     )
@@ -582,16 +567,7 @@ async fn run_session<A: AsrBackend + 'static>(
         return;
     }
 
-    process_and_deliver(
-        deps,
-        raw_text,
-        segments,
-        status,
-        style_preset,
-        control_rx,
-        cancelled,
-    )
-    .await;
+    process_and_deliver(deps, raw_text, segments, status, style_preset, control_rx).await;
 }
 
 /// Output of the deterministic correction + formatting stage.
@@ -600,26 +576,22 @@ struct Shaped {
     /// and the styling-LLM input.
     text_after_heuristic: String,
     detected_lang: &'static str,
-    /// Whether the styling LLM pass should run. The LLM does styling only, so
-    /// this is simply "a non-default style is selected" — no correction gating.
-    needs_llm: bool,
     /// Words the corrector could neither resolve nor confidently preserve.
-    unresolved_words: Vec<(String, usize)>,
+    unresolved: usize,
     /// Risk entries that didn't align to a text token (diagnostic).
     dropped_risks: usize,
 }
 
-/// Pure and synchronous: heuristic correction, then [`lune_dict::formatting::shape`],
-/// and the gate that decides whether the LLM pass runs. The dictionary scan stays with the
-/// caller, which passes the pre-scanned `dict_replacements` in.
+/// Pure and synchronous: heuristic correction, then [`lune_dict::formatting::shape`].
+/// The dictionary scan stays with the caller, which passes the pre-scanned
+/// `dict_replacements` in.
 fn correct_and_format(
     text: &str,
     segments: &[AsrSegment],
     dict_replacements: &[lune_dict::DictMatch],
     heuristic: &LexicalGate,
     pipeline: &PipelineConfig,
-    fmt: &lune_core::config::FormatToggles,
-    wants_styling: bool,
+    fmt: &ResolvedFormat,
 ) -> Shaped {
     let word_risk_scores: Vec<(&str, f32, f32)> = segments
         .iter()
@@ -642,7 +614,7 @@ fn correct_and_format(
         dict_replacements,
         detected_lang,
         heuristic_flag_risk,
-        fmt.resolve_brand_casing(true),
+        fmt.brand_casing,
     );
     let dict_spans: Vec<&str> = dict_replacements
         .iter()
@@ -655,24 +627,10 @@ fn correct_and_format(
         &dict_spans,
     );
 
-    // Words the corrector could neither resolve nor confidently preserve —
-    // surfaced in the gate UI and the reason the correction pass runs. They are
-    // deliberately NOT fed to the LLM prompt as hints.
-    let unresolved_words: Vec<(String, usize)> = heuristic_result
-        .unresolved_words
-        .iter()
-        .map(|ws| (ws.word.clone(), ws.position))
-        .collect();
-
-    // The LLM does styling only (no correction), so the pass runs iff the user
-    // selected a non-default style — no confidence / punctuation / correction
-    // gating. The per-word risk scores still drive the deterministic heuristic
-    // above; they no longer route the LLM.
     Shaped {
         text_after_heuristic,
         detected_lang,
-        needs_llm: wants_styling,
-        unresolved_words,
+        unresolved: heuristic_result.unresolved_words.len(),
         dropped_risks: heuristic_result.dropped_risk_entries,
     }
 }
@@ -681,13 +639,10 @@ fn correct_and_format(
 /// optional LLM polishing, and final delivery.
 ///
 /// Called once per session after the `'capture` loop has produced
-/// `(raw_text, segments)`. All early-exit paths (empty after voice
-/// commands, mid-LLM cancellation) finalize the DB and clear active
-/// state before returning, so the caller has nothing to clean up.
-///
-/// `cancelled` carries the cancel signal observed during capture; this
-/// function may flip it to true if a later signal arrives via
-/// `control_rx`.
+/// `(raw_text, segments)`, and only when capture was not cancelled. All
+/// early-exit paths (empty after voice commands, mid-LLM cancellation)
+/// finalize the DB and clear active state before returning, so the caller has
+/// nothing to clean up.
 async fn process_and_deliver(
     deps: SessionDeps,
     raw_text: String,
@@ -695,8 +650,8 @@ async fn process_and_deliver(
     status: SessionStatus,
     mut style_preset: Option<Arc<StylePreset>>,
     mut control_rx: mpsc::UnboundedReceiver<SessionControl>,
-    mut cancelled: bool,
 ) {
+    let mut cancelled = false;
     // Owns the handles every exit path needs, so the destructuring below can
     // drop them.
     let td = deps.teardown();
@@ -723,7 +678,7 @@ async fn process_and_deliver(
         lune_core::command::VoiceCommand::InsertSnippet(name) => Some(name.clone()),
         _ => None,
     });
-    apply_voice_commands(
+    let unresolved_switch = apply_voice_commands(
         &route.commands,
         session_id,
         &persist,
@@ -749,13 +704,13 @@ async fn process_and_deliver(
                 td.stop(SessionStatus::Cancelled).await;
                 return;
             }
-            td.deliver(&raw_text, rendered, status).await;
+            td.deliver(rendered, status).await;
             return;
         }
         snippet_fallback_raw = snippet_name.is_some();
     }
 
-    let text_after_commands = if snippet_fallback_raw {
+    let text_after_commands = if snippet_fallback_raw || unresolved_switch {
         raw_text.trim().to_owned()
     } else {
         route.remaining.trim().to_owned()
@@ -775,8 +730,18 @@ async fn process_and_deliver(
     }
 
     let pipeline_t0 = tokio::time::Instant::now();
+    // A style's own brand-casing and number choices win; otherwise the global settings.
+    let fmt = {
+        let s = settings.read().await;
+        let style = style_preset
+            .as_ref()
+            .map(|p| p.formatting)
+            .unwrap_or_default();
+        ResolvedFormat::new(&style, s.brand_casing, s.spoken_numbers, s.single_digits)
+    };
     // ── Step 1: Dictionary scan + Heuristic correction ─────────────────
-    let (dictionary_entries, dict_replacements) = {
+    // CPU-bound, so it runs off the async worker like the DB calls do.
+    let (dictionary_entries, shaped) = blocking_db(|| {
         let mut entries = dict
             .top_relevant(&text_after_commands, 20)
             .into_iter()
@@ -794,83 +759,60 @@ async fn process_and_deliver(
             }
         }
         let replacements = dict.scan(&text_after_commands);
-        (entries, replacements)
-    };
-    // A style's own brand-casing and number choices win; otherwise the global settings.
-    let mut fmt = style_preset
-        .as_ref()
-        .map(|p| p.formatting)
-        .unwrap_or_default();
-    {
-        let s = settings.read().await;
-        fmt.brand_casing = Some(fmt.resolve_brand_casing(s.brand_casing));
-        fmt.spoken_numbers = Some(fmt.resolve_spoken_numbers(s.spoken_numbers));
-        fmt.single_digits = Some(fmt.resolve_single_digits(s.single_digits));
-    }
-    let wants_styling = style_preset.is_some();
-    // Deterministic correction + formatting + bypass-gate, as one span so a
-    // single dictation request shows its shaping cost end-to-end.
-    let Shaped {
-        text_after_heuristic,
-        detected_lang,
-        needs_llm,
-        unresolved_words,
-        dropped_risks,
-    } = {
+        // Deterministic correction + formatting, as one span so a single
+        // dictation request shows its shaping cost end-to-end.
         let _span = tracing::info_span!("correct_format", %session_id).entered();
-        correct_and_format(
+        let shaped = correct_and_format(
             &text_after_commands,
             &segments,
-            &dict_replacements,
+            &replacements,
             &heuristic,
             &config.pipeline,
             &fmt,
-            wants_styling,
-        )
-    };
-    let unresolved_count = unresolved_words.len();
+        );
+        (entries, shaped)
+    });
+    let Shaped {
+        text_after_heuristic,
+        detected_lang,
+        unresolved,
+        dropped_risks,
+    } = shaped;
+    let wants_styling = style_preset.is_some();
 
     info!(%session_id, raw = %Transcript::new(&raw_text), "[ASR] raw");
     info!(
         %session_id,
         lang = detected_lang,
-        unresolved = unresolved_count,
+        unresolved,
         dropped_risks,
-        needs_llm,
+        wants_styling,
         "style gate"
     );
 
-    let _ = send_bounded(
-        &event_tx,
-        SessionEvent::GateDecision {
-            used_llm: needs_llm,
-            lang: detected_lang.to_owned(),
-            unresolved: unresolved_words,
-        },
-    )
-    .await;
-
     drain_processing_controls(&mut control_rx, &mut cancelled);
-    let post_llm_text = if cancelled {
-        info!(%session_id, "session cancelled during processing, skipping LLM");
-        String::new()
-    } else if !needs_llm {
-        info!(%session_id, "no style selected — skipping styling LLM");
-        text_after_heuristic
-    } else {
-        style_with_llm(
-            session_id,
-            text_after_heuristic,
-            style_preset
-                .as_ref()
-                .expect("needs_llm implies a selected style preset"),
-            &*post_processor,
-            &config.pipeline,
-            dictionary_entries,
-            detected_lang,
-            &fmt,
-        )
-        .await
+    let post_llm_text = match &style_preset {
+        _ if cancelled => {
+            info!(%session_id, "session cancelled during processing, skipping LLM");
+            String::new()
+        }
+        None => {
+            info!(%session_id, "no style selected — skipping styling LLM");
+            text_after_heuristic
+        }
+        Some(preset) => {
+            style_with_llm(
+                session_id,
+                text_after_heuristic,
+                preset,
+                &*post_processor,
+                &config.pipeline,
+                dictionary_entries,
+                detected_lang,
+                &fmt,
+            )
+            .await
+        }
     };
 
     drain_processing_controls(&mut control_rx, &mut cancelled);
@@ -881,29 +823,35 @@ async fn process_and_deliver(
 
     info!(%session_id, pipeline_ms = pipeline_t0.elapsed().as_millis() as u64, "post-processing complete");
 
-    td.deliver(&raw_text, post_llm_text, status).await;
+    td.deliver(post_llm_text, status).await;
 }
 
 /// Report each routed voice command, and apply the ones that change this
-/// session's own state.
+/// session's own state. Returns true when a `SwitchStyle` named no style: the
+/// utterance is then ordinary dictation ("switch to Python for this script").
 ///
 /// `InsertSnippet` is skipped: the snippet expander below owns it, and puts the
 /// utterance back as dictation when no snippet matches — reporting it here
-/// would announce a command that may never apply.
+/// would announce a command that may never apply. An unresolved `SwitchStyle`
+/// is not reported for the same reason.
 async fn apply_voice_commands(
     commands: &[lune_core::command::VoiceCommand],
     session_id: Uuid,
     persist: &Arc<Mutex<Database>>,
     event_tx: &mpsc::Sender<SessionEvent>,
     style_preset: &mut Option<Arc<StylePreset>>,
-) {
+) -> bool {
+    let mut unresolved_switch = false;
     for cmd in commands {
         if matches!(cmd, lune_core::command::VoiceCommand::InsertSnippet(_)) {
             continue;
         }
-        if let lune_core::command::VoiceCommand::SwitchStyle(style_id) = cmd
-            && let Some(next_preset) = resolve_style(session_id, persist, style_id).await
-        {
+        if let lune_core::command::VoiceCommand::SwitchStyle(style_id) = cmd {
+            let Some(next_preset) = resolve_style(persist, style_id).await else {
+                info!(%session_id, "style switch named no style; dictating the utterance");
+                unresolved_switch = true;
+                continue;
+            };
             info!(
                 %session_id,
                 style = %next_preset.id,
@@ -921,16 +869,12 @@ async fn apply_voice_commands(
         )
         .await;
     }
+    unresolved_switch
 }
 
 /// A style preset by id: the built-in registry first, then the user's custom
-/// styles. `None` when the id names neither, or the lookup failed — the
-/// session keeps the style it already had.
-async fn resolve_style(
-    session_id: Uuid,
-    persist: &Arc<Mutex<Database>>,
-    style_id: &str,
-) -> Option<Arc<StylePreset>> {
+/// styles. `None` when the id names neither, or the lookup failed.
+async fn resolve_style(persist: &Arc<Mutex<Database>>, style_id: &str) -> Option<Arc<StylePreset>> {
     if let Some(preset) = builtin_registry().get(style_id) {
         return Some(preset);
     }
@@ -941,12 +885,9 @@ async fn resolve_style(
     match loaded {
         Ok(found) => found.map(|cs| Arc::new(cs.preset)),
         Err(e) => {
-            warn!(
-                %session_id,
-                style = %style_id,
-                error = %e,
-                "failed to load custom style during voice-command style switch"
-            );
+            // A DB/deserialize error is not a missing style: surface it, then
+            // degrade rather than fail the session.
+            warn!(error = %e, "failed to load custom style from database");
             None
         }
     }
@@ -966,7 +907,13 @@ async fn expand_snippet(
 ) -> Option<String> {
     let snippets = {
         let mut db = persist.lock().await;
-        blocking_db(|| db.list_snippets())
+        blocking_db(|| {
+            if db.has_snippets()? {
+                db.list_snippets()
+            } else {
+                Ok(Vec::new())
+            }
+        })
     }
     .unwrap_or_else(|e| {
         warn!(error = %e, %session_id, "failed to load snippets");
@@ -999,7 +946,7 @@ async fn style_with_llm(
     pipeline: &PipelineConfig,
     dictionary: Vec<lune_core::dict::DictionaryEntry>,
     language: &str,
-    fmt: &lune_core::config::FormatToggles,
+    fmt: &ResolvedFormat,
 ) -> String {
     info!(%session_id, input = %Transcript::new(&text), "[LLM] input");
     let llm_t0 = tokio::time::Instant::now();
@@ -1010,15 +957,12 @@ async fn style_with_llm(
         dictionary,
         language: language.into(),
     };
-    let llm_result = if timeout_secs > 0 {
-        tokio::time::timeout(
-            Duration::from_secs(timeout_secs as u64),
-            post_processor.transform(&input),
-        )
-        .await
-    } else {
-        Ok(post_processor.transform(&input).await)
-    };
+    // `PipelineConfig::clamp` maps 0 to the ceiling, so this always bounds.
+    let llm_result = tokio::time::timeout(
+        Duration::from_secs(u64::from(timeout_secs)),
+        post_processor.transform(&input),
+    )
+    .await;
     match llm_result {
         Ok(Ok(output)) => {
             debug!(%session_id, llm_ms = llm_t0.elapsed().as_millis() as u64, "[LLM] output ready, len={}", output.cleaned_text.len());
@@ -1081,7 +1025,8 @@ async fn read_clipboard_text() -> Option<String> {
     None
 }
 
-/// Run a synchronous SQLite call without parking an async worker.
+/// Run a synchronous SQLite call (or other blocking CPU work) without parking
+/// an async worker.
 ///
 /// `ARCHITECTURE.md` states persistence never stalls the runtime, and the Tauri
 /// command layer keeps that promise with `spawn_blocking`. The session
@@ -1238,12 +1183,9 @@ impl Teardown {
         self.clear().await;
     }
 
-    /// Emit the finalized text, persist the (raw → final) pair and transcript,
-    /// and close the session — shared by the normal pipeline exit and the voice
-    /// snippet fast path (which skips correction and styling entirely).
-    async fn deliver(&self, raw_text: &str, final_text: String, status: SessionStatus) {
+    async fn deliver(&self, final_text: String, mut status: SessionStatus) {
         let session_id = self.session_id;
-        let _ = send_bounded(
+        let delivered = send_bounded(
             &self.event_tx,
             SessionEvent::FinalizedText {
                 session_id,
@@ -1251,6 +1193,12 @@ impl Teardown {
             },
         )
         .await;
+        // The text never reached the delivery forwarder, so the session did not
+        // succeed; `Stopped` says so the way a dropped `Error` does.
+        if !delivered {
+            warn!(%session_id, "finalized text was not handed to delivery");
+            status = SessionStatus::Failed("finalized text was not delivered".into());
+        }
 
         let transcript = if final_text.is_empty() {
             None
@@ -1258,24 +1206,18 @@ impl Teardown {
             Some(final_text)
         };
 
-        // Record (raw ASR, final delivered) as labelled data. Best-effort — a
-        // write failure never affects delivery. Skipped entirely when history is
-        // off: this pair is the whole transcript twice over.
-        if let Some(final_text) = transcript.as_deref().filter(|_| self.persist_history) {
-            let mut db = self.persist.lock().await;
-            if let Err(e) =
-                blocking_db(|| db.insert_correction_pair(session_id, raw_text, final_text))
-            {
-                warn!(error = %e, %session_id, "failed to persist correction pair");
-            }
-        }
-
         // Await the DB finalize inline so a runtime shutdown between here and
         // the next tick can't drop the transcript. The lock is short-held and
         // sqlite writes are sync, so worst-case added latency is ~10ms.
         self.finalize(status, Some(Utc::now()), transcript).await;
 
-        let _ = send_bounded(&self.event_tx, SessionEvent::stopped()).await;
+        let _ = send_bounded(
+            &self.event_tx,
+            SessionEvent::Stopped {
+                error_dropped: !delivered,
+            },
+        )
+        .await;
         self.clear().await;
         info!(%session_id, "session stopped");
     }
@@ -1298,7 +1240,7 @@ impl Teardown {
     }
 
     async fn clear(&self) {
-        clear_active(&self.active_arc, &self.idle_notify).await;
+        clear_active(&self.active_arc, &self.idle_notify, self.session_id).await;
     }
 }
 
@@ -2066,6 +2008,125 @@ mod tests {
             .await;
     }
 
+    #[tokio::test]
+    async fn switch_to_unknown_style_falls_back_to_dictation() {
+        local_set()
+            .run_until(async {
+                let responses = vec![Ok(vec![make_segment(
+                    "switch to the next slide please",
+                    false,
+                )])];
+                let (mgr, _db) = make_manager(scripted_asr(responses), Arc::new(EchoPostProcessor));
+                let (tx, rx) = mpsc::channel(32);
+                let _ = mgr
+                    .start(
+                        tx,
+                        SessionAudio::Owned(speech_stream()),
+                        SessionKind::Dictate,
+                    )
+                    .await
+                    .unwrap();
+
+                let events = collect_events(rx).await;
+                assert!(
+                    !events
+                        .iter()
+                        .any(|e| matches!(e, SessionEvent::CommandDetected { .. })),
+                    "an unresolved style switch must not be reported as a command"
+                );
+                let finalized = events.iter().find_map(|event| match event {
+                    SessionEvent::FinalizedText { text, .. } => Some(text.as_str()),
+                    _ => None,
+                });
+                assert_eq!(finalized, Some("Switch to the next slide please."));
+            })
+            .await;
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn undelivered_final_text_fails_the_session() {
+        let db = Arc::new(Mutex::new(Database::open_in_memory().unwrap()));
+        let session_id = Uuid::new_v4();
+        db.lock()
+            .await
+            .insert_session(&DictationSession {
+                id: session_id,
+                started_at: Utc::now(),
+                ended_at: None,
+                style: None,
+                backend: AsrBackendKind::WhisperCpp,
+                status: SessionStatus::Active,
+                transcript: None,
+            })
+            .unwrap();
+        let (tx, mut rx) = mpsc::channel(1);
+        assert!(send_bounded(&tx, SessionEvent::Started).await);
+        let td = Teardown {
+            session_id,
+            event_tx: tx,
+            persist: Arc::clone(&db),
+            persist_history: true,
+            active_arc: Arc::new(Mutex::new(None)),
+            idle_notify: Arc::new(Notify::new()),
+        };
+        let listener = tokio::spawn(async move {
+            tokio::time::sleep(EVENT_SEND_TIMEOUT + Duration::from_secs(1)).await;
+            let mut events = Vec::new();
+            while let Some(event) = rx.recv().await {
+                events.push(event);
+            }
+            events
+        });
+
+        td.deliver("Final text.".into(), SessionStatus::Completed)
+            .await;
+        drop(td);
+
+        let events = listener.await.unwrap();
+        assert!(
+            !events
+                .iter()
+                .any(|e| matches!(e, SessionEvent::FinalizedText { .. })),
+            "{events:?}"
+        );
+        assert!(
+            events.iter().any(|e| matches!(
+                e,
+                SessionEvent::Stopped {
+                    error_dropped: true
+                }
+            )),
+            "{events:?}"
+        );
+        let session = db.lock().await.get_session(session_id).unwrap().unwrap();
+        assert!(
+            matches!(session.status, SessionStatus::Failed(_)),
+            "{:?}",
+            session.status
+        );
+    }
+
+    #[tokio::test]
+    async fn clear_active_leaves_a_newer_session_in_place() {
+        let active = Arc::new(Mutex::new(None));
+        let idle = Notify::new();
+        let (control_tx, _control_rx) = mpsc::unbounded_channel();
+        let newer = Uuid::new_v4();
+        *active.lock().await = Some(ActiveHandle {
+            control_tx,
+            session_id: newer,
+        });
+
+        clear_active(&active, &idle, Uuid::new_v4()).await;
+        assert_eq!(
+            active.lock().await.as_ref().map(|h| h.session_id),
+            Some(newer)
+        );
+
+        clear_active(&active, &idle, newer).await;
+        assert!(active.lock().await.is_none());
+    }
+
     #[test]
     fn correct_and_format_capitalizes_and_punctuates_clean_english() {
         // The deterministic shaping stage: a clean lowercase utterance gets a
@@ -2074,7 +2135,7 @@ mod tests {
         lune_dict::lexicon::warm();
         let heuristic = LexicalGate::new();
         let pipeline = PipelineConfig::default();
-        let fmt = lune_core::config::FormatToggles::default();
+        let fmt = ResolvedFormat::default();
         let segments = vec![make_segment("hello world", false)];
 
         let shaped = correct_and_format(
@@ -2084,12 +2145,11 @@ mod tests {
             &heuristic,
             &pipeline,
             &fmt,
-            false,
         );
 
         assert_eq!(shaped.text_after_heuristic, "Hello world.");
         assert_eq!(shaped.detected_lang, "English");
-        assert!(shaped.unresolved_words.is_empty());
+        assert_eq!(shaped.unresolved, 0);
     }
 
     #[test]
@@ -2100,8 +2160,8 @@ mod tests {
         let text = "we drove to home depot";
         let segments = vec![make_segment(text, false)];
         let run = |brand_casing| {
-            let fmt = lune_core::config::FormatToggles {
-                brand_casing: Some(brand_casing),
+            let fmt = ResolvedFormat {
+                brand_casing,
                 ..Default::default()
             };
             correct_and_format(
@@ -2111,7 +2171,6 @@ mod tests {
                 &heuristic,
                 &pipeline,
                 &fmt,
-                false,
             )
             .text_after_heuristic
         };
@@ -2132,8 +2191,8 @@ mod tests {
             replacement: "Twenty One Club".to_owned(),
             fuzzy: false,
         }];
-        let fmt = lune_core::config::FormatToggles::default();
-        let shaped = correct_and_format(text, &segments, &dict, &heuristic, &pipeline, &fmt, false);
+        let fmt = ResolvedFormat::default();
+        let shaped = correct_and_format(text, &segments, &dict, &heuristic, &pipeline, &fmt);
         assert_eq!(
             shaped.text_after_heuristic,
             "We went to the Twenty One Club for $25."

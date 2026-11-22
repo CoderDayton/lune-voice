@@ -7,7 +7,7 @@ import type { GpuInstallProgressDto } from '../../../lib/backend/generated/GpuIn
 import { installGpuBackend } from '../../../lib/backend/gpu-install';
 import { isTauriRuntime } from '../../../lib/backend/runtime';
 
-export interface GpuBackendState {
+interface GpuBackendState {
   status: GpuBackendStatusDto | null;
   /** Non-null while the archive is downloading. */
   progress: GpuInstallProgressDto | null;

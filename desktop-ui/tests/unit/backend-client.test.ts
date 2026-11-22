@@ -14,7 +14,6 @@ describe("mock backend client", () => {
   test("loadWorkspaceSnapshot returns a valid snapshot", async () => {
     const snapshot = await mockBackendClient.loadWorkspaceSnapshot();
 
-    expect(snapshot.ipcFlavor).toBe("mock");
     expect(snapshot.serviceStatus).toBe("ready");
     expect(snapshot.settings).toBeDefined();
     expect(snapshot.settings.activationMode).toBe("Toggle");

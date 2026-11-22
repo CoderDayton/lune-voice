@@ -1,6 +1,5 @@
 /target
 /dist
-desktop-ui/src-tauri/onnx-libs/
 # ggml libraries staged for bundling by scripts/release/build-bundles.sh
 desktop-ui/src-tauri/runtime/
 **/*.rs.bk
@@ -9,30 +8,19 @@ desktop-ui/src-tauri/runtime/
 .env
 *.db
 
-.ralph-logs/
 models/
-# llama.cpp keeps model-architecture sources in `models/` directories.
-!vendor/whisper-rs-sys/llama.cpp/**/models/
-test_fixtures/
 CLAUDE.md
 TODO.md
-luneopt/
 /data/
 corpora/
 .claude/
-qwen2.5-1.5b-instruct-gguf/
 
 # Root-level JS artifacts (desktop-ui has its own)
 /node_modules/
 /bun.lock
 /package.json
 
-# Unsloth fine-tuning artifacts
-unsloth/checkpoints/
-unsloth/qwen-asr-corrector/
-unsloth/asr_uncertainty_correction.jsonl
 .playwright-mcp/
-docs/daisyui-llms.txt
 confusion_bank.json
 
 # Scratch dictation recordings dumped at the repo root

@@ -346,7 +346,7 @@ msgstr "Melhor precisão; o decodificador turbo mantém a rapidez."
 msgid "Bigger is more accurate, but slower"
 msgstr "Maior é mais preciso, porém mais lento"
 
-#: src/features/shell/config/navigation.ts:88
+#: src/features/shell/config/navigation.ts:82
 msgid "Blocks of text Lune Voice types when you speak their trigger phrase"
 msgstr "Blocos de texto que o Lune Voice digita quando você fala a frase de ativação"
 
@@ -374,7 +374,7 @@ msgstr "Grafia de marcas (\"github\" → \"GitHub\")"
 msgid "Brands"
 msgstr "Marcas"
 
-#: src/features/shell/config/navigation.ts:70
+#: src/features/shell/config/navigation.ts:64
 msgid "Browse and search past dictations"
 msgstr "Navegue e pesquise ditados anteriores"
 
@@ -603,7 +603,7 @@ msgstr "Correção"
 msgid "Correction sensitivity"
 msgstr "Sensibilidade de correção"
 
-#: src/features/shell/config/navigation.ts:79
+#: src/features/shell/config/navigation.ts:73
 msgid "Corrections Lune Voice applies every time you dictate"
 msgstr "Correções que o Lune Voice aplica sempre que você dita"
 
@@ -1014,7 +1014,7 @@ msgstr "Formal"
 msgid "Formatting"
 msgstr "Formatação"
 
-#: src/features/shell/config/navigation.ts:97
+#: src/features/shell/config/navigation.ts:91
 msgid "Formatting presets for your text"
 msgstr "Predefinições de formatação para o seu texto"
 
@@ -1145,7 +1145,7 @@ msgstr "Segurar enquanto fala"
 msgid "Hold your hotkey, speak, then let go. The text is typed into whatever app you were using."
 msgstr "Segure seu atalho, fale e solte. O texto é digitado no aplicativo que você estava usando."
 
-#: src/features/shell/config/navigation.ts:60
+#: src/features/shell/config/navigation.ts:54
 msgid "Home"
 msgstr "Início"
 
@@ -1184,7 +1184,7 @@ msgstr "Em andamento"
 msgid "In use"
 msgstr "Em uso"
 
-#: src/features/shell/config/navigation.ts:105
+#: src/features/shell/config/navigation.ts:99
 msgid "Input, output, models, and shortcuts"
 msgstr "Entrada, saída, modelos e atalhos"
 
@@ -1433,7 +1433,7 @@ msgstr "Modelos"
 msgid "Models are stored locally. No telemetry, no accounts."
 msgstr "Os modelos são armazenados localmente. Sem telemetria, sem contas."
 
-#: src/features/shell/config/navigation.ts:109
+#: src/features/shell/config/navigation.ts:103
 msgid "Models, shortcuts, output"
 msgstr "Modelos, atalhos, saída"
 
@@ -2036,11 +2036,11 @@ msgstr "Envia as transcrições para um endpoint compatível com OpenAI que voc�
 msgid "Session details"
 msgstr "Detalhes da sessão"
 
-#: src/store/workspace-store.ts:211
+#: src/store/workspace-store.ts:210
 msgid "Session timed out — backend may be unresponsive"
 msgstr "A sessão expirou — o backend pode não estar respondendo"
 
-#: src/features/shell/config/navigation.ts:69
+#: src/features/shell/config/navigation.ts:63
 msgid "Sessions"
 msgstr "Sessões"
 
@@ -2060,7 +2060,7 @@ msgstr "Configurar a aceleração por GPU"
 msgid "Setting up your GPU"
 msgstr "Configurando sua GPU"
 
-#: src/features/shell/config/navigation.ts:104
+#: src/features/shell/config/navigation.ts:98
 msgid "Settings"
 msgstr "Configurações"
 
@@ -2136,7 +2136,7 @@ msgstr "Download menor e menos memória, um pouco menos preciso."
 msgid "Snippet text"
 msgstr "Texto do trecho"
 
-#: src/features/shell/config/navigation.ts:87
+#: src/features/shell/config/navigation.ts:81
 msgid "Snippets"
 msgstr "Trechos"
 
@@ -2228,7 +2228,7 @@ msgstr "Armazenado neste dispositivo"
 msgid "Style"
 msgstr "Estilo"
 
-#: src/features/shell/config/navigation.ts:96
+#: src/features/shell/config/navigation.ts:90
 msgid "Styles"
 msgstr "Estilos"
 
@@ -2261,7 +2261,7 @@ msgid "Switch to light theme"
 msgstr "Mudar para o tema claro"
 
 #: src/features/settings/sections/appearance-section.tsx:26
-#: src/features/shell/config/navigation.ts:121
+#: src/features/shell/config/navigation.ts:115
 msgid "System"
 msgstr "Sistema"
 
@@ -2479,7 +2479,7 @@ msgstr "Digitar no aplicativo"
 msgid "Types as"
 msgstr "Digita como"
 
-#: src/store/workspace-store.ts:688
+#: src/store/workspace-store.ts:646
 msgid "Unable to reach the desktop backend."
 msgstr "Não foi possível conectar ao backend do aplicativo."
 
@@ -2547,7 +2547,7 @@ msgstr "Ver estilo"
 msgid "Visibility"
 msgstr "Visibilidade"
 
-#: src/features/shell/config/navigation.ts:78
+#: src/features/shell/config/navigation.ts:72
 msgid "Vocabulary"
 msgstr "Vocabulário"
 
@@ -2638,7 +2638,7 @@ msgstr "palavras"
 msgid "Words"
 msgstr "Palavras"
 
-#: src/features/shell/config/navigation.ts:120
+#: src/features/shell/config/navigation.ts:114
 msgid "Workspace"
 msgstr "Espaço de trabalho"
 
@@ -2682,7 +2682,7 @@ msgstr "Tudo atualizado"
 msgid "Your API key. Leave it blank to keep the saved key — or if the endpoint runs on your own machine or network and needs none."
 msgstr "Sua chave de API. Deixe em branco para manter a chave salva — ou se o endpoint rodar na sua própria máquina ou rede e não exigir nenhuma."
 
-#: src/features/shell/config/navigation.ts:61
+#: src/features/shell/config/navigation.ts:55
 msgid "Your dictation at a glance"
 msgstr "Seus ditados em resumo"
 

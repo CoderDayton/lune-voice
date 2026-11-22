@@ -2,6 +2,7 @@
 
 import { Channel, invoke } from '@tauri-apps/api/core';
 import { listen } from '@tauri-apps/api/event';
+import { subscribeMockSessionStream } from './mock';
 import { isTauriRuntime } from './runtime';
 import type { SessionStreamEvent } from './types';
 
@@ -53,7 +54,7 @@ export async function attachSessionStream(
   onEvent: (event: SessionStreamEvent) => void,
 ): Promise<() => void> {
   if (!isTauriRuntime()) {
-    return () => {};
+    return subscribeMockSessionStream(onEvent);
   }
 
   const channel = new Channel<SessionStreamEvent>((event) => {

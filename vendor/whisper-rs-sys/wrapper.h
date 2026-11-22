@@ -7,10 +7,3 @@
 #ifdef GGML_USE_VULKAN
 #include "ggml-vulkan.h"
 #endif
-
-/* LUNE FORK: llama and mtmd, for LFM3-Audio (the `llama` feature). */
-#ifdef LUNE_LLAMA
-#include <llama.h>
-#include <mtmd.h>
-#include <mtmd-helper.h>
-#endif

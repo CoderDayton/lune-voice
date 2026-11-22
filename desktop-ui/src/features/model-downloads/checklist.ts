@@ -9,7 +9,7 @@ export interface RunModel {
 
 export type GpuStep = 'queued' | 'downloading' | 'activating' | 'done' | 'failed';
 
-export type ChecklistState = 'queued' | 'active' | 'activating' | 'done' | 'failed';
+type ChecklistState = 'queued' | 'active' | 'activating' | 'done' | 'failed';
 
 export interface ChecklistRow {
   /** The model's local name, or `gpu`. */
@@ -21,7 +21,7 @@ export interface ChecklistRow {
   totalBytes: number;
 }
 
-export interface ChecklistInput {
+interface ChecklistInput {
   models: RunModel[];
   finished: ReadonlySet<string>;
   current: string | null;

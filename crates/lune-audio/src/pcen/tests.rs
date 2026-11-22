@@ -39,31 +39,25 @@ fn bursty(freq: f32, amp: f32, n: usize, on_ms: u32, off_ms: u32) -> Vec<f32> {
         .collect()
 }
 
-fn process_in_hops(agc: &mut PcenAgc, samples: &mut [f32]) -> PcenFrameStats {
-    let mut last = PcenFrameStats {
-        gain_applied: 1.0,
-        signal_rms: 0.0,
-        noise_rms: 0.0,
-        snr_db: 0.0,
-    };
+fn process_in_hops(agc: &mut PcenAgc, samples: &mut [f32]) -> f32 {
     for chunk in samples.chunks_mut(HOP) {
         if chunk.len() == HOP {
-            last = agc.process_frame(chunk);
+            agc.process_frame(chunk);
         }
     }
-    last
+    agc.last_gain()
 }
 
 #[test]
 fn rejects_zero_hop() {
     let r = PcenAgc::new(PcenAgcConfig::default(), SR, 0);
-    assert!(matches!(r, Err(AudioError::Vad(_))));
+    assert!(matches!(r, Err(AudioError::Pcen(_))));
 }
 
 #[test]
 fn rejects_zero_sample_rate() {
     let r = PcenAgc::new(PcenAgcConfig::default(), 0, HOP);
-    assert!(matches!(r, Err(AudioError::Vad(_))));
+    assert!(matches!(r, Err(AudioError::Pcen(_))));
 }
 
 #[test]
@@ -75,7 +69,7 @@ fn rejects_invalid_alpha() {
         };
         assert!(matches!(
             PcenAgc::new(cfg, SR, HOP),
-            Err(AudioError::Vad(_))
+            Err(AudioError::Pcen(_))
         ));
     }
 }
@@ -89,7 +83,7 @@ fn rejects_min_gt_max_gain() {
     };
     assert!(matches!(
         PcenAgc::new(cfg, SR, HOP),
-        Err(AudioError::Vad(_))
+        Err(AudioError::Pcen(_))
     ));
 }
 
@@ -102,7 +96,7 @@ fn rejects_strength_outside_unit_interval() {
         };
         assert!(matches!(
             PcenAgc::new(cfg, SR, HOP),
-            Err(AudioError::Vad(_))
+            Err(AudioError::Pcen(_))
         ));
     }
 }
@@ -115,7 +109,7 @@ fn strength_scales_the_gain_toward_unity() {
             ..Default::default()
         });
         let mut buf = bursty(440.0, 0.014, HOP * 400, 50, 150);
-        process_in_hops(&mut a, &mut buf).gain_applied
+        process_in_hops(&mut a, &mut buf)
     };
     let full = gain_at(1.0);
     let half = gain_at(0.5);
@@ -141,16 +135,10 @@ fn boosts_quiet_speech_like_input_toward_target() {
     // and the AGC is free to boost the bursts toward target_rms.
     let mut a = agc(PcenAgcConfig::default());
     let mut buf = bursty(440.0, 0.014, HOP * 400, 50, 150);
-    let stats = process_in_hops(&mut a, &mut buf);
+    let gain = process_in_hops(&mut a, &mut buf);
     assert!(
-        stats.gain_applied > 2.0,
-        "expected boost on bursty quiet input, got gain={}",
-        stats.gain_applied
-    );
-    assert!(
-        stats.snr_db > 6.0,
-        "bursty input should keep SNR > 6 dB, got {} dB",
-        stats.snr_db
+        gain > 2.0,
+        "expected boost on bursty quiet input, got gain={gain}"
     );
 }
 
@@ -185,12 +173,8 @@ fn attenuates_loud_input_toward_target() {
     // Loud sine at ~0.7 RMS — gain should drop below 1.
     let mut a = agc(PcenAgcConfig::default());
     let mut buf = sine(440.0, 0.99, HOP * 200);
-    let stats = process_in_hops(&mut a, &mut buf);
-    assert!(
-        stats.gain_applied < 1.0,
-        "expected attenuation, got gain={}",
-        stats.gain_applied
-    );
+    let gain = process_in_hops(&mut a, &mut buf);
+    assert!(gain < 1.0, "expected attenuation, got gain={gain}");
 }
 
 #[test]
@@ -210,10 +194,10 @@ fn nan_inf_input_does_not_poison_state() {
     frame[0] = f32::NAN;
     frame[1] = f32::INFINITY;
     frame[2] = f32::NEG_INFINITY;
-    let stats = a.process_frame(&mut frame);
-    assert!(stats.gain_applied.is_finite());
-    assert!(stats.signal_rms.is_finite());
-    assert!(stats.noise_rms.is_finite());
+    a.process_frame(&mut frame);
+    assert!(a.last_gain().is_finite());
+    assert!(a.sig_env_pow.is_finite());
+    assert!(a.noise_env_pow.is_finite());
     for &s in &frame {
         assert!(s.is_finite());
     }
@@ -231,19 +215,18 @@ fn warmup_holds_gain_at_unity_then_releases() {
     let mut buf = bursty(440.0, 0.014, HOP * 16, 50, 150);
     // First 8 frames: gain must be exactly 1.0 (no boost, no attenuation).
     for chunk in buf.chunks_mut(HOP).take(8) {
-        let stats = a.process_frame(chunk);
-        assert_eq!(stats.gain_applied, 1.0, "warmup gain must be unity");
+        a.process_frame(chunk);
+        assert_eq!(a.last_gain(), 1.0, "warmup gain must be unity");
     }
-    assert_eq!(a.warmup_remaining(), 0);
+    assert_eq!(a.warmup_remaining, 0);
 
     // After warmup, push enough frames for the gain smoother to engage on
     // the bursty signal. Expect the boost to come online.
     let mut tail = bursty(440.0, 0.014, HOP * 200, 50, 150);
-    let stats = process_in_hops(&mut a, &mut tail);
+    let gain = process_in_hops(&mut a, &mut tail);
     assert!(
-        stats.gain_applied > 1.5,
-        "post-warmup boost should engage, got gain={}",
-        stats.gain_applied
+        gain > 1.5,
+        "post-warmup boost should engage, got gain={gain}"
     );
 }
 
@@ -255,39 +238,11 @@ fn warmup_zero_means_no_warmup() {
     };
     let mut a = agc(cfg);
     let mut frame = vec![0.5f32; HOP];
-    let stats = a.process_frame(&mut frame);
+    a.process_frame(&mut frame);
     // No warmup → gain came straight from the smoother (might still be 1.0 on
     // the first frame because of seed, but warmup_remaining must be 0).
-    assert_eq!(a.warmup_remaining(), 0);
-    assert!(stats.gain_applied.is_finite());
-}
-
-#[test]
-fn reset_restores_warmup_counter() {
-    let cfg = PcenAgcConfig {
-        warmup_frames: 4,
-        ..Default::default()
-    };
-    let mut a = agc(cfg);
-    let mut frame = vec![0.0f32; HOP];
-    for _ in 0..4 {
-        a.process_frame(&mut frame);
-    }
-    assert_eq!(a.warmup_remaining(), 0);
-    a.reset();
-    assert_eq!(a.warmup_remaining(), 4);
-}
-
-#[test]
-fn reset_reseeds_envelopes() {
-    let mut a = agc(PcenAgcConfig::default());
-    let mut buf = sine(440.0, 0.5, HOP * 50);
-    process_in_hops(&mut a, &mut buf);
-    assert!(a.signal_rms() > 0.0);
-    a.reset();
-    assert_eq!(a.signal_rms(), 0.0);
-    assert_eq!(a.noise_rms(), 0.0);
-    assert_eq!(a.last_gain(), 1.0);
+    assert_eq!(a.warmup_remaining, 0);
+    assert!(a.last_gain().is_finite());
 }
 
 #[test]
@@ -300,18 +255,18 @@ fn noise_tracker_falls_faster_than_it_rises() {
     // warm up at moderate level
     let mut warm = sine(440.0, 0.05, HOP * 30);
     process_in_hops(&mut a, &mut warm);
-    let n_before = a.noise_rms();
+    let n_before = a.noise_env_pow;
 
     // brief loud burst
     let mut burst = sine(440.0, 0.6, HOP * 20);
     process_in_hops(&mut a, &mut burst);
-    let n_peak = a.noise_rms();
+    let n_peak = a.noise_env_pow;
     assert!(n_peak >= n_before);
 
     // long silence
     let mut quiet = vec![0.0f32; HOP * 200];
     process_in_hops(&mut a, &mut quiet);
-    let n_after = a.noise_rms();
+    let n_after = a.noise_env_pow;
     assert!(
         n_after < n_peak,
         "noise envelope should decay during silence: peak={n_peak} after={n_after}"

@@ -64,8 +64,9 @@ fn plugin_dirs(backend_dl: bool, bundled: Option<PathBuf>, downloaded: PathBuf) 
         .collect()
 }
 
+#[cfg_attr(not(feature = "whisper-cpp"), allow(dead_code))]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum DeviceKind {
+enum DeviceKind {
     Cpu,
     Gpu,
     Igpu,

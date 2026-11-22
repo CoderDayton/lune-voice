@@ -1,11 +1,12 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 use lune_asr::AsrRegistry;
+use lune_core::asr::AsrBackendKind;
 use lune_core::config::{
     ActivationMode, AgcMode, AsrBackendConfig, DevicePolicy, DictationMode, FormatToggles,
     HistoryRetention, HotkeyConfig, KeyCombo, LlmBackendConfig, Modifier, OpenAiLlmProvider,
     PillAnchor, PillCorner, PillOrientation, PillSize, PillVisibility, PrivacyMode, RedactedString,
-    StreamingMode, StylePreset, TerminalMode, UserSettings, builtin_registry,
+    StylePreset, TerminalMode, UserSettings, builtin_registry,
 };
 use lune_core::session::SessionStatus;
 use lune_persist::{
@@ -124,10 +125,11 @@ pub fn save_workspace_settings(
     input: SaveWorkspaceSettingsInput,
 ) -> Result<(WorkspaceSnapshot, UserSettings), String> {
     let paths = resolve_paths()?;
-    let mut settings = load_settings(&paths)?;
     let mut database = open_database(&paths)?;
-    apply_settings_dto(&mut settings, input, &mut database)?;
-    save_settings(&paths, &settings)?;
+    let settings = update_settings(&paths, |settings| {
+        apply_settings_dto(settings, input, &mut database)?;
+        Ok(settings.clone())
+    })?;
     // Retention applies the moment it is changed. Switching to "Don't save
     // history" must clear what is already stored rather than wait for the next
     // window load.
@@ -397,7 +399,7 @@ pub fn list_history_page(
             started_at: session.started_at.to_rfc3339(),
             ended_at: session.ended_at.map(|ended| ended.to_rfc3339()),
             transcript: session.transcript.unwrap_or_default(),
-            backend: format!("{:?}", session.backend),
+            backend: backend_label(session.backend).into(),
             style: session.style.unwrap_or_default(),
             status: session_status_label(&session.status),
         })
@@ -587,8 +589,12 @@ pub fn delete_custom_style(style_id: String) -> Result<WorkspaceSnapshot, String
     // If the deleted style was the active selection, clear it — that is a
     // settings change, so persist the TOML too.
     if settings.default_style.as_deref() == Some(style_id.as_str()) {
-        settings.default_style = None;
-        save_settings(&paths, &settings)?;
+        settings = update_settings(&paths, |settings| {
+            if settings.default_style.as_deref() == Some(style_id.as_str()) {
+                settings.default_style = None;
+            }
+            Ok(settings.clone())
+        })?;
     }
     build_snapshot(settings, &mut database)
 }
@@ -639,7 +645,7 @@ fn build_snapshot(
             started_at: session.started_at.to_rfc3339(),
             ended_at: session.ended_at.map(|ended| ended.to_rfc3339()),
             transcript: session.transcript.unwrap_or_default(),
-            backend: format!("{:?}", session.backend),
+            backend: backend_label(session.backend).into(),
             // Empty string = no styling (the session's `style` was `None`).
             style: session.style.unwrap_or_default(),
             status: session_status_label(&session.status),
@@ -728,7 +734,6 @@ fn build_snapshot(
         .unwrap_or_default();
 
     Ok(WorkspaceSnapshot {
-        ipc_flavor: "tauri",
         service_status: "ready".into(),
         capabilities: PlatformCapabilitiesDto::current(),
         settings: settings_to_dto(&settings),
@@ -741,7 +746,7 @@ fn build_snapshot(
     })
 }
 
-fn resolve_paths() -> Result<AppPaths, String> {
+pub(crate) fn resolve_paths() -> Result<AppPaths, String> {
     let paths = AppPaths::resolve().ok_or("failed to resolve app paths")?;
     paths
         .ensure_dirs()
@@ -755,8 +760,16 @@ pub(crate) struct CheckedSettings {
     pub trust: SettingsTrust,
 }
 
-fn load_settings(paths: &AppPaths) -> Result<UserSettings, String> {
+pub(crate) fn load_settings(paths: &AppPaths) -> Result<UserSettings, String> {
     Ok(load_settings_checked(paths)?.settings)
+}
+
+/// Resolve the app paths and load the settings, recovering a malformed file
+/// the way the snapshot does.
+pub(crate) fn load_app_settings() -> Result<(AppPaths, UserSettings), String> {
+    let paths = resolve_paths()?;
+    let settings = load_settings(&paths)?;
+    Ok((paths, settings))
 }
 
 pub(crate) fn load_settings_checked(paths: &AppPaths) -> Result<CheckedSettings, String> {
@@ -766,10 +779,8 @@ pub(crate) fn load_settings_checked(paths: &AppPaths) -> Result<CheckedSettings,
     let loaded = store
         .load_or_quarantine()
         .map_err(|e| format!("load settings: {e}"))?;
-    let mut settings = loaded.settings;
-    settings.migrate_pipeline_fields();
     Ok(CheckedSettings {
-        settings,
+        settings: loaded.settings,
         trust: if loaded.quarantined {
             SettingsTrust::Quarantined
         } else {
@@ -778,55 +789,29 @@ pub(crate) fn load_settings_checked(paths: &AppPaths) -> Result<CheckedSettings,
     })
 }
 
-fn save_settings(paths: &AppPaths, settings: &UserSettings) -> Result<(), String> {
-    let store = SettingsStore::new(paths.settings_file());
-    store
-        .save(settings)
-        .map_err(|e| format!("save settings: {e}"))
+enum UpdateError {
+    Modify(String),
+    Store(lune_persist::PersistError),
 }
 
-pub(crate) fn renamed_input_device(
-    saved: Option<&str>,
-    trust: SettingsTrust,
-    current_name: impl FnOnce(&str) -> Option<String>,
-) -> Option<String> {
-    if trust != SettingsTrust::AsWritten {
-        return None;
+impl From<lune_persist::PersistError> for UpdateError {
+    fn from(e: lune_persist::PersistError) -> Self {
+        Self::Store(e)
     }
-    current_name(saved?)
 }
 
-const INPUT_DEVICE_MIGRATION_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(3);
-
-pub(crate) async fn migrate_input_device(paths: &AppPaths, loaded: &mut CheckedSettings) {
-    let saved = loaded.settings.input_device.clone();
-    let trust = loaded.trust;
-    let lookup = tokio::task::spawn_blocking(move || {
-        renamed_input_device(
-            saved.as_deref(),
-            trust,
-            lune_audio::migrated_input_device_name,
-        )
-    });
-    let renamed = match tokio::time::timeout(INPUT_DEVICE_MIGRATION_TIMEOUT, lookup).await {
-        Ok(joined) => joined.ok().flatten(),
-        Err(_) => {
-            tracing::warn!("input device lookup timed out; keeping the saved name");
-            None
-        }
-    };
-    let Some(name) = renamed else {
-        return;
-    };
-    let previous = loaded.settings.input_device.replace(name);
-    match save_settings(paths, &loaded.settings) {
-        Ok(()) => tracing::info!(
-            from = ?previous,
-            to = ?loaded.settings.input_device,
-            "renamed the saved input device to its current name"
-        ),
-        Err(e) => tracing::warn!(error = %e, "saving the renamed input device failed"),
-    }
+/// Load-modify-save under the settings write lock. Every read-modify-write of
+/// `settings.toml` goes through here.
+pub(crate) fn update_settings<R>(
+    paths: &AppPaths,
+    modify: impl FnOnce(&mut UserSettings) -> Result<R, String>,
+) -> Result<R, String> {
+    SettingsStore::new(paths.settings_file())
+        .update(|settings| modify(settings).map_err(UpdateError::Modify))
+        .map_err(|e| match e {
+            UpdateError::Modify(message) => message,
+            UpdateError::Store(e) => format!("update settings: {e}"),
+        })
 }
 
 fn open_database(paths: &AppPaths) -> Result<Database, String> {
@@ -1078,35 +1063,33 @@ fn apply_settings_dto(
 
 // ── DTO ↔ Core conversions ──────────────────────────────────────────────
 
-fn activation_mode_to_dto(mode: ActivationMode) -> ActivationModeDto {
-    match mode {
-        ActivationMode::Toggle => ActivationModeDto::Toggle,
-        ActivationMode::Hold => ActivationModeDto::Hold,
-        _ => ActivationModeDto::Toggle,
-    }
+macro_rules! dto_enum_conversions {
+    ($to:ident, $from_vis:vis $from:ident, $core:ident <-> $dto:ident, fallback $fallback:ident, [$($variant:ident),+ $(,)?]) => {
+        fn $to(value: $core) -> $dto {
+            match value {
+                $($core::$variant => $dto::$variant,)+
+                _ => $dto::$fallback,
+            }
+        }
+
+        $from_vis fn $from(dto: $dto) -> $core {
+            match dto {
+                $($dto::$variant => $core::$variant,)+
+            }
+        }
+    };
 }
 
-fn activation_mode_from_dto(dto: ActivationModeDto) -> ActivationMode {
-    match dto {
-        ActivationModeDto::Toggle => ActivationMode::Toggle,
-        ActivationModeDto::Hold => ActivationMode::Hold,
-    }
-}
-
-fn dictation_mode_to_dto(mode: DictationMode) -> DictationModeDto {
-    match mode {
-        DictationMode::TypeInPlace => DictationModeDto::TypeInPlace,
-        DictationMode::Clipboard => DictationModeDto::Clipboard,
-        _ => DictationModeDto::Clipboard,
-    }
-}
-
-fn dictation_mode_from_dto(dto: DictationModeDto) -> DictationMode {
-    match dto {
-        DictationModeDto::TypeInPlace => DictationMode::TypeInPlace,
-        DictationModeDto::Clipboard => DictationMode::Clipboard,
-    }
-}
+dto_enum_conversions!(activation_mode_to_dto, activation_mode_from_dto, ActivationMode <-> ActivationModeDto, fallback Toggle, [Toggle, Hold]);
+dto_enum_conversions!(dictation_mode_to_dto, dictation_mode_from_dto, DictationMode <-> DictationModeDto, fallback Clipboard, [TypeInPlace, Clipboard]);
+dto_enum_conversions!(pill_visibility_to_dto, pub(crate) pill_visibility_from_dto, PillVisibility <-> PillVisibilityDto, fallback Always, [Always, WhenDictating, Never]);
+dto_enum_conversions!(pill_anchor_to_dto, pill_anchor_from_dto, PillAnchor <-> PillAnchorDto, fallback BottomCenter, [TopLeft, TopCenter, TopRight, BottomLeft, BottomCenter, BottomRight]);
+dto_enum_conversions!(pill_size_to_dto, pill_size_from_dto, PillSize <-> PillSizeDto, fallback Standard, [Compact, Standard, Large]);
+dto_enum_conversions!(pill_orientation_to_dto, pill_orientation_from_dto, PillOrientation <-> PillOrientationDto, fallback Horizontal, [Horizontal, Vertical]);
+dto_enum_conversions!(pill_corner_to_dto, pill_corner_from_dto, PillCorner <-> PillCornerDto, fallback Rounded, [Pill, Rounded, Square]);
+dto_enum_conversions!(agc_mode_to_dto, agc_mode_from_dto, AgcMode <-> AgcModeDto, fallback Auto, [Off, Auto, Always]);
+dto_enum_conversions!(terminal_mode_to_dto, terminal_mode_from_dto, TerminalMode <-> TerminalModeDto, fallback Auto, [Auto, Terminal, Normal]);
+dto_enum_conversions!(privacy_mode_to_dto, privacy_mode_from_dto, PrivacyMode <-> PrivacyModeDto, fallback LocalOnly, [LocalOnly, AllowRemote]);
 
 fn device_policy_to_dto(policy: DevicePolicy) -> DevicePolicyDto {
     match policy {
@@ -1123,145 +1106,6 @@ fn resolve_device_policy(use_gpu: bool, policy: DevicePolicyDto) -> DevicePolicy
     match policy {
         DevicePolicyDto::Vulkan => DevicePolicy::Vulkan,
         DevicePolicyDto::Auto | DevicePolicyDto::Cpu => DevicePolicy::Auto,
-    }
-}
-
-fn pill_visibility_to_dto(vis: PillVisibility) -> PillVisibilityDto {
-    match vis {
-        PillVisibility::Always => PillVisibilityDto::Always,
-        PillVisibility::WhenDictating => PillVisibilityDto::WhenDictating,
-        PillVisibility::Never => PillVisibilityDto::Never,
-        _ => PillVisibilityDto::Always,
-    }
-}
-
-pub(crate) fn pill_visibility_from_dto(dto: PillVisibilityDto) -> PillVisibility {
-    match dto {
-        PillVisibilityDto::Always => PillVisibility::Always,
-        PillVisibilityDto::WhenDictating => PillVisibility::WhenDictating,
-        PillVisibilityDto::Never => PillVisibility::Never,
-    }
-}
-
-fn pill_anchor_to_dto(a: PillAnchor) -> PillAnchorDto {
-    match a {
-        PillAnchor::TopLeft => PillAnchorDto::TopLeft,
-        PillAnchor::TopCenter => PillAnchorDto::TopCenter,
-        PillAnchor::TopRight => PillAnchorDto::TopRight,
-        PillAnchor::BottomLeft => PillAnchorDto::BottomLeft,
-        PillAnchor::BottomCenter => PillAnchorDto::BottomCenter,
-        PillAnchor::BottomRight => PillAnchorDto::BottomRight,
-        _ => PillAnchorDto::BottomCenter,
-    }
-}
-
-fn pill_anchor_from_dto(dto: PillAnchorDto) -> PillAnchor {
-    match dto {
-        PillAnchorDto::TopLeft => PillAnchor::TopLeft,
-        PillAnchorDto::TopCenter => PillAnchor::TopCenter,
-        PillAnchorDto::TopRight => PillAnchor::TopRight,
-        PillAnchorDto::BottomLeft => PillAnchor::BottomLeft,
-        PillAnchorDto::BottomCenter => PillAnchor::BottomCenter,
-        PillAnchorDto::BottomRight => PillAnchor::BottomRight,
-    }
-}
-
-fn pill_size_to_dto(s: PillSize) -> PillSizeDto {
-    match s {
-        PillSize::Compact => PillSizeDto::Compact,
-        PillSize::Standard => PillSizeDto::Standard,
-        PillSize::Large => PillSizeDto::Large,
-        _ => PillSizeDto::Standard,
-    }
-}
-
-fn pill_size_from_dto(dto: PillSizeDto) -> PillSize {
-    match dto {
-        PillSizeDto::Compact => PillSize::Compact,
-        PillSizeDto::Standard => PillSize::Standard,
-        PillSizeDto::Large => PillSize::Large,
-    }
-}
-
-fn pill_orientation_to_dto(o: PillOrientation) -> PillOrientationDto {
-    match o {
-        PillOrientation::Horizontal => PillOrientationDto::Horizontal,
-        PillOrientation::Vertical => PillOrientationDto::Vertical,
-        _ => PillOrientationDto::Horizontal,
-    }
-}
-
-fn pill_orientation_from_dto(dto: PillOrientationDto) -> PillOrientation {
-    match dto {
-        PillOrientationDto::Horizontal => PillOrientation::Horizontal,
-        PillOrientationDto::Vertical => PillOrientation::Vertical,
-    }
-}
-
-fn pill_corner_to_dto(c: PillCorner) -> PillCornerDto {
-    match c {
-        PillCorner::Pill => PillCornerDto::Pill,
-        PillCorner::Rounded => PillCornerDto::Rounded,
-        PillCorner::Square => PillCornerDto::Square,
-        _ => PillCornerDto::Rounded,
-    }
-}
-
-fn pill_corner_from_dto(dto: PillCornerDto) -> PillCorner {
-    match dto {
-        PillCornerDto::Pill => PillCorner::Pill,
-        PillCornerDto::Rounded => PillCorner::Rounded,
-        PillCornerDto::Square => PillCorner::Square,
-    }
-}
-
-fn agc_mode_to_dto(mode: AgcMode) -> AgcModeDto {
-    match mode {
-        AgcMode::Off => AgcModeDto::Off,
-        AgcMode::Always => AgcModeDto::Always,
-        _ => AgcModeDto::Auto,
-    }
-}
-
-fn agc_mode_from_dto(dto: AgcModeDto) -> AgcMode {
-    match dto {
-        AgcModeDto::Off => AgcMode::Off,
-        AgcModeDto::Auto => AgcMode::Auto,
-        AgcModeDto::Always => AgcMode::Always,
-    }
-}
-
-fn terminal_mode_to_dto(mode: TerminalMode) -> TerminalModeDto {
-    match mode {
-        TerminalMode::Auto => TerminalModeDto::Auto,
-        TerminalMode::Terminal => TerminalModeDto::Terminal,
-        TerminalMode::Normal => TerminalModeDto::Normal,
-        _ => TerminalModeDto::Auto,
-    }
-}
-
-fn terminal_mode_from_dto(dto: TerminalModeDto) -> TerminalMode {
-    match dto {
-        TerminalModeDto::Auto => TerminalMode::Auto,
-        TerminalModeDto::Terminal => TerminalMode::Terminal,
-        TerminalModeDto::Normal => TerminalMode::Normal,
-    }
-}
-
-fn privacy_mode_to_dto(mode: PrivacyMode) -> PrivacyModeDto {
-    match mode {
-        PrivacyMode::LocalOnly => PrivacyModeDto::LocalOnly,
-        PrivacyMode::AllowRemote => PrivacyModeDto::AllowRemote,
-        // `PrivacyMode` is `#[non_exhaustive]`; the strictest option is the
-        // only safe thing to show for a variant this build does not know.
-        _ => PrivacyModeDto::LocalOnly,
-    }
-}
-
-fn privacy_mode_from_dto(dto: PrivacyModeDto) -> PrivacyMode {
-    match dto {
-        PrivacyModeDto::LocalOnly => PrivacyMode::LocalOnly,
-        PrivacyModeDto::AllowRemote => PrivacyMode::AllowRemote,
     }
 }
 
@@ -1330,7 +1174,6 @@ fn asr_backend_from_type(
                 base_url,
                 api_key: RedactedString::new(api_key_str),
                 model: model_str.to_owned(),
-                streaming: StreamingMode::HttpPolling,
             }
         }
     })
@@ -1457,6 +1300,17 @@ fn map_dictionary_entry(entry: StoredDictionaryEntry) -> DictionaryItemDto {
     }
 }
 
+/// `HistoryItemDto.backend`. The frontend's `formatBackend` matches on these
+/// names, so they are part of the contract.
+fn backend_label(kind: AsrBackendKind) -> &'static str {
+    match kind {
+        AsrBackendKind::OpenAiCompatible => "OpenAiCompatible",
+        AsrBackendKind::WhisperCpp => "WhisperCpp",
+        AsrBackendKind::ParakeetCpp => "ParakeetCpp",
+        _ => UNKNOWN_LABEL,
+    }
+}
+
 fn session_status_label(status: &SessionStatus) -> String {
     match status {
         SessionStatus::Active => "Active".into(),
@@ -1472,31 +1326,20 @@ mod tests {
     use super::*;
 
     #[test]
-    fn a_saved_input_device_is_renamed_to_its_current_name() {
-        let renamed = renamed_input_device(
-            Some("Shure MV6, USB Audio"),
-            SettingsTrust::AsWritten,
-            |saved| (saved == "Shure MV6, USB Audio").then(|| "Shure MV6 Mono".to_owned()),
+    fn backend_labels_keep_their_wire_names() {
+        assert_eq!(
+            backend_label(AsrBackendKind::OpenAiCompatible),
+            "OpenAiCompatible"
         );
-        assert_eq!(renamed.as_deref(), Some("Shure MV6 Mono"));
-    }
-
-    #[test]
-    fn quarantined_settings_never_rename_the_input_device() {
-        let renamed = renamed_input_device(
-            Some("Shure MV6, USB Audio"),
-            SettingsTrust::Quarantined,
-            |_| panic!("a quarantined file must not be inspected"),
-        );
-        assert_eq!(renamed, None);
-    }
-
-    #[test]
-    fn the_system_default_input_is_never_renamed() {
-        let renamed = renamed_input_device(None, SettingsTrust::AsWritten, |_| {
-            panic!("no saved device to look up")
-        });
-        assert_eq!(renamed, None);
+        assert_eq!(backend_label(AsrBackendKind::WhisperCpp), "WhisperCpp");
+        assert_eq!(backend_label(AsrBackendKind::ParakeetCpp), "ParakeetCpp");
+        for kind in [
+            AsrBackendKind::OpenAiCompatible,
+            AsrBackendKind::WhisperCpp,
+            AsrBackendKind::ParakeetCpp,
+        ] {
+            assert_eq!(backend_label(kind), format!("{kind:?}"));
+        }
     }
 
     /// A quarantined settings file leaves us holding defaults, not the user's
@@ -1850,7 +1693,6 @@ mod tests {
                 base_url: "https://api.openai.com/v1".parse().unwrap(),
                 api_key: RedactedString::new("secret-asr"),
                 model: "whisper-1".into(),
-                streaming: StreamingMode::HttpPolling,
             },
             ..UserSettings::default()
         };

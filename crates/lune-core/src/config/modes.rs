@@ -10,8 +10,6 @@ pub enum PrivacyMode {
     #[default]
     LocalOnly,
     /// Remote services may be used. None runs unless it is configured.
-    /// `LocalPreferred` is a former name for this same behaviour.
-    #[serde(alias = "LocalPreferred")]
     AllowRemote,
 }
 
@@ -43,9 +41,6 @@ impl std::str::FromStr for DictationMode {
         match s {
             "TypeInPlace" => Ok(Self::TypeInPlace),
             "Clipboard" => Ok(Self::Clipboard),
-            // Legacy: the removed "type and copy" mode migrates to type-in-place
-            // (the copy is now the separate `copy_to_clipboard` toggle).
-            "Both" => Ok(Self::TypeInPlace),
             _ => Err(dictation_mode_parse_err(s)),
         }
     }
@@ -147,7 +142,7 @@ impl std::str::FromStr for PrivacyMode {
     fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
         match s {
             "LocalOnly" => Ok(Self::LocalOnly),
-            "AllowRemote" | "LocalPreferred" => Ok(Self::AllowRemote),
+            "AllowRemote" => Ok(Self::AllowRemote),
             _ => Err(privacy_mode_parse_err(s)),
         }
     }

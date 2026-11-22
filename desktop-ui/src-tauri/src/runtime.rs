@@ -29,7 +29,7 @@ use tokio::sync::{Mutex, RwLock, mpsc};
 use tracing::{debug, info, warn};
 
 use crate::dto::SessionStreamEvent;
-use crate::persistence::load_settings_checked;
+use crate::persistence::{load_settings, load_settings_checked, resolve_paths};
 
 const TOGGLE_DEBOUNCE: Duration = Duration::from_millis(150);
 const CANCEL_DEBOUNCE: Duration = Duration::from_millis(80);
@@ -443,8 +443,7 @@ impl AppRuntime {
                 }
             }
         }
-        let mut loaded = load_settings_checked(&paths)?;
-        crate::persistence::migrate_input_device(&paths, &mut loaded).await;
+        let loaded = load_settings_checked(&paths)?;
         let settings = loaded.settings.clone();
 
         // Retention runs once per launch, not once per window load: with
@@ -571,7 +570,6 @@ impl AppRuntime {
 
         let config = AudioConfig {
             input_device: input_device.clone(),
-            ..AudioConfig::default()
         };
         match open_capture_bounded(config).await {
             Ok(stream) => {
@@ -622,10 +620,7 @@ impl AppRuntime {
     /// always did. Nothing here is worth failing a dictation over.
     async fn open_capture_for_start(&self) -> Option<AudioStream> {
         let input_device = self.inner.settings.read().await.input_device.clone();
-        let config = AudioConfig {
-            input_device,
-            ..AudioConfig::default()
-        };
+        let config = AudioConfig { input_device };
         match open_capture_bounded(config).await {
             Ok(stream) => {
                 self.note_capture_fallback(stream.fell_back());
@@ -1938,18 +1933,6 @@ async fn build_pipeline(
     Ok((pipeline, llm_service, settings))
 }
 
-fn resolve_paths() -> Result<AppPaths, String> {
-    let paths = AppPaths::resolve().ok_or("failed to resolve app paths")?;
-    paths
-        .ensure_dirs()
-        .map_err(|e| format!("ensure app dirs: {e}"))?;
-    Ok(paths)
-}
-
-fn load_settings(paths: &AppPaths) -> Result<UserSettings, String> {
-    Ok(load_settings_checked(paths)?.settings)
-}
-
 /// Whether `privacy_mode` forbids sending audio or text to a remote service.
 ///
 /// Only `LocalOnly` denies. Under `AllowRemote` a remote service still runs
@@ -2507,7 +2490,6 @@ mod tests {
                 base_url: "https://api.example.test/v1".parse().expect("url"),
                 api_key: lune_core::config::RedactedString::new("key"),
                 model: "whisper-1".into(),
-                streaming: lune_core::config::StreamingMode::HttpPolling,
             },
             ..Default::default()
         };

@@ -3,7 +3,9 @@
 pub mod models;
 pub mod schema;
 
-use std::path::Path;
+use std::collections::HashSet;
+use std::path::{Path, PathBuf};
+use std::sync::{Mutex, PoisonError};
 
 use chrono::{DateTime, Utc};
 use diesel::prelude::*;
@@ -53,15 +55,57 @@ fn restrict_db_files(path: &Path) {
 #[cfg(not(unix))]
 fn restrict_db_files(_path: &Path) {}
 
+/// A database file as `open` saw it. Inode and birth time are part of the key
+/// so a file deleted and recreated at the same path is initialised again.
+#[derive(Hash, PartialEq, Eq)]
+struct DbFileKey {
+    path: PathBuf,
+    inode: Option<(u64, u64)>,
+    created: Option<std::time::SystemTime>,
+}
+
+impl DbFileKey {
+    fn of(path: &Path) -> Self {
+        let meta = std::fs::metadata(path).ok();
+        #[cfg(unix)]
+        let inode = meta.as_ref().map(|m| {
+            use std::os::unix::fs::MetadataExt;
+            (m.dev(), m.ino())
+        });
+        #[cfg(not(unix))]
+        let inode = None;
+        Self {
+            path: std::fs::canonicalize(path).unwrap_or_else(|_| path.to_path_buf()),
+            inode,
+            created: meta.and_then(|m| m.created().ok()),
+        }
+    }
+}
+
+static INITIALISED: Mutex<Option<HashSet<DbFileKey>>> = Mutex::new(None);
+
+/// Run `init` the first time this process opens the file at `path`; returns
+/// whether it ran. A failed `init` is retried by the next open. The lock is
+/// held across `init`, so concurrent first opens migrate once.
+fn once_per_file(path: &Path, init: impl FnOnce() -> PersistResult<()>) -> PersistResult<bool> {
+    let key = DbFileKey::of(path);
+    let mut done = INITIALISED.lock().unwrap_or_else(PoisonError::into_inner);
+    let done = done.get_or_insert_with(HashSet::new);
+    if done.contains(&key) {
+        return Ok(false);
+    }
+    init()?;
+    done.insert(key);
+    Ok(true)
+}
+
 use uuid::Uuid;
 
 use lune_core::asr::AsrBackendKind;
 use lune_core::config::{FormatToggles, StylePreset};
 use lune_core::session::{DictationSession, SessionStatus};
 
-use self::models::{
-    CustomStyleRow, NewCorrectionPair, NewCustomStyle, NewDictionaryEntry, NewSession, NewSnippet,
-};
+use self::models::{CustomStyleRow, NewCustomStyle, NewDictionaryEntry, NewSession, NewSnippet};
 use self::schema::{custom_styles, dictionary, sessions, snippets};
 use crate::error::{PersistError, PersistResult};
 use diesel::result::Error as DieselError;
@@ -118,16 +162,9 @@ type SessionRow7 = (
 );
 
 /// Outcome of decoding a stored backend kind from its JSON column value.
-///
-/// Non-parsing cases fall back to `WhisperCpp` so history still loads after a
-/// backend is removed or renamed, but we distinguish an *expected* legacy
-/// migration from a genuinely unrecognized value so only the latter warns.
 enum BackendDecode {
     /// Parsed cleanly to a current variant.
     Parsed(AsrBackendKind),
-    /// A known pre-migration backend (`Qwen3Asr` / its `OrtQwenAsr` alias),
-    /// migrated to the current default. Expected, not an error.
-    LegacyMigrated(AsrBackendKind),
     /// Unrecognized value; fell back to the default and worth surfacing.
     Unknown { kind: AsrBackendKind, error: String },
 }
@@ -135,13 +172,9 @@ enum BackendDecode {
 fn decode_backend(raw: &str) -> BackendDecode {
     match serde_json::from_str::<AsrBackendKind>(raw) {
         Ok(k) => BackendDecode::Parsed(k),
-        // Known backends removed in the whisper.cpp migration — quietly migrated.
-        Err(e) => match raw.trim().trim_matches('"') {
-            "Qwen3Asr" | "OrtQwenAsr" => BackendDecode::LegacyMigrated(AsrBackendKind::WhisperCpp),
-            _ => BackendDecode::Unknown {
-                kind: AsrBackendKind::WhisperCpp,
-                error: e.to_string(),
-            },
+        Err(e) => BackendDecode::Unknown {
+            kind: AsrBackendKind::WhisperCpp,
+            error: e.to_string(),
         },
     }
 }
@@ -162,14 +195,6 @@ fn row_to_session(
         .transpose()?;
     let backend = match decode_backend(&back) {
         BackendDecode::Parsed(kind) => kind,
-        BackendDecode::LegacyMigrated(kind) => {
-            tracing::debug!(
-                session_id = %sid,
-                stored_backend = %back,
-                "migrated legacy session backend to the current default",
-            );
-            kind
-        }
         BackendDecode::Unknown { kind, error } => {
             tracing::warn!(
                 session_id = %sid,
@@ -325,10 +350,13 @@ impl Database {
             conn,
             legacy_pages_reclaimed: reclaimed,
         };
-        db.run_migrations()?;
-        // Migrations may have created the WAL/SHM sidecars; harden everything
-        // now that the schema is in place.
-        restrict_db_files(path);
+        once_per_file(path, || {
+            db.run_migrations()?;
+            // Migrations may have created the WAL/SHM sidecars; harden
+            // everything now that the schema is in place.
+            restrict_db_files(path);
+            Ok(())
+        })?;
         Ok(db)
     }
 
@@ -632,6 +660,11 @@ impl Database {
             .load::<(String, String, String)>(&mut self.conn)?;
 
         Ok(rows.into_iter().map(row_to_snippet).collect())
+    }
+
+    pub fn has_snippets(&mut self) -> PersistResult<bool> {
+        let query = diesel::dsl::exists(snippets::table.select(snippets::id));
+        Ok(diesel::select(query).get_result(&mut self.conn)?)
     }
 
     pub fn delete_snippet(&mut self, snippet_id: &str) -> PersistResult<bool> {
@@ -1043,77 +1076,10 @@ impl Database {
         Ok(())
     }
 
-    /// Record the raw ASR text and final delivered text for a session — the
-    /// labelled `(raw → final)` history. Best-effort; the caller treats failure
-    /// as non-fatal.
-    pub fn insert_correction_pair(
-        &mut self,
-        session_id: Uuid,
-        raw: &str,
-        final_text: &str,
-    ) -> PersistResult<()> {
-        use self::schema::correction_pairs::dsl as cp;
-        // Keep only the newest rows so the table can't grow without bound.
-        const CAP: i64 = 5000;
-        let sid = session_id.to_string();
-        let now = Utc::now().to_rfc3339();
-        // Insert + cap-trim atomically: a failed trim can't leave the table
-        // over CAP.
-        self.conn.transaction(|conn| {
-            diesel::insert_into(cp::correction_pairs)
-                .values(NewCorrectionPair {
-                    session_id: &sid,
-                    raw,
-                    final_text,
-                    created_at: &now,
-                })
-                .execute(conn)?;
-            diesel::sql_query(
-                "DELETE FROM correction_pairs \
-                 WHERE id <= (SELECT MAX(id) FROM correction_pairs) - ?",
-            )
-            .bind::<diesel::sql_types::BigInt, _>(CAP)
-            .execute(conn)?;
-            Ok(())
-        })
-    }
-
-    /// Most recent `(raw, final)` correction pairs, newest first.
-    ///
-    /// Nothing in the app reads these — they are written for retention and
-    /// cascade-delete only. This reader is the in-crate probe those retention
-    /// and cascade tests assert against; offline analysis reads the
-    /// `correction_pairs` table with the sqlite CLI instead.
-    ///
-    /// Contains verbatim transcript text: never log the result.
-    #[cfg(test)]
-    pub fn list_correction_pairs(&mut self, limit: u32) -> PersistResult<Vec<(String, String)>> {
-        use self::schema::correction_pairs::dsl as cp;
-        let rows = cp::correction_pairs
-            .select((cp::raw, cp::final_text))
-            .order((cp::created_at.desc(), cp::id.desc()))
-            .limit(i64::from(limit))
-            .load::<(String, String)>(&mut self.conn)?;
-        Ok(rows)
-    }
-
     pub fn delete_session(&mut self, session_id: &str) -> PersistResult<bool> {
+        use self::schema::sessions::dsl::*;
         let deleted =
-        // Cascade: drop the session's calibration pairs so deleting a session
-        // leaves no transcript text behind. There is no SQL foreign key and the
-        // connection doesn't enable `PRAGMA foreign_keys`, so delete explicitly.
-        // One transaction, so a crash mid-cascade can't leave the `sessions`
-        // row — which carries the transcript — behind after its pairs are gone.
-        self.conn.transaction(|conn| {
-            {
-                use self::schema::correction_pairs::dsl as cp;
-                diesel::delete(cp::correction_pairs.filter(cp::session_id.eq(session_id)))
-                    .execute(conn)?;
-            }
-            use self::schema::sessions::dsl::*;
-            let count = diesel::delete(sessions.filter(id.eq(session_id))).execute(conn)?;
-            Ok::<_, diesel::result::Error>(count > 0)
-        })?;
+            diesel::delete(sessions.filter(id.eq(session_id))).execute(&mut self.conn)? > 0;
         if deleted {
             self.reclaim_freed_pages();
         }
@@ -1154,26 +1120,13 @@ impl Database {
         }
     }
 
-    /// Delete several sessions at once, cascading to their correction pairs.
-    ///
-    /// One transaction for the whole batch, so the History tab's bulk delete
-    /// either removes every selected row or none — a partial commit would leave
-    /// the user re-selecting whatever survived. Returns how many `sessions`
-    /// rows actually existed; ids that were already gone simply don't count.
     pub fn delete_sessions(&mut self, session_ids: &[String]) -> PersistResult<usize> {
         if session_ids.is_empty() {
             return Ok(0);
         }
-        let count = self.conn.transaction(|conn| {
-            {
-                use self::schema::correction_pairs::dsl as cp;
-                diesel::delete(cp::correction_pairs.filter(cp::session_id.eq_any(session_ids)))
-                    .execute(conn)?;
-            }
-            use self::schema::sessions::dsl::*;
-            let count = diesel::delete(sessions.filter(id.eq_any(session_ids))).execute(conn)?;
-            Ok::<_, diesel::result::Error>(count)
-        })?;
+        use self::schema::sessions::dsl::*;
+        let count =
+            diesel::delete(sessions.filter(id.eq_any(session_ids))).execute(&mut self.conn)?;
         if count > 0 {
             self.reclaim_freed_pages();
         }
@@ -1208,21 +1161,12 @@ impl Database {
         Ok(closed)
     }
 
-    /// Delete every session and every correction pair.
-    ///
     /// This is what switching retention to "Don't save history" runs: turning
     /// the setting off has to remove what was already collected, not merely
     /// stop adding to it. Returns the number of sessions deleted.
     pub fn purge_history(&mut self) -> PersistResult<usize> {
-        let count = self.conn.transaction(|conn| {
-            let count = {
-                use self::schema::sessions::dsl::*;
-                diesel::delete(sessions).execute(conn)?
-            };
-            use self::schema::correction_pairs::dsl as cp;
-            diesel::delete(cp::correction_pairs).execute(conn)?;
-            Ok::<_, diesel::result::Error>(count)
-        })?;
+        use self::schema::sessions::dsl::*;
+        let count = diesel::delete(sessions).execute(&mut self.conn)?;
         if count > 0 {
             self.reclaim_freed_pages();
         }
@@ -1234,21 +1178,9 @@ impl Database {
     pub fn prune_sessions(&mut self, days: u32) -> PersistResult<usize> {
         // RFC3339 strings sort lexicographically, so < comparison is safe.
         let cutoff = (Utc::now() - chrono::Duration::days(i64::from(days))).to_rfc3339();
-        // Same atomicity discipline as `delete_session`: the retention sweep is
-        // one cascade, so it commits or rolls back as one.
-        let count = self.conn.transaction(|conn| {
-            let count = {
-                use self::schema::sessions::dsl::*;
-                diesel::delete(sessions.filter(started_at.lt(&cutoff))).execute(conn)?
-            };
-            // Prune calibration pairs in the same retention window.
-            {
-                use self::schema::correction_pairs::dsl as cp;
-                diesel::delete(cp::correction_pairs.filter(cp::created_at.lt(&cutoff)))
-                    .execute(conn)?;
-            }
-            Ok::<_, diesel::result::Error>(count)
-        })?;
+        use self::schema::sessions::dsl::*;
+        let count =
+            diesel::delete(sessions.filter(started_at.lt(&cutoff))).execute(&mut self.conn)?;
         if count > 0 {
             self.reclaim_freed_pages();
         }
@@ -1362,6 +1294,48 @@ mod tests {
             .expect("the latest down.sql should apply on its own");
         db.run_migrations()
             .expect("re-apply the reverted migration");
+    }
+
+    #[test]
+    fn a_database_at_the_previous_schema_version_migrates_cleanly() {
+        #[derive(diesel::QueryableByName)]
+        struct Count {
+            #[diesel(sql_type = diesel::sql_types::BigInt)]
+            n: i64,
+        }
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("lune.db");
+        {
+            let mut conn = SqliteConnection::establish(&path.to_string_lossy()).unwrap();
+            for _ in 0..7 {
+                conn.run_next_migration(MIGRATIONS).unwrap();
+            }
+            diesel::sql_query(
+                "INSERT INTO correction_pairs (session_id, raw, final_text, created_at) \
+                 VALUES ('s', 'raw', 'final', '2026-01-01T00:00:00+00:00')",
+            )
+            .execute(&mut conn)
+            .unwrap();
+        }
+
+        let mut db = Database::open(&path).unwrap();
+        let left = diesel::sql_query(
+            "SELECT COUNT(*) AS n FROM sqlite_master \
+             WHERE name IN ('correction_pairs', 'idx_correction_pairs_created_at')",
+        )
+        .get_result::<Count>(&mut db.conn)
+        .unwrap();
+        assert_eq!(left.n, 0);
+        db.insert_session(&DictationSession {
+            id: Uuid::new_v4(),
+            started_at: Utc::now(),
+            ended_at: None,
+            style: None,
+            backend: AsrBackendKind::WhisperCpp,
+            status: SessionStatus::Completed,
+            transcript: Some("after upgrade".into()),
+        })
+        .unwrap();
     }
 
     #[test]
@@ -1513,22 +1487,6 @@ mod tests {
     }
 
     #[test]
-    fn decode_backend_migrates_legacy_qwen3_quietly() {
-        // The Qwen3-ASR backend and its `OrtQwenAsr` alias were removed; legacy
-        // session rows must still load by migrating to the current default —
-        // and quietly, since it's an expected migration rather than an error.
-        for raw in ["\"Qwen3Asr\"", "\"OrtQwenAsr\""] {
-            assert!(
-                matches!(
-                    decode_backend(raw),
-                    BackendDecode::LegacyMigrated(AsrBackendKind::WhisperCpp)
-                ),
-                "legacy backend value {raw} must migrate quietly to WhisperCpp",
-            );
-        }
-    }
-
-    #[test]
     fn decode_backend_falls_back_on_unknown() {
         assert!(matches!(
             decode_backend("\"SomeRemovedBackend\""),
@@ -1651,9 +1609,11 @@ mod tests {
     #[test]
     fn snippet_crud() {
         let mut db = Database::open_in_memory().unwrap();
+        assert!(!db.has_snippets().unwrap());
 
         db.insert_snippet("greet", "insert greeting", "Hello {name}!")
             .unwrap();
+        assert!(db.has_snippets().unwrap());
 
         let snippets = db.list_snippets().unwrap();
         assert_eq!(snippets.len(), 1);
@@ -1664,6 +1624,7 @@ mod tests {
         let deleted = db.delete_snippet("greet").unwrap();
         assert!(deleted);
         assert_eq!(db.list_snippets().unwrap().len(), 0);
+        assert!(!db.has_snippets().unwrap());
     }
 
     #[test]
@@ -1812,7 +1773,7 @@ mod tests {
     }
 
     #[test]
-    fn session_delete_many_removes_only_the_listed_rows_and_their_pairs() {
+    fn session_delete_many_removes_only_the_listed_rows() {
         let mut db = Database::open_in_memory().unwrap();
         let row = |transcript: &str| DictationSession {
             id: Uuid::new_v4(),
@@ -1826,7 +1787,6 @@ mod tests {
         let (a, b, keep) = (row("one"), row("two"), row("three"));
         for s in [&a, &b, &keep] {
             db.insert_session(s).unwrap();
-            db.insert_correction_pair(s.id, "raw", "final").unwrap();
         }
 
         let ids = [a.id.to_string(), b.id.to_string()];
@@ -1835,8 +1795,6 @@ mod tests {
         let remaining = db.list_sessions(10).unwrap();
         assert_eq!(remaining.len(), 1);
         assert_eq!(remaining[0].id, keep.id);
-        // The cascade is per-id, not a purge: the untouched session keeps its pair.
-        assert_eq!(db.list_correction_pairs(10).unwrap().len(), 1);
     }
 
     #[test]
@@ -1875,30 +1833,6 @@ mod tests {
         let id_str = session.id.to_string();
         assert!(db.delete_session(&id_str).unwrap());
         assert!(!db.delete_session(&id_str).unwrap());
-    }
-
-    #[test]
-    fn correction_pairs_roundtrip_order_and_cascade() {
-        let mut db = Database::open_in_memory().unwrap();
-        let sid = Uuid::new_v4();
-        db.insert_correction_pair(sid, "send there", "send their")
-            .unwrap();
-        db.insert_correction_pair(sid, "over their", "over there")
-            .unwrap();
-
-        let all = db.list_correction_pairs(10).unwrap();
-        assert_eq!(all.len(), 2);
-        // Newest first; the id tiebreaker makes this deterministic under equal timestamps.
-        assert_eq!(all[0], ("over their".to_string(), "over there".to_string()));
-        assert_eq!(db.list_correction_pairs(1).unwrap().len(), 1);
-
-        // delete_session cascades to the session's pairs (no session row here,
-        // so it returns false, but the pairs must still be gone).
-        assert!(!db.delete_session(&sid.to_string()).unwrap());
-        assert!(
-            db.list_correction_pairs(10).unwrap().is_empty(),
-            "deleting the session must remove its correction pairs"
-        );
     }
 
     #[test]
@@ -2072,7 +2006,6 @@ mod tests {
             transcript: Some(SECRET.into()),
         })
         .unwrap();
-        db.insert_correction_pair(sid, SECRET, SECRET).unwrap();
         assert!(db.delete_session(&sid.to_string()).unwrap());
         drop(db);
 
@@ -2126,7 +2059,7 @@ mod tests {
     }
 
     #[test]
-    fn purge_history_clears_sessions_and_their_correction_pairs() {
+    fn purge_history_clears_sessions() {
         let mut db = Database::open_in_memory().unwrap();
         let sid = Uuid::new_v4();
         db.insert_session(&DictationSession {
@@ -2139,15 +2072,9 @@ mod tests {
             transcript: Some("a stored transcript".into()),
         })
         .unwrap();
-        db.insert_correction_pair(sid, "send there", "send their")
-            .unwrap();
 
         assert_eq!(db.purge_history().unwrap(), 1);
         assert!(db.get_session(sid).unwrap().is_none());
-        assert!(
-            db.list_correction_pairs(10).unwrap().is_empty(),
-            "turning history off must clear the transcript pairs too"
-        );
         // Idempotent: purging an already-empty history is not an error.
         assert_eq!(db.purge_history().unwrap(), 0);
     }
@@ -2310,6 +2237,49 @@ mod tests {
 
         // A LIKE metacharacter in the query matches literally, not as a wildcard.
         assert_eq!(db.count_sessions(Some("%")).unwrap(), 0);
+    }
+
+    #[test]
+    fn one_time_init_runs_once_per_file() {
+        let dir = tempfile::tempdir().unwrap();
+        let a = dir.path().join("a.db");
+        let b = dir.path().join("b.db");
+        std::fs::write(&a, b"").unwrap();
+        std::fs::write(&b, b"").unwrap();
+        let ok = || Ok(());
+
+        assert!(once_per_file(&a, ok).unwrap());
+        assert!(!once_per_file(&a, ok).unwrap());
+        assert!(
+            once_per_file(&b, ok).unwrap(),
+            "a second path is its own file"
+        );
+
+        let failed = once_per_file(&b.with_extension("x"), || {
+            Err(PersistError::Migration("boom".into()))
+        });
+        assert!(failed.is_err());
+        assert!(
+            once_per_file(&b.with_extension("x"), ok).unwrap(),
+            "a failed init must be retried"
+        );
+    }
+
+    /// A database deleted while the app runs must be migrated again on reopen,
+    /// not handed out as an empty schema.
+    #[test]
+    fn a_recreated_database_file_is_migrated_again() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("lune.db");
+        drop(Database::open(&path).unwrap());
+        for suffix in ["", "-wal", "-shm"] {
+            let mut file = path.as_os_str().to_owned();
+            file.push(suffix);
+            let _ = std::fs::remove_file(std::path::PathBuf::from(file));
+        }
+
+        let mut db = Database::open(&path).unwrap();
+        db.insert_dictionary_entry("test", "Test", 1).unwrap();
     }
 
     #[test]

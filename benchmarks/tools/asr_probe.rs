@@ -239,10 +239,9 @@ fn user_profile() -> (UserSettings, lune_dict::UserDictionary) {
         );
     }
     let paths = lune_persist::AppPaths::resolve().expect("resolve app paths");
-    let mut settings = lune_persist::SettingsStore::new(paths.settings_file())
+    let settings = lune_persist::SettingsStore::new(paths.settings_file())
         .load()
         .expect("load settings.toml");
-    settings.migrate_pipeline_fields();
     let db_path = std::env::var("LUNE_DICT_DB")
         .map(PathBuf::from)
         .unwrap_or_else(|_| paths.database_file());

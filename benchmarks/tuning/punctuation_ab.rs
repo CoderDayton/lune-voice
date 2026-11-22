@@ -306,8 +306,8 @@ fn main() {
 
         // Confidence band used by this benchmark's `full` arm to decide
         // whether to route through the LLM. The production pipeline has no
-        // such gate (`needs_llm` follows the selected style alone), so these
-        // bounds live here rather than in `PipelineConfig`.
+        // such gate (the LLM runs iff a style is selected), so these bounds
+        // live here rather than in `PipelineConfig`.
         const SKIP_CLEAN_CONF: f32 = 0.40;
         const SKIP_BROKEN_CONF: f32 = 0.30;
 
@@ -321,7 +321,7 @@ fn main() {
         let mean_risk = hc.word_risk_positions.iter().map(|(_, r)| *r).sum::<f32>() / wc as f32;
         let avg_conf = 1.0 - mean_risk;
         let too_broken = avg_conf < SKIP_BROKEN_CONF;
-        let needs_correction = !hc.all_resolved || punct.needs_llm || conf_attention;
+        let needs_correction = !hc.all_resolved || conf_attention;
         let needs_llm = needs_correction && !too_broken;
 
         // Arm llm: corrector output -> LLM always (no deterministic punctuation).

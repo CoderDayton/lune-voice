@@ -82,7 +82,6 @@ export interface WorkspaceSettings {
 export interface HistorySession {
   id: string;
   startedAt: string;
-  endedAt: string | null;
   transcript: string;
   backend: string;
   style: string;
@@ -92,7 +91,6 @@ export interface HistorySession {
 }
 
 export interface WorkspaceRuntimeState {
-  ipcFlavor: string;
   serviceStatus: string;
   /** What the host platform's window system supports. Controls for an
    *  unsupported capability are not rendered. */
@@ -121,7 +119,7 @@ export interface StylePreset {
   fewShotDirty: boolean;
 }
 
-export interface SessionTotals {
+interface SessionTotals {
   sessions: number;
   words: number;
   seconds: number;
@@ -211,7 +209,6 @@ export const DEFAULT_SETTINGS: WorkspaceSettings = {
 };
 
 export const DEFAULT_RUNTIME: WorkspaceRuntimeState = {
-  ipcFlavor: 'unknown',
   serviceStatus: 'Connecting',
   capabilities: { pillAllWorkspaces: true },
   activeSessionId: null,

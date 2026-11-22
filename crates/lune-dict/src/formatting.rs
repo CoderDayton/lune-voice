@@ -1,40 +1,72 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-//! Deterministic punctuation normalization + LLM-gate detection.
+//! Deterministic punctuation normalization.
 //!
 //! ASR output (Qwen3-ASR in particular) often arrives lowercase and without
 //! terminal punctuation even when every *word* is high-confidence. The word
 //! heuristic in [`crate::corrector`] resolves spelling, not punctuation, so a
 //! fully-resolved segment would otherwise be emitted verbatim — "turn on the
-//! light then close the door" — and bypass the LLM entirely.
+//! light then close the door".
 //!
-//! This module mirrors the "resolve deterministically, escalate the residual"
-//! philosophy of the corrector, applied to punctuation:
-//!
-//! * **Tier 1 — deterministic, no LLM:** capitalize the first letter; append a
-//!   terminal period when the segment is a single resolved declarative; append
-//!   a `?` when it is a subject-auxiliary inversion question ("did we ship it").
-//!   These fixes are unambiguous, so they never need the model.
-//! * **Tier 2 — ambiguous, trips the LLM gate:** comma-less run-ons and
-//!   bare wh-leading segments with no end mark. The right fix here
-//!   (internal commas, a sentence split, `?` vs `.` vs `!`) cannot be guessed
-//!   safely, so [`PunctuationOutcome::needs_llm`] is set and the caller routes
-//!   the text through the LLM punctuation pass.
+//! Only unambiguous fixes are applied: capitalize the first letter; append a
+//! terminal period when the segment is a resolved declarative; append a `?`
+//! when it is a subject-auxiliary inversion question ("did we ship it"). A bare
+//! wh-leading segment with no end mark (`?` vs `.` vs `!`) is left unmarked
+//! rather than guessed.
 //!
 //! Non-Latin scripts (CJK, Hangul, etc.) use different punctuation and casing
-//! conventions, so they pass through untouched and never trip the gate.
+//! conventions, so they pass through untouched.
 
-use lune_core::config::FormatToggles;
+use lune_core::config::{FormatToggles, UserSettings};
 
-/// Word count at or above which a separator-free segment is treated as a
-/// run-on candidate the deterministic pass cannot safely punctuate. Tuned for
-/// the "balanced" sensitivity: high enough to ignore ordinary short sentences,
-/// low enough to catch genuinely jarring run-ons.
-const RUN_ON_WORD_THRESHOLD: usize = 12;
+/// Formatting toggles with every per-style override settled against the
+/// global settings. Built once per dictation and passed to every pass.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct ResolvedFormat {
+    pub keybinds: bool,
+    pub title_abbreviations: bool,
+    pub auto_capitalization: bool,
+    pub brand_casing: bool,
+    pub spoken_numbers: bool,
+    pub single_digits: bool,
+}
+
+impl ResolvedFormat {
+    /// `style`'s toggles, each unset override taking the global setting of the
+    /// same name.
+    pub fn new(
+        style: &FormatToggles,
+        brand_casing: bool,
+        spoken_numbers: bool,
+        single_digits: bool,
+    ) -> Self {
+        Self {
+            keybinds: style.keybinds,
+            title_abbreviations: style.title_abbreviations,
+            auto_capitalization: style.auto_capitalization,
+            brand_casing: style.resolve_brand_casing(brand_casing),
+            spoken_numbers: style.resolve_spoken_numbers(spoken_numbers),
+            single_digits: style.resolve_single_digits(single_digits),
+        }
+    }
+}
+
+impl Default for ResolvedFormat {
+    /// Default style toggles under the default global settings.
+    fn default() -> Self {
+        let s = UserSettings::default();
+        Self::new(
+            &FormatToggles::default(),
+            s.brand_casing,
+            s.spoken_numbers,
+            s.single_digits,
+        )
+    }
+}
 
 /// Wh-words that mark a segment as interrogative on their own. When one of
 /// these opens a segment that lacks an end mark, statement-vs-question
-/// punctuation is ambiguous, so it is deferred to the LLM rather than guessed.
+/// punctuation is ambiguous, so no mark is guessed.
 const WH_LEADS: &[&str] = &[
     "who", "what", "when", "where", "why", "how", "which", "whose", "whom",
 ];
@@ -73,34 +105,23 @@ const QUESTION_SUBJECTS: &[&str] = &[
 /// Result of [`normalize`].
 pub struct PunctuationOutcome {
     /// Text with deterministic, unambiguous fixes applied: a leading capital
-    /// and, for resolved declaratives, a terminal period. When `needs_llm` is
-    /// true the terminal mark is left to the LLM, so only capitalization is
-    /// applied here.
+    /// and, for resolved declaratives, a terminal period.
     pub text: String,
-    /// True when residual punctuation is ambiguous enough to warrant the LLM
-    /// (run-on candidate, or interrogative-leading with no end mark).
-    pub needs_llm: bool,
 }
 
 /// Normalize punctuation on a single dictation segment.
-///
-/// Returns the deterministically-fixed text plus whether the residual
-/// punctuation should be handed to the LLM. The returned text is always safe to
-/// emit as-is *and* safe to feed to the LLM as input.
 pub fn normalize(text: &str) -> PunctuationOutcome {
-    normalize_with(text, &FormatToggles::default())
+    normalize_with(text, &ResolvedFormat::default())
 }
 
 /// Like [`normalize`], but with per-style control over the deterministic
 /// formatting transforms — keybind joins, title abbreviations, and
-/// auto-capitalization. The terminal-period fix and the run-on/interrogative LLM
-/// gate are always applied.
-pub fn normalize_with(text: &str, fmt: &FormatToggles) -> PunctuationOutcome {
+/// auto-capitalization. The terminal-mark fix is always applied.
+pub fn normalize_with(text: &str, fmt: &ResolvedFormat) -> PunctuationOutcome {
     let trimmed = text.trim();
     if trimmed.is_empty() || !is_latin(trimmed) {
         return PunctuationOutcome {
             text: text.to_owned(),
-            needs_llm: false,
         };
     }
 
@@ -138,24 +159,14 @@ pub fn normalize_with(text: &str, fmt: &FormatToggles) -> PunctuationOutcome {
         .last()
         .is_some_and(|w| DANGLING_ENDS.contains(&word_core(w).to_lowercase().as_str()));
 
-    // Run-on: long stretch with no internal separator or sentence break. Such a
-    // segment likely needs internal commas or a split — the deterministic pass
-    // can only touch the ends, so escalate it.
-    let run_on = words.len() >= RUN_ON_WORD_THRESHOLD && !has_internal_separator(trimmed);
-
     // A subject-auxiliary inversion ("did we ship it", "is there time") is
-    // grammatically unambiguous, so resolve it to `?` deterministically: the
-    // styling LLM is optional and off by default, so a question must not depend
-    // on it for punctuation. A bare wh-lead ("what a mess" vs "what time is it")
-    // stays ambiguous and is still deferred.
+    // grammatically unambiguous, so resolve it to `?` deterministically. A bare
+    // wh-lead ("what a mess" vs "what time is it") stays ambiguous and gets no
+    // mark.
     let confident_question =
         interrogative && !ends_terminal && !ends_open && is_aux_inversion_question(last_sentence);
 
-    // A remaining interrogative lead without an end mark is ambiguous
-    // (`?` vs `.` vs `!`), so let the LLM decide rather than guessing.
-    let needs_llm = run_on || (interrogative && !ends_terminal && !confident_question);
-
-    // Tier 1: capitalize the first word of the segment and of every internal
+    // Capitalize the first word of the segment and of every internal
     // sentence (ASR emits sentence breaks from pause prosody, and the words
     // after them arrive lowercase).
     let mut out = if fmt.auto_capitalization {
@@ -164,13 +175,10 @@ pub fn normalize_with(text: &str, fmt: &FormatToggles) -> PunctuationOutcome {
         trimmed.to_owned()
     };
 
-    // Tier 1: append a terminal period for resolved declaratives — including
-    // run-ons, so the deterministic (no-LLM) path is never left without an end
-    // mark (`needs_llm` is unchanged: a run-on still routes to the LLM for
-    // internal commas when it runs). Two guards: a one-word dictation (a bare
-    // word, command, or fragment) gets no period, and an interrogative lead with
-    // no end mark is deferred to the LLM (`?` vs `.` can't be guessed safely).
-    // A trailing colon, comma or semicolon (`ends_open`) is left exactly as the
+    // Append a terminal period for resolved declaratives. Two guards: a
+    // one-word dictation (a bare word, command, or fragment) gets no period,
+    // and an interrogative lead with no end mark gets none (`?` vs `.` can't be
+    // guessed safely). A trailing colon, comma or semicolon (`ends_open`) is left exactly as the
     // ASR produced it: no period is appended, so we never emit a double mark
     // such as ":." or ",." and never force a period where the true terminator
     // might be a question mark.
@@ -180,13 +188,9 @@ pub fn normalize_with(text: &str, fmt: &FormatToggles) -> PunctuationOutcome {
         } else if !interrogative {
             out.push('.');
         }
-        // An ambiguous interrogative lead gets no mark here — `needs_llm` owns it.
     }
 
-    PunctuationOutcome {
-        text: out,
-        needs_llm,
-    }
+    PunctuationOutcome { text: out }
 }
 
 /// Spoken-form honorifics ASR emits verbatim ("Mister Thompson") where
@@ -453,17 +457,6 @@ fn drop_dangling_separator(text: &str) -> String {
         }
         _ => text.to_owned(),
     }
-}
-
-/// Whether the body carries any internal separator or sentence break (a comma,
-/// semicolon, colon, dash, or a non-final terminator). A trailing terminator
-/// does not count.
-fn has_internal_separator(text: &str) -> bool {
-    // Drop a trailing terminator (and any closing quote/bracket) so it is not
-    // mistaken for internal structure.
-    let body = text.trim_end_matches(CLOSING).trim_end_matches(TERMINATORS);
-    body.chars()
-        .any(|c| matches!(c, ',' | ';' | ':' | '—' | '–' | '.' | '!' | '?'))
 }
 
 /// Trailing-`.` tokens that mark an abbreviation, not a sentence end. `Mr.`,
@@ -1083,8 +1076,7 @@ fn is_interrogative_lead(words: &[&str]) -> bool {
 /// Whether the segment is a subject-auxiliary inversion question ("did we ship
 /// it", "is there time") — an auxiliary lead immediately followed by a question
 /// subject. Inversion unambiguously marks a question, so unlike a bare wh-lead
-/// this can be resolved to a terminal `?` deterministically rather than deferred
-/// to the (optional) LLM.
+/// this can be resolved to a terminal `?` deterministically.
 fn is_aux_inversion_question(words: &[&str]) -> bool {
     let Some(first) = words.first().map(|w| word_core(w)) else {
         return false;
@@ -1120,11 +1112,11 @@ fn word_core(word: &str) -> &str {
 /// `lang` is a display name from `lune_core::lang::display_name`. The
 /// English-only passes rely on English capitalization and frequency tables, and
 /// on "um" being a filler, which it is not in every language.
-pub fn shape(text: &str, lang: &str, fmt: &FormatToggles) -> String {
+pub fn shape(text: &str, lang: &str, fmt: &ResolvedFormat) -> String {
     shape_keeping(text, lang, fmt, &[])
 }
 
-pub fn shape_keeping(text: &str, lang: &str, fmt: &FormatToggles, keep: &[&str]) -> String {
+pub fn shape_keeping(text: &str, lang: &str, fmt: &ResolvedFormat, keep: &[&str]) -> String {
     let english = lang == "English";
     let text = if english {
         strip_false_starts(&strip_fillers_outside_numbers(&defuse_inconsistent(text)))
@@ -1138,8 +1130,8 @@ pub fn shape_keeping(text: &str, lang: &str, fmt: &FormatToggles, keep: &[&str])
     } else {
         text
     };
-    let text = if fmt.resolve_spoken_numbers(true) {
-        spoken_numbers_to_digits(&text, lang, keep, fmt.resolve_single_digits(false))
+    let text = if fmt.spoken_numbers {
+        spoken_numbers_to_digits(&text, lang, keep, fmt.single_digits)
     } else {
         text
     };
@@ -1262,7 +1254,7 @@ mod tests {
 
     #[test]
     fn shape_writes_spoken_numbers_as_digits_when_on() {
-        let on = FormatToggles::default();
+        let on = ResolvedFormat::default();
         assert_eq!(
             shape("it costs twenty five dollars", "English", &on),
             "It costs $25."
@@ -1271,9 +1263,9 @@ mod tests {
             shape("twenty five people came", "English", &on),
             "25 people came."
         );
-        let off = FormatToggles {
-            spoken_numbers: Some(false),
-            ..FormatToggles::default()
+        let off = ResolvedFormat {
+            spoken_numbers: false,
+            ..ResolvedFormat::default()
         };
         assert_eq!(
             shape("it costs twenty five dollars", "English", &off),
@@ -1283,14 +1275,14 @@ mod tests {
 
     #[test]
     fn shape_writes_a_lone_digit_word_as_a_digit_only_with_single_digits() {
-        let unset = FormatToggles::default();
+        let unset = ResolvedFormat::default();
         assert_eq!(
             shape("it does two things", "English", &unset),
             "It does two things."
         );
-        let on = FormatToggles {
-            single_digits: Some(true),
-            ..FormatToggles::default()
+        let on = ResolvedFormat {
+            single_digits: true,
+            ..ResolvedFormat::default()
         };
         assert_eq!(
             shape("it does two things", "English", &on),
@@ -1302,7 +1294,7 @@ mod tests {
 
     #[test]
     fn shape_keeps_point_as_a_noun_at_a_sentence_start() {
-        let fmt = FormatToggles::default();
+        let fmt = ResolvedFormat::default();
         assert_eq!(
             shape("point five of the plan is cost", "English", &fmt),
             "Point five of the plan is cost."
@@ -1315,7 +1307,7 @@ mod tests {
 
     #[test]
     fn shape_keeps_the_hour_of_twelve_noon() {
-        let fmt = FormatToggles::default();
+        let fmt = ResolvedFormat::default();
         assert_eq!(
             shape("lunch is at twelve noon", "English", &fmt),
             "Lunch is at 12 noon."
@@ -1324,7 +1316,7 @@ mod tests {
 
     #[test]
     fn shape_keeps_numbers_split_by_a_filler_as_words() {
-        let fmt = FormatToggles::default();
+        let fmt = ResolvedFormat::default();
         assert_eq!(
             shape("we need twenty um five chairs", "English", &fmt),
             "We need twenty five chairs."
@@ -1345,7 +1337,7 @@ mod tests {
 
     #[test]
     fn shape_keeping_leaves_dictionary_spans_as_written() {
-        let fmt = FormatToggles::default();
+        let fmt = ResolvedFormat::default();
         assert_eq!(
             shape_keeping(
                 "we went to the Twenty One Club for twenty five dollars",
@@ -1358,15 +1350,26 @@ mod tests {
     }
 
     #[test]
-    fn shape_follows_an_explicit_spoken_numbers_choice() {
-        let unset = FormatToggles::default();
-        assert_eq!(unset.spoken_numbers, None);
-        assert_eq!(shape("twenty five people", "English", &unset), "25 people.");
+    fn resolved_format_takes_unset_overrides_from_the_globals() {
+        let unset = ResolvedFormat::new(&FormatToggles::default(), false, true, false);
+        assert!(!unset.brand_casing && unset.spoken_numbers && !unset.single_digits);
+        let set = FormatToggles {
+            brand_casing: Some(true),
+            spoken_numbers: Some(false),
+            single_digits: Some(true),
+            ..FormatToggles::default()
+        };
+        let set = ResolvedFormat::new(&set, false, true, false);
+        assert!(set.brand_casing && !set.spoken_numbers && set.single_digits);
+        assert_eq!(
+            shape("twenty five people", "English", &ResolvedFormat::default()),
+            "25 people."
+        );
     }
 
     #[test]
     fn shape_leaves_numbers_as_words_without_itn_tables() {
-        let fmt = FormatToggles::default();
+        let fmt = ResolvedFormat::default();
         assert_eq!(
             shape("vingt cinq personnes", "French", &fmt),
             "Vingt cinq personnes."
@@ -1375,7 +1378,7 @@ mod tests {
 
     #[test]
     fn shape_strips_wrapping_quotes_before_punctuating() {
-        let fmt = FormatToggles::default();
+        let fmt = ResolvedFormat::default();
         assert_eq!(
             shape("\"the results were mixed\"", "English", &fmt),
             "The results were mixed."
@@ -1384,7 +1387,7 @@ mod tests {
 
     #[test]
     fn shape_never_puts_a_period_after_a_trailing_comma() {
-        let fmt = FormatToggles::default();
+        let fmt = ResolvedFormat::default();
         for (raw, want) in [
             ("we shipped it today,", "We shipped it today."),
             ("we shipped it today;", "We shipped it today."),
@@ -1403,7 +1406,7 @@ mod tests {
 
     #[test]
     fn shape_keeps_a_short_opener_as_spoken() {
-        let fmt = FormatToggles::default();
+        let fmt = ResolvedFormat::default();
         for (raw, want) in [
             ("yes,", "Yes,"),
             ("hi team,", "Hi team,"),
@@ -1416,7 +1419,7 @@ mod tests {
 
     #[test]
     fn shape_strips_english_fillers() {
-        let fmt = FormatToggles::default();
+        let fmt = ResolvedFormat::default();
         assert_eq!(
             shape("um the results were mixed", "English", &fmt),
             "The results were mixed."
@@ -1426,7 +1429,7 @@ mod tests {
     #[test]
     fn shape_keeps_english_only_passes_off_other_languages() {
         // "um" is a real word outside English, so it must survive.
-        let fmt = FormatToggles::default();
+        let fmt = ResolvedFormat::default();
         let shaped = shape("um dia bonito", "Portuguese", &fmt);
         assert!(shaped.starts_with("Um dia"), "{shaped}");
     }
@@ -1473,7 +1476,6 @@ mod tests {
     fn capitalizes_and_periods_plain_declarative() {
         let out = normalize("turn on the light");
         assert_eq!(out.text, "Turn on the light.");
-        assert!(!out.needs_llm);
     }
 
     #[test]
@@ -1499,15 +1501,8 @@ mod tests {
 
     #[test]
     fn run_on_declarative_still_gets_terminal_period() {
-        // A long comma-less declarative still routes to the LLM (needs_llm) for
-        // internal commas, but the deterministic path now closes it so the
-        // no-LLM (minimal) output isn't left period-less.
         let out =
             normalize("you might have to make a new token that is in between those two colors");
-        assert!(
-            out.needs_llm,
-            "long comma-less declarative must still route to the LLM"
-        );
         assert!(
             out.text.ends_with('.'),
             "deterministic path must still close the run-on: {:?}",
@@ -1644,7 +1639,7 @@ mod tests {
 
     #[test]
     fn shape_strips_english_false_starts() {
-        let fmt = FormatToggles::default();
+        let fmt = ResolvedFormat::default();
         assert_eq!(
             shape("d so you do know w what it loads", "English", &fmt),
             "So you do know what it loads."
@@ -1845,13 +1840,13 @@ mod tests {
     fn normalize_with_respects_toggles() {
         // All formatting transforms off: no keybind join, no title abbreviation,
         // no auto-capitalization. (The terminal period is not a toggle.)
-        let off = FormatToggles {
+        let off = ResolvedFormat {
             keybinds: false,
             title_abbreviations: false,
             auto_capitalization: false,
-            brand_casing: Some(false),
-            spoken_numbers: Some(false),
-            single_digits: Some(false),
+            brand_casing: false,
+            spoken_numbers: false,
+            single_digits: false,
         };
         assert_eq!(
             normalize_with("set the hotkey to Super H", &off).text,
@@ -1859,7 +1854,7 @@ mod tests {
         );
         // Default (all on) joins the chord and capitalizes.
         assert_eq!(
-            normalize_with("set the hotkey to Super H", &FormatToggles::default()).text,
+            normalize_with("set the hotkey to Super H", &ResolvedFormat::default()).text,
             "Set the hotkey to Super+H."
         );
     }
@@ -2021,45 +2016,30 @@ mod tests {
     fn leaves_already_punctuated_text_alone() {
         let out = normalize("Turn on the light.");
         assert_eq!(out.text, "Turn on the light.");
-        assert!(!out.needs_llm);
     }
 
     #[test]
     fn respects_existing_terminal_question_mark() {
         let out = normalize("what time is it?");
         assert_eq!(out.text, "What time is it?");
-        assert!(!out.needs_llm);
     }
 
     #[test]
-    fn interrogative_lead_without_mark_defers_to_llm() {
+    fn interrogative_lead_without_mark_gets_no_mark() {
         let out = normalize("what time is it");
-        // Capitalized but no terminal forced — the LLM owns `?` vs `.`.
+        // Capitalized but no terminal forced: `?` vs `.` is ambiguous.
         assert_eq!(out.text, "What time is it");
-        assert!(out.needs_llm);
     }
 
     #[test]
-    fn long_comma_less_run_defers_to_llm() {
-        let out = normalize("turn on the light then close the door it is getting dark in here now");
-        assert!(out.needs_llm, "12+ word separator-free run should escalate");
-        assert!(out.text.starts_with("Turn"));
-    }
-
-    #[test]
-    fn long_run_with_comma_stays_deterministic() {
+    fn long_run_with_comma_gets_terminal_period() {
         let out = normalize("turn on the light, then close the door it is getting dark");
-        assert!(
-            !out.needs_llm,
-            "a comma signals existing structure, no escalation"
-        );
         assert!(out.text.ends_with('.'));
     }
 
     #[test]
     fn terminal_detection_ignores_trailing_quote() {
         let out = normalize("he said \"go.\"");
-        assert!(!out.needs_llm);
         assert!(out.text.ends_with("\"go.\""));
     }
 
@@ -2067,13 +2047,12 @@ mod tests {
     fn non_latin_text_passes_through_untouched() {
         let out = normalize("你好世界");
         assert_eq!(out.text, "你好世界");
-        assert!(!out.needs_llm);
     }
 
     #[test]
     fn empty_text_passes_through() {
         let out = normalize("   ");
-        assert!(!out.needs_llm);
+        assert_eq!(out.text, "   ");
     }
 
     #[test]
@@ -2110,7 +2089,6 @@ mod tests {
             "would love to see that",
         ] {
             let out = normalize(text);
-            assert!(!out.needs_llm, "imperative escalated: {text}");
             assert!(out.text.ends_with('.'), "no terminal period: {text}");
         }
     }
@@ -2118,8 +2096,7 @@ mod tests {
     #[test]
     fn aux_inversion_questions_get_deterministic_question_mark() {
         // Subject-auxiliary inversion is unambiguously a question, so it is
-        // resolved to `?` deterministically (no LLM) instead of being left
-        // unpunctuated when the optional styling LLM is off.
+        // resolved to `?` instead of being left unpunctuated.
         for text in [
             "can you hear me",
             "do you want coffee",
@@ -2128,7 +2105,6 @@ mod tests {
             "am i wrong about this",
         ] {
             let out = normalize(text);
-            assert!(!out.needs_llm, "resolved deterministically: {text}");
             assert!(out.text.ends_with('?'), "no question mark: {text}");
         }
     }
@@ -2211,11 +2187,10 @@ mod tests {
         // Declarative-ending despite an interrogative lead — not ambiguous.
         let out = normalize("how about that.");
         assert_eq!(out.text, "How about that.");
-        assert!(!out.needs_llm);
     }
 
     fn shaped(raw: &str) -> String {
-        shape(raw, "English", &FormatToggles::default())
+        shape(raw, "English", &ResolvedFormat::default())
     }
 
     #[test]

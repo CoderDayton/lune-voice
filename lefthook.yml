@@ -74,15 +74,6 @@ pre-push:
       run: cd desktop-ui && bun run build:ci
       fail_text: "Desktop UI build failed"
 
-    e2e-models:
-      run: |
-        if [ "${LUNE_E2E_MODELS:-0}" != "1" ]; then
-          echo "Skipping real-model E2E tests (set LUNE_E2E_MODELS=1 to enable)"
-          exit 0
-        fi
-        CARGO_BUILD_JOBS=${CARGO_BUILD_JOBS:-1} cargo test -p lune-llm --test smoke_ort_llm --test kv_cache_integration -- --ignored --nocapture
-      fail_text: "Real-model E2E tests failed"
-
     audit:
       run: |
         if cargo audit --version >/dev/null 2>&1; then

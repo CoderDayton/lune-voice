@@ -3,7 +3,7 @@
 import type { MessageDescriptor } from '@lingui/core';
 import { msg } from '@lingui/core/macro';
 
-export interface LlmReadiness {
+interface LlmReadiness {
   /** Whether the styling LLM can serve a request right now. */
   ready: boolean;
   /** User-facing reason to show when not ready; `null` when ready. Translated
@@ -12,7 +12,7 @@ export interface LlmReadiness {
 }
 
 /** The subset of settings needed to judge styling-LLM readiness. */
-export interface LlmSettings {
+interface LlmSettings {
   llmEnabled: boolean;
   /** Remote provider config; the key is masked ('••••••••') when saved. */
   openaiLlmApiKey: string;

@@ -18,8 +18,7 @@
 
 use std::sync::atomic::{AtomicU64, AtomicUsize, Ordering};
 
-use crossbeam_channel::{Receiver, Sender, TryRecvError, TrySendError, bounded};
-use tokio::sync::Notify;
+use crossbeam_channel::{Receiver, Sender, bounded};
 
 /// Log the first eviction, then one in every `EVICTION_LOG_INTERVAL`. A stalled
 /// consumer would otherwise emit one line per audio chunk.
@@ -31,10 +30,6 @@ pub struct RingBuffer<T> {
     rx: Receiver<T>,
     /// Slots the channel was built with. Fixed for the buffer's lifetime.
     capacity: usize,
-    /// Wakes a waiting `pop().await` when a producer pushes. Replaces an
-    /// exponential-backoff sleep loop that added up to 10 ms of latency
-    /// on the first miss.
-    notify: Notify,
     /// Chunks dropped to make room while a consumer was attached — i.e. audio
     /// a reader actually lost. Reset when the first consumer of a new run
     /// attaches, so it reads per-session rather than per-process.
@@ -55,7 +50,6 @@ impl<T> RingBuffer<T> {
             tx,
             rx,
             capacity,
-            notify: Notify::new(),
             evicted: AtomicU64::new(0),
             consumers: AtomicUsize::new(0),
         })
@@ -120,20 +114,12 @@ impl<T> RingBuffer<T> {
         const MAX_EVICT_RETRIES: usize = 8;
         for _ in 0..MAX_EVICT_RETRIES {
             match self.tx.try_send(item) {
-                Ok(()) => {
-                    self.notify.notify_one();
-                    return;
-                }
-                Err(TrySendError::Full(returned)) => {
-                    item = returned;
+                Ok(()) => return,
+                Err(err) => {
+                    item = err.into_inner();
                     if self.rx.try_recv().is_ok() {
                         self.note_eviction();
                     }
-                }
-                // Channel closed — consumer dropped. Nothing to do.
-                Err(TrySendError::Disconnected(_)) => {
-                    self.notify.notify_one();
-                    return;
                 }
             }
         }
@@ -143,23 +129,6 @@ impl<T> RingBuffer<T> {
                 retries = MAX_EVICT_RETRIES,
                 "ring buffer push dropped a chunk after repeated eviction races"
             );
-        }
-        // Wake one parked consumer (if any). `notify_one` is non-blocking
-        // and safe to call from a non-async producer thread.
-        self.notify.notify_one();
-    }
-
-    /// Pop an item (async, parks until a producer pushes).
-    pub async fn pop(&self) -> Option<T> {
-        loop {
-            match self.rx.try_recv() {
-                Ok(item) => return Some(item),
-                // `notify_one` calls during the await window are coalesced
-                // by `Notify`, so a push that races with the empty check
-                // still wakes us instead of being lost.
-                Err(TryRecvError::Empty) => self.notify.notified().await,
-                Err(TryRecvError::Disconnected) => return None,
-            }
         }
     }
 
@@ -278,17 +247,5 @@ mod tests {
         ring.detach_consumer();
         ring.push(3);
         assert_eq!(ring.evicted(), 2, "still counted while one consumer holds");
-    }
-
-    #[tokio::test]
-    async fn pop_parks_until_a_push_arrives() {
-        use std::sync::Arc;
-        let ring = Arc::new(RingBuffer::new(4).expect("capacity > 0"));
-        let producer = Arc::clone(&ring);
-        tokio::spawn(async move {
-            tokio::time::sleep(std::time::Duration::from_millis(20)).await;
-            producer.push(7);
-        });
-        assert_eq!(ring.pop().await, Some(7));
     }
 }

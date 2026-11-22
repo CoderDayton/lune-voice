@@ -7,7 +7,7 @@ db-path = "~/.cargo/advisory-db"
 db-urls = ["https://github.com/rustsec/advisory-db"]
 
 # Upstream GTK3/Tauri transitive deps — no fix available until Tauri migrates
-# to GTK4. Review quarterly; next review: 2026-09-01.
+# to GTK4. Review quarterly; next review: 2027-03-01.
 ignore = [
     { id = "RUSTSEC-2024-0370", reason = "GTK3 upstream — no Tauri 2.x fix" },
     { id = "RUSTSEC-2024-0384", reason = "GTK3 upstream" },

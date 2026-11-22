@@ -168,7 +168,7 @@ export function AppShell() {
 
 /** Live service-status chip for the desktop command bar. Subscribes to the
  *  runtime status only, so it re-renders independently of route changes. */
-export function ShellStatusChip() {
+function ShellStatusChip() {
   const { t } = useLingui();
   const { status, isActive, isConnected, isConnecting, dotClass } = useServiceStatus();
 

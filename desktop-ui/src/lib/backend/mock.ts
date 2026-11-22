@@ -5,6 +5,7 @@ import type {
   BackendClient,
   PillSnapshotDto,
   SaveWorkspaceSettingsInput,
+  SessionStreamEvent,
   UpdateStateDto,
   WorkspaceSnapshot,
 } from './types';
@@ -20,7 +21,6 @@ const initialDictionaryEntries: DictionaryEntry[] = [
 
 function createMockSnapshot(): WorkspaceSnapshot {
   return {
-    ipcFlavor: 'mock',
     serviceStatus: 'ready',
     capabilities: { pillAllWorkspaces: true },
     settings: {
@@ -277,6 +277,54 @@ export function resetMockBackend() {
   nextDictionaryId = 1000;
   nextStyleId = 1000;
   nextSnippetId = 1000;
+  clearMockCapture();
+  mockCaptureIndex = 0;
+}
+
+// The mock's stand-in for the Tauri session stream, so the simulated capture
+// reaches the store through the same path real events take.
+const mockStreamListeners = new Set<(event: SessionStreamEvent) => void>();
+
+export function subscribeMockSessionStream(
+  onEvent: (event: SessionStreamEvent) => void,
+): () => void {
+  mockStreamListeners.add(onEvent);
+  return () => {
+    mockStreamListeners.delete(onEvent);
+  };
+}
+
+// The second phrase carries a sentence capital + terminal period, the way raw
+// whisper output actually looks, so the field's normalization is exercisable
+// in the browser mock.
+const MOCK_CAPTURE_PHRASES = ['meeting header', 'Standup note.', 'signature'];
+let mockCaptureTimers: ReturnType<typeof setTimeout>[] = [];
+let mockCaptureIndex = 0;
+
+function clearMockCapture() {
+  for (const timer of mockCaptureTimers) clearTimeout(timer);
+  mockCaptureTimers = [];
+}
+
+function simulateMockCapture() {
+  clearMockCapture();
+  if (mockStreamListeners.size === 0) return;
+  const emit = (delay: number, event: SessionStreamEvent) => {
+    mockCaptureTimers.push(
+      setTimeout(() => {
+        for (const listener of mockStreamListeners) listener(event);
+      }, delay),
+    );
+  };
+  // A believable level envelope while "listening", then transcription.
+  for (let t = 80; t < 1500; t += 90) {
+    const level = 0.25 + 0.55 * Math.abs(Math.sin(t / 180)) * (0.7 + 0.3 * Math.random());
+    emit(t, { type: 'audioLevel', level });
+  }
+  emit(1500, { type: 'processing' });
+  const phrase = MOCK_CAPTURE_PHRASES[mockCaptureIndex++ % MOCK_CAPTURE_PHRASES.length];
+  emit(2200, { type: 'captureText', text: phrase });
+  emit(2250, { type: 'sessionStopped' });
 }
 
 function applySettings(input: SaveWorkspaceSettingsInput) {
@@ -476,9 +524,9 @@ export const mockBackendClient: BackendClient = {
     return 'mock-session';
   },
 
-  // The store simulates the capture event sequence in mock mode (it owns the
-  // event pipeline); this only hands back a session id.
+  // The simulated events start after the store has applied `sessionStarted`.
   async startTriggerCapture() {
+    simulateMockCapture();
     return 'mock-capture';
   },
 

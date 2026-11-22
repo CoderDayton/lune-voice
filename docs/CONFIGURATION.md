@@ -196,7 +196,6 @@ type = "OpenAiCompatible"
 base_url = "https://api.openai.com/v1"
 api_key = "sk-..."
 model = "whisper-1"
-streaming = "HttpPolling"
 ```
 
 | Field | Type | Default | Description |
@@ -204,7 +203,6 @@ streaming = "HttpPolling"
 | `base_url` | URL | none | API base URL |
 | `api_key` | string | none | API key (kept in the OS keyring when one is available, inline in `settings.toml` otherwise; redacted in logs, zeroized on drop) |
 | `model` | string | none | Model identifier |
-| `streaming` | enum | none | `"WebSocket"` or `"HttpPolling"` |
 
 > **Privacy:** a remote backend sends your audio to another server, so it needs `privacy_mode = "AllowRemote"` (**Allow remote services** in Settings → General). See [Privacy Mode](#privacy-mode).
 
@@ -256,7 +254,7 @@ device = "auto"
 | Value | Behavior |
 |-------|----------|
 | `"auto"` | Use the GPU when a GPU device is registered; fall back to CPU otherwise. **(default)** |
-| `"vulkan"` | Ask for the GPU (any vendor). If none is available, it still falls back to CPU. The old value `"cuda"` loads as this. |
+| `"vulkan"` | Ask for the GPU (any vendor). If none is available, it still falls back to CPU. |
 | `"cpu"` | Always use the CPU. |
 
 Only a discrete GPU counts. On a machine with just integrated graphics, transcription stays on the CPU, which is usually faster there.
@@ -282,8 +280,6 @@ privacy_mode = "LocalOnly"
 |------|----------|
 | `LocalOnly` | Rejects every remote backend. **(default)** |
 | `AllowRemote` | Allows remote backends. Each one still runs only once it is configured |
-
-`LocalPreferred` is a former name for `AllowRemote` and still loads as it.
 
 Under `LocalOnly`, a remote transcription backend stops the pipeline from
 starting, with a message that says what to change. It doesn't quietly switch to
@@ -563,8 +559,6 @@ Why auto: PCEN helps real speech that sits below the target, but changes audio t
 | 252 clean TTS clips at −20 dBFS (match reference) | 168 | 163 | 168 |
 
 Holding the clip costs no latency, since every backend decodes the whole clip at stop anyway. It costs memory: 64 KB per second of dictation while recording.
-
-Older files have `vad_pcen` instead. `vad_pcen = false` loads as `off`; `true` was the old default and loads as `auto`.
 
 ---
 

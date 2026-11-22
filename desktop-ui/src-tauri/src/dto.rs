@@ -331,8 +331,6 @@ pub struct StylePresetDto {
 #[ts(export, export_to = "../../src/lib/backend/generated/")]
 #[serde(rename_all = "camelCase")]
 pub struct WorkspaceSnapshot {
-    #[ts(type = "string")]
-    pub ipc_flavor: &'static str,
     pub service_status: String,
     pub capabilities: PlatformCapabilitiesDto,
     pub settings: WorkspaceSettingsDto,

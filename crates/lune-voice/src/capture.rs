@@ -131,6 +131,9 @@ const ASR_START_TIMEOUT: Duration = Duration::from_secs(15);
 /// for; the two are raced together.
 const POLL_FINAL_TIMEOUT: Duration = Duration::from_secs(180);
 
+const FLUSH_ACK_TIMEOUT: Duration = Duration::from_millis(200);
+const FLUSH_ACK_POLL: Duration = Duration::from_millis(3);
+
 /// The final-decode ceiling for a clip of `speech_samples`:
 /// [`POLL_FINAL_TIMEOUT`] plus the clip's duration.
 ///
@@ -212,16 +215,18 @@ impl MicAgc {
         let mut frame = [0f32; AGC_HOP];
         let mut sum_sq = 0f32;
         let mut metered = 0usize;
-        while self.pending.len() >= AGC_HOP {
-            frame.copy_from_slice(&self.pending[..AGC_HOP]);
+        let mut pos = 0usize;
+        while self.pending.len() - pos >= AGC_HOP {
+            frame.copy_from_slice(&self.pending[pos..pos + AGC_HOP]);
             agc.process_frame(&mut frame);
             sum_sq += frame.iter().map(|s| s * s).sum::<f32>();
             metered += AGC_HOP;
             if !auto {
                 out.extend_from_slice(&frame);
             }
-            self.pending.drain(..AGC_HOP);
+            pos += AGC_HOP;
         }
+        self.pending.drain(..pos);
         if metered == 0 {
             0.0
         } else {
@@ -283,10 +288,7 @@ fn init_audio_source(
             Box::new(handle)
         }
         SessionAudio::Open => {
-            let config = AudioConfig {
-                input_device,
-                ..AudioConfig::default()
-            };
+            let config = AudioConfig { input_device };
             Box::new(AudioStream::new(config).map_err(|e| format!("audio init: {e}"))?)
         }
     };
@@ -346,7 +348,6 @@ pub(crate) async fn run_capture<A: AsrBackend + 'static>(
     pipeline: &PipelineConfig,
     agc_mode: AgcMode,
     input_device: Option<String>,
-    segment_capacity_hint: usize,
     event_tx: &mpsc::Sender<SessionEvent>,
     control_rx: &mut mpsc::UnboundedReceiver<SessionControl>,
 ) -> std::result::Result<CaptureResult, String> {
@@ -363,7 +364,7 @@ pub(crate) async fn run_capture<A: AsrBackend + 'static>(
     let _consuming = audio_source.consume();
     let _ = send_bounded(event_tx, SessionEvent::Started).await;
 
-    let mut segments = Vec::with_capacity(segment_capacity_hint);
+    let mut segments = Vec::with_capacity(4);
     let mut raw_text = String::with_capacity(256);
 
     let mut speech_samples: usize = 0;
@@ -496,11 +497,18 @@ pub(crate) async fn run_capture<A: AsrBackend + 'static>(
 
     // Recover the producer-side audio tail: the capture callback may hold up
     // to one chunk (~80 ms) of audio past the last full-chunk boundary — often
-    // the final phonemes of the last word. Ask the producer to flush, give the
-    // audio thread one callback cycle to deliver, then push whatever arrives.
+    // the final phonemes of the last word. Ask the producer to flush, wait for
+    // the callback to acknowledge it, then push whatever arrives.
     if !cancelled {
         audio_source.request_flush();
-        tokio::time::sleep(Duration::from_millis(30)).await;
+        let flush_deadline = tokio::time::Instant::now() + FLUSH_ACK_TIMEOUT;
+        while audio_source.flush_pending() {
+            if tokio::time::Instant::now() >= flush_deadline {
+                warn!(%session_id, "capture flush not acknowledged; the last word may be clipped");
+                break;
+            }
+            tokio::time::sleep(FLUSH_ACK_POLL).await;
+        }
         while let Some(chunk) = audio_source.try_next_chunk() {
             framed.clear();
             agc.push(&chunk.samples, &mut framed);
@@ -613,7 +621,6 @@ pub(crate) async fn run_capture<A: AsrBackend + 'static>(
 
     if let Err(e) = asr.end_session(asr_session).await {
         warn!(error = %e, "end_session error");
-        status = SessionStatus::Failed(e.to_string());
     }
 
     Ok(CaptureResult {
@@ -629,10 +636,18 @@ pub(crate) async fn run_capture<A: AsrBackend + 'static>(
 
 #[cfg(test)]
 mod tests {
-    use super::{MicAgc, POLL_FINAL_TIMEOUT, final_decode_ceiling, is_speech_content, rms_of};
+    use super::{
+        MicAgc, POLL_FINAL_TIMEOUT, final_decode_ceiling, is_speech_content, rms_of, run_capture,
+    };
+    use crate::session::SessionAudio;
+    use lune_audio::{AudioConfig, AudioStream};
+    use lune_core::asr::{AsrBackend, AsrSegment, AsrSessionConfig};
     use lune_core::audio::SAMPLE_RATE;
-    use lune_core::config::AgcMode;
+    use lune_core::config::{AgcMode, PipelineConfig};
+    use lune_core::session::SessionStatus;
     use std::time::Duration;
+    use tokio::sync::mpsc;
+    use uuid::Uuid;
 
     /// Tone bursts, 200 ms on and 100 ms off, for `secs`.
     fn speech(amp: f32, secs: f32) -> Vec<f32> {
@@ -743,6 +758,63 @@ mod tests {
         ));
         assert!(is_speech_content("testing123"));
         assert!(is_speech_content("ok"));
+    }
+
+    struct TeardownFails;
+
+    #[async_trait::async_trait]
+    impl AsrBackend for TeardownFails {
+        type SessionHandle = ();
+
+        async fn start_session(&self, _: AsrSessionConfig) -> lune_core::Result<()> {
+            Ok(())
+        }
+        async fn push_audio(&self, _: &(), _: &[f32]) -> lune_core::Result<()> {
+            Ok(())
+        }
+        async fn poll_final(&self, _: &()) -> lune_core::Result<Vec<AsrSegment>> {
+            Ok(vec![AsrSegment {
+                id: 1,
+                confidence: Some(0.9),
+                min_token_confidence: None,
+                word_confidences: Vec::new(),
+                is_final: true,
+                start_ms: Some(0),
+                end_ms: Some(500),
+                text: "hello there".into(),
+                detected_language: None,
+            }])
+        }
+        async fn end_session(&self, _: ()) -> lune_core::Result<()> {
+            Err(lune_core::Error::asr("teardown failed"))
+        }
+    }
+
+    #[tokio::test]
+    async fn a_teardown_error_keeps_the_delivered_transcript_completed() {
+        let stream =
+            AudioStream::from_samples(&vec![0.0; SAMPLE_RATE / 2], AudioConfig::default()).unwrap();
+        let (event_tx, _event_rx) = mpsc::channel(64);
+        let (_control_tx, mut control_rx) = mpsc::unbounded_channel();
+        let result = run_capture(
+            Uuid::new_v4(),
+            &TeardownFails,
+            AsrSessionConfig::default(),
+            SessionAudio::Owned(stream),
+            &PipelineConfig::default(),
+            AgcMode::Off,
+            None,
+            &event_tx,
+            &mut control_rx,
+        )
+        .await
+        .unwrap();
+        assert_eq!(result.raw_text, "hello there");
+        assert!(
+            matches!(result.status, SessionStatus::Completed),
+            "status {:?}",
+            result.status
+        );
     }
 
     #[test]

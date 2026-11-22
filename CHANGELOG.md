@@ -17,7 +17,7 @@ First release, for Linux and Windows.
 - Whisper offers Auto-detect plus 28 languages (the same 25 European ones, and Japanese, Korean and Chinese), each formatted by its own rules
 - Remote transcription through any OpenAI-compatible endpoint, as an alternative to the local engines
 - Silero endpoint trim before decode: silence is cut off both ends and internal pauses are kept, because whisper reads them as punctuation. Dictations longer than 28 s are decoded in pieces split at pauses
-- Automatic gain control on the capture path, so a quiet microphone still reaches the recognizer at a usable level. **Adaptive gain control** in Settings → Dictation picks Off, Auto (the default) or Always. Auto measures each dictation when you stop and leaves clean audio at a normal level alone, so it only changes audio that needs it. An older `vad_pcen = false` loads as Off
+- Automatic gain control on the capture path, so a quiet microphone still reaches the recognizer at a usable level. **Adaptive gain control** in Settings → Dictation picks Off, Auto (the default) or Always. Auto measures each dictation when you stop and leaves clean audio at a normal level alone, so it only changes audio that needs it.
 - Correction pass over the transcript:
   - your dictionary, matched exactly, plus a one-letter near miss on longer words the recognizer was confident about
   - about 2,170 bundled brand, product and tech names re-cased exactly (**Capitalize known names**, on by default; a style can override it)

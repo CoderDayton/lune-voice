@@ -108,10 +108,7 @@ pub async fn export_transcript(
 /// is handled separately by `AppRuntime::ensure_styling_llm_ready`.
 async fn check_styling_llm_configured() -> Result<(), String> {
     run_persist("check styling llm readiness", || {
-        let paths = lune_persist::AppPaths::resolve().ok_or("resolve application paths")?;
-        let settings = lune_persist::SettingsStore::new(paths.settings_file())
-            .load()
-            .map_err(|e| format!("load settings: {e}"))?;
+        let (_, settings) = crate::persistence::load_app_settings()?;
         // Checked first: `LocalOnly` overrides a fully configured provider, so
         // reporting "ready" here and then degrading to the raw transcript at
         // dictation time is the one failure the user cannot diagnose. Styling
@@ -506,9 +503,12 @@ pub async fn detach_session_stream(
 /// Enumerate the microphone input devices cpal currently reports, by name, for
 /// the settings picker. An empty list means only the system default is offered.
 #[tauri::command]
-pub fn list_audio_input_devices(window: WebviewWindow) -> Result<Vec<String>, String> {
+pub async fn list_audio_input_devices(window: WebviewWindow) -> Result<Vec<String>, String> {
     require_window_access(&window, &["main"])?;
-    Ok(lune_audio::list_input_devices())
+    run_persist("list audio input devices", || {
+        Ok(lune_audio::list_input_devices())
+    })
+    .await
 }
 
 #[tauri::command]
@@ -565,9 +565,7 @@ pub async fn check_model_status(
 ) -> Result<Vec<lune_persist::ModelStatus>, String> {
     require_window_access(&window, &["main"])?;
     run_persist("check model status", || {
-        let paths = lune_persist::AppPaths::resolve().ok_or("resolve application paths")?;
-        let store = lune_persist::SettingsStore::new(paths.settings_file());
-        let settings = store.load().map_err(|e| format!("load settings: {e}"))?;
+        let (paths, settings) = crate::persistence::load_app_settings()?;
         Ok(lune_persist::check_model_status(
             &paths.models_dir(),
             &settings.asr_backend,
@@ -601,9 +599,7 @@ pub async fn models_disk_usage(window: WebviewWindow) -> Result<u64, String> {
 pub async fn required_models_ready(window: WebviewWindow) -> Result<bool, String> {
     require_window_access(&window, &["main"])?;
     run_persist("check required models", || {
-        let paths = lune_persist::AppPaths::resolve().ok_or("resolve application paths")?;
-        let store = lune_persist::SettingsStore::new(paths.settings_file());
-        let settings = store.load().map_err(|e| format!("load settings: {e}"))?;
+        let (paths, settings) = crate::persistence::load_app_settings()?;
         Ok(lune_persist::has_required_models(
             &paths.models_dir(),
             &settings.asr_backend,
@@ -767,11 +763,8 @@ pub async fn download_model_cmd(
     }
     let app_handle = app.clone();
     let result = run_persist("download model", move || {
-        let paths = lune_persist::AppPaths::resolve().ok_or("resolve application paths")?;
+        let (paths, settings) = crate::persistence::load_app_settings()?;
         let models_dir = paths.models_dir();
-        let settings = lune_persist::SettingsStore::new(paths.settings_file())
-            .load()
-            .map_err(|e| format!("load settings: {e}"))?;
         tracing::info!(local_name, "starting model download");
         match lune_persist::download_model(&models_dir, &local_name, &DOWNLOAD_CANCEL, |progress| {
             let _ = app_handle.emit("lune://download-progress", &progress);
@@ -833,11 +826,14 @@ pub async fn gpu_backend_status(window: WebviewWindow) -> Result<GpuBackendStatu
 /// dictation, where it reads as a malfunction and where cancelling it loses the
 /// utterance they just spoke.
 #[tauri::command]
-pub fn uinput_access_ready(window: WebviewWindow) -> Result<bool, String> {
+pub async fn uinput_access_ready(window: WebviewWindow) -> Result<bool, String> {
     require_window_access(&window, &["main"])?;
     #[cfg(unix)]
     {
-        Ok(lune_voice::uinput_access_ready())
+        run_persist("check uinput access", || {
+            Ok(lune_voice::uinput_access_ready())
+        })
+        .await
     }
     #[cfg(not(unix))]
     {
@@ -905,11 +901,13 @@ fn retry_native_hotkeys(window: &WebviewWindow) {
     // falling back to `UserSettings::default()` would silently re-bind the
     // hotkey to the stock key and activation mode instead of the user's.
     // Leaving the global-shortcut fallback in place is the honest outcome.
-    let Some(settings) = lune_persist::AppPaths::resolve().and_then(|paths| {
-        lune_persist::SettingsStore::new(paths.settings_file())
-            .load()
-            .ok()
-    }) else {
+    let loaded = lune_persist::AppPaths::resolve()
+        .and_then(|paths| crate::persistence::load_settings_checked(&paths).ok());
+    let Some(crate::persistence::CheckedSettings {
+        settings,
+        trust: crate::persistence::SettingsTrust::AsWritten,
+    }) = loaded
+    else {
         tracing::warn!(
             "uinput access was granted but the settings could not be read; \
              not starting the native listener on default bindings"
@@ -932,11 +930,14 @@ fn retry_native_hotkeys(window: &WebviewWindow) {
 /// package manager removes it — offering to delete it there would break `dpkg`'s
 /// view of its own files.
 #[tauri::command]
-pub fn uinput_rule_installed(window: WebviewWindow) -> Result<bool, String> {
+pub async fn uinput_rule_installed(window: WebviewWindow) -> Result<bool, String> {
     require_window_access(&window, &["main"])?;
     #[cfg(unix)]
     {
-        Ok(lune_voice::uinput_rule_is_self_installed())
+        run_persist("check uinput rule", || {
+            Ok(lune_voice::uinput_rule_is_self_installed())
+        })
+        .await
     }
     #[cfg(not(unix))]
     {

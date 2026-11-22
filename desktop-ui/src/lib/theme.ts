@@ -4,8 +4,8 @@
 
 import { useSyncExternalStore } from 'react';
 
-export type ThemeMode = 'system' | 'dark' | 'light';
-export type ThemeScheme = 'dark' | 'light';
+type ThemeMode = 'system' | 'dark' | 'light';
+type ThemeScheme = 'dark' | 'light';
 
 const STORAGE_KEY = 'lune-theme';
 
@@ -104,7 +104,7 @@ export function initTheme() {
   applyTheme(mode);
 }
 
-export function applyTheme(mode: ThemeMode) {
+function applyTheme(mode: ThemeMode) {
   const scheme = themeSchemeFor(mode, window.matchMedia('(prefers-color-scheme: light)').matches);
   const root = document.documentElement;
   root.setAttribute('data-theme', scheme === 'light' ? 'lune-light' : 'lune');

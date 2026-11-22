@@ -16,8 +16,7 @@ pub use pipeline::{PipelineConfig, PipelineOverrides};
 pub use redacted::RedactedString;
 pub use settings::{
     AsrBackendConfig, DevicePolicy, HistoryRetention, LlmBackendConfig, OpenAiLlmProvider,
-    ParakeetModel, StreamingMode, UserSettings, WhisperModel, is_local_endpoint,
-    require_tls_or_local,
+    ParakeetModel, UserSettings, WhisperModel, is_local_endpoint, require_tls_or_local,
 };
 pub use settings::{PillAnchor, PillCorner, PillOrientation, PillPosition, PillSize};
 pub use style_llm::{
@@ -62,20 +61,6 @@ mod tests {
         let json = r#""LocalOnly""#;
         let mode: PrivacyMode = serde_json::from_str(json).unwrap();
         assert_eq!(mode, PrivacyMode::LocalOnly);
-    }
-
-    /// `LocalPreferred` behaved exactly like `AllowRemote` and was merged into
-    /// it. A file that still names it must keep remote services allowed:
-    /// `lenient` would otherwise read the unknown value as the `LocalOnly`
-    /// default and quietly switch off a service the user had turned on.
-    #[test]
-    fn a_saved_local_preferred_privacy_mode_still_allows_remote() {
-        let parsed: UserSettings = toml::from_str("privacy_mode = \"LocalPreferred\"\n").unwrap();
-        assert_eq!(parsed.privacy_mode, PrivacyMode::AllowRemote);
-        assert_eq!(
-            "LocalPreferred".parse::<PrivacyMode>(),
-            Ok(PrivacyMode::AllowRemote)
-        );
     }
 
     #[test]
@@ -152,30 +137,50 @@ mod tests {
         assert!(matches!(parsed.llm_backend, LlmBackendConfig::Disabled));
     }
 
-    /// `mic_prewarm` was removed — the capture stream is always kept open — so
-    /// every settings.toml written before that still carries the key. Parsing
-    /// has to ignore it rather than fail, or an existing install is quarantined
-    /// on upgrade and silently loses every other setting in the file.
     #[test]
-    fn a_settings_file_with_the_removed_mic_prewarm_key_still_parses() {
-        for value in ["true", "false"] {
-            let parsed: UserSettings =
-                toml::from_str(&format!("mic_prewarm = {value}\nlanguage = \"en\"\n"))
-                    .expect("a removed key must be ignored, not rejected");
-            assert_eq!(parsed.language, "en");
-        }
+    fn a_settings_file_with_removed_keys_and_values_still_loads() {
+        let parsed: UserSettings = toml::from_str(
+            r#"
+language = "en"
+mic_prewarm = true
+vad_pcen = false
+privacy_mode = "LocalPreferred"
+dictation_mode = "Both"
+device = "cuda"
+
+[asr_backend]
+type = "Qwen3Asr"
+"#,
+        )
+        .expect("removed keys and values must not fail the load");
+        assert_eq!(parsed.language, "en");
+        assert_eq!(parsed.privacy_mode, PrivacyMode::LocalOnly);
+        assert_eq!(parsed.dictation_mode, DictationMode::default());
+        assert!(!parsed.copy_to_clipboard);
+        assert_eq!(parsed.device, DevicePolicy::Auto);
+        assert_eq!(parsed.agc_mode, AgcMode::Auto);
+        assert!(matches!(
+            parsed.asr_backend,
+            AsrBackendConfig::WhisperCpp { .. }
+        ));
     }
 
     #[test]
-    fn migration_leaves_llm_backend_untouched_when_style_selected() {
-        // With the local styling engine removed, selecting a style must not
-        // implicitly change the (now purely OpenAI-or-off) llm_backend.
-        let mut settings = UserSettings {
-            default_style: Some("casual".into()),
-            llm_backend: LlmBackendConfig::Disabled,
-            ..UserSettings::default()
-        };
-        settings.migrate_pipeline_fields();
-        assert!(matches!(settings.llm_backend, LlmBackendConfig::Disabled));
+    fn a_remote_asr_backend_with_a_removed_streaming_key_still_loads() {
+        let parsed: UserSettings = toml::from_str(
+            r#"
+[asr_backend]
+type = "OpenAiCompatible"
+base_url = "https://api.openai.com/v1"
+api_key = "k"
+model = "whisper-1"
+streaming = "HttpPolling"
+"#,
+        )
+        .expect("a removed key must be ignored");
+        assert!(matches!(
+            parsed.asr_backend,
+            AsrBackendConfig::OpenAiCompatible { .. }
+        ));
     }
 }

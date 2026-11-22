@@ -12,7 +12,7 @@ export interface DictionaryEntry {
  * first-time user sees the feature work instead of facing a blank form
  * (progressive disclosure — teach by example, lower the activation cost).
  */
-export interface VocabPreset {
+interface VocabPreset {
   phrase: string;
   replacement: string;
   priority: number;

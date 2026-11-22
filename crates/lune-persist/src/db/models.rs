@@ -2,7 +2,7 @@
 
 use diesel::prelude::*;
 
-use super::schema::{correction_pairs, custom_styles, dictionary, sessions, snippets};
+use super::schema::{custom_styles, dictionary, sessions, snippets};
 
 // ── Custom styles ────────────────────────────────────────────────────────────
 
@@ -70,15 +70,4 @@ pub struct NewSession<'a> {
     /// Maintained alongside `transcript` so `session_stats` never has to read
     /// the text back to count words.
     pub word_count: i32,
-}
-
-// ── Correction pairs (raw → final history) ────────────────────────────
-
-#[derive(Insertable)]
-#[diesel(table_name = correction_pairs)]
-pub struct NewCorrectionPair<'a> {
-    pub session_id: &'a str,
-    pub raw: &'a str,
-    pub final_text: &'a str,
-    pub created_at: &'a str,
 }

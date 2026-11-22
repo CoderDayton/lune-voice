@@ -48,7 +48,7 @@ Backends are chosen in one place, through registries and DTO mappers. The deskto
 
 ```
 lune-core (types, config, errors)
-├─ lune-audio (mic, resample, ringbuf, vad, pcen, auto_gain)
+├─ lune-audio (mic, resample, ringbuf, pcen, auto_gain)
 ├─ lune-asr (whisper.cpp, parakeet, openai remote, registry)
 ├─ lune-llm (openai remote, null passthrough, style pipeline, prompt, few-shot)
 ├─ lune-dict (corrector, vocab, voice commands)
@@ -80,7 +80,7 @@ Each crate has one job. `lune-core` defines shared types and traits but has no r
 - `MicAgc` applies the `agc_mode` setting. `always` runs PCEN on each frame as it streams. `auto` (default) holds the clip until stop, measures it (`lune_audio::auto_gain`), then runs full PCEN if it is more than 3 dB off the target level. Near the target it leaves clean audio alone and ramps PCEN up as SNR drops from 20 to 10 dB. The level meter shows the signal after PCEN in both modes, so a quiet mic still moves the bar
 - Chunks go to the ASR backend through `push_audio` as they arrive, or all at once at stop under `auto`. Every backend decodes the whole clip at `poll_final`, so that costs no latency. No VAD runs at this stage
 - The session loop handles Stop, Cancel, deadline and max-speech signals and ends the capture loop when one arrives
-- After Stop, the producer is asked to flush and gets 30 ms to hand over the chunk it still holds (up to ~80 ms, which is the end of the last word), then the AGC's leftover partial frame (or, under `auto`, the whole held clip). Then `poll_final` decodes the buffer
+- After Stop, the producer is asked to flush and the session waits for it to acknowledge, up to 200 ms, so it hands over the chunk it still holds (up to ~80 ms, which is the end of the last word), then the AGC's leftover partial frame (or, under `auto`, the whole held clip). Then `poll_final` decodes the buffer
 
 ### 2. ASR
 

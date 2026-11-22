@@ -346,7 +346,7 @@ msgstr "أعلى دقة، ومفكّك الترميز turbo يُبقيه سري�
 msgid "Bigger is more accurate, but slower"
 msgstr "الأكبر أدق، لكنه أبطأ"
 
-#: src/features/shell/config/navigation.ts:88
+#: src/features/shell/config/navigation.ts:82
 msgid "Blocks of text Lune Voice types when you speak their trigger phrase"
 msgstr "كتل نصية يكتبها Lune Voice عندما تنطق عبارة تشغيلها"
 
@@ -374,7 +374,7 @@ msgstr "حالة أحرف العلامات التجارية (\"github\" → \"Gi
 msgid "Brands"
 msgstr "العلامات التجارية"
 
-#: src/features/shell/config/navigation.ts:70
+#: src/features/shell/config/navigation.ts:64
 msgid "Browse and search past dictations"
 msgstr "تصفّح الإملاءات السابقة وابحث فيها"
 
@@ -603,7 +603,7 @@ msgstr "التصحيح"
 msgid "Correction sensitivity"
 msgstr "حساسية التصحيح"
 
-#: src/features/shell/config/navigation.ts:79
+#: src/features/shell/config/navigation.ts:73
 msgid "Corrections Lune Voice applies every time you dictate"
 msgstr "تصحيحات يطبّقها Lune Voice في كل مرة تُملي فيها"
 
@@ -1014,7 +1014,7 @@ msgstr "رسمي"
 msgid "Formatting"
 msgstr "التنسيق"
 
-#: src/features/shell/config/navigation.ts:97
+#: src/features/shell/config/navigation.ts:91
 msgid "Formatting presets for your text"
 msgstr "إعدادات تنسيق مسبقة لنصك"
 
@@ -1145,7 +1145,7 @@ msgstr "الضغط المستمر أثناء الكلام"
 msgid "Hold your hotkey, speak, then let go. The text is typed into whatever app you were using."
 msgstr "اضغط مع الاستمرار على اختصارك، وتحدّث، ثم اترك المفتاح. يُكتب النص في التطبيق الذي كنت تستخدمه."
 
-#: src/features/shell/config/navigation.ts:60
+#: src/features/shell/config/navigation.ts:54
 msgid "Home"
 msgstr "الرئيسية"
 
@@ -1184,7 +1184,7 @@ msgstr "قيد التنفيذ"
 msgid "In use"
 msgstr "قيد الاستخدام"
 
-#: src/features/shell/config/navigation.ts:105
+#: src/features/shell/config/navigation.ts:99
 msgid "Input, output, models, and shortcuts"
 msgstr "الإدخال والإخراج والنماذج والاختصارات"
 
@@ -1433,7 +1433,7 @@ msgstr "النماذج"
 msgid "Models are stored locally. No telemetry, no accounts."
 msgstr "تُخزن النماذج محليًا. لا قياسات عن بُعد ولا حسابات."
 
-#: src/features/shell/config/navigation.ts:109
+#: src/features/shell/config/navigation.ts:103
 msgid "Models, shortcuts, output"
 msgstr "النماذج والاختصارات والإخراج"
 
@@ -2036,11 +2036,11 @@ msgstr "يُرسل النصوص إلى نقطة نهاية متوافقة مع O
 msgid "Session details"
 msgstr "تفاصيل الجلسة"
 
-#: src/store/workspace-store.ts:211
+#: src/store/workspace-store.ts:210
 msgid "Session timed out — backend may be unresponsive"
 msgstr "انتهت مهلة الجلسة — قد لا تستجيب الواجهة الخلفية"
 
-#: src/features/shell/config/navigation.ts:69
+#: src/features/shell/config/navigation.ts:63
 msgid "Sessions"
 msgstr "الجلسات"
 
@@ -2060,7 +2060,7 @@ msgstr "إعداد تسريع وحدة معالجة الرسوميات"
 msgid "Setting up your GPU"
 msgstr "جارٍ إعداد وحدة معالجة الرسوميات"
 
-#: src/features/shell/config/navigation.ts:104
+#: src/features/shell/config/navigation.ts:98
 msgid "Settings"
 msgstr "الإعدادات"
 
@@ -2136,7 +2136,7 @@ msgstr "تنزيل أصغر وذاكرة أقل، ودقة أقل قليلًا."
 msgid "Snippet text"
 msgstr "نص المقتطف"
 
-#: src/features/shell/config/navigation.ts:87
+#: src/features/shell/config/navigation.ts:81
 msgid "Snippets"
 msgstr "المقتطفات"
 
@@ -2228,7 +2228,7 @@ msgstr "مُخزَّن على هذا الجهاز"
 msgid "Style"
 msgstr "النمط"
 
-#: src/features/shell/config/navigation.ts:96
+#: src/features/shell/config/navigation.ts:90
 msgid "Styles"
 msgstr "الأنماط"
 
@@ -2261,7 +2261,7 @@ msgid "Switch to light theme"
 msgstr "التبديل إلى السمة الفاتحة"
 
 #: src/features/settings/sections/appearance-section.tsx:26
-#: src/features/shell/config/navigation.ts:121
+#: src/features/shell/config/navigation.ts:115
 msgid "System"
 msgstr "النظام"
 
@@ -2479,7 +2479,7 @@ msgstr "الكتابة في التطبيق"
 msgid "Types as"
 msgstr "يُكتب هكذا"
 
-#: src/store/workspace-store.ts:688
+#: src/store/workspace-store.ts:646
 msgid "Unable to reach the desktop backend."
 msgstr "تعذّر الوصول إلى الواجهة الخلفية لسطح المكتب."
 
@@ -2547,7 +2547,7 @@ msgstr "عرض النمط"
 msgid "Visibility"
 msgstr "الظهور"
 
-#: src/features/shell/config/navigation.ts:78
+#: src/features/shell/config/navigation.ts:72
 msgid "Vocabulary"
 msgstr "المفردات"
 
@@ -2638,7 +2638,7 @@ msgstr "كلمات"
 msgid "Words"
 msgstr "الكلمات"
 
-#: src/features/shell/config/navigation.ts:120
+#: src/features/shell/config/navigation.ts:114
 msgid "Workspace"
 msgstr "مساحة العمل"
 
@@ -2682,7 +2682,7 @@ msgstr "لديك أحدث إصدار"
 msgid "Your API key. Leave it blank to keep the saved key — or if the endpoint runs on your own machine or network and needs none."
 msgstr "مفتاح API الخاص بك. اتركه فارغًا للإبقاء على المفتاح المحفوظ — أو إذا كانت نقطة النهاية تعمل على جهازك أو شبكتك ولا تحتاج إلى مفتاح."
 
-#: src/features/shell/config/navigation.ts:61
+#: src/features/shell/config/navigation.ts:55
 msgid "Your dictation at a glance"
 msgstr "إملاؤك في لمحة"
 

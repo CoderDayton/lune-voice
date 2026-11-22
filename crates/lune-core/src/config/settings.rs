@@ -68,20 +68,6 @@ pub enum PillCorner {
     Square,
 }
 
-/// Deserialize `dictation_mode`, tolerating the removed legacy `"Both"` value
-/// (the old "type and copy" mode) by mapping it to `TypeInPlace` via `FromStr`.
-/// The copy behaviour is restored separately by the `copy_to_clipboard`
-/// migration in `lune-persist`, so old configs neither break nor silently lose
-/// their intent. Any other unrecognised value falls back to the default, for
-/// the same reason [`lenient`] exists.
-fn deserialize_dictation_mode<'de, D>(d: D) -> Result<DictationMode, D::Error>
-where
-    D: serde::Deserializer<'de>,
-{
-    let s = String::deserialize(d)?;
-    Ok(s.parse().unwrap_or_default())
-}
-
 /// Deserialize `T`, falling back to `T::default()` for a value this build does
 /// not recognise.
 ///
@@ -151,7 +137,6 @@ pub struct UserSettings {
     pub llm_openai: OpenAiLlmProvider,
     pub hotkey: HotkeyConfig,
     /// Selected styling preset id, or `None` for no styling (raw transcript).
-    /// Legacy configs storing the removed `"minimal"` sentinel migrate to `None`.
     #[serde(default)]
     pub default_style: Option<StyleId>,
     /// BCP-47 tag, e.g. "en-US"
@@ -161,7 +146,7 @@ pub struct UserSettings {
     pub dictation_language: String,
     #[serde(deserialize_with = "lenient")]
     pub privacy_mode: PrivacyMode,
-    #[serde(deserialize_with = "deserialize_dictation_mode")]
+    #[serde(deserialize_with = "lenient")]
     pub dictation_mode: DictationMode,
     /// Keep the dictated text on the clipboard after delivery. Orthogonal to
     /// `dictation_mode` (works with either Paste or Type). Off by default.
@@ -216,7 +201,7 @@ pub struct UserSettings {
     /// How long a dictation stays in the history, in days.
     ///
     /// `None` disables history outright: nothing is written for a dictation —
-    /// no session row, no transcript, no correction pair — and anything already
+    /// no session row, no transcript — and anything already
     /// stored is cleared when the setting changes. It is not "keep forever";
     /// `Some(0)` is. Decode it with [`UserSettings::history_retention`] rather
     /// than matching on the raw field.
@@ -249,8 +234,7 @@ pub struct UserSettings {
     /// back to the default at capture-open time — never fatal.
     #[serde(default)]
     pub input_device: Option<String>,
-    /// Microphone gain control before the recognizer. Replaces the old
-    /// `vad_pcen` bool, which `lune-persist` migrates on load.
+    /// Microphone gain control before the recognizer.
     #[serde(default, deserialize_with = "lenient")]
     pub agc_mode: AgcMode,
     /// Launch the desktop app with the main window hidden to the system
@@ -311,31 +295,6 @@ impl UserSettings {
             None => HistoryRetention::Off,
             Some(0) => HistoryRetention::Forever,
             Some(days) => HistoryRetention::Days(days),
-        }
-    }
-
-    /// Migrate legacy field spellings after deserialization.
-    pub fn migrate_pipeline_fields(&mut self) {
-        // The "minimal" preset (a styling-off sentinel) was removed; "off" is now
-        // the absence of a selection. Map the legacy value to `None`.
-        if self.default_style.as_deref() == Some("minimal") {
-            self.default_style = None;
-        }
-        // Back-fill the saved provider from a remote backend that was configured
-        // before `llm_openai` existed, so it survives being toggled off later.
-        if let LlmBackendConfig::OpenAiCompatible {
-            base_url,
-            api_key,
-            model,
-            max_tokens,
-        } = &self.llm_backend
-        {
-            self.llm_openai = OpenAiLlmProvider {
-                base_url: base_url.to_string(),
-                api_key: api_key.clone(),
-                model: model.clone(),
-                max_tokens: *max_tokens,
-            };
         }
     }
 }
@@ -587,7 +546,6 @@ pub enum AsrBackendConfig {
         base_url: Url,
         api_key: RedactedString,
         model: String,
-        streaming: StreamingMode,
     },
     /// Local whisper.cpp inference via the bundled GGML model `model`.
     WhisperCpp {
@@ -602,10 +560,8 @@ pub enum AsrBackendConfig {
     },
 }
 
-/// Forward/backward-compatible deserialize. An unknown `type` tag — notably
-/// the removed `"Qwen3Asr"` ONNX backend still written in older
-/// `settings.toml` files — maps to the current default (`WhisperCpp`) instead
-/// of failing the entire settings load.
+/// Forward-compatible deserialize. An unknown `type` tag maps to the current
+/// default (`WhisperCpp`) instead of failing the entire settings load.
 impl<'de> Deserialize<'de> for AsrBackendConfig {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
@@ -618,7 +574,6 @@ impl<'de> Deserialize<'de> for AsrBackendConfig {
                 base_url: Url,
                 api_key: RedactedString,
                 model: String,
-                streaming: StreamingMode,
             },
             WhisperCpp {
                 #[serde(default, deserialize_with = "lenient")]
@@ -637,12 +592,10 @@ impl<'de> Deserialize<'de> for AsrBackendConfig {
                 base_url,
                 api_key,
                 model,
-                streaming,
             } => AsrBackendConfig::OpenAiCompatible {
                 base_url,
                 api_key,
                 model,
-                streaming,
             },
             Repr::WhisperCpp { model } => AsrBackendConfig::WhisperCpp { model },
             Repr::ParakeetCpp { model } => AsrBackendConfig::ParakeetCpp { model },
@@ -778,24 +731,15 @@ fn default_sound_cue_volume() -> f32 {
     1.0
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-#[non_exhaustive]
-pub enum StreamingMode {
-    WebSocket,
-    HttpPolling,
-}
-
 /// Compute device policy for local model inference.
 ///
 /// Serializes as lowercase TOML strings: `"auto"`, `"vulkan"`, `"cpu"`.
-/// `"cuda"`, the old name for the GPU choice, still reads as `Vulkan`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
 #[serde(rename_all = "lowercase")]
 pub enum DevicePolicy {
     /// Force CPU-only inference.
     Cpu,
     /// Ask for the GPU (the Vulkan plugin, any vendor), falling back to CPU.
-    #[serde(alias = "cuda")]
     Vulkan,
     /// This is the recommended setting: zero-config on GPU machines, safe on CPU-only.
     #[default]
@@ -1086,7 +1030,7 @@ model = "LargeV4"
     }
 
     #[test]
-    fn device_is_written_as_vulkan_and_still_reads_the_old_cuda_name() {
+    fn device_is_written_as_vulkan() {
         #[derive(Serialize, Deserialize)]
         struct Wrap {
             device: DevicePolicy,
@@ -1096,10 +1040,8 @@ model = "LargeV4"
         })
         .unwrap();
         assert_eq!(written.trim(), r#"device = "vulkan""#);
-        for old in [r#"device = "cuda""#, r#"device = "vulkan""#] {
-            let read: Wrap = toml::from_str(old).unwrap();
-            assert_eq!(read.device, DevicePolicy::Vulkan, "{old}");
-        }
+        let read: Wrap = toml::from_str(&written).unwrap();
+        assert_eq!(read.device, DevicePolicy::Vulkan);
     }
 
     #[test]
@@ -1178,11 +1120,8 @@ model = "LargeV4"
     }
 
     #[test]
-    fn legacy_qwen3_asr_backend_migrates_to_whisper_default() {
-        // Old persisted configs carry `type = "Qwen3Asr"`. With the ONNX backend
-        // removed, deserializing such a config must not fail — it falls back to
-        // the current default (`WhisperCpp`) so settings still load.
-        let cfg: AsrBackendConfig = serde_json::from_str(r#"{"type":"Qwen3Asr"}"#).unwrap();
+    fn unknown_asr_backend_type_falls_back_to_whisper_default() {
+        let cfg: AsrBackendConfig = serde_json::from_str(r#"{"type":"Nonexistent"}"#).unwrap();
         match cfg {
             AsrBackendConfig::WhisperCpp { model } => {
                 assert_eq!(model, WhisperModel::default());

@@ -27,7 +27,6 @@ use tokio::sync::mpsc;
 struct ManifestEntry {
     id: String,
     category: String,
-    expect_bypass: Option<bool>,
 }
 
 fn parse_manifest(text: &str) -> Option<Vec<ManifestEntry>> {
@@ -39,7 +38,6 @@ fn parse_manifest(text: &str) -> Option<Vec<ManifestEntry>> {
                 Some(ManifestEntry {
                     id: e.get("id")?.as_str()?.to_string(),
                     category: e.get("category")?.as_str()?.to_string(),
-                    expect_bypass: e.get("expect_bypass").and_then(|v| v.as_bool()),
                 })
             })
             .collect(),
@@ -64,20 +62,6 @@ struct FixtureResult {
     wall_secs: f64,
     hyp_words: usize,
     ref_words: usize,
-    used_llm: bool,
-    expect_bypass: Option<bool>,
-    unresolved: Vec<String>,
-}
-
-fn category_dir(cat: &str) -> &str {
-    match cat {
-        "quiet_dictation" => "quiet_dictation",
-        "long_form" => "long_form",
-        "commands" => "commands",
-        "punctuation" => "punctuation",
-        "proper_nouns" => "proper_nouns",
-        other => other,
-    }
 }
 
 fn load_domain_fixtures(root: &Path) -> Vec<DomainFixture> {
@@ -100,7 +84,7 @@ fn load_domain_fixtures(root: &Path) -> Vec<DomainFixture> {
 
     let mut fixtures = Vec::new();
     for entry in entries {
-        let dir = bench_dir.join(category_dir(&entry.category));
+        let dir = bench_dir.join(&entry.category);
         let wav_path = dir.join(format!("{}.wav", entry.id));
         let txt_path = dir.join(format!("{}.txt", entry.id));
 
@@ -179,8 +163,6 @@ fn run() -> i32 {
             .rt
             .block_on(run_pipeline(fix, &harness))
             .unwrap_or_default();
-        let used_llm = outcome.used_llm;
-        let unresolved = outcome.unresolved.clone();
         let text = if fix.entry.category == "commands" {
             outcome.command_text.unwrap_or(outcome.final_text)
         } else {
@@ -201,28 +183,15 @@ fn run() -> i32 {
             0.0
         };
 
-        let gate_tag = if used_llm { "LLM" } else { "BYPASS" };
-        let gate_ok = match fix.entry.expect_bypass {
-            Some(true) => !used_llm,
-            Some(false) => used_llm,
-            None => true,
-        };
-        let gate_mark = if !gate_ok { " ⚠" } else { "" };
         println!(
-            "  WER {:5.1}%  CER {:5.1}%  {:.1}s/{:.1}s  RTF {:.3}  [{}{}]  {}",
+            "  WER {:5.1}%  CER {:5.1}%  {:.1}s/{:.1}s  RTF {:.3}  {}",
             wer,
             cer,
             wall,
             fix.audio_secs,
             rtf,
-            gate_tag,
-            gate_mark,
             if exact { "✓" } else { "" }
         );
-
-        if !unresolved.is_empty() {
-            println!("    unresolved: {}", unresolved.join(", "));
-        }
 
         if wer > 0.0 {
             wrap_print("    hyp: ", &text, 72);
@@ -239,9 +208,6 @@ fn run() -> i32 {
             wall_secs: wall,
             hyp_words,
             ref_words,
-            used_llm,
-            expect_bypass: fix.entry.expect_bypass,
-            unresolved,
         });
     }
 
@@ -301,34 +267,14 @@ fn run() -> i32 {
     let total_exact = results.iter().filter(|r| r.exact_match).count();
 
     println!();
-    let llm_count = results.iter().filter(|r| r.used_llm).count();
-    let gate_total = results.iter().filter(|r| r.expect_bypass.is_some()).count();
-    let gate_correct = results
-        .iter()
-        .filter(|r| match r.expect_bypass {
-            Some(true) => !r.used_llm,
-            Some(false) => r.used_llm,
-            None => false,
-        })
-        .count();
     println!(
-        "  Overall: WER {:.1}%  CER {:.1}%  RTF {:.3}  Exact {}/{}  LLM {}/{}",
+        "  Overall: WER {:.1}%  CER {:.1}%  RTF {:.3}  Exact {}/{}",
         avg_wer,
         avg_cer,
         overall_rtf,
         total_exact,
-        results.len(),
-        llm_count,
         results.len()
     );
-    if gate_total > 0 {
-        println!(
-            "  Gate accuracy: {}/{} ({:.0}%)",
-            gate_correct,
-            gate_total,
-            gate_correct as f64 / gate_total as f64 * 100.0
-        );
-    }
 
     // ── Command exact-match ──────────────────────────────────────────
     if let Some(cmds) = by_cat.get("commands") {
@@ -404,8 +350,6 @@ fn run() -> i32 {
 struct PipelineOutcome {
     final_text: String,
     command_text: Option<String>,
-    used_llm: bool,
-    unresolved: Vec<String>,
 }
 
 async fn run_pipeline(
@@ -454,8 +398,6 @@ async fn run_pipeline(
                 .expect("start session");
             let mut final_text = String::new();
             let mut command_text: Option<String> = None;
-            let mut used_llm = false;
-            let mut unresolved = Vec::new();
             let deadline = tokio::time::Instant::now() + std::time::Duration::from_secs(180);
 
             loop {
@@ -467,14 +409,6 @@ async fn run_pipeline(
                         if command_text.is_none() {
                             command_text = command_text_from_payload(&payload);
                         }
-                    }
-                    Ok(Some(SessionEvent::GateDecision {
-                        used_llm: u,
-                        lang: _,
-                        unresolved: w,
-                    })) => {
-                        used_llm = u;
-                        unresolved = w.into_iter().map(|(word, _)| word).collect();
                     }
                     Ok(Some(SessionEvent::Stopped { .. })) => break,
                     Ok(Some(_)) => {}
@@ -492,8 +426,6 @@ async fn run_pipeline(
                 Some(PipelineOutcome {
                     final_text,
                     command_text,
-                    used_llm,
-                    unresolved,
                 })
             }
         })

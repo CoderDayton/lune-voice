@@ -46,9 +46,9 @@ export interface DownloadDeps {
   };
 }
 
-export type RunStatus = 'idle' | 'running' | 'failed' | 'settled';
+type RunStatus = 'idle' | 'running' | 'failed' | 'settled';
 
-export interface RunState {
+interface RunState {
   status: RunStatus;
   /** Every model of the run, in queue order, with sizes fixed at the start. */
   models: RunModel[];
@@ -84,7 +84,7 @@ const IDLE: RunState = {
 };
 
 /** A model as the library knows it, for resuming a run. */
-export interface LibraryModel extends RunModel {
+interface LibraryModel extends RunModel {
   ready: boolean;
 }
 
@@ -350,8 +350,6 @@ export function createDownloadRun(deps: DownloadDeps) {
     },
   };
 }
-
-export type DownloadRun = ReturnType<typeof createDownloadRun>;
 
 /** The run as a checklist, with the GPU plugin as an optional last row. */
 export function runChecklist(

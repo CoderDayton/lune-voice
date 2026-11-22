@@ -137,10 +137,7 @@ fn main() {
 
     let out = PathBuf::from(env::var("OUT_DIR").unwrap());
     let whisper_root = out.join("whisper.cpp");
-    // LUNE FORK: ggml comes from the vendored llama.cpp tree, not whisper.cpp's
-    // own copy, so whisper, parakeet, llama and mtmd share one ggml in the
-    // process. llama.cpp is built and installed first; whisper.cpp then builds
-    // against it with `WHISPER_USE_SYSTEM_GGML`.
+
     let llama_root = out.join("llama.cpp");
 
     // LUNE FORK: upstream copies the sources only when OUT_DIR has none and
@@ -162,10 +159,6 @@ fn main() {
     }
 
     if env::var("WHISPER_DONT_GENERATE_BINDINGS").is_ok() {
-        // LUNE FORK: the bundled bindings carry no llama/mtmd symbols.
-        if cfg!(feature = "llama") {
-            panic!("the `llama` feature needs generated bindings; unset WHISPER_DONT_GENERATE_BINDINGS");
-        }
         let _: u64 = std::fs::copy("src/bindings.rs", out.join("bindings.rs"))
             .expect("Failed to copy bindings.rs");
     } else {
@@ -201,14 +194,6 @@ fn main() {
                 .header("llama.cpp/ggml/include/ggml-vulkan.h")
                 .clang_arg("-DGGML_USE_VULKAN=1");
         }
-        // LUNE FORK
-        #[cfg(feature = "llama")]
-        {
-            bindings = bindings
-                .clang_arg("-DLUNE_LLAMA=1")
-                .clang_arg("-I./llama.cpp/include")
-                .clang_arg("-I./llama.cpp/tools/mtmd");
-        }
 
         let bindings = bindings
             .clang_arg("-I./whisper.cpp/")
@@ -224,10 +209,6 @@ fn main() {
                     .expect("Couldn't write bindings!");
             }
             Err(e) => {
-                // LUNE FORK: the bundled bindings carry no llama/mtmd symbols.
-                if cfg!(feature = "llama") {
-                    panic!("Unable to generate bindings for the `llama` feature: {}", e);
-                }
                 println!("cargo:warning=Unable to generate bindings: {}", e);
                 println!("cargo:warning=Using bundled bindings.rs, which may be out of date");
                 // copy src/bindings.rs to OUT_DIR
@@ -248,9 +229,7 @@ fn main() {
     // switch has to drive the CMake define and the link kind together.
     let shared_libs = backend_dl_enabled() || cfg!(feature = "intel-sycl");
 
-    // LUNE FORK: llama.cpp and whisper.cpp are two CMake projects built with
-    // the same ggml settings and installed into one prefix (OUT_DIR), so the
-    // runtime layout (`out/lib`, `out/bin`) is what it was with one project.
+
     if cfg!(target_os = "windows") {
         println!("cargo:rustc-link-lib=advapi32");
     }
@@ -415,28 +394,8 @@ fn main() {
             std::fs::remove_dir_all(&dir).unwrap();
         }
     }
-    // LUNE FORK: with `llama`, all of llama.cpp: ggml, llama and mtmd (tools,
-    // `common` and the server stay off). Without it, only llama.cpp's `ggml/`
-    // project, with the ggml defaults llama.cpp's CMakeLists would set, so
-    // whisper.cpp gets the same ggml either way.
-    let mut ggml = if cfg!(feature = "llama") {
-        let mut llama = make_config(&llama_root, out.join("llama"));
-        for (key, value) in [
-            ("LLAMA_BUILD_COMMON", "OFF"),
-            ("LLAMA_BUILD_TOOLS", "OFF"),
-            ("LLAMA_BUILD_MTMD", "ON"),
-            ("LLAMA_BUILD_APP", "OFF"),
-            ("LLAMA_BUILD_TESTS", "OFF"),
-            ("LLAMA_BUILD_EXAMPLES", "OFF"),
-            ("LLAMA_BUILD_SERVER", "OFF"),
-            ("LLAMA_CURL", "OFF"),
-            ("LLAMA_OPENSSL", "OFF"),
-            ("LLAMA_ALL_WARNINGS", "OFF"),
-        ] {
-            llama.define(key, value);
-        }
-        llama
-    } else {
+
+    let mut ggml = {
         // Standalone ggml configures a pkg-config file whose template the fork
         // does not carry; nothing reads the result.
         let pc_in = llama_root.join("ggml/ggml.pc.in");
@@ -490,11 +449,6 @@ fn main() {
     if shared_libs {
         println!("cargo:rustc-link-lib=whisper");
         println!("cargo:rustc-link-lib=parakeet");
-        #[cfg(feature = "llama")]
-        {
-            println!("cargo:rustc-link-lib=mtmd");
-            println!("cargo:rustc-link-lib=llama");
-        }
         println!("cargo:rustc-link-lib=ggml");
         println!("cargo:rustc-link-lib=ggml-base");
         // LUNE FORK: with GGML_BACKEND_DL the CPU backend is itself a dlopen-ed
@@ -506,11 +460,6 @@ fn main() {
     } else {
         println!("cargo:rustc-link-lib=static=whisper");
         println!("cargo:rustc-link-lib=static=parakeet");
-        #[cfg(feature = "llama")]
-        {
-            println!("cargo:rustc-link-lib=static=mtmd");
-            println!("cargo:rustc-link-lib=static=llama");
-        }
         println!("cargo:rustc-link-lib=static=ggml");
         println!("cargo:rustc-link-lib=static=ggml-base");
         println!("cargo:rustc-link-lib=static=ggml-cpu");

@@ -8,7 +8,7 @@ const DEFAULT_RETRY_DELAY_MS = 5000;
 const HEALTH_CHECK_INTERVAL_MS = 15_000;
 const SESSION_STREAM_SILENCE_LIMIT_MS = 30_000;
 
-export type WorkspaceBridgeDeps = {
+type WorkspaceBridgeDeps = {
   onSessionEvent: (event: SessionStreamEvent) => void;
   onSnapshotError: (error: unknown) => void;
   onConnectionError?: (scope: 'session' | 'history', error: unknown) => void;

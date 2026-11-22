@@ -42,7 +42,7 @@ interface SessionDetailModalProps {
  * master-detail pane. Owns copy/download and the Ctrl+C shortcut, scoped to
  * its own root so it works in either host.
  */
-export function SessionDetailContent({ session }: { session: HistorySession }) {
+function SessionDetailContent({ session }: { session: HistorySession }) {
   const { t, i18n } = useLingui();
   const presets = useStore(workspaceStore, (s) => s.stylePresets);
   const [copied, setCopied] = useState(false);

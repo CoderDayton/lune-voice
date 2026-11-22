@@ -104,12 +104,10 @@ interpreter = "bash"
 # `transcribe` runs the whole capture→AGC→VAD→whisper(+styling) pipeline on a
 # WAV/f32/dir and prints the hypothesis — the GUI-free way to test ASR quality.
 command = '''
-TYPE="${TYPE:-agc}"
 . scripts/dev/pick-backend.sh
 [ -d /lib/x86_64-linux-gnu ] && export LIBCLANG_PATH="${LIBCLANG_PATH:-/lib/x86_64-linux-gnu}"
 run() { cargo run --release --example "$1" -p lune-voice --features "$FEATURES" "${@:2}"; }
 case "$TYPE" in
-  agc)         cargo run --release --example agc_bench -p lune-audio ;;
   transcribe)  [ -z "$WAV" ] && { echo "set --env WAV=path (.wav/.f32/dir)"; exit 1; }; run asr_probe -- "$WAV" ;;
   domain)      run bench_domain ;;
   pipeline)    run pipeline_real ;;
@@ -127,10 +125,10 @@ case "$TYPE" in
   confusion)   run confusion_mine ;;
   noisify)     run noisify_fixtures ;;
   livewer)     run live_bench ;;
-  *) echo "TYPE must be: agc | transcribe(WAV=) | domain | pipeline | stages | latency | vram | modelload | punctuation | dict | leadin | snippets | styling | rulecmp | live | livewer | confusion | noisify"; exit 1 ;;
+  *) echo "TYPE must be: transcribe(WAV=) | domain | pipeline | stages | latency | vram | modelload | punctuation | dict | leadin | snippets | styling | rulecmp | live | livewer | confusion | noisify"; exit 1 ;;
 esac
 '''
-info = "Benchmarks (--env TYPE=agc|transcribe|domain|pipeline|stages|latency|vram|modelload|punctuation|dict|leadin|snippets|styling|rulecmp|live|livewer|confusion|noisify; transcribe needs WAV=). TYPE=leadin scores opening-word errors per lead-in policy (--env LUNE_BENCH_DIR=dir of your own .wav+.txt clips). TYPE=modelload times cold/warm model load and unload per whisper model (--env REPEATS=n, DEVICE=cpu|vulkan). TYPE=vram measures device memory across dictation toggles and a model swap (NVIDIA only; --env CYCLES=n). Pin the model with --env WHISPER_MODEL=small|medium|large. TYPE=domain gates on a baseline: --env LUNE_BENCH_JSON=out.json to record, --env LUNE_BENCH_BASELINE=base.json to fail on regression (--env LUNE_BENCH_TOLERANCE=pts, default 1.0)"
+info = "Benchmarks (--env TYPE=transcribe|domain|pipeline|stages|latency|vram|modelload|punctuation|dict|leadin|snippets|styling|rulecmp|live|livewer|confusion|noisify; transcribe needs WAV=). TYPE=leadin scores opening-word errors per lead-in policy (--env LUNE_BENCH_DIR=dir of your own .wav+.txt clips). TYPE=modelload times cold/warm model load and unload per whisper model (--env REPEATS=n, DEVICE=cpu|vulkan). TYPE=vram measures device memory across dictation toggles and a model swap (NVIDIA only; --env CYCLES=n). Pin the model with --env WHISPER_MODEL=small|medium|large. TYPE=domain gates on a baseline: --env LUNE_BENCH_JSON=out.json to record, --env LUNE_BENCH_BASELINE=base.json to fail on regression (--env LUNE_BENCH_TOLERANCE=pts, default 1.0)"
 
 # ── Build ────────────────────────────────────────────────────────────────────
 
@@ -180,8 +178,8 @@ command = '''
 set -euo pipefail
 # Assemble the runtime layout a GGML_BACKEND_DL build needs beside the binary:
 #
-#   <bin dir>/libwhisper.so.1, libparakeet.so.1, libllama.so.0, libmtmd.so.0,
-#             libggml.so.0, libggml-base.so.0                      (DT_NEEDED)
+#   <bin dir>/libwhisper.so.1, libparakeet.so.1, libggml.so.0,
+#             libggml-base.so.0                                    (DT_NEEDED)
 #   <bin dir>/backends/libggml-cpu-*.so, libggml-vulkan.so       (dlopen-ed)
 #
 # The executable carries RUNPATH=$ORIGIN (desktop-ui/src-tauri/build.rs), so the
@@ -213,7 +211,6 @@ fi
 mkdir -p "$BIN_DIR/backends" "$BIN_DIR/deps/backends"
 for dest in "$BIN_DIR" "$BIN_DIR/deps"; do
   cp -a "$SRC_DIR"/out/lib/libwhisper.so* "$SRC_DIR"/out/lib/libparakeet.so* \
-    "$SRC_DIR"/out/lib/libllama.so* "$SRC_DIR"/out/lib/libmtmd.so* \
     "$SRC_DIR"/out/lib/libggml*.so* "$dest/"
   cp -a "$SRC_DIR"/out/bin/libggml-cpu-*.so "$dest/backends/"
   if [ -e "$SRC_DIR/out/bin/libggml-vulkan.so" ]; then
@@ -238,14 +235,6 @@ bash scripts/release/gpu-plugin-vulkan.sh
 info = "Build + package the downloadable Vulkan backend plugin for this OS (needs VULKAN_SDK; on Windows run from Git Bash)"
 
 # ── Tools ────────────────────────────────────────────────────────────────────
-
-[scripts.vad-inspect]
-interpreter = "bash"
-command = '''
-if [ -z "$WAV" ]; then echo "Usage: cgs run vad-inspect --env WAV=path/to/file.wav"; exit 1; fi
-cargo run --release -p lune-audio --example vad_inspect -- "$WAV"
-'''
-info = "VAD timeline analysis on a WAV file (--env WAV=path)"
 
 [scripts.record]
 command = "uv run scripts/dev/record_mic.py"

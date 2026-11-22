@@ -66,7 +66,7 @@ export function initialSetupEngine(saved: AsrBackendValue): AsrBackendValue {
  */
 const SMALL_MODEL_MIN_CPU_THREADS = 8;
 
-export interface SetupHardware {
+interface SetupHardware {
   /** Whisper will decode on a GPU. */
   gpu: boolean;
   cpuThreads: number;

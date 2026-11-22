@@ -12,20 +12,17 @@ is vendored under `vendor/whisper-rs-sys/` through `[patch.crates-io]`, with
 two source trees inside it:
 
 - `whisper.cpp/`: whisper.cpp v1.9.5 without its own `ggml/`.
-- `llama.cpp/`: a subset of the lune-turboquant llama.cpp fork (`CMakeLists.txt`,
-  `LICENSE`, `cmake`, `ggml`, `include`, `licenses`, `src`, `vendor`,
-  `tools/mtmd` minus its test media). It owns the ggml.
+- `llama.cpp/`: the `ggml/` directory and `LICENSE` of the lune-turboquant
+  llama.cpp fork. It owns the ggml; no llama or mtmd code is vendored.
 
-`build.rs` builds llama.cpp first (ggml, `llama`, `mtmd`), then whisper.cpp
-with `WHISPER_USE_SYSTEM_GGML`, both installed into one prefix. So whisper,
-parakeet, llama and mtmd share one ggml, and bundles ship all four. The `llama`
-feature is on by default; with `default-features = false` only llama.cpp's
-`ggml/` is built. Changes are marked `LUNE FORK`:
+`build.rs` builds that ggml first, then whisper.cpp with
+`WHISPER_USE_SYSTEM_GGML`, both installed into one prefix. So whisper and
+parakeet share one ggml, and bundles ship `libwhisper`, `libparakeet`,
+`libggml` and `libggml-base`. Changes are marked `LUNE FORK`:
 
 - `build.rs`: the two-project build, `GGML_BACKEND_DL` support, refreshing the
   compiled copies when a vendored tree changes, the 1.9 version declaration.
-- `wrapper.h`, `Cargo.toml`: bind `parakeet.h`, plus `llama.h`, `mtmd.h` and
-  `mtmd-helper.h` under the `llama` feature.
+- `wrapper.h`, `Cargo.toml`: bind and package `parakeet.h`.
 - `src/lib.rs`: a lint allow for the bindgen output.
 - `whisper.cpp/src/whisper.cpp`: language auto-detection honours `audio_ctx`
   and reuses its encode for the first window, so `language = "auto"` costs no
@@ -33,8 +30,8 @@ feature is on by default; with `default-features = false` only llama.cpp's
 
 To upgrade whisper.cpp, copy the same subset of upstream over `whisper.cpp/`,
 reapply the `LUNE FORK` hunk in `src/whisper.cpp`, and run the
-`whisper_lang_detect` test. To upgrade llama.cpp, copy the same subset from the
-fork over `llama.cpp/`. Either upgrade can move the ggml version, which needs a
+`whisper_lang_detect` test. To upgrade ggml, copy `ggml/` from the fork over
+`llama.cpp/ggml/`. Either upgrade can move the ggml version, which needs a
 new GPU plugin ([GPU plugin](GPU_PLUGIN.md)).
 
 ## Distribution model

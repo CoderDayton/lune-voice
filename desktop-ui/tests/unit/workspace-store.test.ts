@@ -2,13 +2,16 @@
 
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { backendClient } from "../../src/lib/backend/client";
+import { LIMITS } from "../../src/lib/backend/generated/limits";
 import { resetMockBackend } from "../../src/lib/backend/mock";
 import {
   addDictionaryEntry,
   loadWorkspaceSnapshot,
   removeDictionaryEntry,
+  removeHistorySessions,
   retryRuntime,
   saveWorkspaceSetting,
+  saveWorkspaceSettings,
   toggleDictation,
   workspaceActions,
   workspaceStore,
@@ -18,14 +21,13 @@ import type { WorkspaceSnapshot } from "../../src/lib/backend/types";
 
 function makeSnapshot(overrides: Partial<WorkspaceSnapshot> = {}): WorkspaceSnapshot {
   return {
-    ipcFlavor: "mock",
     serviceStatus: "ready",
     settings: {
       activationMode: "Toggle",
       dictationMode: "Clipboard",
       useGpu: true,
       devicePolicy: "Auto",
-      asrBackendType: "Qwen3Asr",
+      asrBackendType: "WhisperCpp",
       confidenceThreshold: 0.5,
       adaptiveVad: false,
       speechThreshold: 0.5,
@@ -53,9 +55,11 @@ describe("workspace store", () => {
   const originalSaveWorkspaceSettings = backendClient.saveWorkspaceSettings;
   const originalLoadWorkspaceSnapshot = backendClient.loadWorkspaceSnapshot;
   const originalToggleDictation = backendClient.toggleDictation;
+  const originalDeleteSessions = backendClient.deleteSessions;
 
   beforeEach(async () => {
     resetMockBackend();
+    backendClient.deleteSessions = originalDeleteSessions;
     backendClient.saveWorkspaceSettings = originalSaveWorkspaceSettings;
     backendClient.loadWorkspaceSnapshot = originalLoadWorkspaceSnapshot;
     backendClient.toggleDictation = originalToggleDictation;
@@ -72,6 +76,7 @@ describe("workspace store", () => {
   });
 
   afterEach(() => {
+    backendClient.deleteSessions = originalDeleteSessions;
     backendClient.saveWorkspaceSettings = originalSaveWorkspaceSettings;
     backendClient.loadWorkspaceSnapshot = originalLoadWorkspaceSnapshot;
     backendClient.toggleDictation = originalToggleDictation;
@@ -149,6 +154,47 @@ describe("workspace store", () => {
 
     expect(workspaceStore.state.settings.dictationMode).toBe("Clipboard");
     expect(workspaceStore.state.runtime.error).toContain("backend rejected change");
+  });
+
+  test("a failed save still reports its error when a newer save has started", async () => {
+    let rejectFirst: (reason: unknown) => void = () => {};
+    let calls = 0;
+    backendClient.saveWorkspaceSettings = (input) => {
+      calls += 1;
+      if (calls === 1) {
+        return new Promise((_, reject) => {
+          rejectFirst = reject;
+        });
+      }
+      return originalSaveWorkspaceSettings(input);
+    };
+
+    const first = saveWorkspaceSetting("language", "de");
+    const second = saveWorkspaceSettings({ copyToClipboard: true });
+    expect(await second).toBe(true);
+    rejectFirst(new Error("first save rejected"));
+
+    expect(await first).toBe(false);
+    expect(workspaceStore.state.runtime.error).toContain("first save rejected");
+    expect(workspaceStore.state.settings.copyToClipboard).toBe(true);
+  });
+
+  test("a bulk delete that fails part-way re-syncs the chunks that already landed", async () => {
+    expect(workspaceStore.state.historySessions.some((s) => s.id === "s1")).toBe(true);
+    let calls = 0;
+    backendClient.deleteSessions = async (ids) => {
+      calls += 1;
+      if (calls > 1) throw new Error("second chunk failed");
+      return originalDeleteSessions(ids);
+    };
+    const fillers = Array.from({ length: LIMITS.historyBulkDeleteMax - 1 }, (_, i) => `gone-${i}`);
+
+    const ok = await removeHistorySessions(["s1", ...fillers, "s2"]);
+
+    expect(ok).toBe(false);
+    expect(calls).toBe(2);
+    expect(workspaceStore.state.historySessions.some((s) => s.id === "s1")).toBe(false);
+    expect(workspaceStore.state.runtime.error).toContain("second chunk failed");
   });
 
   test("hydrate keeps OpenAI api keys out of store state", () => {

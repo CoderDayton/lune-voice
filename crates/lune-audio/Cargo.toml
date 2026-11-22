@@ -9,7 +9,6 @@ workspace = true
 
 [dependencies]
 # Core
-tokio = { workspace = true, features = ["sync"] }
 tracing.workspace = true
 
 # Audio capture
@@ -31,10 +30,4 @@ pulseaudio.workspace = true
 futures-executor.workspace = true
 
 [dev-dependencies]
-tokio = { workspace = true, features = ["macros", "rt-multi-thread", "time"] }
 tracing-subscriber.workspace = true
-hound.workspace = true
-# Per-frame speech probability, used by the `agc_bench` and `vad_inspect`
-# examples as a measuring probe. The shipped pipeline uses whisper's Silero
-# VAD, which reports segments rather than a per-frame score.
-earshot = "1.1"

@@ -19,7 +19,7 @@ function makeBackendSettings() {
     dictationMode: "Clipboard" as const,
     useGpu: true,
     devicePolicy: "Auto" as const,
-    asrBackendType: "Qwen3Asr" as const,
+    asrBackendType: "ParakeetCpp" as const,
     confidenceThreshold: 0.75,
     stylePreset: "professional",
     hotkeyToggle: "Ctrl+Space",
@@ -41,7 +41,7 @@ describe("workspace mappers", () => {
       startedAt: "2026-01-15T10:00:00.000Z",
       endedAt: "2026-01-15T10:00:22.000Z",
       transcript: "Hello world from the test",
-      backend: "Qwen3Asr",
+      backend: "WhisperCpp",
       style: "casual",
       status: "completed",
     };
@@ -61,7 +61,7 @@ describe("workspace mappers", () => {
       startedAt: "2026-01-15T10:00:00.000Z",
       endedAt: "2026-01-15T10:00:05.000Z",
       transcript: null,
-      backend: "Qwen3Asr",
+      backend: "WhisperCpp",
       style: "casual",
       status: "cancelled",
     };
@@ -75,7 +75,7 @@ describe("workspace mappers", () => {
       startedAt: "2026-01-15T10:00:00.000Z",
       endedAt: "2026-01-15T10:00:05.000Z",
       transcript: "",
-      backend: "Qwen3Asr",
+      backend: "WhisperCpp",
       style: "casual",
       status: "completed",
     };
@@ -90,7 +90,7 @@ describe("workspace mappers", () => {
       startedAt: "2026-01-15T10:00:00.000Z",
       endedAt: null,
       transcript: "Still running",
-      backend: "Qwen3Asr",
+      backend: "WhisperCpp",
       style: "casual",
       status: "active",
     };
@@ -105,7 +105,7 @@ describe("workspace mappers", () => {
       startedAt: "2026-01-15T10:00:00.000Z",
       endedAt: "2026-01-15T10:00:00.100Z",
       transcript: "Quick",
-      backend: "Qwen3Asr",
+      backend: "WhisperCpp",
       style: "casual",
       status: "completed",
     };
@@ -120,7 +120,7 @@ describe("workspace mappers", () => {
       startedAt: "2026-01-15T10:00:00.000Z",
       endedAt: "2026-01-15T10:00:05.000Z",
       transcript: "  hello   world\t  foo  ",
-      backend: "Qwen3Asr",
+      backend: "WhisperCpp",
       style: "casual",
       status: "completed",
     };
@@ -146,7 +146,7 @@ describe("workspace mappers", () => {
     const result = mapWorkspaceSettings(snapshot);
 
     expect(result.activationMode).toBe("Toggle");
-    expect(result.asrBackend).toBe("Qwen3Asr");
+    expect(result.asrBackend).toBe("ParakeetCpp");
     expect(result.confidenceThreshold).toBe("0.75");
     expect(result.pillVisibility).toBe("WhenDictating");
   });

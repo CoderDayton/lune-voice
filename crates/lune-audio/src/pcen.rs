@@ -85,19 +85,6 @@ impl Default for PcenAgcConfig {
     }
 }
 
-/// Per-frame diagnostics returned by [`PcenAgc::process_frame`].
-#[derive(Debug, Clone, Copy)]
-pub struct PcenFrameStats {
-    /// Smoothed gain actually applied to this frame.
-    pub gain_applied: f32,
-    /// √signal_envelope (post-update).
-    pub signal_rms: f32,
-    /// √noise_envelope (post-update).
-    pub noise_rms: f32,
-    /// 10·log10(signal/noise). Saturates at ±120 dB on degenerate input.
-    pub snr_db: f32,
-}
-
 /// Noise-aware adaptive AGC with per-hop scalar gain.
 pub struct PcenAgc {
     cfg: PcenAgcConfig,
@@ -122,10 +109,10 @@ impl PcenAgc {
         hop_samples: usize,
     ) -> Result<Self, AudioError> {
         if sample_rate == 0 {
-            return Err(AudioError::Vad("pcen: sample_rate must be > 0".into()));
+            return Err(AudioError::Pcen("pcen: sample_rate must be > 0".into()));
         }
         if hop_samples == 0 {
-            return Err(AudioError::Vad("pcen: hop_samples must be > 0".into()));
+            return Err(AudioError::Pcen("pcen: hop_samples must be > 0".into()));
         }
         validate(&cfg)?;
         let hop_ms = (hop_samples as f32) * 1_000.0 / (sample_rate as f32);
@@ -147,17 +134,8 @@ impl PcenAgc {
         })
     }
 
-    /// Reset internal state. Next frame re-seeds the envelopes.
-    pub fn reset(&mut self) {
-        self.sig_env_pow = 0.0;
-        self.noise_env_pow = 0.0;
-        self.last_gain = 1.0;
-        self.warmup_remaining = self.cfg.warmup_frames;
-        self.initialized = false;
-    }
-
     /// Process one frame in place. `frame.len()` must equal `hop_samples`.
-    pub fn process_frame(&mut self, frame: &mut [f32]) -> PcenFrameStats {
+    pub fn process_frame(&mut self, frame: &mut [f32]) {
         debug_assert_eq!(
             frame.len(),
             self.hop_samples,
@@ -211,34 +189,10 @@ impl PcenAgc {
         }
 
         apply_gain(frame, self.last_gain);
-        let g = self.last_gain;
-
-        let sig_rms = self.sig_env_pow.sqrt();
-        let noise_rms = self.noise_env_pow.sqrt();
-        let ratio = (self.sig_env_pow / self.noise_env_pow).max(self.cfg.eps);
-        let snr_db = 10.0 * ratio.log10();
-        PcenFrameStats {
-            gain_applied: g,
-            signal_rms: sig_rms,
-            noise_rms,
-            snr_db: snr_db.clamp(-120.0, 120.0),
-        }
     }
 
-    pub fn signal_rms(&self) -> f32 {
-        self.sig_env_pow.sqrt()
-    }
-    pub fn noise_rms(&self) -> f32 {
-        self.noise_env_pow.sqrt()
-    }
     pub fn last_gain(&self) -> f32 {
         self.last_gain
-    }
-    pub fn hop_samples(&self) -> usize {
-        self.hop_samples
-    }
-    pub fn warmup_remaining(&self) -> u32 {
-        self.warmup_remaining
     }
 }
 
@@ -256,7 +210,7 @@ pub fn apply_gain(samples: &mut [f32], gain: f32) {
 }
 
 fn validate(cfg: &PcenAgcConfig) -> Result<(), AudioError> {
-    let bad = |k: &str| Err(AudioError::Vad(format!("pcen: invalid {k}")));
+    let bad = |k: &str| Err(AudioError::Pcen(format!("pcen: invalid {k}")));
     if !cfg.target_rms.is_finite() || cfg.target_rms <= 0.0 {
         return bad("target_rms");
     }
@@ -309,9 +263,8 @@ fn mean_square_finite(frame: &[f32]) -> f32 {
     }
     // Per-sample finite gate: a single non-finite sample is dropped from the
     // sum rather than collapsing the whole frame's energy to zero. Division is
-    // by the full frame length, matching the original contract (and the
-    // identical guard in `vad::compute_rms`). The branch costs some SIMD width,
-    // but PCEN runs at audio rate where it's negligible.
+    // by the full frame length, matching the original contract. The branch
+    // costs some SIMD width, but PCEN runs at audio rate where it's negligible.
     let sum_sq: f32 = frame
         .iter()
         .map(|&x| if x.is_finite() { x * x } else { 0.0 })

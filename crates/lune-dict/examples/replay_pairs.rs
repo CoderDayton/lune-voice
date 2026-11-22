@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-use lune_core::config::FormatToggles;
 use lune_core::dict::DictionaryEntry;
 use lune_dict::UserDictionary;
 use lune_dict::corrector::{HWCE_FLAG_THRESHOLD, LexicalGate};
+use lune_dict::formatting::ResolvedFormat;
 
 fn main() {
     let args: Vec<String> = std::env::args().collect();
@@ -24,9 +24,9 @@ fn main() {
         .collect();
     let dict = UserDictionary::new(entries);
     let gate = LexicalGate::new();
-    let fmt = FormatToggles {
-        brand_casing: Some(true),
-        ..FormatToggles::default()
+    let fmt = ResolvedFormat {
+        brand_casing: true,
+        ..ResolvedFormat::default()
     };
     let none: &[(&str, f32, f32)] = &[];
     let shaped: Vec<String> = raws

@@ -186,11 +186,21 @@ pub(crate) fn plan_chunks(
     )
 }
 
+/// The language whisper is asked for: the primary subtag of a BCP-47 tag,
+/// lowercased. whisper knows `pt`, not `pt-BR`, and fails the decode on a tag
+/// it does not know.
+#[cfg_attr(not(feature = "whisper-cpp"), allow(dead_code))]
+pub(crate) fn whisper_language(tag: Option<String>) -> Option<String> {
+    let tag = tag?;
+    let primary = tag.trim().split(['-', '_']).next().unwrap_or_default();
+    (!primary.is_empty()).then(|| primary.to_ascii_lowercase())
+}
+
 #[cfg(feature = "whisper-cpp")]
 mod imp {
     use super::{
         AsrSessionConfig, DecodeProfile, LeadIn, Result, WhisperCppConfig, fitted_audio_ctx,
-        lead_in_prefix, plan_chunks,
+        lead_in_prefix, plan_chunks, whisper_language,
     };
     use crate::backend::local::{
         EndpointVad, SAMPLE_RATE, VadTrim, WordConfidences, check_ggml_file, decode_threads,
@@ -238,7 +248,7 @@ mod imp {
         state: WhisperState,
         /// Reused across utterances — `poll_final`/`reset_context` clear it without freeing.
         audio: Vec<f32>,
-        /// BCP-47 short code or `None` for auto-detect.
+        /// Primary language subtag (see [`whisper_language`]) or `None` for auto-detect.
         language: Option<String>,
         /// Monotonic segment id, unique across `poll_final` calls in a session.
         next_id: u64,
@@ -313,7 +323,7 @@ mod imp {
                 // 30 s of 16 kHz audio up front — covers a typical utterance with
                 // no realloc; longer dictations grow the buffer once.
                 audio: Vec::with_capacity(16_000 * 30),
-                language: config.language,
+                language: whisper_language(config.language),
                 next_id: 0,
             }))
         }
@@ -344,7 +354,7 @@ mod imp {
 
             // VAD + decode are seconds of blocking compute; hand the worker
             // off so the UI/event tasks stay responsive during inference.
-            run_blocking(|| {
+            let result = run_blocking(|| {
                 // BeamSearch is whisper.cpp's accuracy-oriented default (beam 5).
                 // Worth the extra CPU here: decoding is one-shot per utterance, and
                 // greedy decoding loses words beam search gets right ("ESLint" →
@@ -382,7 +392,6 @@ mod imp {
                     .as_ref()
                     .map_or(VadTrim::Full, |vad| vad.trim(audio.as_slice()));
                 let Some(slice) = trim.decode_slice(audio.len()) else {
-                    audio.clear();
                     return Ok(Vec::new());
                 };
                 let decode_slice = &audio[slice.start..slice.end];
@@ -490,11 +499,12 @@ mod imp {
                         });
                     }
                 }
-                // Drain the decoded audio so a repeat poll can't re-emit it (matches
-                // Qwen3's take-on-poll contract); capacity is retained for reuse.
-                audio.clear();
                 Ok(out)
-            })
+            });
+            // Drain the decoded audio whatever the outcome, so a repeat poll
+            // can't re-emit it; capacity is retained for reuse.
+            audio.clear();
+            result
         }
 
         async fn reset_context(&self, session: &Self::SessionHandle) -> Result<()> {
@@ -556,7 +566,7 @@ pub use imp::WhisperCppBackend;
 mod tests {
     use super::{
         AUDIO_CTX_MIN, CHUNK_MAX_SAMPLES, CHUNK_MIN_SAMPLES, DecodeProfile, LEAD_NOISE_MAX_RMS,
-        LeadIn, fitted_audio_ctx, lead_in_prefix, plan_chunks,
+        LeadIn, fitted_audio_ctx, lead_in_prefix, plan_chunks, whisper_language,
     };
 
     const SECOND: usize = 16_000;
@@ -573,6 +583,19 @@ mod tests {
             .collect();
         clip.extend((0..SECOND).map(|i| if i % 2 == 0 { 0.3 } else { -0.3 }));
         clip
+    }
+
+    #[test]
+    fn whisper_is_asked_for_the_primary_language_subtag() {
+        let lang = |tag: &str| whisper_language(Some(tag.to_string()));
+        assert_eq!(lang("pt-BR").as_deref(), Some("pt"));
+        assert_eq!(lang("zh-CN").as_deref(), Some("zh"));
+        assert_eq!(lang("zh-Hant-TW").as_deref(), Some("zh"));
+        assert_eq!(lang("en_GB").as_deref(), Some("en"));
+        assert_eq!(lang(" DE ").as_deref(), Some("de"));
+        assert_eq!(lang("en").as_deref(), Some("en"));
+        assert_eq!(lang(""), None);
+        assert_eq!(whisper_language(None), None);
     }
 
     #[test]

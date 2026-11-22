@@ -148,7 +148,6 @@ export const workspaceActions = {
       },
       settings: mapWorkspaceSettings(snapshot),
       runtime: {
-        ipcFlavor: snapshot.ipcFlavor,
         serviceStatus: snapshot.serviceStatus,
         capabilities: snapshot.capabilities ?? DEFAULT_RUNTIME.capabilities,
         activeSessionId: isActiveServiceStatus(snapshot.serviceStatus)
@@ -269,30 +268,7 @@ export async function saveWorkspaceSetting<Key extends keyof WorkspaceSettings>(
   key: Key,
   value: WorkspaceSettings[Key],
 ): Promise<boolean> {
-  const previousSettings = workspaceStore.state.settings;
-  workspaceActions.updateSetting(key, value);
-  const seq = ++_settingsSaveSeq;
-  try {
-    const snapshot = await backendClient.saveWorkspaceSettings(
-      settingsToSaveInput(workspaceStore.state.settings),
-    );
-    if (seq !== _settingsSaveSeq) return true;
-    workspaceActions.hydrate(snapshot);
-    return true;
-  } catch (error) {
-    if (seq !== _settingsSaveSeq) return false;
-    try {
-      const snapshot = await backendClient.loadWorkspaceSnapshot();
-      if (seq !== _settingsSaveSeq) return false;
-      workspaceActions.hydrate(snapshot);
-    } catch (reloadError) {
-      console.warn('[workspace] failed to reload snapshot after save failure', reloadError);
-      if (seq !== _settingsSaveSeq) return false;
-      workspaceStore.setState((s) => ({ ...s, settings: previousSettings }));
-    }
-    workspaceActions.setError(formatError(error));
-    return false;
-  }
+  return saveWorkspaceSettings({ [key]: value } as Partial<WorkspaceSettings>);
 }
 
 // Update several settings and persist them in a single save. Used when two
@@ -312,15 +288,17 @@ export async function saveWorkspaceSettings(patch: Partial<WorkspaceSettings>): 
     workspaceActions.hydrate(snapshot);
     return true;
   } catch (error) {
-    if (seq !== _settingsSaveSeq) return false;
-    try {
-      const snapshot = await backendClient.loadWorkspaceSnapshot();
-      if (seq !== _settingsSaveSeq) return false;
-      workspaceActions.hydrate(snapshot);
-    } catch (reloadError) {
-      console.warn('[workspace] failed to reload snapshot after save failure', reloadError);
-      if (seq !== _settingsSaveSeq) return false;
-      workspaceStore.setState((s) => ({ ...s, settings: previousSettings }));
+    // Only the newest save may resync the settings, but every failure is shown.
+    if (seq === _settingsSaveSeq) {
+      try {
+        const snapshot = await backendClient.loadWorkspaceSnapshot();
+        if (seq === _settingsSaveSeq) workspaceActions.hydrate(snapshot);
+      } catch (reloadError) {
+        console.warn('[workspace] failed to reload snapshot after save failure', reloadError);
+        if (seq === _settingsSaveSeq) {
+          workspaceStore.setState((s) => ({ ...s, settings: previousSettings }));
+        }
+      }
     }
     workspaceActions.setError(formatError(error));
     return false;
@@ -384,7 +362,8 @@ export async function removeHistorySession(sessionId: string) {
  * The backend caps one call at `LIMITS.historyBulkDeleteMax` ids (it bounds the
  * SQL `IN (…)`), and selection survives paging, so a long sweep is split into
  * chunks rather than rejected. Only the last snapshot is hydrated — the
- * intermediate ones are superseded immediately.
+ * intermediate ones are superseded immediately. If a later chunk fails, the
+ * earlier ones are already gone, so the store re-syncs before reporting it.
  */
 export async function removeHistorySessions(sessionIds: string[]): Promise<boolean> {
   if (sessionIds.length === 0) return false;
@@ -399,6 +378,12 @@ export async function removeHistorySessions(sessionIds: string[]): Promise<boole
     void fetchHistoryPage();
     return true;
   } catch (error) {
+    try {
+      workspaceActions.hydrate(await backendClient.loadWorkspaceSnapshot());
+    } catch (reloadError) {
+      console.warn('[workspace] failed to reload snapshot after delete failure', reloadError);
+    }
+    void fetchHistoryPage();
     workspaceActions.setError(formatError(error));
     return false;
   }
@@ -566,8 +551,6 @@ export async function startDictation() {
 /**
  * Start a capture-only session for the snippet trigger recorder. The raw
  * transcript arrives as a `captureText` stream event; nothing is delivered.
- * In the browser mock (no Tauri stream) the event sequence is simulated so
- * the recorder is fully exercisable outside the app.
  */
 export async function startTriggerCapture() {
   const sessionId = await dictationAction(() => backendClient.startTriggerCapture(), null);
@@ -577,32 +560,7 @@ export async function startTriggerCapture() {
     ...s,
     runtime: { ...s.runtime, captureSessionId: sessionId },
   }));
-  if (workspaceStore.state.runtime.ipcFlavor === 'mock') simulateMockCapture();
   return sessionId;
-}
-
-// The second phrase carries a sentence capital + terminal period, the way raw
-// whisper output actually looks, so the field's normalization is exercisable
-// in the browser mock.
-const MOCK_CAPTURE_PHRASES = ['meeting header', 'Standup note.', 'signature'];
-let mockCaptureTimers: ReturnType<typeof setTimeout>[] = [];
-let mockCaptureIndex = 0;
-
-function simulateMockCapture() {
-  for (const timer of mockCaptureTimers) clearTimeout(timer);
-  mockCaptureTimers = [];
-  const emit = (delay: number, event: SessionStreamEvent) => {
-    mockCaptureTimers.push(setTimeout(() => workspaceActions.applySessionEvent(event), delay));
-  };
-  // A believable level envelope while "listening", then transcription.
-  for (let t = 80; t < 1500; t += 90) {
-    const level = 0.25 + 0.55 * Math.abs(Math.sin(t / 180)) * (0.7 + 0.3 * Math.random());
-    emit(t, { type: 'audioLevel', level });
-  }
-  emit(1500, { type: 'processing' });
-  const phrase = MOCK_CAPTURE_PHRASES[mockCaptureIndex++ % MOCK_CAPTURE_PHRASES.length];
-  emit(2200, { type: 'captureText', text: phrase });
-  emit(2250, { type: 'sessionStopped' });
 }
 
 export async function stopDictation() {
@@ -635,7 +593,7 @@ export function getHistoryServerPageCount(state: WorkspaceState) {
 }
 
 // Memoized aggregate stats — recomputed only when historySessions reference changes.
-export interface SessionStats {
+interface SessionStats {
   totalWords: number;
   totalMinutes: number;
   count: number;
@@ -655,7 +613,7 @@ export function getSessionStats(state: WorkspaceState): SessionStats {
   return result;
 }
 
-export interface TodayStats {
+interface TodayStats {
   count: number;
   words: number;
   seconds: number;

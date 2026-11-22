@@ -4,7 +4,8 @@ set -euo pipefail
 
 OUT="${OUT:-release-artifacts}"
 BUILD_DIR="${BUILD_DIR:-target/gpu-plugin-vulkan}"
-# ggml comes from the vendored llama.cpp tree; whisper.cpp builds against it.
+# ggml comes from the vendored llama.cpp tree (only its ggml/ is carried);
+# whisper.cpp builds against it.
 SRC="vendor/whisper-rs-sys/llama.cpp"
 
 case "$(uname -s)" in
@@ -19,21 +20,21 @@ command -v cmake >/dev/null || { echo "cmake is required" >&2; exit 1; }
 SDK="$VULKAN_SDK"
 command -v cygpath >/dev/null && SDK=$(cygpath -m "$SDK")
 
-cmake -S "$SRC" -B "$BUILD_DIR" \
+GGML_DIR="$(cd "$SRC/ggml" && pwd)"
+command -v cygpath >/dev/null && GGML_DIR=$(cygpath -m "$GGML_DIR")
+WRAP="$BUILD_DIR.src"
+mkdir -p "$WRAP"
+printf 'cmake_minimum_required(VERSION 3.14)\nproject(lune-ggml-plugin C CXX)\nadd_subdirectory("%s" ggml)\n' "$GGML_DIR" > "$WRAP/CMakeLists.txt"
+
+cmake -S "$WRAP" -B "$BUILD_DIR" \
   -DCMAKE_BUILD_TYPE=Release \
   -DBUILD_SHARED_LIBS=ON \
   -DGGML_BACKEND_DL=ON \
   -DGGML_NATIVE=OFF \
   -DGGML_VULKAN=ON \
   -DCMAKE_PREFIX_PATH="$SDK;$SDK/lib/VulkanLoader" \
-  -DLLAMA_BUILD_COMMON=OFF \
-  -DLLAMA_BUILD_TOOLS=OFF \
-  -DLLAMA_BUILD_APP=OFF \
-  -DLLAMA_BUILD_TESTS=OFF \
-  -DLLAMA_BUILD_EXAMPLES=OFF \
-  -DLLAMA_BUILD_SERVER=OFF \
-  -DLLAMA_CURL=OFF \
-  -DLLAMA_OPENSSL=OFF \
+  -DGGML_BUILD_TESTS=OFF \
+  -DGGML_BUILD_EXAMPLES=OFF \
   -DCMAKE_POSITION_INDEPENDENT_CODE=ON \
   -DCMAKE_BUILD_WITH_INSTALL_RPATH=ON \
   -DCMAKE_INSTALL_RPATH='$ORIGIN' >/dev/null

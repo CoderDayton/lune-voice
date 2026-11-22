@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-export interface ServiceStatusView {
+interface ServiceStatusView {
   /** A dictation session is running (capturing or transcribing). */
   isActive: boolean;
   /** The runtime is reachable and can take a session. */

@@ -8,8 +8,7 @@
 //! ASR is whisper.cpp (`AsrBackendConfig::WhisperCpp`). The styling LLM is a
 //! remote OpenAI-compatible endpoint (`LUNE_BENCH_LLM_*` env vars — point it
 //! at Ollama, llama-server, LM Studio, or a hosted API) wrapped in
-//! [`lune_llm::StylePipeline`]. There is no ORT runtime and no
-//! correction/edit gate anymore.
+//! [`lune_llm::StylePipeline`].
 
 use std::path::PathBuf;
 use std::sync::Arc;

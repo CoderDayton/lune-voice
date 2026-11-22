@@ -27,7 +27,7 @@ After-speech wait = poll_final (Silero endpoint trim + whisper.cpp decode) + opt
 
 | Stage | Cost profile | Notes |
 |-------|-------------|-------|
-| Audio flush | Negligible | 30 ms tail flush after hotkey release |
+| Audio flush | Negligible | Tail flush after hotkey release: one audio period (about 20 ms on PulseAudio), capped at 200 ms |
 | whisper.cpp decode (`poll_final`) | **Primary fixed cost** | Batch decode of the full utterance; scales with audio length and model size |
 | Silero VAD | Small, separate stage | Trims silence from the start and end before decode, and keeps the pauses inside speech because whisper reads them as punctuation. This is a separate pass, not whisper's in-decode `enable_vad` |
 | LLM styling | Varies; skipped when no style is selected | One completion call to your OpenAI-compatible endpoint. It is plain async HTTP, so it doesn't block anything else |

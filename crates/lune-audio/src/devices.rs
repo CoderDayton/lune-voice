@@ -8,13 +8,7 @@ const PULSE_CAPTURE_PERIOD_MS: u32 = 20;
 
 pub(crate) struct InputDevice {
     pub device: cpal::Device,
-    pub names: DeviceNames,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub(crate) struct DeviceNames {
     pub name: String,
-    pub legacy_names: Vec<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -132,10 +126,7 @@ fn pulse_input_devices(host: &cpal::Host, sources: &[crate::pulse::Source]) -> V
             let source = &sources[idx];
             Some(InputDevice {
                 device: by_id.remove(&source.name)?,
-                names: DeviceNames {
-                    name: source.description.clone(),
-                    legacy_names: source.legacy_alsa_name.clone().into_iter().collect(),
-                },
+                name: source.description.clone(),
             })
         })
         .collect()
@@ -164,10 +155,7 @@ fn cpal_input_devices(host: &cpal::Host) -> Vec<InputDevice> {
         .filter_map(|idx| {
             devices[idx].take().map(|device| InputDevice {
                 device,
-                names: DeviceNames {
-                    name: described[idx].0.clone(),
-                    legacy_names: Vec::new(),
-                },
+                name: described[idx].0.clone(),
             })
         })
         .collect()
@@ -176,34 +164,13 @@ fn cpal_input_devices(host: &cpal::Host) -> Vec<InputDevice> {
 pub fn list_input_devices() -> Vec<String> {
     enumerate_input_devices(&capture_host())
         .into_iter()
-        .map(|d| d.names.name)
+        .map(|d| d.name)
         .collect()
-}
-
-pub fn migrated_input_device_name(saved: &str) -> Option<String> {
-    if !could_be_legacy_name(saved) {
-        return None;
-    }
-    let names: Vec<DeviceNames> = enumerate_input_devices(&capture_host())
-        .into_iter()
-        .map(|d| d.names)
-        .collect();
-    migrated_name(saved, &names)
-}
-
-fn could_be_legacy_name(saved: &str) -> bool {
-    saved.contains(", ")
-}
-
-fn migrated_name(saved: &str, available: &[DeviceNames]) -> Option<String> {
-    let idx = resolve_input_device(Some(saved), available).device?;
-    let current = &available[idx].name;
-    (current != saved).then(|| current.clone())
 }
 
 pub(crate) fn resolve_input_device(
     requested: Option<&str>,
-    available: &[DeviceNames],
+    available: &[String],
 ) -> DeviceSelection {
     let Some(requested) = requested else {
         return DeviceSelection {
@@ -211,14 +178,7 @@ pub(crate) fn resolve_input_device(
             fell_back: false,
         };
     };
-    let device = available
-        .iter()
-        .position(|d| d.name == requested)
-        .or_else(|| {
-            available
-                .iter()
-                .position(|d| d.legacy_names.iter().any(|legacy| legacy == requested))
-        });
+    let device = available.iter().position(|d| d == requested);
     DeviceSelection {
         fell_back: device.is_none(),
         device,
@@ -231,16 +191,13 @@ mod tests {
 
     const RATE_48K: u32 = 48_000;
 
-    fn names(name: &str, legacy: &[&str]) -> DeviceNames {
-        DeviceNames {
-            name: name.into(),
-            legacy_names: legacy.iter().map(|s| (*s).into()).collect(),
-        }
+    fn names(list: &[&str]) -> Vec<String> {
+        list.iter().map(|s| (*s).into()).collect()
     }
 
     #[test]
     fn resolve_input_device_falls_back_when_requested_missing() {
-        let available = [names("Built-in Microphone", &[]), names("HDMI", &[])];
+        let available = names(&["Built-in Microphone", "HDMI"]);
         assert_eq!(
             resolve_input_device(Some("USB Headset"), &available),
             DeviceSelection {
@@ -252,7 +209,7 @@ mod tests {
 
     #[test]
     fn resolve_input_device_selects_requested_when_present() {
-        let available = [names("Built-in Microphone", &[]), names("USB Headset", &[])];
+        let available = names(&["Built-in Microphone", "USB Headset"]);
         assert_eq!(
             resolve_input_device(Some("USB Headset"), &available),
             DeviceSelection {
@@ -264,7 +221,7 @@ mod tests {
 
     #[test]
     fn resolve_input_device_uses_default_when_none_requested() {
-        let available = [names("Built-in Microphone", &[])];
+        let available = names(&["Built-in Microphone"]);
         assert_eq!(
             resolve_input_device(None, &available),
             DeviceSelection {
@@ -272,55 +229,6 @@ mod tests {
                 fell_back: false,
             }
         );
-    }
-
-    #[test]
-    fn resolve_input_device_matches_a_legacy_alsa_name() {
-        let available = [
-            names("DeepFilter Shure MV6", &[]),
-            names("Shure MV6 Mono", &["Shure MV6, USB Audio"]),
-        ];
-        assert_eq!(
-            resolve_input_device(Some("Shure MV6, USB Audio"), &available),
-            DeviceSelection {
-                device: Some(1),
-                fell_back: false,
-            }
-        );
-    }
-
-    #[test]
-    fn resolve_input_device_prefers_a_current_name_over_a_legacy_one() {
-        let available = [names("Headset", &["USB Mic"]), names("USB Mic", &[])];
-        assert_eq!(
-            resolve_input_device(Some("USB Mic"), &available).device,
-            Some(1)
-        );
-    }
-
-    #[test]
-    fn migrated_name_maps_a_legacy_name_to_the_current_one() {
-        let available = [names("Shure MV6 Mono", &["Shure MV6, USB Audio"])];
-        assert_eq!(
-            migrated_name("Shure MV6, USB Audio", &available).as_deref(),
-            Some("Shure MV6 Mono")
-        );
-    }
-
-    #[test]
-    fn only_an_alsa_shaped_name_needs_the_device_list() {
-        assert!(could_be_legacy_name("Shure MV6, USB Audio"));
-        assert!(could_be_legacy_name("HDA Intel PCH, ALC1220 Analog"));
-        assert!(!could_be_legacy_name("Shure MV6 Mono"));
-        assert!(!could_be_legacy_name("DeepFilter Shure MV6"));
-        assert!(!could_be_legacy_name(""));
-    }
-
-    #[test]
-    fn migrated_name_leaves_current_and_unknown_names_alone() {
-        let available = [names("Shure MV6 Mono", &["Shure MV6, USB Audio"])];
-        assert_eq!(migrated_name("Shure MV6 Mono", &available), None);
-        assert_eq!(migrated_name("Unplugged Mic", &available), None);
     }
 
     #[cfg(target_os = "linux")]

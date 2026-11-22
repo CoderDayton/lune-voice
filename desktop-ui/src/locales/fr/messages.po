@@ -346,7 +346,7 @@ msgstr "Meilleure précision ; le décodeur turbo le garde rapide."
 msgid "Bigger is more accurate, but slower"
 msgstr "Plus grand : plus précis, mais plus lent"
 
-#: src/features/shell/config/navigation.ts:88
+#: src/features/shell/config/navigation.ts:82
 msgid "Blocks of text Lune Voice types when you speak their trigger phrase"
 msgstr "Blocs de texte que Lune Voice saisit quand vous prononcez leur déclencheur"
 
@@ -374,7 +374,7 @@ msgstr "Casse des marques (« github » → « GitHub »)"
 msgid "Brands"
 msgstr "Marques"
 
-#: src/features/shell/config/navigation.ts:70
+#: src/features/shell/config/navigation.ts:64
 msgid "Browse and search past dictations"
 msgstr "Parcourir et rechercher vos dictées passées"
 
@@ -603,7 +603,7 @@ msgstr "Correction"
 msgid "Correction sensitivity"
 msgstr "Sensibilité de correction"
 
-#: src/features/shell/config/navigation.ts:79
+#: src/features/shell/config/navigation.ts:73
 msgid "Corrections Lune Voice applies every time you dictate"
 msgstr "Corrections que Lune Voice applique à chaque dictée"
 
@@ -1014,7 +1014,7 @@ msgstr "Formel"
 msgid "Formatting"
 msgstr "Mise en forme"
 
-#: src/features/shell/config/navigation.ts:97
+#: src/features/shell/config/navigation.ts:91
 msgid "Formatting presets for your text"
 msgstr "Préréglages de mise en forme pour votre texte"
 
@@ -1145,7 +1145,7 @@ msgstr "Maintenir pendant la dictée"
 msgid "Hold your hotkey, speak, then let go. The text is typed into whatever app you were using."
 msgstr "Maintenez votre raccourci, parlez, puis relâchez. Le texte est saisi dans l'application que vous utilisiez."
 
-#: src/features/shell/config/navigation.ts:60
+#: src/features/shell/config/navigation.ts:54
 msgid "Home"
 msgstr "Accueil"
 
@@ -1184,7 +1184,7 @@ msgstr "En cours"
 msgid "In use"
 msgstr "Utilisé"
 
-#: src/features/shell/config/navigation.ts:105
+#: src/features/shell/config/navigation.ts:99
 msgid "Input, output, models, and shortcuts"
 msgstr "Entrée, sortie, modèles et raccourcis"
 
@@ -1433,7 +1433,7 @@ msgstr "Modèles"
 msgid "Models are stored locally. No telemetry, no accounts."
 msgstr "Les modèles sont stockés localement. Pas de télémétrie, pas de compte."
 
-#: src/features/shell/config/navigation.ts:109
+#: src/features/shell/config/navigation.ts:103
 msgid "Models, shortcuts, output"
 msgstr "Modèles, raccourcis, sortie"
 
@@ -2036,11 +2036,11 @@ msgstr "Envoie les transcriptions vers un point de terminaison compatible OpenAI
 msgid "Session details"
 msgstr "Détails de la session"
 
-#: src/store/workspace-store.ts:211
+#: src/store/workspace-store.ts:210
 msgid "Session timed out — backend may be unresponsive"
 msgstr "Session expirée — le service local ne répond peut-être pas"
 
-#: src/features/shell/config/navigation.ts:69
+#: src/features/shell/config/navigation.ts:63
 msgid "Sessions"
 msgstr "Sessions"
 
@@ -2060,7 +2060,7 @@ msgstr "Configurer l'accélération GPU"
 msgid "Setting up your GPU"
 msgstr "Configuration de votre GPU"
 
-#: src/features/shell/config/navigation.ts:104
+#: src/features/shell/config/navigation.ts:98
 msgid "Settings"
 msgstr "Paramètres"
 
@@ -2136,7 +2136,7 @@ msgstr "Téléchargement plus léger et moins de mémoire, un peu moins précis.
 msgid "Snippet text"
 msgstr "Texte de l'extrait"
 
-#: src/features/shell/config/navigation.ts:87
+#: src/features/shell/config/navigation.ts:81
 msgid "Snippets"
 msgstr "Extraits"
 
@@ -2228,7 +2228,7 @@ msgstr "Stocké sur cet appareil"
 msgid "Style"
 msgstr "Style"
 
-#: src/features/shell/config/navigation.ts:96
+#: src/features/shell/config/navigation.ts:90
 msgid "Styles"
 msgstr "Styles"
 
@@ -2261,7 +2261,7 @@ msgid "Switch to light theme"
 msgstr "Passer au thème clair"
 
 #: src/features/settings/sections/appearance-section.tsx:26
-#: src/features/shell/config/navigation.ts:121
+#: src/features/shell/config/navigation.ts:115
 msgid "System"
 msgstr "Système"
 
@@ -2479,7 +2479,7 @@ msgstr "Saisir dans l'application"
 msgid "Types as"
 msgstr "Texte saisi"
 
-#: src/store/workspace-store.ts:688
+#: src/store/workspace-store.ts:646
 msgid "Unable to reach the desktop backend."
 msgstr "Impossible de joindre le service local de l'application."
 
@@ -2547,7 +2547,7 @@ msgstr "Voir le style"
 msgid "Visibility"
 msgstr "Visibilité"
 
-#: src/features/shell/config/navigation.ts:78
+#: src/features/shell/config/navigation.ts:72
 msgid "Vocabulary"
 msgstr "Vocabulaire"
 
@@ -2638,7 +2638,7 @@ msgstr "mots"
 msgid "Words"
 msgstr "Mots"
 
-#: src/features/shell/config/navigation.ts:120
+#: src/features/shell/config/navigation.ts:114
 msgid "Workspace"
 msgstr "Espace de travail"
 
@@ -2682,7 +2682,7 @@ msgstr "Vous êtes à jour"
 msgid "Your API key. Leave it blank to keep the saved key — or if the endpoint runs on your own machine or network and needs none."
 msgstr "Votre clé d'API. Laissez-la vide pour conserver la clé enregistrée — ou si le point de terminaison s'exécute sur votre propre machine ou réseau et n'en demande aucune."
 
-#: src/features/shell/config/navigation.ts:61
+#: src/features/shell/config/navigation.ts:55
 msgid "Your dictation at a glance"
 msgstr "Vos dictées en un coup d’œil"
 

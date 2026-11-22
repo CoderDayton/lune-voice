@@ -8,4 +8,4 @@ import type { SnippetItemDto } from "./SnippetItemDto";
 import type { StylePresetDto } from "./StylePresetDto";
 import type { WorkspaceSettingsDto } from "./WorkspaceSettingsDto";
 
-export type WorkspaceSnapshot = { ipcFlavor: string, serviceStatus: string, capabilities: PlatformCapabilitiesDto, settings: WorkspaceSettingsDto, history: Array<HistoryItemDto>, dictionary: Array<DictionaryItemDto>, snippets: Array<SnippetItemDto>, stylePresets: Array<StylePresetDto>, defaultFormatting: FormatTogglesDto, stats: SessionStatsDto, };
+export type WorkspaceSnapshot = { serviceStatus: string, capabilities: PlatformCapabilitiesDto, settings: WorkspaceSettingsDto, history: Array<HistoryItemDto>, dictionary: Array<DictionaryItemDto>, snippets: Array<SnippetItemDto>, stylePresets: Array<StylePresetDto>, defaultFormatting: FormatTogglesDto, stats: SessionStatsDto, };

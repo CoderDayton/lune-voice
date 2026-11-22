@@ -8,20 +8,18 @@
 //! The ring never blocks the audio callback; when it fills, the oldest chunk is
 //! evicted and counted ([`AudioPull::dropped_chunks`]).
 //!
-//! Also here: the PCEN adaptive AGC ([`pcen`]) the capture loop applies, and an
-//! Earshot-backed [`Vad`] used by the offline inspection examples.
+//! Also here: the PCEN adaptive AGC ([`pcen`]) the capture loop applies.
 //!
 //! ## Example
 //! ```no_run
 //! use lune_audio::{AudioStream, AudioConfig};
 //!
-//! #[tokio::main]
-//! async fn main() {
-//!     let stream = AudioStream::new(AudioConfig::default()).unwrap();
-//!
-//!     while let Some(chunk) = stream.next_chunk().await {
+//! let stream = AudioStream::new(AudioConfig::default()).unwrap();
+//! loop {
+//!     while let Some(chunk) = stream.try_next_chunk() {
 //!         println!("Audio: {} samples", chunk.samples.len());
 //!     }
+//!     std::thread::sleep(std::time::Duration::from_millis(10));
 //! }
 //! ```
 
@@ -34,13 +32,10 @@ mod pulse;
 mod ring;
 
 pub use capture::{AudioConfig, AudioStream, AudioStreamHandle, ConsumerGuard};
-pub use devices::{
-    capture_buffer_size, capture_host, list_input_devices, migrated_input_device_name,
-    playback_host,
-};
+pub use devices::{capture_buffer_size, capture_host, list_input_devices, playback_host};
 pub use pcen::{
     DEFAULT_NOISE_CEILING_RMS, EXPECTED_OUTPUT_RMS, PCEN_HOP_SIZE, PcenAgc, PcenAgcConfig,
-    PcenFrameStats, apply_gain,
+    apply_gain,
 };
 
 /// Polling source for downstream consumers (sessions, tests).
@@ -58,6 +53,9 @@ pub trait AudioPull: Send + Sync {
     /// short chunk. Default no-op for sources without producer-side
     /// buffering (file replay already delivers its tail).
     fn request_flush(&self) {}
+    fn flush_pending(&self) -> bool {
+        false
+    }
     /// Chunks the ring buffer discarded because the consumer fell behind.
     ///
     /// Non-zero means audio was lost from the *front* of the buffer, so the
@@ -83,6 +81,9 @@ impl AudioPull for AudioStream {
     fn request_flush(&self) {
         AudioStream::request_flush(self)
     }
+    fn flush_pending(&self) -> bool {
+        AudioStream::flush_pending(self)
+    }
     fn dropped_chunks(&self) -> u64 {
         AudioStream::dropped_chunks(self)
     }
@@ -97,6 +98,9 @@ impl AudioPull for AudioStreamHandle {
     }
     fn request_flush(&self) {
         AudioStreamHandle::request_flush(self)
+    }
+    fn flush_pending(&self) -> bool {
+        AudioStreamHandle::flush_pending(self)
     }
     fn is_offline(&self) -> bool {
         false
@@ -114,9 +118,6 @@ impl AudioPull for AudioStreamHandle {
 pub struct AudioChunk {
     /// PCM samples at target sample rate (default 16kHz), mono, f32 in [-1.0, 1.0]
     pub samples: Vec<f32>,
-
-    /// Monotonic timestamp (milliseconds since stream start)
-    pub timestamp_ms: u64,
 }
 
 /// Errors that can occur during audio capture
@@ -134,6 +135,6 @@ pub enum AudioError {
     #[error("Resampler error: {0}")]
     Resampler(String),
 
-    #[error("VAD initialization error: {0}")]
-    Vad(String),
+    #[error("PCEN configuration error: {0}")]
+    Pcen(String),
 }

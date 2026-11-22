@@ -52,11 +52,11 @@ export type SetupPhase = 'loading' | WizardStep | 'downloading' | 'gpu' | 'error
 
 const STORAGE_KEY = 'lune-setup-complete';
 
-export function isSetupFlagSet(): boolean {
+function isSetupFlagSet(): boolean {
   return typeof window !== 'undefined' && window.localStorage?.getItem(STORAGE_KEY) === '1';
 }
 
-export function markSetupComplete(): void {
+function markSetupComplete(): void {
   window.localStorage?.setItem(STORAGE_KEY, '1');
 }
 

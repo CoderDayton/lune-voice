@@ -93,7 +93,6 @@
                 transform var(--duration-base) var(--ease-standard);
   }
 
-  .interactive-card:hover,
   .card:has(a:hover, button:hover):hover {
     border-color: var(--surface-border-strong);
     background-color: var(--surface-card-hover);
@@ -179,7 +178,6 @@
 
   /* UI chrome should not be selectable — only content text */
   .sidebar-surface,
-  .brand-title,
   .stat-title,
   .stat-desc,
   .badge,

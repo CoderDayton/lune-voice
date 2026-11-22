@@ -4,6 +4,7 @@ use std::ffi::OsStr;
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::{Mutex, MutexGuard, PoisonError};
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use lune_core::config::{AsrBackendConfig, LlmBackendConfig, RedactedString, UserSettings};
@@ -14,27 +15,13 @@ use crate::secrets::{KeyringVault, SecretSlot, SecretVault};
 
 static TMP_COUNTER: AtomicU64 = AtomicU64::new(0);
 
-/// True when raw settings TOML still carries the removed `dictation_mode = "Both"`
-/// (the legacy "type and copy" mode), so its copy intent can be migrated.
-fn dictation_mode_was_both(content: &str) -> bool {
-    content.lines().any(|line| {
-        let line = line.trim();
-        line.starts_with("dictation_mode") && line.contains("\"Both\"")
-    })
-}
+/// Serialises every settings write in this process, so one load-modify-save
+/// cannot overwrite a change another one made between its load and its save.
+static WRITE_LOCK: Mutex<()> = Mutex::new(());
 
-/// True when a file predating `agc_mode` turned the old `vad_pcen` AGC toggle
-/// off. `vad_pcen = true` was the default every save wrote, so it carries no
-/// choice and the file takes the new default.
-fn legacy_agc_was_off(content: &str) -> bool {
-    if !content.contains("vad_pcen") {
-        return false;
-    }
-    let Ok(table) = content.parse::<toml::Table>() else {
-        return false;
-    };
-    !table.contains_key("agc_mode")
-        && table.get("vad_pcen").and_then(toml::Value::as_bool) == Some(false)
+fn write_lock() -> MutexGuard<'static, ()> {
+    // The guarded data is `()`: a panicking holder leaves nothing inconsistent.
+    WRITE_LOCK.lock().unwrap_or_else(PoisonError::into_inner)
 }
 
 /// True when the raw settings TOML carries a non-empty `api_key = "..."` line —
@@ -108,15 +95,6 @@ impl SettingsStore {
         }
         let content = fs::read_to_string(&self.path)?;
         let mut settings: UserSettings = toml::from_str(&content)?;
-        // Migrate the removed "type and copy" (`Both`) mode: the mode itself
-        // deserializes to `TypeInPlace`, but its clipboard-copy intent is now the
-        // separate `copy_to_clipboard` toggle, so set that for legacy configs.
-        if dictation_mode_was_both(&content) {
-            settings.copy_to_clipboard = true;
-        }
-        if legacy_agc_was_off(&content) {
-            settings.agc_mode = lune_core::config::AgcMode::Off;
-        }
         self.restore_secrets(&mut settings);
         Ok(settings)
     }
@@ -167,6 +145,30 @@ impl SettingsStore {
     /// the keyring is unavailable the key stays inline (best-effort security),
     /// so a save never loses it.
     pub fn save(&self, settings: &UserSettings) -> PersistResult<()> {
+        let _guard = write_lock();
+        self.save_locked(settings)
+    }
+
+    /// Load, modify and save while holding the process-wide write lock.
+    ///
+    /// Loads like [`Self::load_or_quarantine`], so a malformed file is moved
+    /// aside and `modify` starts from defaults. An `Err` from `modify` leaves
+    /// the file untouched.
+    pub fn update<R, E>(
+        &self,
+        modify: impl FnOnce(&mut UserSettings) -> Result<R, E>,
+    ) -> Result<R, E>
+    where
+        E: From<PersistError>,
+    {
+        let _guard = write_lock();
+        let mut settings = self.load_or_quarantine()?.settings;
+        let out = modify(&mut settings)?;
+        self.save_locked(&settings)?;
+        Ok(out)
+    }
+
+    fn save_locked(&self, settings: &UserSettings) -> PersistResult<()> {
         let scrubbed = self.persist_secrets(settings);
         let content = toml::to_string_pretty(&scrubbed)?;
         atomic_write(&self.path, content.as_bytes())?;
@@ -562,41 +564,7 @@ mod tests {
     }
 
     #[test]
-    fn legacy_both_mode_migrates_to_type_plus_copy() {
-        use lune_core::config::DictationMode;
-
-        let dir = tempfile::tempdir().unwrap();
-        let path = dir.path().join("settings.toml");
-        let store = SettingsStore::new(&path);
-
-        // Write a valid config, then force the removed legacy `Both` value.
-        store.save(&UserSettings::default()).unwrap();
-        let legacy = fs::read_to_string(&path)
-            .unwrap()
-            .lines()
-            .map(|l| {
-                if l.trim_start().starts_with("dictation_mode") {
-                    "dictation_mode = \"Both\"".to_string()
-                } else {
-                    l.to_string()
-                }
-            })
-            .collect::<Vec<_>>()
-            .join("\n");
-        fs::write(&path, legacy).unwrap();
-
-        // `Both` is gone, so it must not crash the load, and its copy intent is
-        // carried over to the new toggle.
-        let loaded = store.load().unwrap();
-        assert_eq!(loaded.dictation_mode, DictationMode::TypeInPlace);
-        assert!(loaded.copy_to_clipboard, "legacy Both must enable copy");
-    }
-
-    /// `vad_pcen` was a bool before `agc_mode`. Every saved file carries it, so
-    /// `true` (the old default) means no choice was made and takes the new
-    /// default; only an explicit `false` carries over.
-    #[test]
-    fn legacy_vad_pcen_maps_onto_agc_mode() {
+    fn a_removed_vad_pcen_key_loads_with_the_default_agc_mode() {
         use lune_core::config::AgcMode;
 
         let dir = tempfile::tempdir().unwrap();
@@ -604,12 +572,9 @@ mod tests {
         let store =
             SettingsStore::with_vault(&path, Box::new(crate::secrets::InMemoryVault::default()));
 
-        for (legacy, expected) in [
-            ("vad_pcen = false\n", AgcMode::Off),
-            ("vad_pcen = true\n", AgcMode::Auto),
-        ] {
+        for legacy in ["vad_pcen = false\n", "vad_pcen = true\n"] {
             fs::write(&path, format!("{legacy}language = \"en\"\n")).unwrap();
-            assert_eq!(store.load().unwrap().agc_mode, expected, "{legacy}");
+            assert_eq!(store.load().unwrap().agc_mode, AgcMode::Auto, "{legacy}");
         }
 
         fs::write(&path, "vad_pcen = false\nagc_mode = \"always\"\n").unwrap();
@@ -619,7 +584,6 @@ mod tests {
         store.save(&store.load().unwrap()).unwrap();
         let raw = fs::read_to_string(&path).unwrap();
         assert!(!raw.contains("vad_pcen"), "{raw}");
-        assert_eq!(store.load().unwrap().agc_mode, AgcMode::Off);
     }
 
     #[test]
@@ -769,9 +733,77 @@ mod tests {
         assert_eq!(persisted.language, UserSettings::default().language);
     }
 
+    /// Each thread builds its own store, as every call site does, so the lock
+    /// has to be process-wide rather than per instance.
+    #[test]
+    fn concurrent_updates_of_different_fields_both_survive() {
+        const ROUNDS: u32 = 50;
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("settings.toml");
+        let start = UserSettings {
+            pill_edge_margin: 0,
+            session_history_days: Some(0),
+            ..UserSettings::default()
+        };
+        SettingsStore::with_vault(&path, Box::new(crate::secrets::InMemoryVault::default()))
+            .save(&start)
+            .unwrap();
+
+        let barrier = std::sync::Arc::new(std::sync::Barrier::new(2));
+        let bump = |field: fn(&mut UserSettings)| {
+            let path = path.clone();
+            let barrier = std::sync::Arc::clone(&barrier);
+            std::thread::spawn(move || {
+                let store = SettingsStore::with_vault(
+                    &path,
+                    Box::new(crate::secrets::InMemoryVault::default()),
+                );
+                barrier.wait();
+                for _ in 0..ROUNDS {
+                    store
+                        .update(|s| {
+                            field(s);
+                            Ok::<_, PersistError>(())
+                        })
+                        .unwrap();
+                }
+            })
+        };
+        let a = bump(|s| s.pill_edge_margin += 1);
+        let b = bump(|s| {
+            s.session_history_days = Some(s.session_history_days.unwrap_or(0) + 1);
+        });
+        a.join().unwrap();
+        b.join().unwrap();
+
+        let end =
+            SettingsStore::with_vault(&path, Box::new(crate::secrets::InMemoryVault::default()))
+                .load()
+                .unwrap();
+        assert_eq!(end.pill_edge_margin, ROUNDS);
+        assert_eq!(end.session_history_days, Some(ROUNDS));
+    }
+
+    #[test]
+    fn update_leaves_the_file_alone_when_modify_fails() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("settings.toml");
+        let store =
+            SettingsStore::with_vault(&path, Box::new(crate::secrets::InMemoryVault::default()));
+        store.save(&UserSettings::default()).unwrap();
+        let before = fs::read_to_string(&path).unwrap();
+
+        let result = store.update(|s| {
+            s.language = "changed".into();
+            Err::<(), _>(PersistError::NotFound("refused".into()))
+        });
+        assert!(result.is_err());
+        assert_eq!(fs::read_to_string(&path).unwrap(), before);
+    }
+
     #[test]
     fn api_keys_go_to_vault_not_toml() {
-        use lune_core::config::{OpenAiLlmProvider, StreamingMode};
+        use lune_core::config::OpenAiLlmProvider;
         use url::Url;
 
         let dir = tempfile::tempdir().unwrap();
@@ -786,7 +818,6 @@ mod tests {
                 base_url: Url::parse("https://api.example.com/v1").unwrap(),
                 api_key: RedactedString::new("secret-asr"),
                 model: "whisper-1".into(),
-                streaming: StreamingMode::HttpPolling,
             },
             llm_openai: OpenAiLlmProvider {
                 base_url: "https://api.example.com/v1".into(),

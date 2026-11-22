@@ -13,8 +13,6 @@
 #   "auto"    — Use the GPU when the plugin and a GPU are there, else CPU. (default)
 #   "vulkan"  — Ask for the GPU; still falls back to CPU if it can't start.
 #   "cpu"     — Force CPU-only, even if a GPU is present.
-#
-# The old value "cuda" still loads, as "vulkan".
 device = "auto"
 
 # Built-in style preset applied by default.
@@ -38,7 +36,6 @@ privacy_mode = "LocalOnly"
 # How finalized text reaches the focused window.
 # "TypeInPlace"  — Type via uinput kernel device; works in any app.
 # "Clipboard"    — Copy to clipboard + Ctrl+V paste (compositor-agnostic fallback). (default)
-# "Both"         — Type AND copy to clipboard simultaneously.
 dictation_mode = "Clipboard"
 
 # How the hotkey activates dictation.
@@ -103,7 +100,6 @@ type = "WhisperCpp"
 # base_url = "https://api.openai.com/v1"
 # api_key  = "sk-..."
 # model    = "whisper-1"
-# streaming = "Off"   # or "On"
 
 
 # ── LLM backend ──────────────────────────────────────────────────────────────

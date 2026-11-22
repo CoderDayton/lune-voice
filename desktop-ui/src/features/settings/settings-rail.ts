@@ -15,13 +15,13 @@ import {
 } from 'lucide-react';
 import type { SettingsSectionId } from './sections';
 
-export interface SettingsRailItem {
+interface SettingsRailItem {
   id: SettingsSectionId;
   label: MessageDescriptor;
   icon: LucideIcon;
 }
 
-export interface SettingsRailGroup {
+interface SettingsRailGroup {
   name: MessageDescriptor;
   items: SettingsRailItem[];
 }

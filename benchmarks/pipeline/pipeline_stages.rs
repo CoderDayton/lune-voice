@@ -7,8 +7,7 @@
 //!   session create → push audio → ASR poll_final
 //!
 //! and reports which stage dominates. whisper.cpp does not expose the internal
-//! mel/encoder/decode sub-stage timings the old ONNX Qwen3 backend recorded, so
-//! the ASR cost is reported as a single `poll_final` stage. LLM styling is not
+//! mel/encoder/decode sub-stage timings, so the ASR cost is reported as a single `poll_final` stage. LLM styling is not
 //! measured here — production skips it by default (no style selected), and
 //! its cost belongs in a dedicated styling benchmark, not the ASR latency one.
 //!

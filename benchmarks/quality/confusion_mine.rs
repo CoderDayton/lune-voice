@@ -370,7 +370,7 @@ async fn decode_raw(
 }
 
 /// Detect language hint from fixture name. Returns BCP-47 style code
-/// that maps to Qwen3's canonical language names in start_session.
+/// passed to the ASR session as its language hint.
 /// Returns None for auto-detect if no language can be inferred.
 fn language_from_fixture(name: &str) -> Option<&str> {
     // LUNE_AUTO_LANG=1 → None for all fixtures (test auto-detect)

@@ -16,14 +16,13 @@ import type { WorkspaceSnapshot, SessionStreamEvent } from "../../src/lib/backen
 
 function makeSnapshot(overrides: Partial<WorkspaceSnapshot> = {}): WorkspaceSnapshot {
   return {
-    ipcFlavor: "mock",
     serviceStatus: "ready",
     settings: {
       activationMode: "Toggle",
       dictationMode: "Clipboard",
       useGpu: true,
       devicePolicy: "Auto",
-      asrBackendType: "Qwen3Asr",
+      asrBackendType: "WhisperCpp",
       confidenceThreshold: 0.5,
       adaptiveVad: false,
       speechThreshold: 0.5,

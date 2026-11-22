@@ -134,16 +134,20 @@ impl ModelSpec {
     /// Human-readable display name for this model.
     pub fn display_name(&self) -> &str {
         let Self::Directory { local_name, .. } = self;
-        match local_name.as_str() {
-            model_dirs::DIR_WHISPER_VAD => "Whisper VAD (silero)",
-            model_dirs::DIR_WHISPER_BASE => WhisperModel::Base.display_name(),
-            model_dirs::DIR_WHISPER_SMALL => WhisperModel::Small.display_name(),
-            model_dirs::DIR_WHISPER_MEDIUM => WhisperModel::Medium.display_name(),
-            model_dirs::DIR_WHISPER_LARGE_V3_TURBO => WhisperModel::LargeV3Turbo.display_name(),
-            model_dirs::DIR_PARAKEET_TDT_V3_Q8 => ParakeetModel::TdtV3Q8.display_name(),
-            model_dirs::DIR_PARAKEET_TDT_V3_Q4K => ParakeetModel::TdtV3Q4K.display_name(),
-            _ => local_name,
+        if local_name == model_dirs::DIR_WHISPER_VAD {
+            return "Whisper VAD (silero)";
         }
+        WhisperModel::ALL
+            .into_iter()
+            .find(|m| m.dir() == local_name)
+            .map(WhisperModel::display_name)
+            .or_else(|| {
+                ParakeetModel::ALL
+                    .into_iter()
+                    .find(|m| m.dir() == local_name)
+                    .map(ParakeetModel::display_name)
+            })
+            .unwrap_or(local_name)
     }
 
     /// Check if this model is fully present locally (no download needed).
@@ -1313,7 +1317,6 @@ mod tests {
             base_url: "https://example.com/v1".parse().unwrap(),
             api_key: lune_core::config::RedactedString::new("test-key"),
             model: "whisper".into(),
-            streaming: lune_core::config::StreamingMode::HttpPolling,
         }
     }
 
@@ -1870,6 +1873,48 @@ mod tests {
                 );
             }
         }
+    }
+
+    #[test]
+    fn every_offered_model_has_its_display_name() {
+        let names: Vec<(String, String)> = ModelSpec::all()
+            .iter()
+            .map(|s| (s.local_name().to_string(), s.display_name().to_string()))
+            .collect();
+        let expected = [
+            (model_dirs::DIR_WHISPER_VAD, "Whisper VAD (silero)"),
+            (model_dirs::DIR_WHISPER_BASE, "Whisper Base (q8_0)"),
+            (model_dirs::DIR_WHISPER_SMALL, "Whisper Small (q5_1)"),
+            (model_dirs::DIR_WHISPER_MEDIUM, "Whisper Medium (q5_0)"),
+            (
+                model_dirs::DIR_WHISPER_LARGE_V3_TURBO,
+                "Whisper Large v3 Turbo (q8_0)",
+            ),
+            (
+                model_dirs::DIR_PARAKEET_TDT_V3_Q4K,
+                "Parakeet TDT 0.6B v3 (q4_k)",
+            ),
+            (
+                model_dirs::DIR_PARAKEET_TDT_V3_Q8,
+                "Parakeet TDT 0.6B v3 (q8_0)",
+            ),
+        ]
+        .map(|(dir, name)| (dir.to_string(), name.to_string()));
+        assert_eq!(names, expected);
+    }
+
+    #[test]
+    fn an_unknown_model_directory_is_shown_by_its_name() {
+        let spec = ModelSpec::Directory {
+            repo_id: "someone/else".into(),
+            required_files: vec![],
+            suffix_patterns: vec![],
+            local_name: "hand-placed".into(),
+            description: "",
+            required: false,
+            role: ModelRole::SpeechToText,
+        };
+        assert_eq!(spec.display_name(), "hand-placed");
     }
 
     #[test]

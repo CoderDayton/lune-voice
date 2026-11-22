@@ -151,7 +151,6 @@ impl AsrRegistry {
                     api_key: api_key.clone(),
                     model: model.clone(),
                     timeout: Duration::from_secs(30),
-                    min_samples_before_request: 8000,
                 })?;
                 Ok(Self::OpenAi(backend))
             }

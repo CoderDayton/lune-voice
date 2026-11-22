@@ -50,12 +50,6 @@ pub enum SessionEvent {
         session_id: Uuid,
         payload: String,
     },
-    /// Gate decision: true = LLM was used, false = bypassed.
-    GateDecision {
-        used_llm: bool,
-        lang: String,
-        unresolved: Vec<(String, usize)>,
-    },
     Error(String),
     /// Non-fatal anomaly observable by listeners (e.g. a persist write
     /// failed but the session itself is still progressing). Carries human

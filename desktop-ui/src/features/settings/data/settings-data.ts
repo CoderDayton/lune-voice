@@ -37,7 +37,7 @@ export type PillCornerValue = 'Pill' | 'Rounded' | 'Square';
  * plain string for text that must not be translated — endonyms in the spoken
  * language list, product names, sizes.
  */
-export type OptionText = string | MessageDescriptor;
+type OptionText = string | MessageDescriptor;
 
 export interface Option<Value extends string> {
   value: Value;
@@ -50,7 +50,7 @@ type IconComponent = ComponentType<{
   className?: string;
 }>;
 
-export interface DescriptiveOptionData<Value extends string> {
+interface DescriptiveOptionData<Value extends string> {
   value: Value;
   label: OptionText;
   description?: OptionText;
@@ -58,7 +58,7 @@ export interface DescriptiveOptionData<Value extends string> {
 }
 
 /** Resolved option text, ready to render. */
-export interface LocalizedOption<Value extends string> {
+interface LocalizedOption<Value extends string> {
   value: Value;
   label: string;
   description?: string;
@@ -178,7 +178,7 @@ export const llmEngines: DescriptiveOptionData<LlmEngineValue>[] = [
   },
 ];
 
-export interface WhisperModelOption extends DescriptiveOptionData<WhisperModelValue> {
+interface WhisperModelOption extends DescriptiveOptionData<WhisperModelValue> {
   /** On-disk model directory — matches the backend ModelSpec `local_name`. */
   localName: string;
   /** Approximate download size, e.g. "264 MB". */
@@ -220,7 +220,7 @@ export const whisperModels: WhisperModelOption[] = [
 /** Parakeet quantizations — mirrors `ParakeetModel` in lune-core. */
 export type ParakeetModelValue = 'TdtV3Q8' | 'TdtV3Q4K';
 
-export interface ParakeetModelOption extends DescriptiveOptionData<ParakeetModelValue> {
+interface ParakeetModelOption extends DescriptiveOptionData<ParakeetModelValue> {
   /** On-disk model directory — matches the backend ModelSpec `local_name`. */
   localName: string;
   /** Approximate download size. */
@@ -369,7 +369,7 @@ export type ModelChoice =
   | { engine: 'ParakeetCpp'; model: ParakeetModelValue }
   | { engine: 'OpenAiCompatible' };
 
-export interface ModelChoiceSettings {
+interface ModelChoiceSettings {
   asrBackend: AsrBackendValue;
   dictationLanguage: string;
   whisperModel?: WhisperModelValue;
@@ -445,7 +445,7 @@ export const deliveryMethods: DescriptiveOptionData<DictationModeValue>[] = [
   },
 ];
 
-export type DictationLanguageValue =
+type DictationLanguageValue =
   | 'auto'
   | 'en'
   | 'bg'
@@ -560,7 +560,7 @@ export const agcModes: DescriptiveOptionData<AgcModeValue>[] = [
 
 export type PrivacyModeValue = 'LocalOnly' | 'AllowRemote';
 
-export type HistoryRetentionValue = 'off' | '7' | '30' | '90' | '365' | 'forever';
+type HistoryRetentionValue = 'off' | '7' | '30' | '90' | '365' | 'forever';
 
 export const historyRetentionOptions: Option<HistoryRetentionValue>[] = [
   { value: 'off', label: msg`Don't save history` },
@@ -590,7 +590,7 @@ export function historyRetentionDays(value: HistoryRetentionValue): number | nul
   return Number(value);
 }
 
-export type ModelIdleUnloadValue = 'never' | '5' | '15' | '30' | '60' | '120';
+type ModelIdleUnloadValue = 'never' | '5' | '15' | '30' | '60' | '120';
 
 export const modelIdleUnloadOptions: DescriptiveOptionData<ModelIdleUnloadValue>[] = [
   {

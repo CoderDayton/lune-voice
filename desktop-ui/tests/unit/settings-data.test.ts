@@ -42,7 +42,6 @@ describe("settings data", () => {
     expect(values).toContain("WhisperCpp");
     expect(values).toContain("ParakeetCpp");
     expect(values).toContain("OpenAiCompatible");
-    expect(values).not.toContain("Qwen3Asr");
   });
 
   test("Parakeet's model directories match the backend's", () => {

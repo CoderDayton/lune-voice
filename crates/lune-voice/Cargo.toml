@@ -19,7 +19,6 @@ whisper-vulkan = ["whisper-cpp", "lune-asr/whisper-vulkan"]
 lune-core.workspace = true
 lune-audio.workspace = true
 lune-asr.workspace = true
-lune-llm.workspace = true
 lune-dict.workspace = true
 lune-persist.workspace = true
 async-trait.workspace = true
@@ -29,13 +28,13 @@ tracing.workspace = true
 uuid.workspace = true
 serde_json.workspace = true
 arboard.workspace = true
-enigo.workspace = true
 # Output sound cues (src/sound.rs): decode embedded WAVs and play via cpal.
 hound.workspace = true
 cpal.workspace = true
 
 # Foreground-window capture (src/focus/windows.rs).
 [target.'cfg(target_os = "windows")'.dependencies]
+enigo.workspace = true
 windows-sys = { workspace = true, features = [
   "Win32_Foundation",
   "Win32_Security",
@@ -60,6 +59,7 @@ zbus = { workspace = true }
 x11rb = "0.14"
 
 [dev-dependencies]
+lune-llm.workspace = true
 tempfile.workspace = true
 # `test-util` gives paused-time tests, so the terminal-send timeout can be
 # exercised without a real 5 s wait.
