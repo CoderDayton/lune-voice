@@ -84,14 +84,20 @@ impl DbFileKey {
 
 static INITIALISED: Mutex<Option<HashSet<DbFileKey>>> = Mutex::new(None);
 
-/// Run `init` the first time this process opens the file at `path`; returns
-/// whether it ran. A failed `init` is retried by the next open. The lock is
-/// held across `init`, so concurrent first opens migrate once.
-fn once_per_file(path: &Path, init: impl FnOnce() -> PersistResult<()>) -> PersistResult<bool> {
+/// Run `init` the first time this process opens the file at `path`, or when
+/// the file has no schema; returns whether it ran. NTFS reuses the creation
+/// time of a recreated file, so the key alone cannot tell a new file apart.
+/// A failed `init` is retried by the next open. The lock is held across
+/// `init`, so concurrent first opens migrate once.
+fn once_per_file(
+    path: &Path,
+    schema_present: bool,
+    init: impl FnOnce() -> PersistResult<()>,
+) -> PersistResult<bool> {
     let key = DbFileKey::of(path);
     let mut done = INITIALISED.lock().unwrap_or_else(PoisonError::into_inner);
     let done = done.get_or_insert_with(HashSet::new);
-    if done.contains(&key) {
+    if schema_present && done.contains(&key) {
         return Ok(false);
     }
     init()?;
@@ -350,7 +356,13 @@ impl Database {
             conn,
             legacy_pages_reclaimed: reclaimed,
         };
-        once_per_file(path, || {
+        let schema_present = diesel::select(diesel::dsl::sql::<diesel::sql_types::BigInt>(
+            "(SELECT COUNT(*) FROM sqlite_master WHERE type = 'table' \
+             AND name = '__diesel_schema_migrations')",
+        ))
+        .get_result::<i64>(&mut db.conn)?
+            > 0;
+        once_per_file(path, schema_present, || {
             db.run_migrations()?;
             // Migrations may have created the WAL/SHM sidecars; harden
             // everything now that the schema is in place.
@@ -2248,19 +2260,23 @@ mod tests {
         std::fs::write(&b, b"").unwrap();
         let ok = || Ok(());
 
-        assert!(once_per_file(&a, ok).unwrap());
-        assert!(!once_per_file(&a, ok).unwrap());
+        assert!(once_per_file(&a, true, ok).unwrap());
+        assert!(!once_per_file(&a, true, ok).unwrap());
         assert!(
-            once_per_file(&b, ok).unwrap(),
+            once_per_file(&a, false, ok).unwrap(),
+            "a known file without a schema is initialised again"
+        );
+        assert!(
+            once_per_file(&b, true, ok).unwrap(),
             "a second path is its own file"
         );
 
-        let failed = once_per_file(&b.with_extension("x"), || {
+        let failed = once_per_file(&b.with_extension("x"), true, || {
             Err(PersistError::Migration("boom".into()))
         });
         assert!(failed.is_err());
         assert!(
-            once_per_file(&b.with_extension("x"), ok).unwrap(),
+            once_per_file(&b.with_extension("x"), true, ok).unwrap(),
             "a failed init must be retried"
         );
     }

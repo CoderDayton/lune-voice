@@ -28,6 +28,7 @@ ignore = [
     { id = "RUSTSEC-2025-0075", reason = "Tauri transitive dep" },
     { id = "RUSTSEC-2025-0080", reason = "Tauri transitive dep" },
     { id = "RUSTSEC-2025-0081", reason = "Tauri transitive dep" },
+    { id = "RUSTSEC-2026-0543", reason = "chrono unmaintained notice, no vulnerability — direct and transitive dep" },
     { id = "RUSTSEC-2024-0422", reason = "GTK3 upstream — gtk-layer-shell, needed for the native pill" },
     { id = "RUSTSEC-2024-0423", reason = "GTK3 upstream — gtk-layer-shell-sys" },
     # Unmaintained, not vulnerable. bincode 2 is a direct dep of lune-dict's
