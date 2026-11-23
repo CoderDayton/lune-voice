@@ -20,8 +20,8 @@
 //!
 //! ## How
 //!
-//! In-process IBus engine over `zbus` (blocking — the delivery thread is sync,
-//! single-owner). At startup we connect to the IBus private bus, serve a
+//! In-process IBus engine over `zbus`, driven with `zbus::block_on` (the
+//! delivery thread is sync, single-owner). At startup we connect to the IBus private bus, serve a
 //! `Factory` + `Engine` object, and `RegisterComponent` so the daemon knows our
 //! `lune-voice` engine. To inject we momentarily make our engine the global
 //! engine, emit `CommitText`, then restore the user's previous engine — so the
@@ -37,8 +37,8 @@ use std::sync::{Arc, Condvar, Mutex};
 use std::time::Duration;
 
 use tracing::{debug, info, warn};
-use zbus::blocking::{Connection, connection};
-use zbus::zvariant::Value;
+use zbus::Variant as Value;
+use zbus::{Connection, block_on, connection};
 
 const ENGINE_NAME: &str = "lune-voice";
 const COMPONENT_NAME: &str = "org.freedesktop.IBus.LuneVoice";
@@ -276,11 +276,8 @@ struct LuneFactory;
 
 #[zbus::interface(name = "org.freedesktop.IBus.Factory")]
 impl LuneFactory {
-    fn create_engine(
-        &self,
-        _engine_name: &str,
-    ) -> zbus::fdo::Result<zbus::zvariant::OwnedObjectPath> {
-        zbus::zvariant::OwnedObjectPath::try_from(ENGINE_PATH)
+    fn create_engine(&self, _engine_name: &str) -> zbus::fdo::Result<zbus::OwnedObjectPath> {
+        zbus::OwnedObjectPath::try_from(ENGINE_PATH)
             .map_err(|e| zbus::fdo::Error::Failed(format!("engine path: {e}")))
     }
 }
@@ -353,7 +350,7 @@ fn empty_av() -> Value<'static> {
 /// tuple `From` impls) because IBus serializables exceed the tuple arity —
 /// `IBusEngineDesc` has 19 fields.
 fn structure(fields: Vec<Value<'static>>) -> Value<'static> {
-    let mut builder = zbus::zvariant::StructureBuilder::new();
+    let mut builder = zbus::wire::StructureBuilder::new();
     for field in fields {
         builder = builder.append_field(field);
     }
@@ -376,7 +373,7 @@ fn ibus_text(text: &str) -> Value<'static> {
         s("IBusText"),
         attachments(),
         s(text),
-        Value::Value(Box::new(ibus_attr_list())),
+        Value::Variant(Box::new(ibus_attr_list())),
     ])
 }
 
@@ -567,13 +564,13 @@ impl IbusTyper {
         // CommitText payload is `(v)` wrapping a serialized IBusText. A `Value`
         // signal arg is serialized as `v` automatically; don't double-wrap.
         let payload = ibus_text(text);
-        let sent = match self.conn.emit_signal(
+        let sent = match block_on(self.conn.emit_signal(
             None::<&str>,
             ENGINE_PATH,
             ENGINE_IFACE,
             "CommitText",
             &(payload,),
-        ) {
+        )) {
             Ok(()) => true,
             Err(e) => {
                 warn!(error = %e, "ibus: CommitText emit failed");
@@ -619,31 +616,28 @@ impl IbusTyper {
     }
 
     fn set_global_engine(&self, name: &str) -> zbus::Result<()> {
-        self.conn
-            .call_method(
-                Some(IBUS_SERVICE),
-                IBUS_PATH,
-                Some(IBUS_IFACE),
-                "SetGlobalEngine",
-                &(name,),
-            )
-            .map(|_| ())
+        block_on(self.conn.call_method(
+            Some(IBUS_SERVICE),
+            IBUS_PATH,
+            Some(IBUS_IFACE),
+            "SetGlobalEngine",
+            &(name,),
+        ))
+        .map(|_| ())
     }
 
     /// Name of the current global engine, if any. `GetGlobalEngine` returns a
     /// variant-wrapped `IBusEngineDesc`; its 3rd field (after name + attachments)
     /// is the engine name.
     fn global_engine_name(&self) -> Option<String> {
-        let reply = self
-            .conn
-            .call_method(
-                Some(IBUS_SERVICE),
-                IBUS_PATH,
-                Some(IBUS_IFACE),
-                "GetGlobalEngine",
-                &(),
-            )
-            .ok()?;
+        let reply = block_on(self.conn.call_method(
+            Some(IBUS_SERVICE),
+            IBUS_PATH,
+            Some(IBUS_IFACE),
+            "GetGlobalEngine",
+            &(),
+        ))
+        .ok()?;
         let body = reply.body();
         let desc: Value = body.deserialize().ok()?;
         engine_name_from_desc(&desc)
@@ -655,29 +649,25 @@ impl IbusTyper {
 /// in-process factory.
 fn connect_and_register(state: &Arc<EngineState>) -> Result<Connection, String> {
     let address = discover_ibus_address()?;
-    let conn = connection::Builder::address(address.as_str())
-        .map_err(|e| format!("ibus address parse: {e}"))?
+    let builder = connection::Builder::address(address.as_str())
         .method_timeout(METHOD_TIMEOUT)
         .serve_at(FACTORY_PATH, LuneFactory)
-        .map_err(|e| format!("serve factory: {e}"))?
         .serve_at(
             ENGINE_PATH,
             LuneEngine {
                 state: Arc::clone(state),
             },
-        )
-        .map_err(|e| format!("serve engine: {e}"))?
-        .build()
-        .map_err(|e| format!("connect ibus bus: {e}"))?;
+        );
+    let conn = block_on(builder.build()).map_err(|e| format!("connect ibus bus: {e}"))?;
 
-    conn.call_method(
+    block_on(conn.call_method(
         Some(IBUS_SERVICE),
         IBUS_PATH,
         Some(IBUS_IFACE),
         "RegisterComponent",
         // A `Value` arg is serialized as `v` automatically; don't double-wrap.
         &(ibus_component(),),
-    )
+    ))
     .map_err(|e| format!("RegisterComponent: {e}"))?;
 
     Ok(conn)
@@ -697,20 +687,18 @@ pub fn restore_displaced_engine_now() -> bool {
     let Ok(address) = discover_ibus_address() else {
         return false;
     };
-    let Ok(conn) = connection::Builder::address(address.as_str())
-        .and_then(|b| b.method_timeout(METHOD_TIMEOUT).build())
-    else {
+    let builder = connection::Builder::address(address.as_str()).method_timeout(METHOD_TIMEOUT);
+    let Ok(conn) = block_on(builder.build()) else {
         return false;
     };
-    let restored = conn
-        .call_method(
-            Some(IBUS_SERVICE),
-            IBUS_PATH,
-            Some(IBUS_IFACE),
-            "SetGlobalEngine",
-            &(target.as_str(),),
-        )
-        .is_ok();
+    let restored = block_on(conn.call_method(
+        Some(IBUS_SERVICE),
+        IBUS_PATH,
+        Some(IBUS_IFACE),
+        "SetGlobalEngine",
+        &(target.as_str(),),
+    ))
+    .is_ok();
     if restored {
         info!(engine = %target, "ibus: restored the user's engine on shutdown");
         clear_displaced_engine();
@@ -745,7 +733,7 @@ fn engine_name_from_desc(desc: &Value<'_>) -> Option<String> {
                 Value::Str(s) => Some(s.as_str().to_string()),
                 _ => None,
             },
-            Value::Value(boxed) => inner(boxed, depth + 1),
+            Value::Variant(boxed) => inner(boxed, depth + 1),
             _ => None,
         }
     }
