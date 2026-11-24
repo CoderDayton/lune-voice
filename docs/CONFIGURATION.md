@@ -572,7 +572,7 @@ These go in the `[pipeline]` section of `settings.toml` (`PipelineOverrides`). E
 
 | Parameter | Default | Effect | Tradeoff |
 |-----------|---------|--------|----------|
-| `word_confidence_threshold` | 0.50 (whisper.cpp, Parakeet); unset for remote | Words below this count as uncertain. Only uncertain single words can get a near-miss dictionary fix. `0.0`–`1.0`; a value outside it is clamped | Higher allows more near-miss fixes |
+| `word_confidence_threshold` | 0.50 (whisper.cpp), 0.70 (Parakeet); unset for remote | Words below this count as uncertain. Only uncertain single words can get a near-miss dictionary fix. `0.0`–`1.0`; a value outside it is clamped | Higher allows more near-miss fixes |
 | `max_speech_secs` | 300 (local Whisper and Parakeet), 120 (remote) | Ends the session after this many seconds of audio. `1`–`600`; a value outside it is clamped | Higher allows longer dictations |
 | `llm_timeout_secs` | 30 | Uses the unstyled text if styling takes longer than this. `1`–`300`; `0` and anything above 300 become 300, so there is no unbounded call | Lower caps the worst-case wait |
 

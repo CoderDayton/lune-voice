@@ -225,10 +225,9 @@ impl AsrRegistry {
                 llm_timeout_secs: 30,
             },
             AsrBackendKind::ParakeetCpp => PipelineConfig {
-                // TDT token probabilities are sharply peaked: a clean word sits
-                // near 1.0 and a doubtful one well below. Uncalibrated like
-                // whisper's, so the same moderate gate applies.
-                word_confidence_threshold: Some(0.50),
+                // TDT token probabilities run higher than whisper's: 0.70 flags
+                // the share of wrong words whisper's 0.50 does (`parakeet_ab`).
+                word_confidence_threshold: Some(0.70),
                 // Long dictations are cut at pauses into pieces inside the
                 // model's ~50 s encoder window (`parakeet_cpp::piece_limit`),
                 // which keeps encoder memory bounded, so the cap matches whisper's.

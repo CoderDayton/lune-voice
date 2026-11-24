@@ -118,6 +118,7 @@ case "$TYPE" in
   punctuation) run punctuation_ab ;;
   dict)        run dict_carrier_ab ;;
   leadin)      run lead_in_ab ;;
+  parakeet)    run parakeet_ab ;;
   snippets)    cargo run --release --example snippet_bench -p lune-voice ;;
   styling)     run styling_capability ;;
   rulecmp)     run styling_rulecmp ;;

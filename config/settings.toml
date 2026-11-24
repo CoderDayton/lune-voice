@@ -137,7 +137,7 @@ type = "Disabled"
 # [pipeline]
 # word_confidence_threshold = 0.65   # 0.0-1.0. Words below this count as uncertain
 #                                    # and may get a near-miss dictionary fix
-#                                    # (default 0.50 for local backends)
+#                                    # (default 0.50 for Whisper, 0.70 for Parakeet)
 # max_speech_secs = 60               # 1-600. Auto-stop after N seconds of audio
 #                                    # (default 300 local, 120 remote)
 # llm_timeout_secs = 8               # 1-300. Use the unstyled text if styling takes
