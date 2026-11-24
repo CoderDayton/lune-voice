@@ -610,6 +610,36 @@ pub fn strip_false_starts(text: &str) -> String {
     kept.join(" ")
 }
 
+const NEVER_DOUBLED: &[&str] = &[
+    "the", "a", "an", "i", "it", "you", "we", "he", "she", "they", "to", "of", "and", "or", "if",
+    "what", "how", "just", "like", "this", "my", "your", "for", "with", "but",
+];
+
+pub fn collapse_repeated_words(text: &str) -> String {
+    if !is_latin(text) {
+        return text.to_owned();
+    }
+    let mut kept: Vec<String> = Vec::new();
+    for tok in text.split_whitespace() {
+        let core = word_core(tok);
+        let repeats = kept.last().is_some_and(|prev| {
+            let word = prev.to_ascii_lowercase();
+            tok.starts_with(core)
+                && (core == word || core == "I" && word == "i")
+                && NEVER_DOUBLED.contains(&word.as_str())
+        });
+        let swaps = core == "the"
+            && tok.starts_with(core)
+            && kept.last().is_some_and(|prev| prev == "a" || prev == "an");
+        match kept.last_mut() {
+            Some(prev) if repeats => prev.push_str(&tok[core.len()..]),
+            Some(prev) if swaps => *prev = tok.to_owned(),
+            _ => kept.push(tok.to_owned()),
+        }
+    }
+    kept.join(" ")
+}
+
 const KEY_WORDS: &[&str] = &[
     "ctrl", "control", "alt", "shift", "dash", "plus", "press", "key", "letter",
 ];
@@ -1119,7 +1149,9 @@ pub fn shape(text: &str, lang: &str, fmt: &ResolvedFormat) -> String {
 pub fn shape_keeping(text: &str, lang: &str, fmt: &ResolvedFormat, keep: &[&str]) -> String {
     let english = lang == "English";
     let text = if english {
-        strip_false_starts(&strip_fillers_outside_numbers(&defuse_inconsistent(text)))
+        collapse_repeated_words(&strip_false_starts(&strip_fillers_outside_numbers(
+            &defuse_inconsistent(text),
+        )))
     } else {
         text.to_owned()
     };
@@ -1635,6 +1667,52 @@ mod tests {
         ] {
             assert_eq!(strip_false_starts(text), text);
         }
+    }
+
+    #[test]
+    fn collapse_repeated_words_keeps_one_copy() {
+        for (said, want) in [
+            ("open the the settings page", "open the settings page"),
+            ("it has a a voice mode", "it has a voice mode"),
+            ("actually I I I wanted that", "actually I wanted that"),
+            ("features. It it can run", "features. It can run"),
+            ("the way to to to connect", "the way to connect"),
+            ("So what what is it?", "So what is it?"),
+            ("copy of of, well, the file", "copy of, well, the file"),
+            ("it was a the last one", "it was the last one"),
+        ] {
+            assert_eq!(collapse_repeated_words(said), want);
+        }
+    }
+
+    #[test]
+    fn collapse_repeated_words_keeps_deliberate_repeats() {
+        for text in [
+            "No no no keep it",
+            "that was very very quick",
+            "I know that that works",
+            "log in in the morning",
+            "drag it, it should move",
+            "what it is is a bug",
+            "she got a A on it",
+            "and blah blah blah",
+            "the. The next one",
+        ] {
+            assert_eq!(collapse_repeated_words(text), text);
+        }
+    }
+
+    #[test]
+    fn shape_collapses_english_repeats_only() {
+        let fmt = ResolvedFormat::default();
+        assert_eq!(
+            shape("open the the settings page", "English", &fmt),
+            "Open the settings page."
+        );
+        assert_eq!(
+            shape("das ist die die Seite", "German", &fmt),
+            "Das ist die die Seite."
+        );
     }
 
     #[test]
