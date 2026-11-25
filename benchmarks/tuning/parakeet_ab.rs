@@ -234,6 +234,15 @@ fn score<B: AsrBackend>(
                 *slot += (*r >= threshold) as usize;
             }
         }
+        if print.is_some() && std::env::var("LUNE_BENCH_TEXT").is_ok_and(|v| v != "0") {
+            for seg in &segments {
+                println!(
+                    "      [{:>6.1}s] {}",
+                    seg.start_ms.unwrap_or(0) as f64 / 1000.0,
+                    seg.text
+                );
+            }
+        }
         if let Some(label) = print {
             println!(
                 "    {label:34} {:30} {:>5.1}%  {errors}/{}",
