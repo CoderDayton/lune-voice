@@ -376,6 +376,7 @@ pub(crate) async fn run_capture<A: AsrBackend + 'static>(
     // output scratch.
     let mut agc = MicAgc::new(agc_mode);
     let mut framed: Vec<f32> = Vec::with_capacity(AGC_HOP * 8);
+    let mut raw_audio: Option<Vec<f32>> = crate::audio_dump::dir().map(|_| Vec::new());
 
     // `.max(1)`: a misconfigured max_speech_samples below one second of audio
     // would otherwise yield a zero deadline and end every session instantly.
@@ -432,6 +433,9 @@ pub(crate) async fn run_capture<A: AsrBackend + 'static>(
 
                     // Adaptive gain before the recognizer; whisper decodes the
                     // full buffer (no online VAD in this stage).
+                    if let Some(raw) = raw_audio.as_mut() {
+                        raw.extend_from_slice(&chunk.samples);
+                    }
                     framed.clear();
                     let level = agc.push(&chunk.samples, &mut framed);
                     if !framed.is_empty()
@@ -510,6 +514,9 @@ pub(crate) async fn run_capture<A: AsrBackend + 'static>(
             tokio::time::sleep(FLUSH_ACK_POLL).await;
         }
         while let Some(chunk) = audio_source.try_next_chunk() {
+            if let Some(raw) = raw_audio.as_mut() {
+                raw.extend_from_slice(&chunk.samples);
+            }
             framed.clear();
             agc.push(&chunk.samples, &mut framed);
             if !framed.is_empty()
@@ -546,6 +553,9 @@ pub(crate) async fn run_capture<A: AsrBackend + 'static>(
 
     if !cancelled {
         let _ = send_bounded(event_tx, SessionEvent::Processing).await;
+        if let Some(raw) = raw_audio.take() {
+            crate::audio_dump::save_wav(session_id, raw);
+        }
     }
 
     if cancelled {

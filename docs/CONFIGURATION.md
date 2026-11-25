@@ -625,6 +625,7 @@ max_tokens = 512
 |----------|---------| 
 | `RUST_LOG` | Tracing filter (e.g., `lune_asr=debug,lune_llm=info`) |
 | `LUNE_LOG_TRANSCRIPTS` | Set to `1` to include transcript text in logs. It is redacted by default; only set this while debugging recognition |
+| `LUNE_SAVE_AUDIO` | Set to a directory to keep every dictation there: `<session id>.wav` (the microphone audio before gain control, 16 kHz mono 16-bit) and `<session id>.hyp.txt` (the delivered text). Both are unencrypted. Rename a checked `.hyp.txt` to `.txt` and the directory works as `LUNE_BENCH_DIR` for `cgs bench` |
 | `LUNE_DISABLE_IBUS` | Set to any value to skip the IBus delivery path and always type through `uinput` |
 | `HF_TOKEN` | HuggingFace token for model downloads; only needed for gated or private repos |
 | `LUNE_UPDATER_ENDPOINT` | Override the release manifest URL used by the update check |

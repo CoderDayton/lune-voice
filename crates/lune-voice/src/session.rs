@@ -118,6 +118,7 @@ impl<A: AsrBackend + 'static> SessionManager<A> {
         config: SessionManagerConfig,
         settings: Arc<RwLock<UserSettings>>,
     ) -> Self {
+        crate::audio_dump::dir();
         Self {
             asr,
             router,
@@ -823,6 +824,7 @@ async fn process_and_deliver(
 
     info!(%session_id, pipeline_ms = pipeline_t0.elapsed().as_millis() as u64, "post-processing complete");
 
+    crate::audio_dump::save_text(session_id, &post_llm_text);
     td.deliver(post_llm_text, status).await;
 }
 

@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
+mod audio_dump;
 mod capture;
 pub mod delivery;
 mod redact;
