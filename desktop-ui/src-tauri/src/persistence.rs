@@ -942,6 +942,14 @@ fn apply_settings_dto(
     settings.sound_cues_enabled = input.sound_cues_enabled;
     settings.sound_cue_volume = input.sound_cue_volume.clamp(0.0, 1.0);
     settings.device = resolve_device_policy(input.use_gpu, input.device_policy);
+    let shown_threshold =
+        settings
+            .pipeline
+            .word_confidence_threshold
+            .or(
+                AsrRegistry::default_pipeline_config(settings.asr_backend.kind())
+                    .word_confidence_threshold,
+            );
     settings.asr_backend = asr_backend_from_type(
         input.asr_backend_type,
         &settings.asr_backend,
@@ -959,7 +967,14 @@ fn apply_settings_dto(
             "confidenceThreshold must be {CONFIDENCE_MIN}–{CONFIDENCE_MAX}, got {ct}"
         ));
     }
-    settings.pipeline.word_confidence_threshold = input.confidence_threshold;
+    let untouched = match (shown_threshold, input.confidence_threshold) {
+        (Some(shown), Some(sent)) => (shown - sent).abs() < 1e-4,
+        (None, None) => true,
+        _ => false,
+    };
+    if !untouched {
+        settings.pipeline.word_confidence_threshold = input.confidence_threshold;
+    }
 
     // Validate style_preset — `None`/empty means no styling (raw transcript);
     // any present value must be a known builtin or custom style.
@@ -1507,6 +1522,27 @@ mod tests {
         let mut input = default_save_input();
         input.core.language = "bad tag".into();
         assert!(apply_settings_dto(&mut settings, input, &mut db).is_err());
+    }
+
+    #[test]
+    fn an_untouched_confidence_threshold_is_not_pinned() {
+        let mut settings = UserSettings::default();
+        let mut db = Database::open_in_memory().expect("db");
+        let shown = settings_to_dto(&settings).core.confidence_threshold;
+        assert!(shown.is_some());
+
+        let mut input = default_save_input();
+        input.core.confidence_threshold = shown;
+        apply_settings_dto(&mut settings, input, &mut db).unwrap();
+        assert_eq!(settings.pipeline.word_confidence_threshold, None);
+
+        let mut input = default_save_input();
+        input.core.confidence_threshold = Some(0.61);
+        apply_settings_dto(&mut settings, input, &mut db).unwrap();
+        let mut input = default_save_input();
+        input.core.confidence_threshold = Some(0.61);
+        apply_settings_dto(&mut settings, input, &mut db).unwrap();
+        assert_eq!(settings.pipeline.word_confidence_threshold, Some(0.61));
     }
 
     #[test]
