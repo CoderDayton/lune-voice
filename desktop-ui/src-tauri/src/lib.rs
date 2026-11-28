@@ -53,7 +53,7 @@ static QUIT_REQUESTED: AtomicBool = AtomicBool::new(false);
 const SHUTDOWN_RESTORE_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(3);
 
 #[cfg(target_os = "linux")]
-fn install_shutdown_signal_handler() {
+fn install_shutdown_signal_handler(app: tauri::AppHandle) {
     use tokio::signal::unix::{SignalKind, signal};
 
     tauri::async_runtime::spawn(async move {
@@ -81,6 +81,13 @@ fn install_shutdown_signal_handler() {
         {
             tracing::warn!("input-method restore timed out; exiting anyway");
         }
+        // Exit through the event loop like tray Quit: `process::exit` here runs
+        // the GL driver's exit hooks while the main thread is still rendering
+        // the webview, and that segfaults on NVIDIA.
+        QUIT_REQUESTED.store(true, Ordering::SeqCst);
+        app.exit(0);
+        tokio::time::sleep(SHUTDOWN_RESTORE_TIMEOUT).await;
+        tracing::warn!("event loop did not exit; forcing exit");
         std::process::exit(0);
     });
 }
@@ -303,7 +310,7 @@ pub fn run() {
         .plugin(tauri_plugin_opener::init())
         .setup(|app| {
             #[cfg(target_os = "linux")]
-            install_shutdown_signal_handler();
+            install_shutdown_signal_handler(app.handle().clone());
             let runtime =
                 tauri::async_runtime::block_on(runtime::AppRuntime::new(app.handle().clone()))
                     .map_err(|error| -> Box<dyn std::error::Error> { error.into() })?;
